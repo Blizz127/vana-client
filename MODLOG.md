@@ -13236,7 +13236,8 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   list), Status' Merit Points / Job Points / Unity / Master Levels / Alter Ego
   Points, Records of Eminence (quest00 rows, the modern Journal tab and command row), Search's Monstrosity, Unity and
   master level rows. Trust is left to the server (a server may keep it as a convenience): the lists show only the Trust
-  spells the server says are known. The Search job list offers WAR MNK WHM BLM RDM THF PLD DRK BST BRD RNG, its level fields stop at 60
+  spells the server says are known. Records of Eminence likewise stays (a kept convenience; the server decides
+  its records). The Search job list offers WAR MNK WHM BLM RDM THF PLD DRK BST BRD RNG, its level fields stop at 60
   (the only level cap the client computes). Nothing is sent or invented: only the client's own windows change. Any
   expansion bit on is retail's behaviour.
 - Expansions view: modern Command Menu > System > Expansions (Locked / Unlocked per bit) or `/expansions` (the same

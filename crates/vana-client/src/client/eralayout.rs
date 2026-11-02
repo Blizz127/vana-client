@@ -217,8 +217,8 @@ pub fn specs(locked: bool, modern: bool) -> Vec<Spec> {
         let hidden: Vec<u16> = rows.iter().filter(|r| r.1 == Cat::Mount).map(|r| r.0).collect();
         out.push(Spec { name: menu, rows: Rows::Ids(rows.iter().map(|r| r.0).collect()), hidden, clip: None });
     }
-    // quest00: Records of Eminence's rows and panel are not drawn (client/quests.rs), the frame ends under row 2.
-    out.push(Spec { name: super::quests::CHOOSER, rows: Rows::Ids(Vec::new()), hidden: Vec::new(), clip: Some(super::quests::BASE_FRAME_H) });
+    // quest00 stays whole: Records of Eminence is kept in every era (client/era.rs `has`). Were it hidden, its rows and
+    // panel would go and the frame end under row 2: `clip: Some(super::quests::BASE_FRAME_H)`.
     out
 }
 
@@ -423,12 +423,12 @@ mod tests {
     fn the_lock_off_asks_for_nothing_and_on_names_the_windows() {
         assert!(specs(false, false).is_empty() && specs(false, true).is_empty());
         let names: Vec<&str> = specs(true, false).iter().map(|s| s.name).collect();
-        assert_eq!(names, ["menu    statcom2", "menu    abimenu", "menu    abiselec", "menu    quest00"]);
+        assert_eq!(names, ["menu    statcom2", "menu    abimenu", "menu    abiselec"]);
         // The ability menus drop their Mount child (6 and 5).
         let hidden: Vec<Vec<u16>> = specs(true, false).iter().filter(|s| s.name.contains("abi")).map(|s| s.hidden.clone()).collect();
         assert_eq!(hidden, [vec![6], vec![5]]);
         // Modern: statcom2 stays the file's (its page draws its own rows), the others as before.
         let modern: Vec<&str> = specs(true, true).iter().map(|s| s.name).collect();
-        assert_eq!(modern, ["menu    abimenu", "menu    abiselec", "menu    quest00"]);
+        assert_eq!(modern, ["menu    abimenu", "menu    abiselec"]);
     }
 }

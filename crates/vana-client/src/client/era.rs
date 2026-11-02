@@ -3,11 +3,11 @@
 //! A server tells the client which expansions it runs only through the lobby's expansions bitmask (`Lobby.expansions`,
 //! u32 @0x20 of the lobby reply: bit 0 the base game, bits 1..11 the expansions in release order). When no expansion bit
 //! is on the server runs the base game's era, and the client hides what did not exist then: the windows of later
-//! systems (mounts, Unity, Merit / Job / Alter Ego Points, Master Levels, Records of Eminence, the Search
+//! systems (mounts, Unity, Merit / Job / Alter Ego Points, Master Levels, the Search
 //! menu's Unity and Monstrosity rows) are hidden or greyed, the Search menu offers the base jobs only and stops its
 //! level fields at 60. The classic (DAT-drawn) windows that list those rows drop them and re-pack the rest the way a
 //! menu with fewer rows is laid out (client/eralayout.rs: the abilities menus' Mounts row, Status' five rows, the
-//! journal chooser's Records of Eminence rows and panel); a row whose window cannot be re-packed safely stays, greyed.
+//! classic menus); a row whose window cannot be re-packed safely stays, greyed.
 //! The Search menu's rows (greyed, not dropped) are its own fixed layout. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
 //! retail behaviour is unchanged. There is no player switch: only the server's bits decide.
 //!
@@ -64,7 +64,9 @@ pub enum Feature {
 pub fn has(era: Era, feature: Feature) -> bool {
     // Every feature listed is later than the base game, but a server may keep some as conveniences. Trust is left to
     // the server: the lists only ever show the Trust spells it says the character knows, so its own rules gate it.
-    era == Era::Expanded || feature == Feature::Trust
+    // Records of Eminence too (kept as a modern convenience by the server this fork targets; harmless elsewhere: the
+    // server decides what its records hold).
+    era == Era::Expanded || matches!(feature, Feature::Trust | Feature::RecordsOfEminence)
 }
 
 /// The level cap the client shows itself (its Search level fields): 60 in the base era, else retail's 99.
@@ -199,12 +201,13 @@ mod tests {
 
     #[test]
     fn base_features_jobs_and_cap() {
-        for f in [Feature::Mounts, Feature::Unity, Feature::MeritPoints, Feature::JobPoints, Feature::MasterLevels, Feature::AlterEgoPoints, Feature::RecordsOfEminence, Feature::Monstrosity] {
+        for f in [Feature::Mounts, Feature::Unity, Feature::MeritPoints, Feature::JobPoints, Feature::MasterLevels, Feature::AlterEgoPoints, Feature::Monstrosity] {
             assert!(!has(Era::Base, f), "{f:?}");
             assert!(has(Era::Expanded, f), "{f:?}");
         }
         // Server-gated in every era: shown when the server lists the spells.
         assert!(has(Era::Base, Feature::Trust) && has(Era::Expanded, Feature::Trust));
+        assert!(has(Era::Base, Feature::RecordsOfEminence) && has(Era::Expanded, Feature::RecordsOfEminence));
         assert_eq!(level_cap(Era::Base), 60);
         assert_eq!(level_cap(Era::Expanded), 99);
         // WAR .. RNG are offered, SAM (12) onwards are not, while expansions leave every job.
