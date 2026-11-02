@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Git pre-push hook: runs the leak check over every commit being pushed.
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue
+  if [[ "$remote_sha" == "$zero" ]]; then
+    base=$(git merge-base "$local_sha" upstream/master 2>/dev/null || true)
+    range="${base:+$base..}$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  "$root/tools/fork/leak-check.sh" "$range"
+done

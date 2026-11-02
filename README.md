@@ -4,6 +4,11 @@
 
 # vana-client
 
+> **Fork notice.** This is a fork of [lenonk/vana-client](https://github.com/lenonk/vana-client), created and
+> maintained by Lenon Kitchens and released under the MIT License. All credit for the original client goes to its
+> author. This fork follows upstream closely (see [docs/fork/upstream-sync.md](docs/fork/upstream-sync.md)) and adds
+> its own changes on the `develop` branch. Please report problems with this fork here, not upstream.
+
 A native client for FINAL FANTASY XI, written in Rust, for [LandSandBoat](https://github.com/LandSandBoat/server)
 (LSB) servers. It runs without Wine and without PlayOnline: it reads the game's data files and talks to the
 server directly.
@@ -161,7 +166,8 @@ no code from the original client. To use it you need the game files from Square 
 
 ## License
 
-vana-client is released under the [MIT License](LICENSE).
+vana-client is released under the [MIT License](LICENSE), Copyright (c) 2026 Lenon Kitchens. Changes made in this fork
+are released under the same licence.
 
 Bundled third-party files keep their own licenses: the Fira Sans, Inter and JetBrains Mono fonts are under the SIL
 Open Font License (the texts are beside them in `crates/vana-client/assets/fonts`), and the patched copy of
