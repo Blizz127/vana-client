@@ -817,8 +817,14 @@ fn std_data(data: &str) -> (u32, [i32; 4], [String; 2]) {
 /// 128 of a 0x0B5 / 0x0B6 and every client draws 150 of an 0x017), cut after the last space that leaves at least
 /// half a line, else at a character; a character or an auto-translate phrase (four chars) is never split.
 pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
-    // The units that may not be split: a character, or a whole phrase.
-    let mut units: Vec<(Vec<u8>, bool)> = Vec::new();
+    chat_split(text, max).into_iter().map(|(_, b)| b).collect()
+}
+
+/// `chat_lines` with each line's text as typed, for our own echo (one echo line per packet).
+pub(crate) fn chat_split(text: &str, max: usize) -> Vec<(String, Vec<u8>)> {
+    // The units that may not be split: a character, or a whole phrase (its encoding, its text, a space?).
+    let mut units: Vec<(Vec<u8>, String, bool)> = Vec::new();
+    let mut block_text = String::new();
     let mut buf = [0u8; 4];
     let mut block = Vec::new();
     for ch in text.chars() {
@@ -826,12 +832,13 @@ pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
         let cp = ch as u32;
         if (crate::dat::font::PHRASE_BASE..crate::dat::font::PHRASE_BASE + 0x400).contains(&cp) {
             block.extend_from_slice(&b);
+            block_text.push(ch);
             if (cp - crate::dat::font::PHRASE_BASE) / 0x100 < 3 {
                 continue;
             }
         }
-        let unit = if block.is_empty() { b } else { std::mem::take(&mut block) };
-        units.push((unit, ch == ' '));
+        let (unit, utext) = if block.is_empty() { (b, ch.to_string()) } else { (std::mem::take(&mut block), std::mem::take(&mut block_text)) };
+        units.push((unit, utext, ch == ' '));
     }
     let mut lines = Vec::new();
     let mut i = 0;
@@ -839,7 +846,7 @@ pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
         let (mut len, mut end, mut space) = (0usize, i, None);
         while end < units.len() && len + units[end].0.len() <= max {
             len += units[end].0.len();
-            if units[end].1 && len >= max / 2 {
+            if units[end].2 && len >= max / 2 {
                 space = Some(end);
             }
             end += 1;
@@ -851,10 +858,11 @@ pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
         }
         // Cut after a space when the line is full and there is more to come; the space ends this line.
         let stop = if end < units.len() { space.map_or(end, |s| s + 1) } else { end };
-        let line: Vec<u8> = units[i..stop].iter().flat_map(|u| u.0.iter().copied()).collect();
-        let trimmed = if line.last() == Some(&b' ') && stop < units.len() { line[..line.len() - 1].to_vec() } else { line };
-        if !trimmed.is_empty() {
-            lines.push(trimmed);
+        let cut_space = stop < units.len() && stop > i && units[stop - 1].2;
+        let take = &units[i..if cut_space { stop - 1 } else { stop }];
+        let bytes: Vec<u8> = take.iter().flat_map(|u| u.0.iter().copied()).collect();
+        if !bytes.is_empty() {
+            lines.push((take.iter().map(|u| u.1.as_str()).collect(), bytes));
         }
         i = stop;
     }
@@ -862,7 +870,7 @@ pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
 }
 
 /// What one c2s chat packet carries at most (`chat_lines`).
-const CHAT_LINE: usize = 127;
+pub(crate) const CHAT_LINE: usize = 127;
 
 fn text(p: &SubPacket, at: usize, len: usize) -> String {
     p.str(at, len)
@@ -1712,6 +1720,9 @@ mod chat_line_tests {
         assert!(lines.iter().all(|l| l.len() <= 127 && !l.is_empty()));
         // No piece starts or ends with the space it was cut at, and nothing is lost but those spaces.
         assert!(lines.iter().all(|l| l[0] != b' ' && *l.last().unwrap() != b' '));
+        // The texts match the bytes (ASCII here).
+        let texts: Vec<String> = super::chat_split(text.trim_end(), 127).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(texts.join(" "), text.trim_end());
         let joined: Vec<u8> = lines.join(&b' ');
         assert_eq!(joined, text.trim_end().as_bytes());
     }

@@ -1828,6 +1828,9 @@ fn chat(w: &mut World, cid: u16, msg: &str) -> Done {
     // The echoes (all.c 90072..90740): our name and the text as typed, in the sender's mode. Not done: the assist
     // channels' rank icon (s2c 0x01B ranks, MentorFlg).
     let me = w.name.clone();
+    // Ours: one echo per packet the line goes out as (client/net.rs `chat_split`), as the others see it.
+    let pieces: Vec<String> = super::net::chat_split(msg, super::net::CHAT_LINE).into_iter().map(|(t, _)| t).collect();
+    for msg in pieces.iter().map(String::as_str) {
     let (line, mode) = match cid {
         id::YELL => {
             let zone = w.zone.and_then(|z| w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, z as u32))).unwrap_or_default();
@@ -1845,6 +1848,7 @@ fn chat(w: &mut World, cid: u16, msg: &str) -> Done {
         _ => (format!("{me} : {msg}"), 1),
     };
     super::push_chat_from(w, line, mode, kind, &me);
+    }
     if send_it {
         send(w, NetCommand::Chat { kind, text: msg.to_string() });
         restore_temp_mode(w);
@@ -1924,7 +1928,10 @@ fn tell(w: &mut World, args: &[String], line: &str) -> Done {
         return Ok(());
     }
     let msg = tail(line, 2).trim().to_string();
-    super::push_chat_from(w, format!(">>{name} : {msg}"), 4, 3, &name);
+    // Ours: one echo per packet the tell goes out as (client/net.rs `chat_split`).
+    for (piece, _) in super::net::chat_split(&msg, super::net::CHAT_LINE) {
+        super::push_chat_from(w, format!(">>{name} : {piece}"), 4, 3, &name);
+    }
     // FUN_1018d6e0: the sent-tell names, newest first, 8 at most (exact match moves to the front).
     w.tell_hist.retain(|n| *n != name);
     w.tell_hist.insert(0, name.clone());
