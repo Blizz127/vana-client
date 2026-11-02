@@ -6505,6 +6505,8 @@ pub struct App {
     pads: gamepad::Pads,
     pad_events: Vec<egui::Event>,
     osk: osk::Edge,
+    /// The built-in on-screen keyboard (osk.rs), where Steam does not provide one.
+    kb: osk::Keyboard,
     /// The window has the focus (the pad reads while another window has it).
     focused: bool,
     /// The login screen's focus is on a text field (its fields draw as the login window's, not egui's).
@@ -6756,6 +6758,7 @@ impl App {
             pads: gamepad::Pads::default(),
             pad_events: Vec::new(),
             osk: osk::Edge::default(),
+            kb: osk::Keyboard::default(),
             focused: true,
             login_text: false,
             frame_limit,
@@ -10815,7 +10818,8 @@ impl App {
         let notches = self.list_wheel.trunc();
         self.list_wheel -= notches;
         // Over a modern panel the pointer is egui's: the game's windows get no clicks or wheel there.
-        let mine = !(matches!(&self.phase, Phase::World(w) if w.modern) && (ctx.is_pointer_over_egui() || ctx.egui_is_using_pointer()));
+        // The built-in keyboard's keys are egui's in every phase.
+        let mine = !(matches!(&self.phase, Phase::World(w) if w.modern) && (ctx.is_pointer_over_egui() || ctx.egui_is_using_pointer())) && !self.kb.hovered();
         let input = ctx.input(|i| UiInput {
             wheel: if mine { notches as i32 } else { 0 },
             pointer: i.pointer.hover_pos().map(|p| (p.x * ppp * k.0, p.y * ppp * k.1 + ptr_dy)),
@@ -12344,13 +12348,34 @@ impl App {
         }
     }
 
+    /// The text field that has the keys, if any, for the on-screen keyboard.
+    fn text_field(&self) -> Option<osk::Field> {
+        match &self.phase {
+            Phase::World(w) => text_field_open(w).then_some(if w.typing { osk::Field::Chat } else { osk::Field::Other }),
+            Phase::Login { .. } => self.login_text.then_some(osk::Field::Login),
+            _ => None,
+        }
+    }
+
+    /// Raises the keyboard for `field`: Steam's under Steam, else ours.
+    fn raise_osk(&mut self, field: osk::Field) {
+        if osk::request(field) == osk::Raised::Builtin {
+            self.kb.open(field);
+        }
+    }
+
     /// Once a frame, before the key functions: reads the gamepad (a no-op with none connected), holds its keys and
     /// sticks in the input state, queues its egui key events, and raises the on-screen keyboard when a text field opens
     /// under it.
     fn poll_gamepad(&mut self) {
         let dt = self.last_frame.elapsed().as_secs_f32().min(0.1);
         let tuning = gamepad::Tuning { deadzone: self.cfg.gamepad_deadzone, camera_speed: self.cfg.gamepad_camera_speed };
-        let ctx = self.pad_ctx();
+        // The field first: a keyboard over a field that is gone closes before it takes another frame of the pad.
+        let field = self.text_field();
+        if field.is_none() {
+            self.kb.close();
+        }
+        let ctx = if self.kb.is_open() { gamepad::Ctx::Osk } else { self.pad_ctx() };
         let out = self.pads.frame(self.cfg.gamepad, self.focused, ctx, tuning, dt);
         self.input.set_pad(&out.keys, out.sticks);
         if out.pressed {
@@ -12364,14 +12389,20 @@ impl App {
                 return;
             }
         }
-        self.pad_events.extend(out.events);
-        let (open, field) = match &self.phase {
-            Phase::World(w) => (text_field_open(w), if w.typing { osk::Field::Chat } else { osk::Field::Other }),
-            Phase::Login { .. } => (self.login_text, osk::Field::Login),
-            _ => (false, osk::Field::Other),
-        };
-        if self.osk.update(open, self.pads.in_use()) {
-            osk::request(field);
+        if ctx == gamepad::Ctx::Osk {
+            // Every event is the keyboard's; what it types goes on to the field.
+            for ev in &out.events {
+                let typed = self.kb.pad_event(ev);
+                self.pad_events.extend(typed);
+            }
+        } else {
+            self.pad_events.extend(out.events);
+        }
+        let rose = self.osk.update(field.is_some(), self.pads.in_use());
+        if let Some(field) = field
+            && ((out.open_osk && !self.kb.is_open()) || rose)
+        {
+            self.raise_osk(field);
         }
     }
 
@@ -12714,7 +12745,12 @@ impl App {
         let ctx = gfx.egui_ctx.clone();
         self.update_netwait(dt);
         let before = self.ui_snap();
-        let mut output = perf::timed(|| "egui".into(), || ctx.run_ui(raw, |ui| self.ui(ui.ctx(), size)));
+        let mut output = perf::timed(|| "egui".into(), || ctx.run_ui(raw, |ui| {
+            self.ui(ui.ctx(), size);
+            // The built-in keyboard over everything the UI drew; its mouse clicks reach the field next frame.
+            let typed = self.kb.show(ui.ctx());
+            self.pad_events.extend(typed);
+        }));
         self.egui_deltas.append(std::mem::take(&mut output.textures_delta));
         let after = self.ui_snap();
         if let (Some(s), Some(a)) = (Self::ui_sound(&before, &after), self.audio.as_mut()) {
@@ -12738,7 +12774,8 @@ impl App {
             gfx.egui_state.egui_input_mut().events.push(egui::Event::Paste(t));
         }
         if self.ui_drawn {
-            platform.cursor_icon = if self.cfg.tool("0021") == 0 { egui::CursorIcon::None } else { egui::CursorIcon::Default };
+            // Over the on-screen keyboard the system cursor shows: the game's drawn one is under it.
+            platform.cursor_icon = if self.cfg.tool("0021") == 0 && !self.kb.hovered() { egui::CursorIcon::None } else { egui::CursorIcon::Default };
         } else {
             self.mouse.invalidate();
         }

@@ -19,11 +19,15 @@
 //! | LB / RB           | Num+ (log / window view), Num- (page) | the same                | -                      |
 //! | LT / RT (held)    | Ctrl / Alt: the macro palettes     | the same                   | the same               |
 //! | Select / Back     | Space: open the chat line          | -                          | Tab (auto-translate)   |
-//! | Start             | Pause: the log-out prompt          | - (main menu)              | -                      |
+//! | Start             | Pause: the log-out prompt          | - (main menu)              | on-screen keyboard     |
 //! | Left stick click  | Num/: walk / run                   | -                          | -                      |
 //!
 //! While LT or RT is held the D-pad and A / B work the palette (Left / Right the cell, Up / Down the set, A runs it,
 //! B closes it), which is the client's own palette code reading the arrows, Enter and Escape.
+//!
+//! While the built-in on-screen keyboard (client/osk.rs) is up it has the pad whole (`Ctx::Osk`, `osk_binding`): the
+//! D-pad and left stick move its cursor, A types the key under it, B is Backspace (repeating), X Space, Y turns the key
+//! page, Start sends Enter to the field, Select closes it. With it closed over a text field, Start brings it back.
 //!
 //! TODO: the right stick click, the D-pad's Down in the field and the right stick over the map (zoom) have no
 //! binding; key functions 0xb7..0xba (the second pad word, inferred to be the gamepad) are not wired.
@@ -96,6 +100,9 @@ pub enum Ctx {
     Action,
     /// A text field has the keys (the chat line, the login's fields).
     Typing,
+    /// Our own on-screen keyboard (client/osk.rs) is up over a text field and takes the pad whole: every button is
+    /// one of its keys (see `osk_binding`), nothing reaches the game, no DIK is held and the sticks do not walk.
+    Osk,
 }
 
 /// What a button does: an egui key event (for the windows, which read those), DIK keys held while it is down (for the
@@ -137,9 +144,33 @@ const fn arrow(key: Key, dik: &'static [u8]) -> Option<Binding> {
     Some(Binding { key: Some(key), dik, repeat: true, text: None })
 }
 
+/// The on-screen keyboard's buttons (`Ctx::Osk`). The keys are the keyboard's own vocabulary, not the game's: the
+/// events go to the keyboard (client/osk.rs `pad_event`), never into the window's input. D-pad: Arrow keys (move the
+/// cursor, repeating); A Enter (type the key under the cursor); B Backspace (repeating); X Space; Y Tab (the next key
+/// page); Start F2 (send Enter to the field); Select Escape (close the keyboard).
+fn osk_binding(b: Btn) -> Option<Binding> {
+    use Btn::*;
+    match b {
+        South => bind(Some(Key::Enter), &[]),
+        East => arrow(Key::Backspace, &[]),
+        West => bind(Some(Key::Space), &[]),
+        North => bind(Some(Key::Tab), &[]),
+        Start => bind(Some(Key::F2), &[]),
+        Select => bind(Some(Key::Escape), &[]),
+        DPadUp => arrow(Key::ArrowUp, &[]),
+        DPadDown => arrow(Key::ArrowDown, &[]),
+        DPadLeft => arrow(Key::ArrowLeft, &[]),
+        DPadRight => arrow(Key::ArrowRight, &[]),
+        _ => None,
+    }
+}
+
 /// The default mapping (the table in the module docs).
 pub fn binding(b: Btn, ctx: Ctx) -> Option<Binding> {
     use Btn::*;
+    if ctx == Ctx::Osk {
+        return osk_binding(b);
+    }
     let ctx = if ctx == Ctx::Action { Ctx::Menu } else { ctx };
     let typing = ctx == Ctx::Typing;
     match (b, ctx) {
@@ -237,6 +268,8 @@ pub struct Out {
     pub keys: Vec<u8>,
     pub sticks: [f32; 4],
     pub pressed: bool,
+    /// Start was pressed over a text field: bring the on-screen keyboard back (Select closed it).
+    pub open_osk: bool,
 }
 
 /// Turns snapshots into events and held keys, tracking what is down. A button keeps the binding it was pressed with
@@ -279,6 +312,10 @@ impl Mapper {
                     self.down[i] = true;
                     self.held_for[i] = 0.0;
                     self.bound[i] = binding(b, ctx);
+                    if b == Btn::Start && ctx == Ctx::Typing {
+                        out.open_osk = true;
+                        out.pressed = true;
+                    }
                     if let Some(bd) = self.bound[i] {
                         out.pressed = true;
                         if let Some(k) = bd.key {
@@ -494,11 +531,13 @@ mod tests {
             assert_eq!(f(DPadLeft, c), Some((Some(Key::ArrowLeft), vec![0xcb], true)));
             assert_eq!(f(DPadRight, c), Some((Some(Key::ArrowRight), vec![0xcd], true)));
         }
-        // Only the arrows repeat.
-        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing] {
+        // Only the arrows repeat (and the on-screen keyboard's Backspace).
+        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing, Ctx::Osk] {
             for b in BUTTONS {
                 if let Some(x) = binding(b, c) {
-                    assert_eq!(x.repeat, x.key.is_some_and(|k| matches!(k, Key::ArrowUp | Key::ArrowDown | Key::ArrowLeft | Key::ArrowRight)), "{b:?} {c:?}");
+                    let arrow = x.key.is_some_and(|k| matches!(k, Key::ArrowUp | Key::ArrowDown | Key::ArrowLeft | Key::ArrowRight));
+                    let backspace = c == Ctx::Osk && x.key == Some(Key::Backspace);
+                    assert_eq!(x.repeat, arrow || backspace, "{b:?} {c:?}");
                 }
             }
         }
@@ -514,6 +553,62 @@ mod tests {
         assert_eq!(f(North, Ctx::Field), Some((None, vec![0x37], false)));
         assert_eq!(f(LeftThumb, Ctx::Field), Some((None, vec![0xb5], false)));
         assert_eq!(f(LeftThumb, Ctx::Menu), None);
+        // Start in a text field is nothing for the game: it brings the on-screen keyboard back (`osk_returns_on_start`).
+        assert_eq!(f(Start, Ctx::Typing), None);
+    }
+
+    /// The on-screen keyboard's context: virtual keys for the keyboard, no DIK, nothing for the game.
+    #[test]
+    fn osk_mapping_table() {
+        use Btn::*;
+        let f = |b| binding(b, Ctx::Osk).map(|x| (x.key, x.dik.to_vec(), x.repeat, x.text));
+        assert_eq!(f(South), Some((Some(Key::Enter), vec![], false, None)));
+        assert_eq!(f(East), Some((Some(Key::Backspace), vec![], true, None)));
+        assert_eq!(f(West), Some((Some(Key::Space), vec![], false, None)));
+        assert_eq!(f(North), Some((Some(Key::Tab), vec![], false, None)));
+        assert_eq!(f(Start), Some((Some(Key::F2), vec![], false, None)));
+        assert_eq!(f(Select), Some((Some(Key::Escape), vec![], false, None)));
+        assert_eq!(f(DPadUp), Some((Some(Key::ArrowUp), vec![], true, None)));
+        assert_eq!(f(DPadDown), Some((Some(Key::ArrowDown), vec![], true, None)));
+        assert_eq!(f(DPadLeft), Some((Some(Key::ArrowLeft), vec![], true, None)));
+        assert_eq!(f(DPadRight), Some((Some(Key::ArrowRight), vec![], true, None)));
+        // The rest do nothing, so no Ctrl / Alt, no log views, no walk toggle under the keyboard.
+        for b in [LeftBumper, RightBumper, LeftTrigger, RightTrigger, LeftThumb] {
+            assert_eq!(f(b), None, "{b:?}");
+        }
+        // No button holds a DIK key in it.
+        for b in BUTTONS {
+            assert!(binding(b, Ctx::Osk).is_none_or(|x| x.dik.is_empty()), "{b:?}");
+        }
+    }
+
+    /// Under the keyboard neither stick walks or turns, the left one is a D-pad, and held triggers hold nothing.
+    #[test]
+    fn osk_takes_the_pad_whole() {
+        let mut m = Mapper::default();
+        let mut s = pressed(&[Btn::LeftTrigger, Btn::RightTrigger]);
+        s.left = (0.0, 1.0);
+        s.right = (1.0, 0.0);
+        let out = m.step(&s, Ctx::Osk, tuning(), 0.016);
+        assert_eq!(out.sticks, [0.0; 4]);
+        assert!(out.keys.is_empty());
+        assert_eq!(keys(&out), vec![(Key::ArrowUp, true, false)]);
+    }
+
+    /// Select closes the keyboard; Start, over a text field and with it closed, asks for it back (the press is the
+    /// pad's, and nothing is sent to the field).
+    #[test]
+    fn osk_returns_on_start() {
+        let mut m = Mapper::default();
+        let out = m.step(&pressed(&[Btn::Start]), Ctx::Typing, tuning(), 0.016);
+        assert!(out.open_osk && out.pressed && out.events.is_empty() && out.keys.is_empty());
+        // Held: once. Not in the field, a menu or the keyboard.
+        assert!(!m.step(&pressed(&[Btn::Start]), Ctx::Typing, tuning(), 0.016).open_osk);
+        let mut m = Mapper::default();
+        for c in [Ctx::Field, Ctx::Menu, Ctx::Action, Ctx::Osk] {
+            assert!(!m.step(&pressed(&[Btn::Start]), c, tuning(), 0.016).open_osk, "{c:?}");
+            m.step(&Snapshot::default(), c, tuning(), 0.016);
+        }
     }
 
     /// Every DIK the table names is one the window's keys can produce (input.rs), so the key functions see it.
@@ -524,7 +619,7 @@ mod tests {
             .into_iter()
             .map(|k| super::super::input::dik(k).unwrap())
             .collect();
-        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing] {
+        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing, Ctx::Osk] {
             for b in BUTTONS {
                 for d in binding(b, c).iter().flat_map(|x| x.dik) {
                     assert!(known.contains(d), "{b:?} {c:?} {d:#x}");
@@ -728,9 +823,9 @@ mod tests {
     #[test]
     fn no_pad_changes_nothing() {
         let mut m = Mapper::default();
-        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing] {
+        for c in [Ctx::Field, Ctx::Menu, Ctx::Typing, Ctx::Osk] {
             let out = m.step(&Snapshot::default(), c, tuning(), 0.016);
-            assert!(out.events.is_empty() && out.keys.is_empty() && out.sticks == [0.0; 4] && !out.pressed);
+            assert!(out.events.is_empty() && out.keys.is_empty() && out.sticks == [0.0; 4] && !out.pressed && !out.open_osk);
         }
     }
 }

@@ -108,11 +108,23 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | LB / RB | Numpad + (log and window views) / Numpad - (page) | same | |
 | LT / RT (held) | Ctrl / Alt macro palette: D-pad picks, A runs, B closes | same | same |
 | Select / Back | Open the chat line | | Tab (auto-translate) |
-| Start | Log-out prompt | Main menu | |
+| Start | Log-out prompt | Main menu | On-screen keyboard (see below) |
 | Left stick click | Walk / run | | |
 
-When a text field opens and the pad was the last thing used, the client asks Steam to raise its on-screen keyboard if
-the game was started by Steam. Outside Steam there is no on-screen keyboard yet.
+When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was
+started by Steam (Game Mode, a non-Steam shortcut), else the client's built-in one, a small keyboard drawn over the field
+(at the top of the screen for the chat line, at the bottom otherwise). The layout is fixed. The pad drives it, and the
+mouse can click its keys.
+
+| Button | On-screen keyboard |
+|---|---|
+| D-pad / left stick | Move the cursor |
+| A / Cross | Type the key under the cursor |
+| B / Circle | Backspace (repeats) |
+| X / Square | Space |
+| Y / Triangle | Next key page: letters, capitals (one letter), symbols |
+| Start | Enter (the chat line sends; the login moves to the next field) |
+| Select / Back | Close the keyboard (in a text field, Start opens it again) |
 
 ## Install the game data
 
