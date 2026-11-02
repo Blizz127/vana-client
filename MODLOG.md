@@ -13306,12 +13306,35 @@ Outside Steam the pad had no way to type. `osk::request` now answers `Raised::St
   context; the game bound nothing there) opens it again (`Out.open_osk`).
 - poll_gamepad order: the field is decided first (no field closes the keyboard before it takes the frame's pad input),
   then the context, then the mapper.
-- Drawn after `ui()` in the same egui pass, `Order::Tooltip`, anchored top for the chat line (retail's chat line is at
-  the bottom) and bottom otherwise; keys sized from the window width (28..60 points, at most half the height). The
+- Drawn after `ui()` in the same egui pass, `Order::Tooltip`, anchored top for the chat line (*(inferred)*: the chat
+  line is taken to sit at the bottom, not checked against a screenshot) and bottom otherwise; keys sized from the window width (28..60 points, at most half the height). The
   game's windows get no click or wheel while the pointer is over it (`mine`, every phase), and the system cursor shows
   there (the game's drawn one would be under the egui mesh).
 - Not tested: a display or a pad (no hardware here). Unit tests: key grid, cursor movement and wrapping, paging,
   events, the pad's button table (gamepad::tests::osk_*, osk::tests).
+
+## Linux release build in the sandbox (release/sniper.Dockerfile, release/build-linux-sandbox.sh; ours) (2026-11-02)
+Upstream's release/build-linux.sh mounts the host's rustup into the sniper SDK container. The sandbox flow needs no host
+toolchain and no network at build time.
+- Image `vana-sniper:build`: `registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest` (pulled by tag, not pinned; the
+  pull in this run was digest sha256:bb30053d3cd19d35c76ae69b2790dbaa1430448006f8240cb6d7e723f2d1940e), then rustup-init
+  1.29.0 (sha256 pinned in the file) with toolchain 1.95.0 in /usr/local/rustup, world-readable, `RUSTUP_TOOLCHAIN` set so
+  a `--network none` run never looks for another channel. Image-build time is the only network use (the pull and rustup).
+- No apt step: the SDK already has every development file the client links (libudev, PipeWire, PulseAudio, ALSA, Vulkan,
+  X11 / XCB / Wayland / xkbcommon, clang 11 with libclang.so.1, cmake, gcc 10). The Dockerfile checks them with
+  pkg-config and fails the image build if one is missing, rather than installing anything.
+- Build: `--network none --user 1000:1000 --cap-drop ALL --tmpfs /tmp:rw,exec,size=8g`, the repo at /src, the host's
+  cargo registry at /cargo/registry, CARGO_HOME=/cargo, CARGO_NET_OFFLINE=true, CARGO_TARGET_DIR=/src/target/steamrt (apart
+  from the sandbox image's glibc-newer target/), `-C target-cpu=x86-64-v2` as upstream, `cargo build --profile dist`
+  (fat LTO): 16 min on this box. Output copied to target/assets/vana-client-linux-x86_64. No cpuset (upstream pinned cores
+  0..11 for a map server that is not ours; `VANA_BUILD_CPUS` sets one).
+- Checks, run inside the SDK image against the shipped file (the wrapper does them every build): highest GLIBC symbol
+  needed 2.30 (list 2.2.5 .. 2.30) against the runtime's 2.31 (`ldd --version`); GLIBCXX at most 3.4.21, CXXABI 1.3.9;
+  `ldd` lists libstdc++, libpthread, libudev.so.1, libdl, libpipewire-0.3.so.0, libasound.so.2, libgcc_s, libm, libc and
+  nothing missing; `--help` runs. Not covered: libraries opened at run time (the Vulkan loader, X11 / Wayland through
+  winit) are not in `ldd`, and the SDK has more libraries than the runtime, so a clean `ldd` there is the weaker check.
+- release/steam-deck.md: the non-Steam-game steps. Borderless is not the client's default (0034 = 1, a 1280x800
+  window); the page has the Deck config set 0034 = 3 through FFXI_CONFIG rather than changing the default.
 
 ## Gamepad gaps: the creator's name entry, R3 and the map's zoom (client/gamepad.rs, mod.rs; ours, NOT retail) (2026-11-02)
 - Creator name entry (step 5 with no world list up): it is a text field read from raw events like the others, but

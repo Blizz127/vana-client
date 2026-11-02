@@ -74,7 +74,8 @@ the sticks or trackpads into a mouse or keyboard. The client's mapping is the RE
 ## 5. First start
 
 Start it from the Game Mode library. With no game files yet it offers to download them, or to use an install already on
-disk. Log in with the on-screen keyboard (A types, B backspaces, Start sends Enter). Check the window mode took (borderless,
-filling the screen); if it did not, Settings > Window Mode.
+disk. Under Steam the text fields raise Steam's own keyboard (not the client's built-in one, whose buttons are in the
+README): use Steam's controls on it. Check the window mode took (borderless, filling the screen); if it did not,
+Settings > Window Mode.
 
 Nothing here is specific to a server: the server and account are entered at the login screen as on any desktop.
