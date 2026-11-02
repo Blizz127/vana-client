@@ -378,41 +378,98 @@ pub fn parse_animation(name: String, d: &[u8]) -> Result<Animation> {
     Ok(Animation { name, frames, speed, tracks })
 }
 
-/// World-space bone transforms (rotation, translation) for a pose.
-pub fn pose(skel: &Skeleton, anims: &[(&Animation, f32)]) -> Vec<(Quat, Vec3)> {
-    let mut local: Vec<(Quat, Vec3)> = skel.bones.iter().map(|b| (b.rot, b.pos)).collect();
+/// Bone 0's translation (rest + motion) through RotY(3 pi / 2) as FUN_10033800 does: (x, y, z) -> (-z, y, x).
+pub fn root_turn(t: Vec3) -> Vec3 {
+    Vec3::new(-t.z, t.y, t.x)
+}
+
+/// A posed bone: model-space rotation and translation, and the scale accumulated down the chain, which its
+/// vertices and points take in the bone's own frame (FUN_100339b0 pass 2).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoneXf {
+    pub q: Quat,
+    pub t: Vec3,
+    pub s: Vec3,
+}
+
+impl BoneXf {
+    pub const IDENTITY: Self = Self { q: Quat::IDENTITY, t: Vec3::ZERO, s: Vec3::ONE };
+
+    /// A point given in the bone's frame, in model space.
+    pub fn at(&self, off: Vec3) -> Vec3 {
+        self.t + self.q * (self.s * off)
+    }
+
+    pub fn lerp(&self, to: &Self, k: f32) -> Self {
+        Self { q: self.q.slerp(to.q, k), t: self.t.lerp(to.t, k), s: self.s.lerp(to.s, k) }
+    }
+}
+
+/// Model-space bone transforms for a pose (FUN_10033800, FUN_100339b0): a child's translation is scaled by its
+/// parent's accumulated scale, in the parent's frame.
+pub fn pose(skel: &Skeleton, anims: &[(&Animation, f32)]) -> Vec<BoneXf> {
+    pose_held(skel, anims, &[])
+}
+
+/// `pose` with drawn weapons held (FUN_10029320 / FUN_100339b0 pass 1): each (carry, grip) pair's carry bone takes
+/// the grip bone's rotation and translation, and the carry bone's descendants chain from it.
+pub fn pose_held(skel: &Skeleton, anims: &[(&Animation, f32)], grips: &[(u16, u16)]) -> Vec<BoneXf> {
+    let n = skel.bones.len();
+    let mut local: Vec<(Quat, Vec3, Vec3)> = skel.bones.iter().map(|b| (b.rot, b.pos, Vec3::ONE)).collect();
     for (anim, frame) in anims {
         for t in &anim.tracks {
             let Some(b) = skel.bones.get(t.bone) else { continue };
-            let (r, tr, _scale) = t.sample(*frame);
+            let (r, tr, s) = t.sample(*frame);
             // Verified visually: r * rest poses correctly (rest * r folds the torso); translation adds
             // unrotated (shield bone 87 lands on the forearm only that way).
-            local[t.bone] = (r * b.rot, b.pos + tr);
+            local[t.bone] = (r * b.rot, b.pos + tr, s);
         }
     }
-    let mut world: Vec<(Quat, Vec3)> = Vec::with_capacity(local.len());
-    for (i, b) in skel.bones.iter().enumerate() {
-        let (r, t) = local[i];
+    let grips: Vec<(usize, usize)> = grips.iter().map(|&(c, g)| (c as usize, g as usize)).filter(|&(c, g)| c > 0 && c < n && g < n).collect();
+    // Pass 0's set-up: the grip's local scale takes the carry's; the carry's subtree waits for pass 1.
+    let mut held = vec![false; n];
+    for &(c, g) in &grips {
+        let s = local[c].2;
+        local[g].2 *= s;
+    }
+    let chain = |world: &[BoneXf], i: usize| -> BoneXf {
+        let (r, t, s) = local[i];
+        let p = world[skel.bones[i].parent];
+        BoneXf { q: p.q * r, t: p.t + p.q * (p.s * t), s: p.s * s }
+    };
+    let mut world: Vec<BoneXf> = Vec::with_capacity(n);
+    for i in 0..n {
         if i == 0 {
-            world.push((r, t));
-        } else {
-            let (pr, pt) = world[b.parent];
-            world.push((pr * r, pt + pr * t));
+            let (r, t, s) = local[0];
+            world.push(BoneXf { q: r, t: root_turn(t), s });
+            continue;
+        }
+        let parent = skel.bones[i].parent;
+        held[i] = held[parent] || grips.iter().any(|&(c, _)| c == parent);
+        world.push(if held[i] { BoneXf::IDENTITY } else { chain(&world, i) });
+    }
+    // Pass 1: the carry bone on the grip (its own scale kept), then its subtree in order.
+    for &(c, g) in &grips {
+        world[c] = BoneXf { q: world[g].q, t: world[g].t, s: world[c].s };
+    }
+    for i in 1..n {
+        if held[i] {
+            world[i] = chain(&world, i);
         }
     }
     world
 }
 
-/// Skinned position and normal per vertex.
-pub fn skin(part: &MeshPart, world: &[(Quat, Vec3)]) -> Vec<(Vec3, Vec3)> {
+/// Skinned position and normal per vertex (positions come pre-weighted; normals turn only).
+pub fn skin(part: &MeshPart, world: &[BoneXf]) -> Vec<(Vec3, Vec3)> {
     part.vertices
         .iter()
         .map(|inf| {
             let (mut p, mut n) = (Vec3::ZERO, Vec3::ZERO);
             for i in inf {
-                let (r, t) = world.get(i.bone).copied().unwrap_or((Quat::IDENTITY, Vec3::ZERO));
-                p += r * i.pos + t * i.weight;
-                n += r * i.normal;
+                let b = world.get(i.bone).copied().unwrap_or(BoneXf::IDENTITY);
+                p += b.q * (b.s * i.pos) + b.t * i.weight;
+                n += b.q * i.normal;
             }
             (p, n.normalize_or_zero())
         })
@@ -719,6 +776,9 @@ pub struct Character {
     /// The `wepN` hide bytes 0 / 1 the model's `init` leaves set (ops 0x75 / 0xa3): seeded on the actor so the first
     /// frames before `init` runs do not show them.
     pub init_hidden: [[bool; 2]; 10],
+    /// Drawn weapons' (carry, grip) bones, main then sub (FUN_10029320): bone(point main info[6]) on bone(point 127),
+    /// bone(point sub info[6]) on bone(point 126).
+    pub grips: [Option<(u16, u16)>; 2],
     pub log: Vec<String>,
     /// The animations as GPU words (`prepare`), else packed when first posed.
     pub packed: Option<std::sync::Arc<super::animpack::Packed>>,
@@ -824,8 +884,7 @@ mod tests {
             let skel = super::load_file(&d).unwrap().skeleton.unwrap();
             let rest = super::pose(&skel, &[]);
             let (bone, off) = skel.points[12];
-            let (q, t) = rest[bone as usize];
-            let h = -(t + q * off).y;
+            let h = -rest[bone as usize].at(off).y;
             println!("file {file}: point 12 bone {bone} height {h:.2}");
             assert!((lo..hi).contains(&h), "file {file}: {h}");
         }
@@ -850,7 +909,7 @@ pub fn load_character(index: &DatIndex, look: &Look) -> Result<Character> {
     let Some(skeleton) = base.skeleton else { bail!("file {skel_id} has no skeleton") };
     let mut log = vec![format!("skeleton {skel_id}: {} bones, {} animations", skeleton.bones.len(), base.animations.len())];
     log.extend(base.warnings);
-    let mut ch = Character { skeleton, parts: base.parts, textures: base.textures, animations: base.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: base.schedulers, pc: None, mount: None, log, packed: None, skin: None, files: vec![skel_id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default() };
+    let mut ch = Character { skeleton, parts: base.parts, textures: base.textures, animations: base.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: base.schedulers, pc: None, mount: None, log, packed: None, skin: None, files: vec![skel_id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
     ch.merge_size_info(base.info);
     let (mut body_info, mut sub_info, mut main_info) = (None, None, None);
     for (slot, model, id) in part_ids {
@@ -900,6 +959,16 @@ pub fn load_character(index: &DatIndex, look: &Look) -> Result<Character> {
     // FUN_100cea10 case 7: a weapon in the sub slot gives its info[3] (+0x88a) and zeroes the upper-body pick (+0x87d).
     let dual = super::motionfile::dual_wield(look.sub);
     ch.pc = Some(super::motionfile::PcMotion { race: look.race, weapon: byte(main_info, 3), draw: byte(main_info, 4), skirt: byte(body_info, 9), dual: dual.then(|| byte(sub_info, 3)), sub_draw: byte(sub_info, 4) });
+    // FUN_10029b90: a point's bone, 0 past 0x7f or without the point. A grip bone 0 means no remap; so does a carry
+    // bone 0 *(ours: retail would remap the root)*.
+    let point_bone = |p: i8| if p < 0 { 0 } else { ch.skeleton.points.get(p as usize).map_or(0, |x| x.0) };
+    for (k, (info, grip_point)) in [(main_info, 127i8), (sub_info, 126)].into_iter().enumerate() {
+        let carry = byte(info, 6);
+        let (c, g) = (point_bone(carry), point_bone(grip_point));
+        if carry != -1 && c != 0 && g != 0 {
+            ch.grips[k] = Some((c, g));
+        }
+    }
     let upper = skel_id + 1 + if dual { 0 } else { selector(sub_info, 5).min(1) };
     let skirt = skel_id + 3 + selector(body_info, 9).saturating_sub(1).min(1);
     for (what, id) in [("upper-body motions", upper), ("skirt motions", skirt)] {

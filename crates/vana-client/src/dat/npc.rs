@@ -174,9 +174,10 @@ fn self_contained(id: u32, file: &[u8], f: super::character::CharFile, skeleton:
         f.textures.len(),
         f.animations.len()
     )];
+    log.push(format!("attach points: {:?}", skeleton.points.iter().take(4).collect::<Vec<_>>()));
     log.extend(f.warnings);
     let mount = f.moun.map(|moun| super::character::MountInfo { moun, rate: f.info.map_or(0xff, |i| i[15]), cam: f.info.map_or(0xff, |i| i[14]) });
-    let mut ch = Character { skeleton, parts: f.parts, textures: f.textures, animations: f.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: f.schedulers, pc: None, mount, log, packed: None, skin: None, files: vec![id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default() };
+    let mut ch = Character { skeleton, parts: f.parts, textures: f.textures, animations: f.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: f.schedulers, pc: None, mount, log, packed: None, skin: None, files: vec![id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
     ch.merge_size_info(f.info);
     let init = init_scheduler(file);
     apply_motion_ops(&mut ch, &init);
@@ -238,12 +239,12 @@ mod tests {
         for m in [3014u16, 3002] {
             let ch = load_npc(&index, &NpcLook::Model(m)).unwrap();
             let rest = crate::dat::character::pose(&ch.skeleton, &[]);
-            let p = ch.skeleton.points.get(0x2b).map(|(b, off)| (b, rest.get(*b as usize).map(|(q, t)| *t + *q * *off)));
+            let p = ch.skeleton.points.get(0x2b).map(|(b, off)| (b, rest.get(*b as usize).map(|x| x.at(*off))));
             println!("model {m}: {} bones, {} points, point 0x2b {p:?}", ch.skeleton.bones.len(), ch.skeleton.points.len());
         }
         let hume = load_character(&index, &Look { race: 1, ..Default::default() }).unwrap();
         let rest = crate::dat::character::pose(&hume.skeleton, &[]);
-        let p = hume.skeleton.points.get(0x2b).map(|(b, off)| (b, rest.get(*b as usize).map(|(q, t)| *t + *q * *off)));
+        let p = hume.skeleton.points.get(0x2b).map(|(b, off)| (b, rest.get(*b as usize).map(|x| x.at(*off))));
         println!("hume: {} points, point 0x2b {p:?}", hume.skeleton.points.len());
     }
 
@@ -316,7 +317,7 @@ mod tests {
     #[test]
     fn size_info_order() {
         let skel = super::super::character::Skeleton { name: String::new(), bones: Vec::new(), points: Vec::new(), point_rots: Vec::new(), look_limits: [[0.0; 3]; 2], boxes: Vec::new() };
-        let mut ch = Character { skeleton: skel, parts: Vec::new(), textures: Vec::new(), animations: Vec::new(), size_info: [0xFF; 4], motions: Default::default(), schedulers: Vec::new(), pc: None, mount: None, log: Vec::new(), packed: None, skin: None, files: Vec::new(), part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default() };
+        let mut ch = Character { skeleton: skel, parts: Vec::new(), textures: Vec::new(), animations: Vec::new(), size_info: [0xFF; 4], motions: Default::default(), schedulers: Vec::new(), pc: None, mount: None, log: Vec::new(), packed: None, skin: None, files: Vec::new(), part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
         let mut later = [0xFFu8; 16];
         later[10..14].copy_from_slice(&[85, 100, 115, 140]);
         ch.merge_size_info(Some(later));

@@ -126,7 +126,7 @@ enum Cmd {
         #[arg(long)]
         chase: bool,
     },
-    /// Dump the structure of one MMB in a zone by name.
+    /// Dump the structure of one MMB in a zone (or, from 1000, a file id) by name.
     MmbDump { zone: u32, name: String },
     /// Waypoints between two ground positions with the client's walk collision (A* on a 1-unit grid),
     /// printed as a --goto string.
@@ -485,6 +485,9 @@ enum Cmd {
         /// Extra motion files (event banks, battle files) searched before the model's, last first.
         #[arg(long, num_args = 1..)]
         motions: Vec<u32>,
+        /// Weapons drawn: their carry bones on the grips (FUN_10029320).
+        #[arg(long)]
+        held: bool,
         #[arg(long)]
         out: PathBuf,
     },
@@ -679,7 +682,7 @@ enum Cmd {
     /// Render the camera of an event scheduler (event opcode 0x45: camera file n, tag) in a zone.
     CsShot {
         zone: u32,
-        /// Opcode 0x45 file number (file id 0x77f0 + n, remapped from 300).
+        /// Opcode 0x45 file number (file id 0x77f0 + n, remapped from 300), or a file id from 0x77f0.
         file: u32,
         scheduler: String,
         #[arg(long)]
@@ -815,6 +818,8 @@ enum Cmd {
     },
     /// Render a zone offscreen to a PNG. Coordinates are game units (Y points down).
     ZoneShot {
+        /// The scene number (0x00A's scene): the zone id below 256; from 256 the zone-in's own (Western Adoulin
+        /// 256 is 700, file 83891).
         zone: u32,
         #[arg(long)]
         out: PathBuf,
@@ -1163,7 +1168,7 @@ fn main() -> Result<()> {
             Ok(())
         }
         Cmd::DumpMsi { msi, out } => dump_msi(&msi, &out),
-        Cmd::CharShot { race, face, head, body, hands, legs, feet, main, sub, range, anim, frame, yaw, motions, out } => {
+        Cmd::CharShot { race, face, head, body, hands, legs, feet, main, sub, range, anim, frame, yaw, motions, held, out } => {
             use dat::character::{Look, load_character};
             let index = dat::DatIndex::open(&config::Config::load().ffxi_dir())?;
             let mut ch = load_character(&index, &Look { race, face, head, body, hands, legs, feet, main, sub, range })?;
@@ -1193,7 +1198,8 @@ fn main() -> Result<()> {
             for (a, f) in &anims {
                 println!("animation {} frame {f} of {} ({} tracks, speed {})", a.name, a.frames, a.tracks.len(), a.speed);
             }
-            let mesh = render::character::pose_character(&ch, &anims);
+            let grips: Vec<(u16, u16)> = if held { ch.grips.iter().flatten().copied().collect() } else { Vec::new() };
+            let mesh = render::character::pose_character_held(&ch, &anims, &grips);
             let centre = (mesh.min + mesh.max) / 2.0;
             let size = (mesh.max - mesh.min).max_element();
             let (s, c) = yaw.to_radians().sin_cos();
@@ -1356,6 +1362,10 @@ fn main() -> Result<()> {
                         fx.load_sub_area(fx::lib::Library::load(dat::zone::file_id(*id), f.clone())?);
                     }
                     fx.set_weather(&weather, 0.0);
+                    // FFXI_FX_AUDIT: fx-sweep's record of skipped ops and missing parts, printed after the run.
+                    if std::env::var_os("FFXI_FX_AUDIT").is_some() {
+                        fx.reg.audit = Some(fx::Audit::default());
+                    }
                     // Names under 4 letters are NUL padded ("c37" is c37 NUL).
                     let fourcc = |s: &str| (s.len() <= 4).then(|| std::array::from_fn::<u8, 4, _>(|i| s.as_bytes().get(i).copied().unwrap_or(0)));
                     if let Some(name) = start.as_deref().and_then(fourcc)
@@ -1394,6 +1404,24 @@ fn main() -> Result<()> {
                             eg.after_submit(gpu, &mut fx);
                         }
                         println!("effects: {} live elements after {ticks} ticks", fx.live_count());
+                        if let Some(au) = fx.reg.audit.as_ref() {
+                            println!("audit: {au:?}");
+                        }
+                        // FFXI_FX_ONLY=a,b: only these generators' instances drawn (FFXI_FX_HIDE=a,b: all but these).
+                        let names = |v: &str| std::env::var(v).ok().map(|s| s.split(',').map(|n| fourcc(n.trim()).unwrap_or([0; 4])).collect::<Vec<_>>());
+                        let (only, hide) = (names("FFXI_FX_ONLY"), names("FFXI_FX_HIDE"));
+                        if only.is_some() || hide.is_some() {
+                            for i in 0..fx.insts.len() {
+                                let name = fx.insts[i].as_ref().map(|x| x.name);
+                                if name.is_some_and(|n| only.as_ref().is_some_and(|o| !o.contains(&n)) || hide.as_ref().is_some_and(|h| h.contains(&n))) {
+                                    fx.kill(i);
+                                }
+                            }
+                            let mut e = gpu.device.create_command_encoder(&Default::default());
+                            eg.update(gpu, &mut e, &mut fx, &f);
+                            gpu.queue.submit([e.finish()]);
+                            eg.after_submit(gpu, &mut fx);
+                        }
                         let on = std::env::var_os("FFXI_NO_LAMPS").is_none();
                         // FFXI_LAMPS_DARK: the shells hidden but no lamp lights (to see what the lights add).
                         if let Some(l) = lamps.update(&mut fx, ground.as_ref(), on).filter(|_| std::env::var_os("FFXI_LAMPS_DARK").is_none()) {
@@ -1461,12 +1489,14 @@ fn main() -> Result<()> {
             let cfg = config::Config::load();
             let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
             let keys = dat::zone::Keys::from_ffximain(&std::fs::read(cfg.ffxi_dir().join("FFXiMain.dll"))?)?;
-            let file = index.read(dat::zone::file_id(zone))?;
+            // From 1000 a file id itself (an effect file's stand-ins).
+            let file = index.read(if zone >= 1000 { zone } else { dat::zone::file_id(zone) })?;
             for c in dat::chunks(&file)?.into_iter().filter(|c| c.kind == 0x2E) {
                 let mut data = c.data.to_vec();
                 dat::zone::decode_mmb(&keys, &mut data);
                 let Ok(mesh) = dat::zone::parse_mmb(&data) else { continue };
-                if mesh.name != name {
+                // The MMB's own name, or the chunk's (effect files name them there).
+                if mesh.name != name && String::from_utf8_lossy(&c.name).trim_end_matches(['\0', ' ']) != name {
                     continue;
                 }
                 let u32_at = |o: usize| u32::from_le_bytes(data[o..o + 4].try_into().unwrap());

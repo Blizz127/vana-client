@@ -101,6 +101,8 @@ struct Sched {
 
 struct Shot {
     file: Arc<SchedFile>,
+    /// Its scheduler's file id (with `tag`): a stop of that scheduler ends it (op 0x52; FUN_10073b20 kills children).
+    file_id: u32,
     /// The scheduler that started it.
     tag: String,
     path: usize,
@@ -134,6 +136,9 @@ pub struct Screen {
     /// Op 0x0f: the scene colour multiply per channel, 2 * RGB / 255 (MODULATE2X, 0x80 = 1.0; A unused):
     /// from, to, start tick, length.
     fade: ([f32; 3], [f32; 3], f32, f32),
+    /// Op 0x51 (renderer +0x334, from +0x31c): the level over everything, scene and 2D windows (FUN_1000a820), as the
+    /// fade: from, to, start, length.
+    level: ([f32; 3], [f32; 3], f32, f32),
     pub cross: Option<Cross>,
     /// Op 0x72: the additive flash, RGBA / 255: from, to, start tick, length.
     flash: ([f32; 4], [f32; 4], f32, f32),
@@ -141,12 +146,16 @@ pub struct Screen {
     /// the capture, DAT_1045692c = 0).
     blur: ([f32; 5], [f32; 5], f32, f32),
     blur_starts: u32,
+    /// Camera paths an event's effect tasks asked for (fx_camera), started at the next advance.
+    fx_shots: Vec<(Arc<SchedFile>, u32, String, String, f32, [crate::fx::sched::Who; 2])>,
+    /// Crossfades (op 0x10) of an event's effect tasks, their lengths, started at the next advance.
+    fx_crosses: Vec<f32>,
 }
 
 
 impl Default for Screen {
     fn default() -> Self {
-        Screen { scheds: Vec::new(), files: HashMap::new(), shot: None, tick: 0.0, fade: ([1.0; 3], [1.0; 3], 0.0, 0.0), cross: None, flash: ([0.0; 4], [0.0; 4], 0.0, 0.0), blur: ([0.5, 0.5, 0.5, 0.0, 1.0], [0.5, 0.5, 0.5, 0.0, 1.0], 0.0, 0.0), blur_starts: 0 }
+        Screen { scheds: Vec::new(), files: HashMap::new(), shot: None, tick: 0.0, fade: ([1.0; 3], [1.0; 3], 0.0, 0.0), level: ([1.0; 3], [1.0; 3], 0.0, 0.0), cross: None, flash: ([0.0; 4], [0.0; 4], 0.0, 0.0), blur: ([0.5, 0.5, 0.5, 0.0, 1.0], [0.5, 0.5, 0.5, 0.0, 1.0], 0.0, 0.0), blur_starts: 0, fx_shots: Vec::new(), fx_crosses: Vec::new() }
     }
 }
 
@@ -162,11 +171,16 @@ impl Screen {
             .clone()
     }
 
-    /// The scene multiply now (1.0 = unchanged).
+    /// The scene multiply now (1.0 = unchanged): op 0x0f's colour times op 0x51's level.
     pub fn multiply(&self) -> [f32; 3] {
-        let (from, to, start, len) = self.fade;
-        let t = if len <= 0.0 { 1.0 } else { ((self.tick - start) / len).clamp(0.0, 1.0) };
-        std::array::from_fn(|i| from[i] + (to[i] - from[i]) * t)
+        let (f, l) = (self.lerp(self.fade), self.lerp(self.level));
+        std::array::from_fn(|i| f[i] * l[i])
+    }
+
+    /// Op 0x51's level for the 2D windows (their colour and alpha; the mean of its RGB).
+    pub fn ui_level(&self) -> f32 {
+        let l = self.lerp(self.level);
+        ((l[0] + l[1] + l[2]) / 3.0).clamp(0.0, 1.0)
     }
 
     /// An effect scheduler's screen op (fx/tasks.rs): 0x0f the multiply, 0x72 the flash over dur x speed - 1 ticks,
@@ -175,7 +189,10 @@ impl Screen {
         let f = |v: u8| v as f32 / 255.0;
         let now = self.tick;
         match code {
-            0x0f => self.fade = (self.fade.1, [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0), now, (ticks - 1.0).max(0.0)),
+            // Case 0xf: from the colour drawn now (+0x320), an interrupted fade too.
+            0x0f => self.fade = (self.lerp(self.fade), [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0), now, (ticks - 1.0).max(0.0)),
+            // Case 0x51 (all.c 66225): the 0x0f task on the level.
+            0x51 => self.level = (self.lerp(self.level), [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0), now, (ticks - 1.0).max(0.0)),
             0x72 => self.flash = (self.flash.1, c.map(f), now, (ticks - 1.0).max(0.0)),
             0x0e => {
                 self.blur = (self.blur.1, [f(c[0]), f(c[1]), f(c[2]), f(c[3]), zoom], now, ticks.max(0.0));
@@ -183,6 +200,39 @@ impl Screen {
             }
             _ => {}
         }
+    }
+
+    /// Scheduler op 0x04 / 0x81 in a task an event's scheduler started (main's `cut1`..: fx/tasks.rs): the path
+    /// plays from now as this runner's own 0x04 does.
+    pub fn fx_camera(&mut self, index: &DatIndex, c: crate::fx::EventCamera) {
+        let four = |v: [u8; 4]| String::from_utf8_lossy(&v).trim_end_matches('\0').to_string();
+        if let Some(f) = self.file(index, c.file) {
+            self.fx_shots.push((f, c.file, four(c.tag), four(c.path.to_le_bytes()), c.ticks.max(1.0), c.who));
+        }
+    }
+
+    /// Op 0x10 in an event's effect task (FUN_1005f020 for any task): a crossfade over `ticks`.
+    pub fn fx_cross(&mut self, ticks: f32) {
+        self.fx_crosses.push(ticks.max(1.0));
+    }
+
+    /// The camera task ends now (its scheduler stopped, op 0x52; or op 0xb0 named its path): the camera holds there.
+    fn end_shot(&mut self, matches: impl Fn(&Shot) -> bool) {
+        let now = self.tick;
+        if let Some(s) = self.shot.as_mut().filter(|s| matches(s)) {
+            s.ticks = (now - s.start).max(0.0);
+        }
+    }
+
+    /// Op 0xb0 (FUN_1003bd70): the camera task playing path `name` ends.
+    pub fn stop_path(&mut self, name: &str) {
+        let paths = |s: &Shot| s.file.title.as_ref().and_then(|t| t.paths.get(s.path)).map(|p| p.name.clone());
+        self.end_shot(|s| paths(s).is_some_and(|p| p == name));
+    }
+
+    /// The camera task is alive (FUN_1003c3e0 ends it with its time).
+    fn shot_live(&self) -> bool {
+        self.shot.as_ref().is_some_and(|s| self.tick - s.start < s.ticks)
     }
 
     fn lerp<const N: usize>(&self, (from, to, start, len): ([f32; N], [f32; N], f32, f32)) -> [f32; N] {
@@ -216,6 +266,8 @@ impl Screen {
         let mut shot = None;
         let mut fade = None;
         let mut cross = None;
+        let mut stops: Vec<String> = Vec::new();
+        let mut level = None;
         for s in &mut self.scheds {
             while s.cursor < s.ops.len() && now >= s.next_at {
                 let op = &s.ops[s.cursor];
@@ -232,7 +284,14 @@ impl Screen {
                         let m = [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0);
                         fade = Some((m, at, (op.ticks as f32 * s.speed - 1.0).max(0.0)));
                     }
+                    0x51 if op.data.len() >= 12 => {
+                        let c = &op.data[8..12];
+                        let m = [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0);
+                        level = Some((m, at, (op.ticks as f32 * s.speed - 1.0).max(0.0)));
+                    }
                     0x10 => cross = Some(Cross { start: at, len: (op.ticks as f32 * s.speed).max(1.0), camera: current, captured: false }),
+                    // Case 0xb0 (FUN_1003bd70): the camera task playing path u32 @8 ends.
+                    0xb0 if op.data.len() >= 12 => stops.push(String::from_utf8_lossy(&op.data[8..12]).trim_end_matches('\0').to_string()),
                     _ => {}
                 }
                 s.next_at = at + op.wait as f32 * s.speed;
@@ -245,10 +304,27 @@ impl Screen {
             if let Some(p) = f.title.as_ref().and_then(|t| t.paths.get(path)) {
                 log::info!("event camera {tag}: path {} flags {:#x}, {} keys, {ticks} ticks{}", p.name, p.flags, p.keys.len(), if p.flags & crate::dat::title::FROM_CURRENT != 0 { ", from the current camera" } else { "" });
             }
-            self.shot = Some(Shot { file: f, tag, path, start: at, ticks, from: current.map(key_of), follow, who, frame: None });
+            self.shot = Some(Shot { file: f, file_id: file, tag, path, start: at, ticks, from: current.map(key_of), follow, who, frame: None });
+        }
+        for name in stops {
+            self.stop_path(&name);
+        }
+        for len in std::mem::take(&mut self.fx_crosses) {
+            cross = Some(Cross { start: now, len, camera: current, captured: false });
+        }
+        // The effect tasks' paths after the runner's (they ran this frame).
+        for (f, file_id, tag, name, ticks, who) in std::mem::take(&mut self.fx_shots) {
+            let Some(path) = f.title.as_ref().and_then(|t| t.paths.iter().position(|p| p.name == name)) else { continue };
+            if let Some(p) = f.title.as_ref().and_then(|t| t.paths.get(path)) {
+                log::info!("event camera {tag} (effect task): path {} flags {:#x}, {} keys, {ticks} ticks", p.name, p.flags, p.keys.len());
+            }
+            self.shot = Some(Shot { file: f, file_id, tag, path, start: now, ticks, from: current.map(key_of), follow, who, frame: None });
         }
         if let Some((to, at, ticks)) = fade {
-            self.fade = (self.fade.1, to, at, ticks);
+            self.fade = (self.lerp(self.fade), to, at, ticks);
+        }
+        if let Some((to, at, ticks)) = level {
+            self.level = (self.lerp(self.level), to, at, ticks);
         }
         if cross.is_some() {
             self.cross = cross;
@@ -367,6 +443,12 @@ pub struct State {
     pub idle: HashMap<u32, String>,
     /// World ids of the bound actors (+0x120 bit 7) and how each is drawn.
     pub bound: HashSet<u32>,
+    /// Op 0x92 (+0x12c bit 16): a bound actor's name is not drawn while the event runs (FUN_10096000); unbinding
+    /// clears it.
+    pub no_name: HashSet<u32>,
+    /// First person at the event's start (DAT_10351bb8 = DAT_10475578, FUN_100ad2c0): op 0x46 sub 1 leaves it, sub 0
+    /// and the end put it back (FUN_100acf70).
+    first_saved: bool,
     pub poses: HashMap<u32, Pose>,
     /// Event status (+0x174) by actor, set by op 0xac sub 1: the status a bound actor poses with (+0x170).
     pub event_status: HashMap<u32, u8>,
@@ -435,6 +517,8 @@ impl State {
             faded: HashSet::new(),
             idle: HashMap::new(),
             bound: HashSet::new(),
+            no_name: HashSet::new(),
+            first_saved: false,
             poses: HashMap::new(),
             event_status: HashMap::new(),
             event_rides: HashMap::new(),
@@ -697,6 +781,7 @@ impl Host for LiveHost<'_> {
                 let who = |a: u32| if a == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(a)) };
                 self.w.effects.stop_event_scheduler(file, u32::from_le_bytes(crate::dat::generator::fourcc(&tag)), who(actor), who(target));
                 self.w.screen.scheds.retain(|x| !(x.file == file && x.tag == tag && x.actor == actor && x.target == target));
+                self.w.screen.end_shot(|s| s.file_id == file && s.tag == tag);
             }
             // 0x46 sub 0 kills the camera tasks (FUN_1003c780) and puts the camera behind the player.
             // Op 0x71: the window takes the text engine from the chat line (FUN_101c68a0).
@@ -706,6 +791,8 @@ impl Host for LiveHost<'_> {
             }
             Effect::Camera { flag, offset } => {
                 self.st.camera_flag = flag;
+                self.w.cam_free = flag;
+                self.w.camst.first = flag && self.st.first_saved;
                 if flag {
                     self.w.screen.shot = None;
                     let dir = self.w.net.me.lock().map(|m| m.dir).unwrap_or(0);
@@ -772,8 +859,9 @@ impl Host for LiveHost<'_> {
                 }
                 Packet::Raw { id, body } => self.send(NetCommand::Packet { id, body }),
             },
-            Effect::Position { op: 0x36 | 0x37, actor, .. } => {
+            Effect::Position { op: op @ (0x36 | 0x37), actor, pos, dir } => {
                 let id = self.wid(actor);
+                log::debug!("event position {op:#x}: {id:#x} at ({:.2}, {:.2}, {:.2}) dir {dir:.3}", pos[0], pos[1], pos[2]);
                 self.st.snap.insert(id);
             }
             // 0x4b on an unbound actor turns the actor itself (+0x18).
@@ -805,6 +893,26 @@ impl Host for LiveHost<'_> {
                 if let Some(Arg::Actor(a)) = args.get(1) {
                     let id = self.wid(*a);
                     self.hide(id, &args, 0);
+                }
+            }
+            // FUN_100b7e20: actor@2's +0x12c bit 17 = u8@1: no occlusion test for its model (FUN_100c9da0).
+            Effect::Op { op: 0x94, args, .. } => {
+                if let (Some(on), Some(Arg::Actor(a))) = (Self::arg_int(&args, 0), args.get(1)) {
+                    let id = self.wid(*a);
+                    if let Some(e) = self.w.entities.get_mut(&id) {
+                        e.no_occlusion = on & 1 != 0;
+                    }
+                }
+            }
+            // FUN_100b7d10: actor@2's +0x12c bit 16 = u8@1; a bound actor shows no name while it is set.
+            Effect::Op { op: 0x92, args, .. } => {
+                if let (Some(on), Some(Arg::Actor(a))) = (Self::arg_int(&args, 0), args.get(1)) {
+                    let id = self.wid(*a);
+                    if on & 1 != 0 {
+                        self.st.no_name.insert(id);
+                    } else {
+                        self.st.no_name.remove(&id);
+                    }
                 }
             }
             // FUN_100b6a60 0..3: the actor's turn (+0xdc) / look (+0xe0) percent, read while an event runs.
@@ -1046,9 +1154,20 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: 0x77, args, .. } => {
                 if let (Some(h), Some(wt)) = (Self::arg_int(&args, 0), Self::arg_int(&args, 1)) {
                     self.st.time = Some(((h != 0xff).then_some(h as u32), (wt != 0xff).then_some(wt as u16)));
+                    // FUN_10092900: the weather's effects switch at once too.
+                    if wt != 0xff {
+                        self.w.effects.set_weather(crate::dat::weather::weather_tag(wt as u16), 0.0);
+                    }
                 }
             }
-            Effect::Op { op: 0x78, .. } => self.st.time = None,
+            // FUN_10092940: back to the server's weather, effects too.
+            Effect::Op { op: 0x78, .. } => {
+                if self.st.time.is_some_and(|t| t.1.is_some()) {
+                    let wt = self.w.weather;
+                    self.w.effects.set_weather(crate::dat::weather::weather_tag(wt), 0.0);
+                }
+                self.st.time = None;
+            }
             // FUN_100b6950 / 6a00 / 69b0 / 6980 / 6a30: the event's door state (+0x174) for the bound actor.
             Effect::Op { op: op @ (0x4c | 0x4d | 0x4f | 0x8e | 0x8f), actor, args, .. } => {
                 let v = match op {
@@ -1426,6 +1545,10 @@ impl Host for LiveHost<'_> {
         self.w.entities.get(&id).map(|e| super::monstrosity::name(e).to_string()).filter(|n| !n.is_empty()).or_else(|| self.w.npc_names.get(&id).cloned()).unwrap_or_default()
     }
 
+    fn camera_free(&self) -> bool {
+        self.w.cam_free
+    }
+
     fn player_word(&self) -> u32 {
         self.w.stats.as_ref().map_or(0, |s| s.main.0 as u32 | (s.main.1 as u32) << 8)
     }
@@ -1638,6 +1761,8 @@ fn begin(w: &mut World, mut wt: Box<Waiting>, index: &DatIndex) {
     let dialog = Dialog::load(index, fz).map_err(|e| log::warn!("dialogue of zone {fz}: {e:#}")).ok();
     let start = Start { zone: s.zone, event: s.event, target: s.target, params: s.params, strings: s.strings.clone() };
     let mut st = State::new(s);
+    st.camera_flag = w.cam_free;
+    st.first_saved = w.camst.first;
     // FUN_100bb300 -> FUN_1008cda0: a server-hidden actor (+0x120 bits 14 / 15) starts the event hidden; the
     // model colour goes back to 0x80808080 unless Mode & 0x200 (FUN_10095c00).
     for b in blocks.iter().filter(|b| bound_block(b, st.start.event)) {
@@ -1887,6 +2012,13 @@ fn keep_pose(w: &mut World, p: Pose) {
 /// FUN_100ac9c0 / FUN_100bb750 / FUN_1008d710: the bound actors go back to their own transforms and status
 /// bits, event motions and looks end, deferred despawns happen.
 fn finish(w: &mut World, live: Box<Live>) {
+    // FUN_100acf20: first person as it was before the event.
+    w.camst.first = live.st.first_saved;
+    // Op 0x77's weather without its 0x78: the lighting goes back with the event, so the effects do too.
+    if live.st.time.is_some_and(|t| t.1.is_some()) {
+        let wt = w.weather;
+        w.effects.set_weather(crate::dat::weather::weather_tag(wt), 0.0);
+    }
     // We stay where the event left us (FUN_10089a60 once unbound), unless & 1 puts us back at the bind place (+0x24).
     if live.st.bound.contains(&w.my_id)
         && live.st.flags() & 1 == 0
@@ -1938,7 +2070,10 @@ fn finish(w: &mut World, live: Box<Live>) {
     }
     w.event_end_at = Some(Instant::now());
     w.screen.shot = None;
-    w.map_open = None;
+    // FUN_100ac9c0: an event map still open closes (FUN_101f14c0(1)), as when an abort skips the script's 0x8a.
+    if w.map_open.take().is_some() {
+        w.map_cmds.push(super::map::Cmd::CloseEvent);
+    }
     super::maze::event_end(w);
     // The player's post-event request (+0x1f8 = 300, +0x1fa = 1).
     if live.st.bound.contains(&w.my_id) {
@@ -2016,6 +2151,17 @@ pub fn strings(w: &mut World, s: Vec<String>) {
     }
 }
 
+/// s2c 0x05B / 0x065 mode 1 (FUN_1009d500 case 1): a bound actor with its model in moves its event body to the
+/// server's place at once (event 204's "back onto the pier"; the event's end then keeps that pose).
+pub fn server_place(w: &mut World, id: u32, pos: [f32; 3], dir: u8) {
+    let Some(l) = &mut w.event else { return };
+    if !l.st.bound.contains(&id) || !w.actors.contains_key(&id) {
+        return;
+    }
+    l.rt.place_body(if id == w.my_id { PLAYER } else { id }, pos, rad_of(dir));
+    l.st.snap.insert(id);
+}
+
 /// s2c 0x05B / 0x065 position modes 1 and 2 end a 0x05C round trip (FUN_1009d500).
 pub fn position_ack(w: &mut World, mode: u8) {
     if matches!(mode, 1 | 2)
@@ -2043,6 +2189,21 @@ pub fn holds(w: &mut World, id: u32) -> bool {
         return true;
     }
     false
+}
+
+/// Op 0x77's hour while the event holds one (the clock stands at its minute 0).
+pub fn hour(w: &World) -> Option<u32> {
+    w.event.as_ref().and_then(|l| l.st.time).and_then(|t| t.0)
+}
+
+/// The weather in force: op 0x77's while the event holds one, else the server's.
+pub fn weather(w: &World) -> u16 {
+    w.event.as_ref().and_then(|l| l.st.time).and_then(|t| t.1).unwrap_or(w.weather)
+}
+
+/// Bound actors whose name op 0x92 turned off while the event runs (FUN_10096000).
+pub fn nameless(w: &World) -> HashSet<u32> {
+    w.event.as_ref().map_or_else(HashSet::new, |l| l.st.no_name.intersection(&l.st.bound).copied().collect())
 }
 
 /// The running event binds this actor (+0x120 bit 7).
@@ -2101,8 +2262,10 @@ pub fn camera_frame(screen: &mut Screen, effects: &crate::fx::Effects, actors: &
 /// its frame is known.
 pub fn camera(w: &World) -> Option<Camera> {
     let l = w.event.as_ref()?;
-    if l.st.camera_flag {
-        return None;
+    // A live camera task shows (FUN_10014820 takes its requests); without one the camera holds where it was while
+    // op 0x46's mode is off (FUN_1001e030 / FUN_1001fd70 return), else the free camera runs.
+    if !w.screen.shot_live() {
+        return if l.st.camera_flag { None } else { w.last_camera };
     }
     let s = w.screen.shot.as_ref()?;
     let path = s.file.title.as_ref()?.paths.get(s.path).filter(|p| !p.keys.is_empty())?;
@@ -2112,7 +2275,7 @@ pub fn camera(w: &World) -> Option<Camera> {
         (true, Some(m)) => (m.transform_point3(k.eye), m.transform_point3(k.target)),
         (true, None) => return w.last_camera,
     };
-    Some(Camera { eye, target, up: Vec3::NEG_Y, fov_y: fov_y(k.focal) })
+    Some(Camera { eye, target, up: crate::dat::title::up_of(eye, target, k.roll), fov_y: fov_y(k.focal) })
 }
 
 /// The running shot's path name (test drives wait for it).
@@ -2919,6 +3082,69 @@ mod tests {
         assert!((b.zoom - 0.99).abs() < 1e-6 && (b.a - 60.0 / 255.0).abs() < 1e-3, "{b:?}");
         sc.fx_op(0x0e, [0x80, 0x80, 0x80, 0], 1.0, 0.0);
         assert!(sc.blur().is_none());
+    }
+
+    /// Op 0x51 takes the scene and the 2D windows down together, apart from 0x0f's colour.
+    #[test]
+    fn level_over_everything() {
+        let mut sc = Screen::default();
+        sc.fx_op(0x51, [0, 0, 0, 0], 0.0, 11.0);
+        sc.tick = 5.0;
+        assert!((sc.ui_level() - 0.5).abs() < 1e-3 && (sc.multiply()[0] - 0.5).abs() < 1e-3);
+        sc.fx_op(0x0f, [0x40, 0x40, 0x40, 0x80], 0.0, 1.0);
+        sc.tick = 20.0;
+        assert!(sc.ui_level() < 1e-3 && sc.multiply()[0] < 1e-3);
+        sc.fx_op(0x51, [0x80, 0x80, 0x80, 0x80], 0.0, 1.0);
+        sc.tick = 30.0;
+        assert!((sc.ui_level() - 1.0).abs() < 1e-2 && (sc.multiply()[0] - 0.502).abs() < 1e-2, "{:?}", sc.multiply());
+    }
+
+    /// A camera task lives for its ticks; op 0xb0 naming its path, or a stop of its scheduler, ends it there.
+    #[test]
+    fn shot_lifetime() {
+        let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
+        if index.read(30777).is_err() {
+            return;
+        }
+        let who = [crate::fx::sched::Who::None; 2];
+        let cam = |path: &str| crate::fx::EventCamera { file: 30777, tag: *b"x000", path: u32::from_le_bytes(crate::dat::generator::fourcc(path)), ticks: 50.0, who };
+        let mut sc = Screen::default();
+        sc.fx_camera(&index, cam("d000"));
+        sc.advance(None, None);
+        assert!(sc.shot_live());
+        sc.tick = 49.0;
+        assert!(sc.shot_live());
+        sc.tick = 50.0;
+        assert!(!sc.shot_live(), "ends with its time");
+        sc.fx_camera(&index, cam("d000"));
+        sc.advance(None, None);
+        sc.tick = 60.0;
+        sc.stop_path("d001");
+        assert!(sc.shot_live(), "another path's stop");
+        sc.stop_path("d000");
+        assert!(!sc.shot_live(), "op 0xb0");
+        sc.fx_camera(&index, cam("d000"));
+        sc.advance(None, None);
+        sc.end_shot(|s| s.file_id == 30777 && s.tag == "x001");
+        assert!(sc.shot_live(), "another scheduler's stop");
+        sc.end_shot(|s| s.file_id == 30777 && s.tag == "x000");
+        assert!(!sc.shot_live(), "its scheduler's stop");
+    }
+
+    /// Case 0xf starts from the colour drawn now (+0x320): a fade begun mid-fade goes on from there, and the same op
+    /// arriving again does not cut to its end.
+    #[test]
+    fn fade_from_drawn() {
+        let mut sc = Screen::default();
+        // To black over 21 ticks (dur 21: 20 ticks).
+        sc.fx_op(0x0f, [0, 0, 0, 0x80], 0.0, 21.0);
+        sc.tick = 10.0;
+        assert!((sc.multiply()[0] - 0.5).abs() < 1e-3, "{:?}", sc.multiply());
+        // Back to normal from half way.
+        sc.fx_op(0x0f, [0x80, 0x80, 0x80, 0x80], 0.0, 21.0);
+        assert!((sc.multiply()[0] - 0.5).abs() < 1e-3, "{:?}", sc.multiply());
+        sc.tick = 20.0;
+        assert!((sc.multiply()[0] - (0.5 + 0.5 * 0.5)).abs() < 1e-2, "{:?}", sc.multiply());
     }
 
     #[test]

@@ -1761,13 +1761,13 @@ with ~/ffxi/lab/combat/q.sh. Inferred items are marked *(inf)*.
 - Draw / sheathe: vtable +0x31c = FUN_100a30c0(bool, slot) sets model +0x83c + slot (+0x320 reads both; override
   pair +0x83e via +0x324 / +0x328, scheduler ops 0xa7 / 0xa8, timed FUN_10060e50). FUN_10029320 (pose setup) remaps
   when drawn: bone(point 127) -> bone(main info[6], +0x87e), bone(point 126) -> bone(sub info[6], +0x888);
-  FUN_100339b0 pass 0 skips the carry subtree, pass 1 sets world[carry] = world[grip] *(inf: the copy)* and re-chains
+  FUN_100339b0 pass 0 skips the carry subtree, pass 1 sets world[carry] = world[grip] and re-chains
   its children. Default sheathed (model reset all.c 145748 clears +0x31c / +0x324; init all.c 146831 sets +0x31c(1, 0)
-  only for engaged or flagged actors). Not done in ours.
-- Track scale channels (Trion's 83 / 95 have 1.075) are ignored by our posing; FUN_10019d30 not checked.
+  only for engaged or flagged actors). Done 2026-11-01 ("Drawn weapons ride the grips").
+- Track scale channels are posed since 2026-11-01 (see "Motion scale and the root turn").
 
 ### Open
-- Weapon attach on draw / sheathe (vtable +0x31c; see "Weapons and motion lookup"), the bntg / klbt / hwat / res0 schedulers, dual-wield files,
+- the bntg / klbt / hwat / res0 schedulers, dual-wield files,
   multi-hit swing letters, the move direction for atr / atb / atl (moving always picks f).
 - Scheduler ops other than 0x05 in motion schedulers (sounds 0x57 / 0x0a, 0x20 / 0x2f / 0x59).
 - The actor pass's real blend states for faded actors.
@@ -2041,7 +2041,7 @@ Decompile: ~/ffxi/lab/creatorwork/ghidra/all.c / all.asm. Research notes with ad
   Elvaan, 1.3 Taru, 2.6 Galka (unit test dat::character::plate_points). Lift for bone-0 points: status 5 / 85 -1.3,
   63..83 -0.5 (FUN_1002b7a0; the mount sub-cases and the +0xa4 gate are not decoded).
 - About 40 NPC / monster models pick another point in their init scheduler (ops 0x9e arrow / 0x9f plate); those
-  follow the animated bone in retail. Not implemented: they use point 2.
+  follow the animated bone in retail. Done 2026-11-01 ("Plate and arrow points from `init`").
 - FUN_10084b20: the plate's letters hang down from the anchor (top edge on it), centred, -0.5 px; the arrow's tip
   is on the same point, truncated. Name pulse (FUN_100819d0): the target's alpha x (sin(ticks * 16 deg) * 32 + 96) /
   128.
@@ -2069,8 +2069,8 @@ Decompile: ~/ffxi/lab/creatorwork/ghidra/all.c / all.asm. Research notes with ad
   (FUN_1008dfb0 entity level, FUN_1017a400: a ray from y - 2 down 50, else from y + 2 up 15, nearest hit to the
   start, all faces). Before, only packets snapped, and monsters spawned before the zone loaded kept LSB's navmesh y
   (a few tenths high). The near-camera front-face variant (FUN_100a3560, depth <= 10) is not separate here.
-- Not done: retail's per-actor ground shadow (FUN_10032f80, "system kage tex"), root xz rotation by 3pi/2 for bone 0
-  translations and scale channels in posing (neither changes these models' heights).
+- Retail's per-actor ground shadow (FUN_10032f80, "system kage tex"): see "Actor ground shadows". The bone 0 turn and
+  scale channels in posing: done 2026-11-01 ("Motion scale and the root turn").
 
 ### Frame limiter and present mode (not retail)
 - config.json `frame_limit` (30, 60, 75, 90, 100, 120, 144, 165, 180, 200, 240, 300, 360 or 0 = unlimited; default
@@ -6374,9 +6374,7 @@ vtable +0x1c4 of point +0x8a7 (2 from the constructor) plus f32 +0x8c0; FUN_1002
 times the size (no bone, no rotation, no status), lifted only for status 5 / 0x55 (-1.3) and 0x3f..0x53 (-0.5). A
 dead PC's plate stays at standing head height, as ours (plate_point). The PC `dead` scheduler (7072) has no 0xb4 /
 0x9f.
-- Not done: scheduler op 0xb4 (+0x8c0 for the op's duration; only 8 `cst0` schedulers, -1.5 for 600 ticks); op 0x9f
-  plate points (29 `init` + 3 `nam0` monster schedulers: those plates follow the posed bone, death motions
-  included); the current build's mount sub-case (asm 0x100d4619..0x100d4714: -0.5, or per-race tables for mount
+- Not done: scheduler op 0xb4 (+0x8c0 for the op's duration; only 8 `cst0` schedulers, -1.5 for 600 ticks); the current build's mount sub-case (asm 0x100d4619..0x100d4714: -0.5, or per-race tables for mount
   entity +0x1db 0x1d {0, .5, .5, .5, 1.1, -.7, -.7, .5, .05} / 0x25 {0, .4, .4, .4, .4, -.8, -.8, .4, .4}; -1.3
   without a mount actor or with k = FUN_10022340(race) 0 / 6, k not decoded).
 
@@ -12962,6 +12960,267 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   at (2.0, -7.5) by the door, while the Orchestrion that unlocks it is ordinary furniture wherever it was placed. Only
   FUN_101d4c20 / FUN_101d4c80 read the gated table; nothing moves the NPC onto the furniture. The original client does
   the same (user, 2026-11-01): an invisible target by the door. Not a bug.
+
+## Effect update ops 0x29..0x2b: the sine sway (Buburimu's fish) (2026-11-01)
+
+- FUN_100499d0's table at 0x1004d08c (index op - 1): 0x29 -> 0x1004b627, 0x2a -> 0x1004b683, 0x2b -> 0x1004b6c1. Each
+  takes x = (elem +0x114 - +0x110) x f1 x 1/60 (0x1031ffd0) + f2, i.e. the elapsed ticks in seconds, and v = sin(x) x
+  amplitude x frame +0xeb0 (dt, FUN_1004d420): 0x29 amplitude S[s], pos x += cos(S[s+3]) v, z += sin(S[s+3]) v; 0x2a
+  S[s+1], y += v; 0x2b S[s+2], z += cos(S[s+3]) v, x += sin(S[s+3]) v. Rotation is untouched. Emission ops 0x3d (S[s+3],
+  the heading) and 0x3e..0x40 (S[s..s+2]) fill the slots.
+- Zone 118 (DAT 218) has 16 self-starting fish generators (gyb1 / gyb2, gyd1..gyd4, gye1..gye4, gyh1, gyl1..gyl3,
+  gyz1 / gyz2) in the bay near (441..485, 22, -116..-122): D3b morphs mgy* (textures sak*), zgya the shark. gyl / gyb
+  have no velocity (gyl's op 0x02 slot is zero), so the sway is their only motion; ours skipped the three ops and they
+  sat still. gyd follows path psa1 (ops 0x54 / 0x34). Now in effects.wgsl and update_ref; test gpu_fish_sway.
+- Correction to "D3b morph elements": ops 0x1e..0x22 (case 0x1004bf13) sample at the day fraction (DAT_106175bc,
+  Vana'diel seconds of the day / 86400) when the parameter has bit 4, with no repeat; only life t is repeated
+  (param >> 5) & 0x1ff times (fmod 1). Ours repeated the day fraction too (gyl's weights take 0x51).
+
+## Cutscene cameras from an event scheduler's sub-schedulers (2026-11-01)
+
+- FUN_10057000 (the scheduler op switch; table 0x1005cc6c indexed by op - 2) case 4 / 0x81 (0x1005908c): the camera
+  path 4cc @8 (resource kind 6, FUN_100712e0) is created through FUN_1003ba60 for dur x speed on actor1 / actor2
+  (FUN_10056c30 / c40) and linked to the task (FUN_10073820); the task goes on (return 0, as case 2 does).
+- Ours played op 0x04 only in client/event.rs's runner, which walks the event op's own scheduler. Tasks that
+  scheduler starts (op 0x03 and family) run in fx/tasks.rs, which had no case 4: their shots never played. CoP's
+  Bahamut scene (Lower Delkfutt's Tower event 0x25, op 0x9f #69 = DAT 51252 `main`): main sets c000 and starts
+  cut1..cut4 (c001 0 s, c002 18.8 s, c003, c004); ours held c000, a fixed shot of open sea at (306, -12, -244), for
+  the 57 s. Now a task started by an event op, or by one of its tasks (Task::event, inherited through run_op), hands
+  its op 0x04 / 0x81 to the runner (Effects::event_cameras -> Screen::fx_camera), which starts the shot as its own
+  0x04 does; the event's own scheduler (event_root) stays the runner's. Test sub_scheduler_cameras.
+- Checked offscreen: `cs-shot` takes a file id from 0x77f0 (op 0x9f's 0xc7ef files), `mmb-dump` a file id from 1000
+  (the chunk's name too), and zone-shot FFXI_FX_ONLY / FFXI_FX_HIDE (generators by name) and FFXI_FX_AUDIT (the task
+  VM's default-arm ops). Area 542's sea is DAT 51252's `bahm` generators; its `max1..max5` wall (flag 0x200, Rx Ry Rz)
+  stands upright with a mirrored copy below the surface (max2's negative z scale), as the data has it.
+
+## Cutscene fades, names and weather against the original (2026-11-01)
+
+- Fades (scheduler op 0x0f, FUN_10057000 case 0xf, all.c 65189): one task, which kills the running one and starts from
+  +0x320, the colour drawn last frame (all.c 12601: +0x320 = +0x338 each frame), over ftol(dur x speed) - 1 ticks. Ours
+  ran an event's own scheduler twice, in client/event.rs's runner and as an fx task, each starting from the last
+  target: the second began at the first's end, so every scripted fade (file 30904's fdo / fdi, thousands of starts)
+  was a cut. Now the event's own scheduler's 0x0f is the runner's only (Task::event_root), and every 0x0f starts from
+  Screen::multiply(). Test fade_from_drawn.
+- Correction to "Op 0x92 ... is NOT 'hide in the event'": FUN_100b7d10 sets actor@2 +0x12c bit 16 = u8@1, and
+  FUN_10096000 (all.c 114896, the name for the plate: FUN_10096050 -> FUN_10081830 vtable +0xcc -> FUN_100ce4d0)
+  returns no name for an actor bound to a running event (+0x120 bit 7, DAT_1046ddf9) with that bit or +0x120 bit 17
+  set; unbinding (FUN_100bb750) clears it. Scripts set it on the cast (Ceizak event 3: the player and nine NPCs), so
+  in retail their plates go during cutscenes. Ours: State::no_name, event::nameless in name_plates.
+- Op 0x77 (FUN_100b6880, all.c 135830): an hour other than 0xff freezes the clock (FUN_101854d0) at that hour, minute
+  0; a weather other than 0xff calls FUN_10092900 -> FUN_10184af0 -> FUN_101804d0, the 0x057 switch with no blend, so
+  the weather's effects change too. Op 0x78 (FUN_100b6920) restarts the clock and switches back to the server's
+  weather (FUN_10092940). Ours lit by them only; now the effects switch on 0x77 / 0x78 (and on a swapped area,
+  event::weather), the effects' and the music's hour follow 0x77's (event::hour), and an event ending with 0x77 still
+  in force goes back as its lighting does *(ours: retail keeps it until a 0x78)*.
+
+## Event op 0x5f subs 5 / 6 / 7: named actor timers, not a speed (2026-11-01)
+
+- FUN_100b5490 subs 5 / 6 call FUN_100b3570(.., 1): after playing the motion as subs 3 / 4 do, vtable +0x2a8 =
+  FUN_10083780(val@0x10 ticks, the motion's 4cc, actor) makes an XiActorTimerTask (+0x74 ticks, +0x78 name) that
+  FUN_10083850 counts down by frame ticks and deletes below 0; the op is 2 bytes longer. Sub 7 (FUN_100b3170(0, 1))
+  waits while actor@2 has a timer named u32@10 (vtable +0x2ac = FUN_100838c0); it never looks at the motion.
+- Ours read val@0x10 as a speed and dropped it, and made sub 7 wait for the motion's own length ('tlk0' #80: 80
+  ticks in retail, ~306 in ours; with no timer retail does not wait at all). Now Runtime::timers by (actor, 4cc),
+  counted down each tick, set when sub 5 / 6 issue a motion on a ready actor. Common in talk scenes (Ceizak event 3:
+  85 pairs; 669 sub-7 sites in 30 story zones).
+
+## Cutscene camera roll (2026-11-01)
+
+- Every camera task writes its key's roll to camera +0xa4 (FUN_1003c3e0, FUN_1003bb30), FUN_10020ad0 copies it to
+  +0x5c, and the view builder FUN_10020de0 (asm 0x10020e1d..0x10020e78) turns the base up (0, -1, 0) (+0xa8,
+  FUN_1001d6c0) by Rz(roll) then Ry(yaw), yaw = atan2(-d.x, -d.z) of d = target - eye, row vectors: up = (sin r cos y,
+  -cos r, -sin r sin y). Op 0x46 sub 0 (FUN_10082b20) resets the roll. Ours always used (0, -1, 0): 10,354 of the
+  80,194 event camera paths carry a roll (about 4,600 of 1 degree or more, some to 180; CoP's Bahamut c004 -5.5 ->
+  -17.6 degrees; 17 title flyover paths). Now title::up_of in the cutscene camera and the flyover.
+
+## Cutscene camera: the mode flag, the task's life, stops, sub-task crossfades (2026-11-01)
+
+- Op 0x46's mode is one global, DAT_10346088, written only by FUN_10082b20 (1) / FUN_10082be0 (0) from op 0x46, zone
+  entry (FUN_100929e0) and a UI path; an event's start leaves it, so it is normally 1 (free). Ours started each event
+  at 0: sub 2 answered 0, and the 101 scripts of the form `46 02 L; if L == 0 -> 46 00` (battlefield entries) put
+  the camera behind the player. Now World::cam_free (true at zone-in), the VM's sub 2 reads it, sub 0 / 1 / 3 write
+  it.
+- The camera task ends with its time (FUN_1003c3e0); with none the camera holds while the mode is 0 (FUN_1001e030 /
+  FUN_1001fd70 return) and the free camera runs at 1. A live task shows either way (FUN_10014820 takes its requests,
+  *(inf: the frame order)*). Ours showed a shot only at 0 and re-framed ended framed shots on moving actors; now a live
+  shot shows, and without one the camera holds (World::last_camera) or runs free.
+- The camera task is a child of its scheduler (FUN_10073820) and dies with it (FUN_10073b20 -> FUN_100738e0): event
+  op 0x52's stop (FUN_10061ed0 -> FUN_10055f40) ends the shot of that scheduler (Shot::file_id / tag). Scheduler op
+  0xb0 (FUN_1003bd70) ends the task playing the named path (525 uses; 36 cut a path early, 46 stop another
+  scheduler's). Both freeze the camera where it was.
+- Op 0x10 (crossfade) in an event's sub-task (19 uses, e.g. 57106 gst0..) went to the default arm; it now reaches the
+  screen as the root's does (Effects::event_crosses -> Screen::fx_cross), as does op 0xb0 (event_path_stops). Test
+  shot_lifetime.
+
+## A mode-1 position moves a bound actor's event body (Mhaura's ferry left-behind) (2026-11-01)
+
+- User report: left behind by the Mhaura ferry (no permit), a ship cabin stayed at the dock and they could not get
+  back onto the pier. The cabin is sub-area 493 (file 593: room, door, pillars, the lantern, shelves, barrels, and its
+  own collision with the deck at y -2.074), loaded by RID `m6x0` on the gangway. Left behind, LSB plays event 204:
+  fdo0, op 0x47 sub 0 (8.112, -1.362, 5.239: the pier), the 0x05C round trip, fdi0. LSB answers with s2c 0x065 mode 1.
+- FUN_1009d500 case 1 (all.c 117396): the entity takes the place and facing (FUN_1009d360), and an actor with its
+  model (+0x120 bit 9) bound to the event (bit 7) has them copied into its event body (+0x260 +0x140..+0x15c). Ours set
+  our position only; the event's end kept the body's pose (the deck), so the trigger point never reached `m6x5` on the
+  pier, sub-area 493 never unloaded and its deck and the gangway's closed door box held us. Now event::server_place
+  (Runtime::place_body, snapped). Live (Lnxcsfix, `!pos 8.2 -3.9 -2.8 249`, `!cs 204`): 493 unloads during the
+  event and we stand on the pier.
+- Open: while docked the cabin and the ferry's `fune` mesh do not quite meet (the user saw cracks round the doors).
+  The sub-area is built for a ship at yaw 0; ours ends the arrival `seq0` at yaw about -0.062 (pat1's face step,
+  fx/drive.rs), 0.37 units off at the near doors. Retail's drive reads the same *(inf)*: to compare with the retail
+  client before changing it.
+  - 2026-11-01 (user: "never worked"): a vertex fit (fune vs sub-area 493, positions and normals) puts the hull exactly
+    on the cabin at our final position (-0.516, 0.026, -8.410) with yaw 0 (5 exact matches, 1 at our -0.0624), and
+    LSB's dock pose is the same with rotation 0. So only the heading is off. `pat1` (flags 3: abs, face; backward;
+    curve 4; yaw0 0.0698) ends on the course 0.149 of its last chord (points 1 -> 0), so yaw0 - course is -0.079
+    there and our freeze (h < 0.1 a frame) leaves -0.0624; `pat2` (flags 9: abs, fwd, no face) slides it in +z without
+    turning. Nothing traced turns it to 0; whether retail shows the same gap is still to be seen on the retail client.
+  - Seen on the retail client by the user: the same until the last second of the arrival, then the heading snaps to 0
+    and the doors fit. LSB sends the ship's 0x00E at the arrival (state 0x12, staging), 20 s in (the dock position,
+    heading 0, mask 07) and again at 41 s (docked: byte for byte the 20 s one). Retail passes over the 20 s one (pat1
+    drives the ship then) and takes the 41 s one (seq0 ended at 40 s, no drive). Traced: a drive holds actor +0x88
+    bit 0 (ctor vt+0x178 = FUN_10081fb0, dtor FUN_1005f2c0 -> vt+0x17c = FUN_10081fd0), FUN_100a57f0 reads it, and the
+    pushes FUN_10092c20 / FUN_10092b20 are kind-gated (not 5); the call that puts the 0x00E pose on an undriven ship
+    is not found *(inf)*. Ours: client/ships.rs `posed` -> a ship position update moves the model (position, heading
+    target) unless Effects::driving. Live: the 41 s update turned the ferry from -0.063 to 0 at (-0.516, 0.026,
+    -8.409); the 20 s one was passed over. The Port Jeuno airship (drive 1.4945, dock 64 = 1.5708) gets the same.
+
+## Event op 0x94: no occlusion test for the actor (2026-11-01)
+
+- FUN_100b7e20 (all.c 136915) sets actor@2 +0x12c bit 17 = u8@1; the model update FUN_100c9da0 (all.c 149246 /
+  149559) runs its every-4th-frame occlusion test only with that bit and +0x130 bit 0 clear. Nothing clears it at the
+  event's end. Scripts set it on the cast (3,504 sites in 30 story zones; every participant of the Seekers scenes).
+  Ours dropped the op, so cutscene actors went through our occlusion queries and could vanish for a frame or two
+  after a cut. Now Entity::no_occlusion skips the query and its stale result.
+
+## Cutscenes leave first person (2026-11-01)
+
+- The event's start keeps the first-person flag (FUN_100ad2c0: DAT_10351bb8 = DAT_10475578 when our model is in).
+  Op 0x46 sub 1 (FUN_100b47a0) calls FUN_100acf70(0) -> FUN_100a7350: first person off, our model shown; sub 0 calls
+  it with the saved flag, as does the event's end (FUN_100acf20). Ours kept first person through cutscenes, our own
+  model faded out in every one started from it. Now State::first_saved, applied on 0x46 and in finish.
+
+## Camera paths eased by a KeyFrame (2026-11-01)
+
+- FUN_1003c320 (all.c 44049): a path ease value outside 0..4 is a 4cc naming a KeyFrame (kind 0x19) in the path's
+  file, sampled linearly (FUN_10053550) or eased with path flag bit 21 (FUN_100537f0); not found, linear. Ours took
+  every such path as linear (9 paths: file 57174's y070 / y100 / y110 / y123 / y140 / x800, 70757 c001; 30788 c021 and
+  56949 z001 name a missing 'k000'). Now Title::parse resolves CameraPath::ease_key. Test keyframe_eases.
+
+## Op 0x51: the level over the scene and the windows (2026-11-01)
+
+- Scheduler case 0x51 (all.c 66225) is the 0x0f task on another channel: it writes renderer +0x334 from +0x31c, the
+  level FUN_1000a820 draws over everything after the 2D windows (MODLOG "Name plates under the screen fade"). File
+  30904's fdis / fdos, fai1 / fao1, fai2 / fao2, fdil / fdol use it (about 100 event starts). Ours sent it to the
+  default arm, so nothing faded. Now Screen::level (from what is shown, as 0x0f), in Screen::multiply (scene and
+  plates) and Screen::ui_level (the 2D layer's level, the mean of its RGB *(inf: as the lobby's modulate)*); an event's
+  own scheduler's 0x51 is the runner's, as 0x0f. Test level_over_everything.
+
+## Scheduler ops 0x8a / 0x8b: slotted sounds (2026-11-01)
+
+- Case 0x8a (all.c 67399) plays the SeSep @8 as op 0x60 does (FUN_100360e0) and keeps its handle in slot u32 @0x20
+  (0..7, DAT_10469394); case 0x8b (all.c 67423) stops that slot's sound (FUN_10035d70). 51 / 46 uses, mostly in event
+  roots (30734 '6040', stopped 90 ticks in; 30980 'tvon'). Ours sent both to the default arm: those sounds never
+  played. Now Sound::slot (a new 0x8a takes the slot from the old sound, as the handle is overwritten). Test
+  slotted_sound (the stop is not seen offline: without an audio device a sound that never starts is dropped).
+
+## Scheduler children and motions on the actor a doll stands for (2026-11-01)
+
+- Cases 3 / 0x73 (all.c 64862..64891) start the child on FUN_100617c0 / FUN_10061820 (all.c 72892): actor1 / actor2
+  walked through CXiDollActor to the actor it stands for. Cases 5 and 0x28 act on FUN_100617c0's actor too. Ours
+  passed the doll on, and 0x05 / 0x28 took `t.a1.id()`, None for a doll, so no motion played. Event files: 37 calls
+  (31 with actor1 a doll); battle effect files 1,140 calls in 954 files, 68 0x05 and 53 0x28 with actor1 a doll. Now
+  Effects::doll_of on those.
+
+## Motion scale and the root turn (2026-11-01)
+
+- Found on the CoP opening (zone 184 event 0x25): Bahamut (model 1473, file 2773, skeleton `baha`) flies by `hou0`
+  in motion file 32603 (DAT 499): op 0x05 `ba0?` for 378 ticks, then `ba1?` for 95 with a 30-tick blend. `ba00`
+  (190 keys) keys bone 1 at scale 0.5 on every key and moves it about 22 units along its flight; we ignored scale,
+  so he was drawn twice his size around the camera paths x000..x003. Retail frames (the user's recording, 4:08..4:24)
+  match ours shot for shot with scale applied.
+- Bone records (FUN_10018d00 writes 10 channels per bone into 13-float records at DAT_1044c718, stride 0x34): quat
+  @0, translation @0x10, local scale @0x1c, accumulated scale @0x28. Every record starts as identity, zero,
+  (1, 1, 1) (DAT_10345f04); region blends lerp translation and scale (FUN_10026870) as well as the rotation.
+- FUN_10033800: rotation = motion x rest (FUN_10031d30, Hamilton product, the same order as ours), translation =
+  rest + motion; bone 0's translation then goes through D3DX RotationY(0x4096cbe4 = 3 pi / 2) as a row vector:
+  (x, y, z) -> (-z, y, x). Asm 100338e6..10033918.
+- FUN_100339b0 pass 0: accumulated scale S(0) = s(0), S(i) = S(parent) x s(i) per axis; bone i's matrix = rotation
+  with translation t(i) x S(parent) per axis, times the parent's matrix (no scale in it yet). Pass 2 (called last
+  by FUN_10029320): matrix(i) = Scaling(S(i)) x matrix(i), so vertices and attach points scale in the bone's own
+  frame. Column form: T(i) = T(p) + Q(p) (S(p) x t(i)), Q(i) = Q(p) q(i), vertex = Q(i) (S(i) x v) + T(i).
+- How common: a scan of every DAT (scratch cop/scalescan.py) finds 467,935 tracks with a scale other than 1 in 130,895
+  motions, 143,090 of them uneven per axis, and some at 0 on an axis (`wz70` bone 31: (1, 0, 0)), so scale is a
+  general mechanism, not a special case.
+- Ours: dat::character::BoneXf (q, t, s; `at(off)` for points), pose() and skin(); render/anim.rs poses with scale
+  (scratch 6 vec4 per bone, track words 14..19); the pose region is 3 vec4 per bone (quat, translation, scale;
+  render/mod.rs POSE_PER_BONE), read by vs_skinned / the shine wrap (zone.wgsl) and render/points.rs. Attach
+  frames (FxActors::frame) take the scale too. Normals turn only (our shader normalises them) *(inf: retail's fixed
+  function lighting may see a scaled normal)*.
+- Op 0x5b with name bytes 00 fe fe fe (npc137's first thread in 184): retail passes any name but 0 / 'xxxx' to
+  SetAction; no motion of that name exists in DAT 499, so nothing plays in either client.
+
+## Drawn weapons ride the grips (FUN_100339b0 pass 1), and event maps close at the event's end (2026-11-01)
+
+- User report: Nine (Mithra THF/NIN, daggers main 430 / sub 379) dropped her weapons running while engaged. Her
+  daggers are skinned to bones 97 / 99, children of the carry bones 96 / 98 (rest on the ground: (0, 0.993, 0.061)
+  under bone 2). The engaged `btl1` keys 96 / 98 into the hands, but `run1` of her battle file 47223 keys them at
+  identity, so they fell to the ground. Not new: the build before the scale change renders the same.
+- FUN_10029320 (asm 10029320..1002943f): drawn = vtable +0x320 != 0 (or the +0x328 overrides, not in ours). The
+  +0x878 block (vtable +0x3d8): byte 6 = +0x87e main info[6], byte 0x10 = +0x888 sub info[6] (FUN_100ceae0 cases 6 / 7
+  copy 0x45 chunk byte 6 of each weapon's part file). Pairs (FUN_10029b90: a point's bone, 0 past 0x7f):
+  carry bone(point main info[6]) <- grip bone(point 127); carry bone(point sub info[6]) <- grip bone(point 126);
+  a grip bone 0 means no pair.
+- FUN_100339b0 pass 0 with the pairs: the grip's local scale x= the carry's local scale; the carry's flag (DAT_1044c310)
+  cleared, so its descendants are skipped (the carry itself is computed). Pass 1 (asm 10033ab3..10033b9b): matrix
+  [carry] = matrix[grip] (FUN_10026bc0), then every bone still flagged 0 is chained from its parent in order. Pass 2
+  scales all as before (the carry keeps its own accumulated scale).
+- Ours: Character::grips (dat/character.rs load_character), pose_held (CPU), job words 29 / 30 (carry | grip << 16)
+  and the compute pass's pass 1 (render/anim.rs chain / emit), used while Actor::drawn (state 2 after "in N" until
+  the sheathe). Nine: carry 96 on grip 78, 98 on grip 63; run1 frame 4 the carries at 1.01 / 0.92 high instead of
+  -0.05 (test drawn_weapons_ride_the_grips, CPU and GPU). char-shot --held renders it.
+- Event maps: the ship's route map (zone 220 event 0x400: 0x89, a message, 0x8a, end) was left up after an Escape
+  aborted the event before its message opened, and a mode-1 map ignores Escape, so nothing could close it. FUN_100ac9c0
+  (the event's end) closes an open event map (DAT_10476cde != 0: FUN_101f14c0(1)); ours only forgot map_open. Now
+  the end pushes Cmd::CloseEvent.
+
+## Plate and arrow points from `init` (scheduler ops 0x9e / 0x9f / 0xad) (2026-11-01)
+
+- User report: Laughing Bison's (Mhaura, model 1315 = file 2615, skeleton `kan-`) name and target arrow hung about 1.4
+  to the side of her. Her `init` runs ops 0xad, 0x9e and 0x9f, each with byte @8 = 0x1c: point 28 for the arrow and the
+  plate. Point 28 and point 2 are both bone 0 at (-1.4, -2.6, -0.1), but only point 2 takes the unrotated rest path.
+- Scheduler ops (asm 1005b759 / 1005b789 / 1005b7b9): FUN_100617c0 (actor1 through its dolls), vtable +0xb0 / +0xb8 /
+  +0xc0 with byte @8 = FUN_100a3150 / FUN_100a3170 / FUN_100a3190: actor +0x8a6 (arrow), +0x8a7 (plate), +0x8a8 (reader
+  not traced). FUN_1002b5e0 for any point but 2, with actor +0x30 bit 4: FUN_10029930, the posed point (the drawn
+  bone matrices, so it turns with bone 0's rest quarter turn and the facing and follows the motion).
+- Ours: Effects::anchor_points -> Actor::anchors (reset to 2 with each new model), Actor::anchor_at (posed in the actor
+  loop, CPU bones for such actors), client anchor_point (arrow 0 / plate 1). Seen live by the user: Laughing Bison's
+  plate and arrow over her.
+
+## Airships: a server pose held until the path lets go (2026-11-02)
+
+- User report: Port Jeuno's airships stood off their berth (doors misaligned, the deck edge over the pier) until they
+  snapped in about 2 minutes after docking, just before leaving. 487af5f applied a ship's position update only when
+  it came with no path drive running. LSB sends the dock pose as the docked phase begins: 26 s into the San d'Oria,
+  Bastok and Windurst arrivals (file 31010 `pts0` / `ptt0` / `ptu0` end at 1600 ticks = 26.7 s) and 45 s into
+  Kazham's (`ptv0`, 2700 ticks = 45.0 s). Each came while the path still ran, was passed over, and the next update
+  came only with the closing phase.
+- Decompile: FUN_100c47f0 (the model actor's frame) starts with FUN_100a57f0. Its FUN_10086e90 sets +0xc4 = +0x34
+  every frame, and with +0x88 bit 0 clear +0xe4 = +0x44, so an undriven model actor holds its own pose there.
+  FUN_100c4050 (XiModelActor's set-rotation: +0x744, +0x44, entity +0x34 and FUN_100929a0) is called only from
+  FUN_101cdf50 (Mog House layout quarter turns). The pushes FUN_10092c20 / FUN_100929d0 / FUN_10092b20 skip kind 5.
+  So the call that puts a server pose on a ship is still not found *(inf)*.
+- Ours *(inf)*: an update that comes mid-drive is held (ModelActor::held) and applied once Effects::driving is false.
+  Mhaura's ferry now turns as `pat1` ends (40 s) instead of at the 41 s update, which looks the same.
+- Checked against every LSB transport (ship ids from npcs.yaml door_id, drive ends from the files): each departure
+  path ends after its hide (Port Jeuno 36.7 / 49 s vs 33 / 46 s; Bastok 40 vs 37; Windurst 33.3 vs 29; San d'Oria
+  38.3 vs 35; Kazham 41.7 vs 38; Mhaura / Selbina 40 vs 38; Whitegate / Nashmau 40 vs 37; manaclipper 45 / 53.3 vs
+  41 / 49), so a held staging pose lands while the ship is hidden. The barge's held moves go to its hidden place
+  (0, 100, 0), and the pirate ship's paths end on LSB's (30, 0, 0) and (150, 0, -1000), so only its heading turns
+  (about 0.06). The airship arrivals in Port Bastok (30 vs 29 s), Port San d'Oria (25 vs 23), Port Windurst (41.7 vs
+  40) and Kazham (41.7 vs 40) were passed over the same way.
+- Live (Lnxcsfix at the San d'Oria berth): Kazham's docked update came at 44.4 s and was applied at 45.0 s (yaw
+  1.665 -> 1.571 at (-4, 10.45, 117)); San d'Oria's came at 25.6 s and was applied at 26.4 s (1.493 -> 1.571 at
+  (-68, 10.45, 117)). Seen fixed by the user.
 
 ## Era lock and the Expansions view (ours, not retail)
 

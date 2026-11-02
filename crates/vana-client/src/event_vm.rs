@@ -150,6 +150,10 @@ pub trait Host {
     fn player_word(&self) -> u32 {
         0
     }
+    /// DAT_10346088, op 0x46's camera mode: free (1) unless an event set 0 (FUN_10082b20 / be0); it outlives events.
+    fn camera_free(&self) -> bool {
+        true
+    }
     /// Values 0x7f07 / 0x7f87: an actor's race byte (+0xef); 0 for non-PC looks.
     fn race(&self, _actor: u32) -> u8 {
         0
@@ -338,6 +342,9 @@ pub struct Runtime {
     submap: u32,
     /// Race and server id per VM actor (values 0x7f07 / 0x7f0a), from the host each tick.
     actor_info: std::collections::HashMap<u32, (u8, u32)>,
+    /// Op 0x5f subs 5 / 6: XiActorTimerTasks by (actor, motion 4cc), ticks left (FUN_10083780, counted down by
+    /// FUN_10083850); sub 7 waits while one lives (FUN_100838c0).
+    timers: std::collections::HashMap<(u32, u32), f32>,
     pub dt: f32,
     /// Print each executed op to stderr.
     pub trace: bool,
@@ -379,12 +386,13 @@ impl Runtime {
             end_phase: 0,
             cancelled: false,
             done: false,
-            camera: false,
+            camera: host.camera_free(),
             cam_seed: None,
             last_speaker: None,
             names: None,
             player_word: host.player_word(),
             actor_info: std::collections::HashMap::new(),
+            timers: std::collections::HashMap::new(),
             reg_armed: false,
             reg_value: 0,
             recipe_wait: false,
@@ -627,6 +635,16 @@ impl Runtime {
         self.wait_pos = false;
     }
 
+    /// FUN_1009d500 case 1: a bound actor's body (+0x260 +0x140 / +0x150) takes the server's place and facing.
+    pub fn place_body(&mut self, own: u32, pos: [f32; 3], dir: f32) {
+        for (i, v) in self.vms.iter().enumerate() {
+            if v.own == own {
+                let b = &mut self.bodies[i];
+                (b.pos, b.dir, b.tilt) = (pos, dir, [0.0; 2]);
+            }
+        }
+    }
+
     /// Transforms of the bound actors (the client draws event actors from these).
     pub fn actors(&self) -> impl Iterator<Item = (u32, &Body)> {
         self.vms.iter().enumerate().map(|(i, v)| (v.own, &self.bodies[i]))
@@ -654,6 +672,11 @@ impl Runtime {
         }
         self.dt = dt.max(1.0);
         self.frame += 1;
+        let step = self.dt;
+        self.timers.retain(|_, t| {
+            *t -= step;
+            *t >= 0.0
+        });
         for a in self.vms.iter().map(|v| v.actor).chain([PLAYER]).collect::<Vec<_>>() {
             self.actor_info.insert(a, (host.race(a), host.server_id(a)));
         }
@@ -1558,11 +1581,17 @@ impl Runtime {
                 }
                 self.yield_(v);
             }
-            // FUN_100b5490: subs 3..6 are the 0x5b / 0x66 forms one byte on (5 / 6 add a speed val@0x10).
+            // FUN_100b5490: subs 3..6 are the 0x5b / 0x66 forms one byte on; 5 / 6 then start a timer named by the
+            // motion for val@0x10 ticks (FUN_100b3570 -> vtable +0x2a8) when the motion plays.
             0x5f if matches!(sub, Some(3..=6)) => {
-                let (a, t, file, name) = (self.actor_at(v, 4), self.actor_at(v, 8), self.val(v, 2), four_cc(self.u32_at(v, 0xc)));
+                let (a, t, file, raw) = (self.actor_at(v, 4), self.actor_at(v, 8), self.val(v, 2), self.u32_at(v, 0xc));
+                let name = four_cc(raw);
                 let bank = if matches!(sub, Some(3) | Some(5)) { 0x5b } else { 0x66 };
                 if self.thread(v).state == 0 {
+                    if matches!(sub, Some(5 | 6)) && host.ready(a) && raw != 0 && raw != 0x7878_7878 {
+                        let ticks = self.val(v, 0x10) as f32;
+                        self.timers.insert((a, raw), ticks);
+                    }
                     host.effect(Effect::Motion { op: bank, actor: a, target: t, file, name });
                     self.thread(v).state = 1;
                 }
@@ -1572,10 +1601,11 @@ impl Runtime {
                 }
                 self.yield_(v);
             }
-            // Sub 7 (FUN_100b3170(0, 1)): waits on model vtable +0x2ac; taken as the 0x53 wait (inferred).
+            // Sub 7 (FUN_100b3170(0, 1)): waits while actor@2 has the timer named u32@10 (vtable +0x2ac, FUN_100838c0),
+            // not on the motion.
             0x5f if sub == Some(7) => {
-                let (a, name) = (self.actor_at(v, 2), four_cc(self.u32_at(v, 10)));
-                if host.ready(a) && host.busy(&Busy::Playing { actor: a, name }) {
+                let (a, raw) = (self.actor_at(v, 2), self.u32_at(v, 10));
+                if host.ready(a) && self.timers.contains_key(&(a, raw)) {
                     self.yield_(v);
                 } else {
                     self.adv(v, len);

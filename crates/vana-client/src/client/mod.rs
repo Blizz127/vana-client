@@ -461,6 +461,8 @@ struct Entity {
     reset_bases: bool,
     /// +0x138 bit 31 (event op 0xac sub 2 / 3): while its model is hidden its schedulers' sounds stay off.
     ev_reserved: bool,
+    /// +0x12c bit 17 (event op 0x94, FUN_100b7e20): no occlusion test (FUN_100c9da0); never cleared.
+    no_occlusion: bool,
     /// A door's id (0x00E SubKind 2, u32 @0x34); 0 for anything else.
     door: u32,
     /// A lift's (shaft id, move start, move end) (0x00E SubKind 3, client/lifts.rs).
@@ -1558,6 +1560,7 @@ fn self_entity(w: &World) -> Entity {
         motion_bases: Vec::new(),
         reset_bases: false,
         ev_reserved: false,
+        no_occlusion: false,
         door: 0,
         lift: None,
         ship: None,
@@ -1692,7 +1695,8 @@ fn name_plates(gu: &mut GameUi, world: &World, sw: f32, sh: f32, view_proj: glam
         let (x, y) = ((ndc.x + 1.0) / 2.0 * sw - 0.5, (1.0 - ndc.y) / 2.0 * sh - 0.5);
         (x.abs() <= sw + 100.0 && y.abs() <= sh + 100.0).then_some((x, y, [sw * 0.00234375 * s, sh * 0.00234375 * s], ndc.z))
     };
-    let hidden = event::hidden(world);
+    let mut hidden = event::hidden(world);
+    hidden.extend(event::nameless(world));
     // Retail draws plates into the scene target before the op 0x0f multiply (FUN_10010d20, MODLOG "Name plates under
     // the screen fade"); ours scale their colour by it, which is the same for an alpha-blended plate.
     let m = world.screen.multiply().map(|c| c * (1.0 - world.fade));
@@ -1765,7 +1769,7 @@ fn name_plates(gu: &mut GameUi, world: &World, sw: f32, sh: f32, view_proj: glam
 /// Where the target cursor points (FUN_10153470 -> vtable +0x27c, FUN_100ce6d0): attach point 2 like the name
 /// plate (+0x8a6 = +0x8a7 = 2), projected and truncated; the plate hangs below the same point.
 fn target_point(world: &World, id: u32, sw: f32, sh: f32, view_proj: glam::Mat4) -> Option<(f32, f32)> {
-    let p = plate_point(world, id)?;
+    let p = anchor_point(world, id, 0)?;
     let clip = view_proj * p.extend(1.0);
     if clip.w <= 0.0 {
         return None;
@@ -1774,10 +1778,19 @@ fn target_point(world: &World, id: u32, sw: f32, sh: f32, view_proj: glam::Mat4)
     Some((((ndc.x + 1.0) / 2.0 * sw).trunc(), ((1.0 - ndc.y) / 2.0 * sh).trunc()))
 }
 
-/// FUN_100d23f0 for attach point 2 (FUN_1002b5e0): the actor position plus the skeleton's point 2 offset times
-/// the model scale, rest data only, so it does not move with the pose; then FUN_100d4560's bone-0 drop
-/// (ride::bone0_drop). Without points: the mesh top.
+/// The name plate's anchor (+0x8a7).
 fn plate_point(world: &World, id: u32) -> Option<Vec3> {
+    anchor_point(world, id, 1)
+}
+
+/// FUN_100d23f0 for the arrow's (0) or the plate's (1) attach point. Point 2 (FUN_1002b5e0): the actor position plus
+/// the skeleton's point 2 offset times the model scale, rest data only, so it does not move with the pose; then
+/// FUN_100d4560's bone-0 drop (ride::bone0_drop). Another point (ops 0x9e / 0x9f) is the posed point. Without points:
+/// the mesh top.
+fn anchor_point(world: &World, id: u32, which: usize) -> Option<Vec3> {
+    if let Some(p) = world.actors.get(&id).and_then(|a| a.anchor_at[which]) {
+        return Some(p);
+    }
     // A door's screen point (XiDoorActor vtable +0x27c, FUN_100ac390) is its own position (+0x1bc), unlifted; the
     // Mog House door is one too (FUN_101d2ff0, at its `_720` box centre).
     if let Some(e) = world.entities.get(&id).filter(|e| e.door != 0 || id == myroom::DOOR_ID) {
@@ -4307,6 +4320,7 @@ fn place_mogdoor(w: &mut World) {
             motion_bases: Vec::new(),
             reset_bases: false,
             ev_reserved: false,
+            no_occlusion: false,
             door: 0,
             lift: None,
             ship: None,
@@ -4509,7 +4523,12 @@ struct Actor {
     shadow_off: bool,
     noblob: bool,
     /// Last frame's bone transforms (model space) and model scale, for look points.
-    bones: Vec<(glam::Quat, Vec3)>,
+    bones: Vec<crate::dat::character::BoneXf>,
+    /// Attach points of the target arrow (+0x8a6), the name plate (+0x8a7) and +0x8a8, 2 from the constructor
+    /// (FUN_100c3d20); scheduler ops 0x9e / 0x9f / 0xad set them.
+    anchors: [u8; 3],
+    /// The arrow's and the plate's posed points this frame (world), for anchors other than 2.
+    anchor_at: [Option<Vec3>; 2],
     scale: f32,
     /// Set once the rest-pose top is known.
     top_key: String,
@@ -4527,7 +4546,7 @@ struct Actor {
     look: actmotion::Look,
     emote: Option<String>,
     /// Rest-pose bones (model space), for attach points of a look target.
-    rest: Vec<(glam::Quat, Vec3)>,
+    rest: Vec<crate::dat::character::BoneXf>,
     /// /jump (draw actor +0x8bc): ticks left of the jump motion, below 0 none.
     jump: f32,
     /// The pick's bones (FUN_100cff40): those with geometry whose parent has some too, once per model.
@@ -4594,6 +4613,8 @@ impl Actor {
             shadow_off: false,
             noblob: false,
             bones: Vec::new(),
+            anchors: [2; 3],
+            anchor_at: [None; 2],
             scale: 1.0,
             top_key: String::new(),
             find_cache: Default::default(),
@@ -5003,7 +5024,7 @@ fn attach_point(w: &World, places: &HashMap<u32, Place>, id: u32, k: u16) -> Opt
     let ch = a.character.as_ref()?;
     let model = actor_frame(p, a) * glam::Mat4::from_scale(a.axes.unwrap_or(Vec3::splat(a.scale)));
     let drop = |bone: u16| if bone == 0 { ride::bone0_drop(w, id, p.status) * a.scale } else { 0.0 };
-    match ch.skeleton.points.get(k as usize).and_then(|(bone, off)| a.rest.get(*bone as usize).map(|(q, t)| (*bone, *t + *q * *off))) {
+    match ch.skeleton.points.get(k as usize).and_then(|(bone, off)| a.rest.get(*bone as usize).map(|x| (*bone, x.at(*off)))) {
         Some((bone, local)) => Some(model.transform_point3(local) + Vec3::new(0.0, drop(bone), 0.0)),
         None => Some(p.pos + Vec3::new(0.0, a.top * 1.2, 0.0)),
     }
@@ -5143,7 +5164,7 @@ impl crate::fx::Actors for FxActors<'_> {
             *off * a.scale
         } else {
             let bones = if a.bones.is_empty() { &a.rest } else { &a.bones };
-            bones.get(*bone as usize).map(|(q, t)| (*t + *q * *off) * a.scale)?
+            bones.get(*bone as usize).map(|x| x.at(*off) * a.scale)?
         };
         let d = if *bone == 0 { self.drops.get(&id).copied().unwrap_or(0.0) } else { 0.0 };
         Some(if d == 0.0 { p } else { p + self.matrix(id).map_or(Vec3::new(0.0, d * a.scale, 0.0), |m| point_drop(m, d * a.scale)) })
@@ -5159,9 +5180,9 @@ impl crate::fx::Actors for FxActors<'_> {
         let (bone, off) = *ch.skeleton.points.get(k as usize)?;
         let r = ch.skeleton.point_rots.get(k as usize).copied().unwrap_or(Vec3::ZERO);
         let bones = if a.bones.is_empty() { &a.rest } else { &a.bones };
-        let (q, t) = *bones.get(bone as usize)?;
+        let b = *bones.get(bone as usize)?;
         let local = glam::Mat4::from_translation(off) * glam::Mat4::from_rotation_z(r.z) * glam::Mat4::from_rotation_y(r.y) * glam::Mat4::from_rotation_x(r.x);
-        let mut f = glam::Mat4::from_rotation_translation(q, t) * local;
+        let mut f = glam::Mat4::from_scale_rotation_translation(b.s, b.q, b.t) * local;
         f.w_axis = (f.w_axis.truncate() * a.scale).extend(1.0);
         Some(f)
     }
@@ -5938,6 +5959,8 @@ struct World {
     /// Scheduler tasks, cutscene camera and screen fades (they outlive the event), and the camera drawn last.
     screen: event::Screen,
     last_camera: Option<Camera>,
+    /// DAT_10346088 (event op 0x46): the free camera runs unless an event turned it off; reset at zone-in.
+    cam_free: bool,
     /// After an event: ticks to the next 0x016 about ourselves, until a full 0x00D comes (FUN_100ac9c0 +0x1f8).
     /// Movement is not held for it: retail players never stand frozen after talking to an NPC.
     self_lock: Option<f32>,
@@ -7141,6 +7164,8 @@ impl App {
                 a.play_ui_se(id);
             }
             let hour = w.clock.map(|(t, at)| crate::dat::weather::vana_minute(t, at.elapsed().as_secs_f32()) as u32 / 60).unwrap_or(12);
+            // Op 0x77's hour is the clock's while it holds (FUN_100b6880).
+            let hour = event::hour(w).unwrap_or(hour);
             let party = w.party.party().count().max(1) as u32;
             let cx = crate::audio::MusicContext { status: w.my_motion.status, hour, party, party_battle: party_battle(w), myroom: w.myroom.is_some_and(|r| r.map != 0x2d4), basket: w.actors.get(&w.my_id).is_some_and(|a| matches!(&a.source, Some(Source::Pc(l)) if l.range == 0xc)) };
             if let Some(c) = w.music.select(cx) {
@@ -7788,6 +7813,7 @@ impl App {
                             event_pending: None,
                             screen: Default::default(),
                             last_camera: None,
+                            cam_free: true,
                             self_lock: None,
                             map_open: None,
                             map_cmds: Vec::new(),
@@ -8015,6 +8041,7 @@ impl App {
                             (a.motion_names, a.rebase, a.fresh) = (None, true, true);
                             // Attach points from the rest pose while the GPU model builds ('spop' dolls it at once).
                             (a.rest, a.bones, a.motion_link) = (crate::dat::character::pose(&ch.skeleton, &[]), Vec::new(), None);
+                            (a.anchors, a.anchor_at) = ([2; 3], [None; 2]);
                         }
                         world.models.insert(key, ch);
                         // Looks no actor wears any more go once there are more than MODEL_CACHE.
@@ -8099,7 +8126,7 @@ impl App {
                         world.lamps = Default::default();
                         if let Some(l) = fx {
                             world.effects.load_zone(l);
-                            world.effects.set_weather(crate::dat::weather::weather_tag(world.weather), 0.0);
+                            world.effects.set_weather(crate::dat::weather::weather_tag(event::weather(world)), 0.0);
                         }
                         if let Some(gfx) = &self.gfx {
                             world.effects.reg.light_keys = geometry.light_keys.clone();
@@ -8334,7 +8361,7 @@ impl App {
             w.area_ease.clear();
             if let Some(l) = fx {
                 w.effects.switch_zone(l);
-                w.effects.set_weather(crate::dat::weather::weather_tag(w.weather), 0.0);
+                w.effects.set_weather(crate::dat::weather::weather_tag(event::weather(w)), 0.0);
             }
             if let Some(r) = &w.renderer {
                 w.effects.reg.light_keys = r.light_keys.clone();
@@ -8701,6 +8728,7 @@ impl App {
                         motion_bases: Vec::new(),
                         reset_bases: false,
                         ev_reserved: false,
+                        no_occlusion: false,
                         door: 0,
                         lift: None,
                         ship: None,
@@ -8905,6 +8933,9 @@ impl App {
                     if let Some((ship, start)) = e.ship {
                         entry.ship_rebuild |= entry.ship.is_some_and(|(old, _)| old != ship);
                         entry.ship = Some((ship, start));
+                        if e.pos.is_some() {
+                            world.ships.posed.push(e.id);
+                        }
                     }
                 }
                 NetEvent::Chat { kind, attr, data, from, text } => {
@@ -8994,6 +9025,9 @@ impl App {
                         }
                         let f = forward_from_dir(dir);
                         camera::face(world, f.x.atan2(f.z));
+                    }
+                    if mode == 1 {
+                        event::server_place(world, id, pos, dir);
                     }
                     event::position_ack(world, mode);
                     // FUN_1008f740: entity +0x144 = Mode; 3 runs `pop0`, 6 `pop1` on the actor.
@@ -9387,6 +9421,7 @@ impl App {
                 actor.gpu = None;
                 (actor.motion_names, actor.rebase, actor.fresh) = (None, true, true);
                 (actor.rest, actor.bones, actor.motion_link) = (crate::dat::character::pose(&m.skeleton, &[]), Vec::new(), None);
+                (actor.anchors, actor.anchor_at) = ([2; 3], [None; 2]);
             } else if world.models_loading.insert(key.clone()) {
                 wanted.push((key, source));
             }
@@ -9613,6 +9648,11 @@ impl App {
         for (id, ticks, speed) in std::mem::take(&mut world.effects.self_moves) {
             ride::self_move(world, id, ticks, speed);
         }
+        for (id, which, point) in std::mem::take(&mut world.effects.anchor_points) {
+            if let Some(a) = world.actors.get_mut(&id) {
+                a.anchors[which as usize] = point;
+            }
+        }
         // Scheduler ops 0x29 / 0x2a / 0xa0 / 0x88: the model colour toward an ARGB target, stopped, or set.
         for op in std::mem::take(&mut world.effects.fades) {
             let (id, argb, frames) = match op {
@@ -9717,6 +9757,17 @@ impl App {
         }
         for (code, c, zoom, ticks) in std::mem::take(&mut world.effects.screen_ops) {
             world.screen.fx_op(code, c, zoom, ticks);
+        }
+        for ticks in std::mem::take(&mut world.effects.event_crosses) {
+            world.screen.fx_cross(ticks);
+        }
+        for name in std::mem::take(&mut world.effects.event_path_stops) {
+            world.screen.stop_path(String::from_utf8_lossy(&name.to_le_bytes()).trim_end_matches('\0'));
+        }
+        for c in std::mem::take(&mut world.effects.event_cameras) {
+            if let Some(index) = world.index.clone() {
+                world.screen.fx_camera(&index, c);
+            }
         }
         for (id, _, ticks) in std::mem::take(&mut world.effects.locks) {
             let until = Instant::now() + std::time::Duration::from_secs_f32(ticks.max(0.0) / 60.0);
@@ -12893,6 +12944,7 @@ impl App {
                 r.show_link999(&gfx.gpu, ceiling);
             }
             let new_lamps = if w.renderer.as_ref().is_some_and(|r| r.ready(&gfx.gpu)) { w.lamps.update(&mut w.effects, w.ground.as_ref(), self.cfg.lamp_lights) } else { None };
+            let ev_hour = event::hour(w);
             if let Some(r) = &mut w.renderer {
                 if let Some(l) = &new_lamps {
                     r.set_lamps(&gfx.gpu, &l.iter().map(|l| (l.pos, l.slot)).collect::<Vec<_>>());
@@ -13267,8 +13319,11 @@ impl App {
                     }
                     // CPU bones only where they are read: the locked camera (player bone 13, target bone 5), first
                     // person, and the attach points of actors with live effects.
-                    let pose_now = || if from.is_empty() { crate::dat::character::pose(&ch.skeleton, &anims) } else { crate::render::character::pose_blend(&ch, &from, &anims, t) };
-                    if (w.locked && (*id == w.my_id || w.target == Some(*id))) || (w.camst.first && *id == w.my_id) || fx_posed.contains(id) {
+                    // FUN_10029320: a drawn weapon's carry bone rides its grip.
+                    let held: Vec<(u16, u16)> = if a.drawn { ch.grips.iter().flatten().copied().collect() } else { Vec::new() };
+                    let pose_now = || if from.is_empty() { crate::dat::character::pose_held(&ch.skeleton, &anims, &held) } else { crate::render::character::pose_blend(&ch, &from, &anims, t, &held) };
+                    let posed_anchor = a.anchors[..2].iter().any(|&k| k != 2);
+                    if (w.locked && (*id == w.my_id || w.target == Some(*id))) || (w.camst.first && *id == w.my_id) || fx_posed.contains(id) || posed_anchor {
                         a.bones = pose_now();
                     } else {
                         a.bones.clear();
@@ -13296,7 +13351,7 @@ impl App {
                             && let Some(g) = w.ground.as_ref()
                         {
                             let m = actor_frame(&Place { pos, forward, tilt, status, ratio, size }, a) * glam::Mat4::from_scale(a.axes.unwrap_or(Vec3::splat(a.scale)));
-                            let pt = |k: usize| ch.skeleton.points.get(k).and_then(|(b, off)| a.rest.get(*b as usize).map(|(q, t)| m.transform_point3(*t + *q * *off)));
+                            let pt = |k: usize| ch.skeleton.points.get(k).and_then(|(b, off)| a.rest.get(*b as usize).map(|x| m.transform_point3(x.at(*off))));
                             let snapped = |p: Vec3| g.snap(p.x, p.z, p.y).map(|y| Vec3::new(p.x, y, p.z));
                             if let (Some(p10), Some(p11), Some(p8), Some(p9)) = (pt(10), pt(11), pt(8), pt(9))
                                 && let (Some(fa), Some(fb)) = (snapped((p10 + p11) * 0.5), snapped((p8 + p9) * 0.5))
@@ -13311,13 +13366,18 @@ impl App {
                     }
                     let frame = actor_frame(&Place { pos, forward, tilt, status, ratio, size }, a);
                     let model = frame * glam::Mat4::from_scale(a.axes.unwrap_or(Vec3::splat(a.scale)));
+                    // FUN_1002b5e0: an arrow or plate point other than 2 is the posed point (FUN_10029930), in the world.
+                    for k in 0..2 {
+                        let bones = if a.bones.is_empty() { &a.rest } else { &a.bones };
+                        a.anchor_at[k] = ch.skeleton.points.get(a.anchors[k] as usize).filter(|_| a.anchors[k] != 2).and_then(|&(b, off)| bones.get(b as usize).map(|x| model.transform_point3(x.at(off))));
+                    }
                     // FUN_100cd040 (camera_collision_spec.md 2.2): the eye near posed point 12 fades the actor (not the
                     // player in first person, who fades on its own). A CPU pose only when the rest pose is close.
                     let cam_fade = if *id == w.my_id && w.camst.first {
                         1.0
                     } else {
                         let (b12, off12) = ch.skeleton.points.get(12).copied().unwrap_or((0, Vec3::ZERO));
-                        let at = |bones: &[(glam::Quat, Vec3)]| model.transform_point3(bones.get(b12 as usize).map_or(Vec3::ZERO, |(q, t)| *t + *q * off12));
+                        let at = |bones: &[crate::dat::character::BoneXf]| model.transform_point3(bones.get(b12 as usize).map_or(Vec3::ZERO, |x| x.at(off12)));
                         let rest = at(&a.rest);
                         if Vec3::new(rest.x - eye.x, 0.0, rest.z - eye.z).length() > 0.5 + 2.0 * a.scale {
                             1.0
@@ -13329,12 +13389,12 @@ impl App {
                     };
                     // FUN_100d5b10: an event's look, else the target / face target; eased and weighted in world space.
                     let point = |k: usize| ch.skeleton.points.get(k).copied().unwrap_or((0, Vec3::ZERO));
-                    let p3 = model.transform_point3(a.rest.get(point(3).0 as usize).map_or(Vec3::ZERO, |(q, t)| *t + *q * point(3).1));
+                    let p3 = model.transform_point3(a.rest.get(point(3).0 as usize).map_or(Vec3::ZERO, |x| x.at(point(3).1)));
                     let target = match a.look.mode {
                         actmotion::LookMode::Actor(..) => look_points.get(id).copied(),
                         actmotion::LookMode::Facing(pitch, yaw) => {
                             let (p, y) = (pitch as f32 * TAU_4096, yaw as f32 * TAU_4096);
-                            let head = a.rest.get(point(7).0 as usize).map_or(Vec3::ZERO, |b| b.1);
+                            let head = a.rest.get(point(7).0 as usize).map_or(Vec3::ZERO, |b| b.t);
                             Some(model.transform_point3(head + Vec3::new(p.cos() * y.cos(), -p.sin(), -p.cos() * y.sin()) * 20.0))
                         }
                         actmotion::LookMode::Off => face_points.get(id).copied(),
@@ -13371,7 +13431,9 @@ impl App {
                         && let Some((rect, z)) = box_on_screen(cview, cproj, model, &box_corners(b))
                     {
                         visible.insert(*id);
-                        if *id != w.my_id {
+                        if w.entities.get(id).is_some_and(|e| e.no_occlusion) {
+                            r.occl.results.remove(id);
+                        } else if *id != w.my_id {
                             r.occl.query(*id, rect, z);
                         }
                     }
@@ -13398,7 +13460,7 @@ impl App {
                     g.area = actor_area(w.entities.get(id), w.ground.as_ref().and_then(|gr| gr.area(pos))).unwrap_or(0);
                     if drawn {
                         let files: Vec<_> = extra.iter().map(|(_, f)| f.clone()).collect();
-                        r.pose_actor_gpu(g, &ch, &files, &anims, if a.prev.is_some() { &from } else { &[] }, t, model, look, overlay);
+                        r.pose_actor_gpu(g, &ch, &files, &anims, if a.prev.is_some() { &from } else { &[] }, t, model, look, overlay, &held);
                         counts.posed += 1;
                         // FUN_100c9330: a mounted rider's point 0x6b and the mount's saddle point, for the offset.
                         if let Some((key, k)) = ride::query(&w.rides, *id)
@@ -13521,6 +13583,8 @@ impl App {
                     let mut view_rot = view;
                     view_rot.w_axis = glam::Vec4::W;
                     let minute = w.clock.map(|(t, at)| crate::dat::weather::vana_minute(t, at.elapsed().as_secs_f32())).unwrap_or(720.0);
+                    // Op 0x77's hour holds the clock at its minute 0 (FUN_100b6880).
+                    let minute = ev_hour.map_or(minute, |h| h as f32 * 60.0);
                     let f = crate::fx::Frame {
                         dt: (dt * 60.0).max(1e-3),
                         seconds: dt,
@@ -13653,7 +13717,7 @@ impl App {
             // While the indicator is up it alone is drawn, at full level. Out of the lobby the empty screen is
             // black, not the lobby's 0x808080 (scene level 0 clears to black).
             Phase::World(w) if w.downloading.is_some() => (1.0, 0.0),
-            Phase::World(w) => (1.0 - w.fade, 0.0),
+            Phase::World(w) => ((1.0 - w.fade) * w.screen.ui_level(), 0.0),
             _ => (self.lobby_fade.ui, self.lobby_fade.scene),
         };
         if !matches!(self.phase, Phase::World(_)) && drew_world && scene_level < 0.995 {

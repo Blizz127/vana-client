@@ -573,6 +573,16 @@ pub struct WeaponOp {
 
 pub use equip::{EquipCall, EquipState};
 
+/// A camera path an event's task asked for: its file and scheduler, the path's 4cc, its length in ticks, the actors.
+#[derive(Clone, Debug)]
+pub struct EventCamera {
+    pub file: u32,
+    pub tag: [u8; 4],
+    pub path: u32,
+    pub ticks: f32,
+    pub who: [sched::Who; 2],
+}
+
 /// What effect runs skipped or could not resolve (the fx-sweep command, main.rs).
 #[derive(Default, Debug)]
 pub struct Audit {
@@ -911,6 +921,8 @@ pub struct Effects {
     seq_over: f32,
     /// Op 0x6e for the client: actor, ticks, units a tick along its facing.
     pub self_moves: Vec<(u32, f32, f32)>,
+    /// Ops 0x9e / 0x9f / 0xad for the client: actor, which (0 arrow +0x8a6, 1 name plate +0x8a7, 2 +0x8a8), point.
+    pub anchor_points: Vec<(u32, u8, u8)>,
     /// Op 0x9a for the client: actor, entity +0x130 bit 1.
     pub gens_off: Vec<(u32, bool)>,
     /// Skill / magic actions' holds for the client: op 0x20 (actor2) / 0x59 (actor1, no reactions) as (actor, ticks,
@@ -986,6 +998,13 @@ pub struct Effects {
     /// Scheduler ops 0x0f / 0x72 / 0x0e for the screen (client/event.rs Screen): code, the RGBA bytes @8, f32 @0xc
     /// (0x0e's zoom), dur x speed.
     pub screen_ops: Vec<(u8, [u8; 4], f32, f32)>,
+    /// Camera ops (0x04 / 0x81) of an event's tasks this frame, for the cutscene camera (client/event.rs Screen).
+    pub event_cameras: Vec<EventCamera>,
+    /// Ops 0x10 (crossfade ticks) and 0xb0 (camera path 4cc to end) of an event's tasks this frame.
+    pub event_crosses: Vec<f32>,
+    pub event_path_stops: Vec<u32>,
+    /// The running task's event: the tasks its op creates take it (tasks.rs run_op).
+    spawn_event: bool,
     /// Ops 0x79 / 0x8c / 0xa4 / 0xa5: actor1's battle / idle / run / walk motion set (motion::MotionNames::apply).
     pub motion_sets: Vec<(u32, u8, u32)>,
     /// Op 0xab: actor1's entity +0x130 bit 4 (its motion bases reset at each model creation).
@@ -1084,6 +1103,7 @@ impl Effects {
             actor_poses: HashMap::new(),
             seq_over: 0.0,
             self_moves: Vec::new(),
+            anchor_points: Vec::new(),
             gens_off: Vec::new(),
             holds: Vec::new(),
             locks: Vec::new(),
@@ -1125,6 +1145,10 @@ impl Effects {
             skill_files_done: Vec::new(),
             door_moves: Vec::new(),
             screen_ops: Vec::new(),
+            event_cameras: Vec::new(),
+            event_crosses: Vec::new(),
+            event_path_stops: Vec::new(),
+            spawn_event: false,
             motion_sets: Vec::new(),
             base_resets: Vec::new(),
             death_picks: Vec::new(),
