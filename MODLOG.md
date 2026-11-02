@@ -13257,7 +13257,9 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   - Status (statcom2): children 7 Merit Points, 8 Job Points, 11 Unity, 12 Master Levels, 13 Alter Ego Points. The
     rows are the layout's own chain of down links from child 1 (1 2 12 3 4 5 6 10 11 9 7 8 13), so Down / Up walk
     1 2 3 4 5 6 10 9. The cursor starts on Profile when it was remembered on a dropped child. The disabled
-    marking (`StatusUi.off`) stays for the case below.
+    marking (`StatusUi.off`) stays for the case below, and for the modern Status page, which lists its own rows
+    (dimmed) and reads statcom2 for their help lines: statcom2 is left as the file has it while the modern UI is on
+    (the sync is keyed on lock and modern, `eralayout::specs(locked, modern)`).
   - Abilities (abimenu child 6, abiselec child 5): the Mounts row. Pet moves up (index 5 -> 4 in abimenu, 4 -> 3 in
     abiselec); `magic::cat_rows(w, menu)` is the one row list for the keys, hit tests, cursor memory (by child), the
     type-to-search hits (`Hit.cat` is an index into it) and the modern panel (which now lists no Mounts row either).

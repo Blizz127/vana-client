@@ -198,15 +198,19 @@ impl Layouts {
     }
 }
 
-/// The windows the base era rewrites. `locked` is the era lock (client/era.rs `locked`); lifted, nothing is.
-pub fn specs(locked: bool) -> Vec<Spec> {
+/// The windows the base era rewrites. `locked` is the era lock (client/era.rs `locked`); lifted, nothing is. The modern
+/// Status page lists its own rows (dimmed) and reads statcom2 for their help lines, so statcom2 is left as the file has it
+/// while `modern` is on.
+pub fn specs(locked: bool, modern: bool) -> Vec<Spec> {
     use super::magic::{Cat, cat_rows_all};
     let mut out = Vec::new();
     if !locked {
         return out;
     }
     // statcom2: Merit Points 7, Job Points 8, Unity 11, Master Levels 12, Alter Ego Points 13 (client/status.rs).
-    out.push(Spec { name: super::status::STATCOM, rows: Rows::Chain(1), hidden: vec![7, 8, 11, 12, 13], clip: None });
+    if !modern {
+        out.push(Spec { name: super::status::STATCOM, rows: Rows::Chain(1), hidden: vec![7, 8, 11, 12, 13], clip: None });
+    }
     // abimenu / abiselec: the Mount row (child 6 / 5; Pet moves up under the others).
     for menu in ["menu    abimenu", "menu    abiselec"] {
         let rows = cat_rows_all(menu);
@@ -417,11 +421,14 @@ mod tests {
 
     #[test]
     fn the_lock_off_asks_for_nothing_and_on_names_the_windows() {
-        assert!(specs(false).is_empty());
-        let names: Vec<&str> = specs(true).iter().map(|s| s.name).collect();
+        assert!(specs(false, false).is_empty() && specs(false, true).is_empty());
+        let names: Vec<&str> = specs(true, false).iter().map(|s| s.name).collect();
         assert_eq!(names, ["menu    statcom2", "menu    abimenu", "menu    abiselec", "menu    quest00"]);
         // The ability menus drop their Mount child (6 and 5).
-        let hidden: Vec<Vec<u16>> = specs(true).iter().filter(|s| s.name.contains("abi")).map(|s| s.hidden.clone()).collect();
+        let hidden: Vec<Vec<u16>> = specs(true, false).iter().filter(|s| s.name.contains("abi")).map(|s| s.hidden.clone()).collect();
         assert_eq!(hidden, [vec![6], vec![5]]);
+        // Modern: statcom2 stays the file's (its page draws its own rows), the others as before.
+        let modern: Vec<&str> = specs(true, true).iter().map(|s| s.name).collect();
+        assert_eq!(modern, ["menu    abimenu", "menu    abiselec", "menu    quest00"]);
     }
 }

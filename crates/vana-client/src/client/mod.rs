@@ -1845,10 +1845,10 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     world.ui_wh = (sw, sh);
     // Ours (client/eralayout.rs): the classic windows' layouts follow the era lock.
-    let locked = era::locked(world);
-    if world.era_synced != Some(locked) || gu.era_for != Some(locked) {
-        world.era_packed = gu.sync_era(&eralayout::specs(locked));
-        (world.era_synced, gu.era_for) = (Some(locked), Some(locked));
+    let era_state = (era::locked(world), world.modern);
+    if world.era_synced != Some(era_state) || gu.era_for != Some(era_state) {
+        world.era_packed = gu.sync_era(&eralayout::specs(era_state.0, era_state.1));
+        (world.era_synced, gu.era_for) = (Some(era_state), Some(era_state));
     }
     // The focused list's scroll bar and the wheel, before the windows see the press.
     let taken = scrollbar::frame(gu, world, input);
@@ -5787,7 +5787,7 @@ struct World {
     /// The classic windows the era lock re-packed without their later-era rows (client/eralayout.rs), and the lock state
     /// that was last synced to the layouts.
     era_packed: Vec<&'static str>,
-    era_synced: Option<bool>,
+    era_synced: Option<(bool, bool)>,
     /// The Status row's windows (client/status.rs); s2c 0x063 type 2 (limit points, bits, max merits), type 5 (job point
     /// access), types 3 / 4 (Monstrosity: the types seen as bits, type 3's rank word and prestige); 0x067 @0x25.
     status: Option<status::StatusUi>,

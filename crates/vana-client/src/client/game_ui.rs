@@ -239,8 +239,8 @@ pub struct GameUi {
     pub modern_order: std::cell::RefCell<std::collections::HashMap<String, Vec<u16>>>,
     /// The era lock's rewritten layouts (client/eralayout.rs).
     era: super::eralayout::Layouts,
-    /// The lock state the layouts were last synced to (a new GameUi has the file's own).
-    pub era_for: Option<bool>,
+    /// The lock and modern state the layouts were last synced to (a new GameUi has the file's own).
+    pub era_for: Option<(bool, bool)>,
     /// The focused lists' bars drawn this frame, and a press held on one (client/scrollbar.rs).
     pub bars: Vec<super::scrollbar::Site>,
     pub bar_hold: Option<super::scrollbar::Hold>,
