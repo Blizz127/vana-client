@@ -88,6 +88,66 @@ fn rows(w: &World) -> Vec<Row> {
     out
 }
 
+/// The name of the friend the open list's cursor is on.
+pub(super) fn cursor_name(w: &World) -> Option<String> {
+    mes_friend(w).map(|f| f.name.clone())
+}
+
+/// `friends.list` changed under an open list (the launcher's feed): the rows built afresh, the cursor back on `keep` when
+/// it is still there (else kept in range, flmes closed) and the view moved to show it.
+pub(super) fn refresh_rows(w: &mut World, keep: Option<&str>) {
+    if w.friendui.as_ref().is_none_or(|u| u.list.is_none()) {
+        return;
+    }
+    let new = rows(w);
+    let at = keep.and_then(|n| new.iter().position(|r| matches!(*r, Row::Entry(k) if w.friends.list.get(k).is_some_and(|f| f.name == n))));
+    if let Some(ui) = w.friendui.as_mut() {
+        reseat(ui, new, at);
+    }
+}
+
+/// The open list's rows replaced; the cursor on row `at`, or (None) kept in range with flmes closed; top follows.
+fn reseat(ui: &mut FriendUi, new: Vec<Row>, at: Option<usize>) {
+    let Some((rows, top, cursor)) = ui.list.as_mut() else { return };
+    *cursor = at.unwrap_or((*cursor).min(new.len().saturating_sub(1)));
+    *top = (*top).min(*cursor).min(new.len().saturating_sub(ROWS));
+    if *cursor >= *top + ROWS {
+        *top = *cursor + 1 - ROWS;
+    }
+    *rows = new;
+    if at.is_none() {
+        ui.mes = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shrinking_list_leaves_the_cursor_in_range() {
+        let entries = |n: usize| (0..n).map(Row::Entry).collect::<Vec<_>>();
+        let mut ui = FriendUi { list: Some((entries(40), 20, 30)), mes: Some(2), ..Default::default() };
+        reseat(&mut ui, entries(3), None);
+        let (rows, top, cursor) = ui.list.clone().unwrap();
+        assert_eq!((rows.len(), top, cursor, ui.mes), (3, 0, 2, None));
+        // Empty: the cursor stays at 0 (the draw code never reads a row then).
+        reseat(&mut ui, Vec::new(), None);
+        let (_, top, cursor) = ui.list.unwrap();
+        assert_eq!((top, cursor), (0, 0));
+    }
+
+    #[test]
+    fn the_cursor_follows_its_friend_and_keeps_flmes() {
+        let entries = |n: usize| (0..n).map(Row::Entry).collect::<Vec<_>>();
+        let mut ui = FriendUi { list: Some((entries(40), 0, 3)), mes: Some(2), ..Default::default() };
+        reseat(&mut ui, entries(40), Some(33));
+        let (_, top, cursor) = ui.list.clone().unwrap();
+        assert!(cursor == 33 && top <= cursor && cursor < top + ROWS);
+        assert_eq!(ui.mes, Some(2));
+    }
+}
+
 fn cursor_row(w: &World) -> Option<Row> {
     let (rows, _, c) = w.friendui.as_ref()?.list.as_ref()?;
     rows.get(*c).copied()

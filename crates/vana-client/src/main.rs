@@ -1074,6 +1074,9 @@ fn main() -> Result<()> {
     let client = matches!(cli.cmd, None | Some(Cmd::Play { .. }));
     let mut log = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(if client { "info,vana_client::fx=debug" } else { "info" }));
     log.format_timestamp_millis();
+    // The HTTP library's debug and trace output carries request headers (the friends feed's bearer token): never above
+    // warn, whatever RUST_LOG says.
+    log.filter_module("ureq", log::LevelFilter::Warn).filter_module("ureq_proto", log::LevelFilter::Warn);
     let path = config::log_path();
     if (client || cfg!(windows))
         && let Ok(file) = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|_| {

@@ -186,7 +186,10 @@ enum Fetch {
 }
 
 fn fetch(agent: &ureq::Agent, url: &str, token: &str) -> Result<Snapshot, Fetch> {
-    let mut resp = agent.get(url).header("Authorization", &format!("Bearer {token}")).header("Accept", "application/json").call().map_err(|e| {
+    // Marked sensitive so the http types never print it.
+    let mut auth = ureq::http::HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| Fetch::Failed("unusable token".into()))?;
+    auth.set_sensitive(true);
+    let mut resp = agent.get(url).header("Authorization", auth).header("Accept", "application/json").call().map_err(|e| {
         Fetch::Failed(match e {
             ureq::Error::Timeout(_) => "timed out".into(),
             ureq::Error::HostNotFound | ureq::Error::ConnectionFailed | ureq::Error::Io(_) => "connection failed".into(),
@@ -214,6 +217,18 @@ fn next_token(mut read: impl FnMut() -> Option<String>, used: &str, mut pause: i
             return None;
         }
     }
+}
+
+/// The last token the service turned away. It outlives a poller: a new world (another character, a login after a
+/// logout) starts from the same login file's token and must not send it again.
+static REJECTED: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+fn reject(token: &str) {
+    *REJECTED.lock().unwrap_or_else(|e| e.into_inner()) = Some(token.to_string());
+}
+
+fn rejected(token: &str) -> bool {
+    REJECTED.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some(token)
 }
 
 /// The running poller. Dropping it (the world is gone: logout) stops the thread.
@@ -266,7 +281,8 @@ pub fn spawn(cred: FeedCred) -> Feed {
                 token = cred.token.read();
                 continue;
             };
-            let wait = match fetch(&agent, &cred.url, &t) {
+            let got = if rejected(&t) { Err(Fetch::Expired) } else { fetch(&agent, &cred.url, &t) };
+            let wait = match got {
                 Ok(s) => {
                     if failing {
                         log::info!("friends feed: back");
@@ -278,6 +294,7 @@ pub fn spawn(cred: FeedCred) -> Feed {
                     POLL
                 }
                 Err(Fetch::Expired) => {
+                    reject(&t);
                     log::warn!("friends feed: sign-in expired");
                     if !cred.token.refreshable() {
                         return;
@@ -422,6 +439,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert!(!format!("{c:?}").contains("friends-feed-test"));
         assert!(FeedCred::from_login(&serde_json::json!({"friends_feed": {"url": "https://example.invalid/f", "token_file": ""}})).is_none());
+    }
+
+    #[test]
+    fn remembers_the_rejected_token_across_pollers() {
+        assert!(!rejected("token-a"));
+        reject("token-a");
+        assert!(rejected("token-a"));
+        assert!(!rejected("token-b"));
     }
 
     #[test]

@@ -38,9 +38,11 @@ pub struct Friend {
 impl Friend {
     /// A feed friend; None without a name.
     fn from_feed(i: usize, f: &FeedFriend) -> Option<Self> {
-        let name = f.username.as_deref().map(str::trim).filter(|n| !n.is_empty())?;
+        // The service's text goes to the game's font: no control characters, bounded.
+        let clean = |s: &str, n: usize| s.chars().filter(|c| !c.is_control()).take(n).collect::<String>().trim().to_string();
+        let name = clean(f.username.as_deref()?, 32);
         let index = i.min(199) as u8;
-        Some(Self { index, order: index, name: name.into(), status: f.status(), feed: true, place: f.location(), ..Default::default() })
+        (!name.is_empty()).then(|| Self { index, order: index, name, status: f.status(), feed: true, place: clean(&f.location(), 64), ..Default::default() })
     }
 
     fn from_info(f: &FriendInfo) -> Self {
@@ -177,9 +179,17 @@ fn feed_poll(w: &mut World) {
         return;
     }
     let Some(snap) = f.feed.as_ref().and_then(|d| d.snapshots.try_iter().last()) else { return };
-    f.list = feed_entries(&snap.friends);
-    f.loaded = true;
-    log::info!("friends feed: {} friends", f.list.len());
+    let list = feed_entries(&snap.friends);
+    let same = |a: &[Friend], b: &[Friend]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (&x.name, x.status, &x.place) == (&y.name, y.status, &y.place));
+    if f.loaded && same(&f.list, &list) {
+        return;
+    }
+    // An open list holds row indexes into the old one: rebuilt, the cursor kept on its friend.
+    let keep = super::friendlist::cursor_name(w);
+    w.friends.list = list;
+    w.friends.loaded = true;
+    super::friendlist::refresh_rows(w, keep.as_deref());
+    log::info!("friends feed: {} friends", w.friends.list.len());
 }
 
 /// The feed's friends as list entries: nameless ones and repeats of a name dropped, 200 at most.
@@ -627,6 +637,10 @@ mod tests {
         assert!(list.iter().all(|f| f.feed && !f.black && !f.pending && !f.mail && f.account == 0 && f.record.is_none()));
         assert_eq!(list[0].place, "Example Game");
         assert_eq!(list[2].place, "");
+        // Control characters and length are cleaned before the game's font sees them.
+        let odd = feed_entries(&[friend(Some("a\u{1b}[31mb\n"), "online"), friend(Some(&"x".repeat(100)), "online")]);
+        assert_eq!(odd[0].name, "a[31mb");
+        assert_eq!(odd[1].name.len(), 32);
     }
 
     #[test]
