@@ -194,6 +194,11 @@ pub struct Config {
     pub minimap_span: f32,
     /// Ours (the wheel, as modern MMOs): the camera's rest distance as a share of retail's.
     pub cam_dist: f32,
+    /// Not retail (client/gamepad.rs): gamepad input on; the sticks' deadzone as a share of their travel (0..0.8) and
+    /// the right stick's camera speed as a multiple of the keys'.
+    pub gamepad: bool,
+    pub gamepad_deadzone: f32,
+    pub gamepad_camera_speed: f32,
     /// Ours: resting's ticks as timed on the first rest seen, [first heal, interval, the server's look period] in
     /// seconds (client/resttick.rs).
     pub rest_tick: Option<[f32; 3]>,
@@ -379,6 +384,9 @@ impl Default for Config {
             minimap_size: 1,
             minimap_span: 160.0,
             cam_dist: 1.0,
+            gamepad: true,
+            gamepad_deadzone: crate::client::gamepad::DEFAULT_DEADZONE,
+            gamepad_camera_speed: crate::client::gamepad::DEFAULT_CAMERA_SPEED,
             rest_tick: None,
             cursor_size: 0,
             auto_sort: 0,
@@ -418,6 +426,8 @@ impl Config {
         if c.logins.is_empty() && !c.server.trim().is_empty() && !c.username.trim().is_empty() {
             c.remember_login();
         }
+        c.gamepad_deadzone = c.gamepad_deadzone.clamp(0.0, crate::client::gamepad::MAX_DEADZONE);
+        c.gamepad_camera_speed = c.gamepad_camera_speed.clamp(0.1, 5.0);
         c
     }
 

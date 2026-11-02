@@ -12981,3 +12981,46 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   login on record the bits become the baseline and nothing is announced.
 - Names are a static list (the client reads no expansion names from the game's files). Tests: era::tests,
   searchmenu::tests.
+
+## Gamepad (client/gamepad.rs, client/osk.rs; ours, NOT retail) (2026-11-02)
+What the retail binary tells us (sources are the Input layer and Config notes above), and what is a choice:
+- Retail has a pad: key functions test a pad word with the callback bits of `PAD` in input.rs, and 0xb7..0xba test a
+  *second* pad word, *(inferred: the gamepad's)*. They are not wired here; nothing else is known of them.
+- Config > Misc. 4 (conf13wi) keeps its 0xce rows only while FUN_101bced0() > 0 *(inferred: a connected-pad count)*;
+  the in-game Config's Gamepad row (configwi child 13) takes no cursor. Both stay as they are; our own page is Settings >
+  Gamepad.
+- The retail PC pad's button-to-key table is not in FFXiMain's data tables we read, so the layout below is a choice
+  that reaches the keys the client already has (everything marked *(inferred)*). Nothing about retail's own button
+  numbering is claimed.
+- Design: the pad is another keyboard. Held buttons set DIK keys in `Input` (`set_pad`, ORed into the key state each
+  frame, so presses, repeats and releases are the keyboard's, FUN_10005520); buttons the windows read (Enter, Escape,
+  arrows, `-`, Backspace, Tab, Space) also send the egui key events the window's keys send, into the same raw input the
+  test script's `key:` steps use. The sticks are axes 4 / 5 (move) and 6 / 7 (camera; 0x79 / 0x7a / 0x9d / 0x9e map
+  scroll on the left stick, 0x7c zoom on the right one's Y): `Input::axis` takes the larger of keys and stick, as it
+  does for the compact keyboard's stick (FUN_1011fe30), so with no pad nothing changes.
+- Mapping *(all inferred, from the keys' retail roles above)*: A Enter (talk / confirm / action menu, FUN_101524e0,
+  FUN_10127790); B Escape (cancel, clear target); X `-` (the main menu, mod.rs Minus arm); Y Num* (key functions 0x44 /
+  0x30: lock-on or /heal); LB Num+ (0x11 / 0x78: window views, log), RB Num- (0x18: page); LT / RT held = Ctrl / Alt (key
+  functions 0x76 / 0x77 open the macro palettes, FUN_101a2e80; the palette's own code takes arrows / Enter / Escape, so
+  the D-pad, A and B work it); Select Space (opens the chat line) and Tab while typing (auto-translate); Start Pause
+  (0x13, the log-out prompt, FUN_101609f0) in the field and `-` in windows; L3 Num/ (0x45, walk / run); D-pad in the
+  field Tab / Shift+Tab (0x84 / 0x97, FUN_101587f0) and F1 (0x46, ourselves), elsewhere the arrows. Synthetic events
+  carry no modifiers (the Ctrl / Alt letter shortcuts match on them), and only the arrows repeat (Enter would
+  double-confirm): 0.3 s then every 0.07 s *(inf: retail's 18 ticks / 4 ticks, see Input layer)*.
+- Sticks: a radial deadzone with the rescale reaching 1.0 at 0.95 of the raw length, since Speed (FUN_100a5f60) runs
+  only past 0.9 and a pad topping out near 0.92 would otherwise walk. A push between the deadzone and 0.9 walks at
+  retail's third speed. Stick up = axis 5 negative (the W key). Camera speed multiplies after the deadzone. Config
+  `gamepad` (true), `gamepad_deadzone` (0.2, kept 0..0.8), `gamepad_camera_speed` (1.0, kept 0.1..5).
+- Context: in a window, menu, event or the lobby screens the left stick is the D-pad (past 0.6) and neither stick walks
+  or turns; typing the same. With only the action menu up (it stays up while engaged) the buttons are the menu's but
+  the sticks still walk and turn the camera, as the keyboard's movement keys do. A held LT / RT (Ctrl / Alt) stands the
+  character, as Ctrl / Alt stop the movement keys (flag 0x80). gilrs keeps reporting while another window has the focus: the pad reads only while ours
+  has it. Unplugging, losing focus or turning the setting off hands the mapper an empty state, which lifts every held
+  key (a stuck Ctrl would leave the palette open). The pad in use is the first found, then the last one a button went
+  down on. gilrs starts lazily and not at all with the setting off; a failed start is logged once.
+- On-screen keyboard: osk::request(field) on the frame a text field opens with the pad the last device used (a
+  keyboard or mouse press clears it). Under Steam (`SteamAppId` / `SteamGameId` set) it opens `steam://open/keyboard`
+  through xdg-open / ShellExecute without waiting; elsewhere it does nothing (TODO: our own keyboard).
+- Linux builds link libudev (gilrs-core). Not tested with hardware (gilrs cannot be driven without a device): the
+  mapping table, deadzone, stick vectors, repeat, release-on-unplug and the Input integration are unit tests
+  (gamepad::tests, input::tests::gamepad_keys_and_sticks, osk::tests).

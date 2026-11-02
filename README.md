@@ -61,11 +61,11 @@ Playable on a local LSB server. Working today:
   texture packs (install from an archive, order, enable, uninstall). Our HD pack, the game's textures upscaled 4x, is
   on the [releases page](https://github.com/lenonk/vana-client/releases/tag/hd-pack-1)
 - Music and sound effects
+- Gamepads (Linux and Windows; see below)
 
 Not done yet:
 
 - Some event script operations (the mini-games on 0xb3 among them)
-- Gamepad support
 - macOS builds
 
 ## Requirements
@@ -73,6 +73,7 @@ Not done yet:
 - A GPU with Vulkan support
 - Rust 1.85 or newer (edition 2024)
 - PipeWire or PulseAudio for sound
+- On Linux, libudev (`libudev.so.1`, present on every systemd distro) for gamepads; building needs its development files
 - The game data from Square Enix's official installer, `FFXIFullSetup_US.part1.exe` and its other parts
 - A LandSandBoat server to connect to
 
@@ -87,6 +88,31 @@ cargo build --release
 The binary is `target/release/vana-client`. Release builds are incremental, without link-time optimisation; for a binary to hand out, `cargo build --profile dist` (fat LTO, one codegen unit) writes `target/dist/vana-client`.
 
 Published releases are built with `release/build-linux.sh` (in the Steam Runtime 3 "sniper" SDK container, so one binary runs on every current distro) and `release/build-windows.sh` (a MinGW cross build), then `release/publish.sh VERSION` tags them and creates the GitHub release that the in-app Update offers.
+
+## Gamepad
+
+A connected gamepad works with no setup (Linux evdev; Windows Gaming Input, so Xbox, PlayStation and most other
+pads). The layout follows retail's PC gamepad as far as the client's key functions allow; the pad presses the same
+keys as the keyboard. Config > Settings > Gamepad turns it off and sets the sticks' deadzone and the camera speed
+(`gamepad`, `gamepad_deadzone`, `gamepad_camera_speed` in config.json).
+
+| Button | Walking about | In a window or menu | In a text field |
+|---|---|---|---|
+| Left stick | Move | Cursor | Caret |
+| Right stick | Camera | | |
+| D-pad | Left / right: previous / next target; up: yourself | Cursor | Caret, line history |
+| A / Cross | Enter: talk, confirm, action menu | Confirm | Send |
+| B / Circle | Escape: cancel, clear target | Cancel | Cancel |
+| X / Square | Main menu | Main menu | Backspace |
+| Y / Triangle | Lock-on (Numpad *) | Numpad * | Space |
+| LB / RB | Numpad + (log and window views) / Numpad - (page) | same | |
+| LT / RT (held) | Ctrl / Alt macro palette: D-pad picks, A runs, B closes | same | same |
+| Select / Back | Open the chat line | | Tab (auto-translate) |
+| Start | Log-out prompt | Main menu | |
+| Left stick click | Walk / run | | |
+
+When a text field opens and the pad was the last thing used, the client asks Steam to raise its on-screen keyboard if
+the game was started by Steam. Outside Steam there is no on-screen keyboard yet.
 
 ## Install the game data
 
