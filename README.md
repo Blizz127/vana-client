@@ -89,6 +89,8 @@ The binary is `target/release/vana-client`. Release builds are incremental, with
 
 Published releases are built with `release/build-linux.sh` (in the Steam Runtime 3 "sniper" SDK container, so one binary runs on every current distro) and `release/build-windows.sh` (a MinGW cross build), then `release/publish.sh VERSION` tags them and creates the GitHub release that the in-app Update offers.
 
+`release/build-linux-sandbox.sh` is the same Linux build with no network: an image from the sniper SDK plus the pinned Rust toolchain (`release/sniper.Dockerfile`, built once), then the build runs in it with `--network none` from a populated cargo registry and checks the binary's glibc requirement, `ldd` and `--help` inside the SDK image. `release/steam-deck.md` covers adding the client as a non-Steam game in Game Mode.
+
 ## Gamepad
 
 A connected gamepad works with no setup (Linux evdev; Windows Gaming Input, so Xbox, PlayStation and most other
