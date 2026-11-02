@@ -152,6 +152,12 @@ pub struct Config {
     pub lamp_lights: bool,
     /// Extra (the clock add-ons): Earth time, the moon and the next day beside the Vana'diel clock (client/clock.rs).
     pub earth_clock: bool,
+    /// Ours (not retail, client/era.rs): while the server's lobby bits name no expansion the client hides the windows of
+    /// later systems, offers the base jobs only and caps its own level fields at 60. Off keeps retail's behaviour.
+    pub era_lock: bool,
+    /// The lobby's expansion bits at the last login by server and account (`era::seen_key`): a bit set that was not
+    /// there then is announced once.
+    pub expansions_seen: std::collections::BTreeMap<String, u32>,
     /// Extra (the trust chatter filters): trusts' party lines (battle message 711) are not printed.
     pub hide_trust_speech: bool,
     /// Extra (Battlemod's filters): "readies" / "starts casting" lines only for us and monsters.
@@ -347,6 +353,8 @@ impl Default for Config {
             target_distance: false,
             target_hpp: false,
             earth_clock: false,
+            era_lock: true,
+            expansions_seen: Default::default(),
             lamp_lights: true,
             hide_trust_speech: false,
             hide_ready_lines: false,

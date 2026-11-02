@@ -25,6 +25,7 @@ pub struct Settings {
     pub target_distance: bool,
     pub target_hpp: bool,
     pub earth_clock: bool,
+    pub era_lock: bool,
     pub lamp_lights: bool,
     pub hide_trust_speech: bool,
     pub hide_ready_lines: bool,
@@ -69,6 +70,7 @@ impl Settings {
             target_distance: c.target_distance,
             target_hpp: c.target_hpp,
             earth_clock: c.earth_clock,
+            era_lock: c.era_lock,
             lamp_lights: c.lamp_lights,
             hide_trust_speech: c.hide_trust_speech,
             hide_ready_lines: c.hide_ready_lines,
@@ -112,6 +114,7 @@ impl Settings {
         c.target_distance = self.target_distance;
         c.target_hpp = self.target_hpp;
         c.earth_clock = self.earth_clock;
+        c.era_lock = self.era_lock;
         c.lamp_lights = self.lamp_lights;
         c.hide_trust_speech = self.hide_trust_speech;
         c.hide_ready_lines = self.hide_ready_lines;
@@ -166,6 +169,7 @@ enum Val {
     TargetDistance,
     TargetHpp,
     EarthClock,
+    EraLock,
     LampLights,
     TrustSpeech,
     ReadyLines,
@@ -219,7 +223,7 @@ const fn row(label: &'static str, help: &'static str, val: Val, choices: &'stati
 const TABS: [&str; 8] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Mods"];
 /// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
 const MODS: usize = 7;
-const EXTRA_TABS: [&str; 3] = ["Maps", "Timers", "Misc."];
+const EXTRA_TABS: [&str; 4] = ["Maps", "Timers", "Misc.", "Era"];
 
 /// `in_game`: the volumes are the Gameplay page's there, so the Sound page leaves them out. `modern`: the minimap's and
 /// the Timers' place and size are set by dragging them there, so those rows are left out.
@@ -305,9 +309,13 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [Row] {
         row("Battle Names", "Names in battle lines in one colour, or coloured by who they are: you, your party, the alliance, a monster your party claimed, another's claim.", NameColours, &[(0, "Plain"), (1, "Coloured")], Now),
         row("Text Auto-Advance", "An event's message waiting for a key goes on by itself after this many seconds.", AutoAdvance, &[(0, "OFF"), (3, "3 s"), (5, "5 s"), (8, "8 s")], Now),
     ];
+    // Ours (client/era.rs): its own page, so the Misc. page keeps its length.
+    const ERA: &[Row] = &[
+        row("Era Lock", "On: while the server runs no expansion, the windows of later systems (mounts, Trust, Unity, Merit and Job Points, Records of Eminence) are greyed, the Search menu offers the base jobs and caps levels at 60. /expansions lists what the server has on.", EraLock, OFF_ON, Now),
+    ];
     match kind {
-        Kind::Extras if modern => [&MAPS[..3], TIMERS_MODERN, EXTRA_MISC][tab.min(2)],
-        Kind::Extras => [MAPS, TIMERS, EXTRA_MISC][tab.min(2)],
+        Kind::Extras if modern => [&MAPS[..3], TIMERS_MODERN, EXTRA_MISC, ERA][tab.min(3)],
+        Kind::Extras => [MAPS, TIMERS, EXTRA_MISC, ERA][tab.min(3)],
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
         // Panel Places (the last Linux row) is a character's: in game only.
@@ -443,6 +451,7 @@ impl SettingsUi {
             Val::TargetDistance => self.s.target_distance as u32,
             Val::TargetHpp => self.s.target_hpp as u32,
             Val::EarthClock => self.s.earth_clock as u32,
+            Val::EraLock => self.s.era_lock as u32,
             Val::LampLights => self.s.lamp_lights as u32,
             Val::TrustSpeech => self.s.hide_trust_speech as u32,
             Val::ReadyLines => self.s.hide_ready_lines as u32,
@@ -479,6 +488,7 @@ impl SettingsUi {
             Val::TargetDistance => self.s.target_distance = x != 0,
             Val::TargetHpp => self.s.target_hpp = x != 0,
             Val::EarthClock => self.s.earth_clock = x != 0,
+            Val::EraLock => self.s.era_lock = x != 0,
             Val::LampLights => self.s.lamp_lights = x != 0,
             Val::TrustSpeech => self.s.hide_trust_speech = x != 0,
             Val::ReadyLines => self.s.hide_ready_lines = x != 0,
@@ -1401,7 +1411,7 @@ mod tests {
         assert_eq!(Settings::of(&back), ui.s);
     }
 
-    /// Extras: pages as Settings (Maps, Timers, Misc.), opened on the page name; buttons pick with Left / Right and
+    /// Extras: pages as Settings (Maps, Timers, Misc., Era), opened on the page name; buttons pick with Left / Right and
     /// Enter; Up from the page name wraps to the last row.
     #[test]
     fn extras_buttons() {
@@ -1409,7 +1419,7 @@ mod tests {
         let mut ui = SettingsUi::open_kind(&c, [1280, 800], Kind::Extras);
         assert_eq!((ui.tab, ui.row), (0, 0));
         ui.key(egui::Key::ArrowLeft);
-        assert_eq!(ui.tab, 2);
+        assert_eq!(ui.tab, 3);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::ArrowDown);
         assert_eq!((ui.row, ui.col), (1, 1));

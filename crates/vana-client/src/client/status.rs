@@ -3,6 +3,7 @@
 //! joblevel, masterle, btlskill, mgcskill or trdskill.
 
 use super::World;
+use super::era::{self, Feature};
 use super::game_ui::GameUi;
 use super::net::NetCommand;
 use crate::audio::Ui;
@@ -59,9 +60,24 @@ pub fn open(w: &mut World) {
     if !(w.jp_access.is_some_and(|a| a & 1 != 0) && level >= 99) {
         off.push(8);
     }
+    for c in era_off(w) {
+        if !off.contains(&c) {
+            off.push(c);
+        }
+    }
     let _ = w.net.commands.send(NetCommand::StatusRequest(0));
     w.status = Some(StatusUi { sel: w.cursor_recall(STATCOM), shown: None, off, once: false, busy: true, return_menu: w.menu, cur: [None, None], cur_wait: None, m_page: 0 });
     w.menu = None;
+}
+
+/// Ours (client/era.rs): the children of the systems the base era lacks, kept disabled: 7 Merit Points, 8 Job Points,
+/// 11 Unity, 12 Master Levels, 13 Alter Ego Points.
+fn era_off(w: &World) -> Vec<u16> {
+    [(7, Feature::MeritPoints), (8, Feature::JobPoints), (11, Feature::Unity), (12, Feature::MasterLevels), (13, Feature::AlterEgoPoints)]
+        .into_iter()
+        .filter(|&(_, f)| era::hidden(w, f))
+        .map(|(c, _)| c)
+        .collect()
 }
 
 /// s2c 0x061 (LAB_10147010): the busy strip ends.
@@ -85,6 +101,7 @@ pub fn update(w: &mut World) {
     let ae = w.has_key_item(0xd21);
     let skills = w.skill_base;
     let mon = super::monstrosity::active(w);
+    let era_off = era_off(w);
     let Some(s) = w.status.as_mut() else { return };
     if !ready {
         return;
@@ -102,10 +119,10 @@ pub fn update(w: &mut World) {
         }
     }
     if level > 98 && ml {
-        s.off.retain(|&o| o != 12);
+        s.off.retain(|&o| o != 12 || era_off.contains(&12));
     }
     if level > 98 && ae {
-        s.off.retain(|&o| o != 13);
+        s.off.retain(|&o| o != 13 || era_off.contains(&13));
     }
 }
 

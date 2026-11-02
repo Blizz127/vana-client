@@ -61,7 +61,7 @@ fn close(w: &mut World) {
 
 /// Records of Eminence: quest00's rows 2..4 (Current objectives, Objective List, Vana'Bout; FUN_10230740(row)).
 fn roe_open(w: &mut World, k: usize) {
-    if k == 2 && !w.roe.vanabout() {
+    if roe_off(w) || k == 2 && !w.roe.vanabout() {
         w.sounds.push(Se::Error as u32);
         return;
     }
@@ -70,8 +70,17 @@ fn roe_open(w: &mut World, k: usize) {
     roe::open(w, k + 2);
 }
 
+fn roe_off(w: &World) -> bool {
+    super::super::era::hidden(w, super::super::era::Feature::RecordsOfEminence)
+}
+
 /// Another tab: the open one closes, the other opens as its command would.
 fn switch(w: &mut World, to: Tab) {
+    // Ours (client/era.rs): no Records of Eminence in the base era; the tab refuses and Tab skips it.
+    if to == Tab::Roe && roe_off(w) {
+        w.sounds.push(Se::Error as u32);
+        return;
+    }
     close(w);
     match to {
         Tab::Missions => missions::open_menu(w),
@@ -153,7 +162,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, page: bool) -> bool {
         }
         (_, K::Tab) => {
             let k = TABS.iter().position(|x| x.0 == t).unwrap_or(0);
-            switch(w, TABS[(k + 1) % TABS.len()].0);
+            let next = TABS[(k + 1) % TABS.len()].0;
+            let next = if next == Tab::Roe && roe_off(w) { TABS[(k + 2) % TABS.len()].0 } else { next };
+            switch(w, next);
         }
         (Tab::Missions | Tab::Quests | Tab::KeyItems, K::ArrowUp | K::ArrowDown) if !on_list => {
             let side = if key == K::ArrowDown { K::ArrowRight } else { K::ArrowLeft };

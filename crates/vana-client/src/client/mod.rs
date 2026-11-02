@@ -94,6 +94,7 @@ mod winhits;
 mod auction;
 mod tilt;
 mod aepoints;
+mod era;
 mod jobpoints;
 mod merits;
 mod plate;
@@ -2181,6 +2182,8 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                 _ if post::active(world) => post::key(world, gu, *key),
                 // The pool windows over the action menu (loot, lootope, lnowin).
                 _ if treasure::active(world) => treasure::key(world, *key),
+                // Ours: the Expansions view and the new expansion notice (client/era.rs).
+                _ if era::active(world) && world.modern && matches!(key, egui::Key::Enter | egui::Key::Escape) => era::key(world, *key),
                 _ if world.chatctrl.is_some() => chatctrl::key(world, *key),
                 _ if world.arealist.is_some() => arealist::key(world, gu, *key),
                 _ if world.levelsync.is_some() => levelsync::key(world, *key),
@@ -5739,6 +5742,12 @@ struct World {
     missions: Option<missions::Missions>,
     mission_cmd: Option<Option<String>>,
     expansions: u32,
+    /// Ours (not retail, client/era.rs): the lobby's expansion bits as sent (`expansions` keeps only the installed ones),
+    /// the config's era lock, the Expansions view, and the expansion bits new at this login (the one-time notice).
+    lobby_expansions: u32,
+    era_lock: bool,
+    era_view: bool,
+    era_new: u32,
     /// The Status row's windows (client/status.rs); s2c 0x063 type 2 (limit points, bits, max merits), type 5 (job point
     /// access), types 3 / 4 (Monstrosity: the types seen as bits, type 3's rank word and prestige); 0x067 @0x25.
     status: Option<status::StatusUi>,
@@ -6817,6 +6826,7 @@ impl App {
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.map_overlay = self.cfg.map_overlay;
             w.synth_amount = self.cfg.synth_amount;
+            w.era_lock = self.cfg.era_lock;
             w.stamp_all_lines = self.cfg.stamp_all_lines;
             (w.target_distance, w.target_hpp, w.auto_advance) = (self.cfg.target_distance, self.cfg.target_hpp, self.cfg.auto_advance);
             (w.earth_clock, w.hide_trust_speech, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_trust_speech, self.cfg.hide_ready_lines);
@@ -7416,7 +7426,14 @@ impl App {
                             Phase::Characters { chars, selected: Some(s), .. } => chars.get(*s).map(|c| c.world.clone()).unwrap_or_default(),
                             _ => String::new(),
                         };
-                        let expansions = if let Phase::Characters { expansions, .. } = &self.phase { *expansions & self.installed } else { 0 };
+                        let lobby_expansions = if let Phase::Characters { expansions, .. } = &self.phase { *expansions } else { 0 };
+                        let expansions = lobby_expansions & self.installed;
+                        // The bits that were not on at this server and account's last login: announced once (client/era.rs).
+                        let seen = era::seen_key(&self.cfg.server, &self.cfg.username);
+                        let era_new = era::new_bits(self.cfg.expansions_seen.get(&seen).copied(), lobby_expansions);
+                        if self.cfg.expansions_seen.insert(seen, lobby_expansions) != Some(lobby_expansions) {
+                            let _ = self.cfg.save();
+                        }
                         // The effects' GPU side caches by the World's registry ids (library, texture, mesh); a new
                         // World starts a new registry, so the old session's cache would draw the wrong ones.
                         self.effects_gpu = None;
@@ -7624,6 +7641,10 @@ impl App {
                             missions: None,
                             mission_cmd: None,
                             expansions,
+                            lobby_expansions,
+                            era_lock: self.cfg.era_lock,
+                            era_view: false,
+                            era_new,
                             status: None,
                             merits: None,
                             jp_access: None,
@@ -7917,6 +7938,13 @@ impl App {
                             // The last session's lines in the modern chat, dimmed (not retail).
                             if self.cfg.modern_ui {
                                 w.chat.restore(&crate::config::chat_history_path(&w.name), "------ last session ------");
+                            }
+                            if let Some(text) = era::notice(w.era_new) {
+                                w.chat.push(text);
+                            }
+                            // The alert is the modern UI's; the classic one has the log line.
+                            if !self.cfg.modern_ui {
+                                w.era_new = 0;
                             }
                         }
                         if let Ok((index, _)) = self.game_data() {

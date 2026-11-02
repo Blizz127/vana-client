@@ -3,6 +3,7 @@
 //! before the target prompt (FUN_1022cf30 / FUN_10224b70). MODLOG "Magic and ability menus".
 
 use super::World;
+use super::era::{self, Feature};
 use super::game_ui::GameUi;
 use super::target::{self, SubThen};
 use crate::audio::Ui;
@@ -227,10 +228,15 @@ fn order_mut<'a>(w: &'a mut World, aix: bool) -> Option<&'a mut super::macros::O
 /// the job / level rule, SCH / GEO main for flags 8 / 0x20, and for blue magic 0x200..0x2df a set spell (s2c 0x044).
 pub(super) fn magic_rows(w: &World, ty: u16, list_mode: bool, exclude: u32) -> Vec<u16> {
     let (Some(acts), Some(st)) = (w.actions.as_ref(), w.stats.as_ref()) else { return Vec::new() };
+    let trust_hidden = era::hidden(w, Feature::Trust);
     order(w, false, &w.spells_known)
         .into_iter()
         .filter(|&s| {
             let Some(r) = acts.spell(s) else { return false };
+            // Ours (client/era.rs): no Trust spells in the base era.
+            if r.kind == 8 && trust_hidden {
+                return false;
+            }
             let shown = exclude & (1 << (r.kind & 0x1f)) == 0 && (ty == 0 || r.kind == ty);
             let castable = w.recasts_seen
                 && acts.can_cast(s, st.main, st.sub, 0)
@@ -289,6 +295,11 @@ pub(super) fn remember(w: &mut World) {
 
 /// FUN_1022b220: the magic list, built and opened.
 pub fn open_magic(w: &mut World, ty: u16, list_mode: bool, exclude: u32) {
+    // Ours (client/era.rs): no Trust in the base era.
+    if ty == 8 && era::hidden(w, Feature::Trust) {
+        w.sounds.push(Ui::Error as u32);
+        return;
+    }
     let rows = magic_rows(w, ty, list_mode, exclude);
     // Ours: the modern UI gives every magic list its sort window (retail: mgcmenu's list mode only, attached below).
     let sort = w.modern.then_some(if ty == 6 { "menu    blusortw" } else { "menu    mgcsortw" });
@@ -331,7 +342,7 @@ pub fn open_ability(w: &mut World, ty: u16, sortable: bool) {
 
 /// FUN_10226650: the owned mounts (s2c 0x0AE bits) in moix.dat order; none before the first 0x0AE.
 pub(super) fn mount_rows(w: &World) -> Vec<u16> {
-    let Some(bits) = w.mount_bits else { return Vec::new() };
+    let Some(bits) = w.mount_bits.filter(|_| !era::hidden(w, Feature::Mounts)) else { return Vec::new() };
     let order: Vec<u16> = w.macros.as_ref().map_or_else(|| (0..0x40).collect(), |m| m.moix.clone());
     order.into_iter().filter(|&id| id < 64 && bits & (1 << id) != 0).collect()
 }
@@ -339,6 +350,11 @@ pub(super) fn mount_rows(w: &World) -> Vec<u16> {
 /// FUN_10226490(1, sortable): the mount list (abimenu row 6 attaches abisortw; abiselec row 5 does not), with subwindo
 /// in mode 10. Kept in `w.ability` (type 0xfffe for the cursor memory).
 pub fn open_mount(w: &mut World, sortable: bool) {
+    // Ours (client/era.rs): no mounts in the base era.
+    if era::hidden(w, Feature::Mounts) {
+        w.sounds.push(Ui::Error as u32);
+        return;
+    }
     let rows = mount_rows(w);
     let sort = (sortable || w.modern).then_some("menu    abisortw");
     let mut win = ListWin { kind: Kind::Mount, ty: 0xfffe, exclude: 0, list_mode: false, rows, scroll: 0, cursor: 0, hidden: false, sort, sort_focus: None, ask: None, manual: 0, picked: 0 };

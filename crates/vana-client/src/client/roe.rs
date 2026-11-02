@@ -208,6 +208,11 @@ fn objective(w: &World, id: u16) -> Option<std::sync::Arc<Objective>> {
 /// quest00 rows 2 / 3 / 4 (FUN_10230740 -> FUN_10231550 / FUN_10231610 / FUN_102316e0): quest01 in that mode, the
 /// rows built on its first frame.
 pub fn open(w: &mut World, mode: usize) {
+    // Ours (client/era.rs): no Records of Eminence in the base era.
+    if super::era::hidden(w, super::era::Feature::RecordsOfEminence) {
+        w.sounds.push(crate::audio::Ui::Error as u32);
+        return;
+    }
     open_hook(w);
     let l = List { mode, state: 0, rows: Vec::new(), built: false, top: 0, cursor: 0, stack: vec![(ROOT, 0)], siblings: (0, 0), described: 0, page2: false, sent: None };
     if let Some(q) = w.quests.as_mut() {

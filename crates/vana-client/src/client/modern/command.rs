@@ -2,7 +2,7 @@
 //! icons; a category opens its rows in a submenu beside it. Arrows and Enter or the mouse; a pick runs the retail row
 //! (client/mod.rs's menu dispatch) through `World::menu_click`.
 
-use super::super::{World, menu_disabled_on, monstrosity};
+use super::super::{World, era, menu_disabled_on, monstrosity};
 use super::{Panels, Title};
 use crate::audio::Ui as Se;
 
@@ -18,6 +18,8 @@ enum Kind {
     Sub(&'static [Entry]),
     /// Ours: the Journal on its Records of Eminence tab (retail reaches them through Quests).
     Roe,
+    /// Ours: the Expansions view (client/era.rs).
+    Expansions,
 }
 
 const fn row(label: &'static str, icon: &'static str, page: u8, id: u16) -> Entry {
@@ -43,6 +45,7 @@ const WORLD: &[Entry] = &[row("Map", "icons/map", 0, 12), row("Region Info", "ic
 const SYSTEM: &[Entry] = &[
     row("Macros", "icons/macro", 1, 6),
     row("Config", "icons/config", 1, 7),
+    Entry { label: "Expansions", icon: "icons/info", kind: Kind::Expansions },
     row("Help Desk", "icons/help", 1, 8),
     row("Log Out", "icons/cancel", 1, 12),
     row("Shut Down", "icons/system", 1, 11),
@@ -106,8 +109,8 @@ fn disabled(w: &World, e: &Entry) -> bool {
     match e.kind {
         Kind::Row(page, id) => menu_disabled_on(w, page).contains(&id),
         // As Quests.
-        Kind::Roe => menu_disabled_on(w, 1).contains(&2),
-        Kind::Sub(_) => false,
+        Kind::Roe => menu_disabled_on(w, 1).contains(&2) || era::hidden(w, era::Feature::RecordsOfEminence),
+        Kind::Sub(_) | Kind::Expansions => false,
     }
 }
 
@@ -120,7 +123,7 @@ pub fn key(w: &mut World, key: egui::Key) {
     c.top = c.top.min(top.len() - 1);
     let sub = match top[c.top].kind {
         Kind::Sub(s) => Some(s),
-        Kind::Row(..) | Kind::Roe => None,
+        Kind::Row(..) | Kind::Roe | Kind::Expansions => None,
     };
     match (c.sub, key) {
         (None, K::ArrowDown | K::ArrowUp) => {
@@ -170,6 +173,7 @@ pub fn bar_focus(w: &World) -> BarFocus {
     match e.kind {
         Kind::Row(page, id) => BarFocus::Row(page, id),
         Kind::Roe => BarFocus::Text("Records of Eminence", "View your Records of Eminence objectives and progress.".into()),
+        Kind::Expansions => BarFocus::Text("Expansions", "Which expansions the server has on, and what is new.".into()),
         Kind::Sub(s) => BarFocus::Text(e.label, s.iter().map(|r| label(w, r)).collect::<Vec<_>>().join(", ") + "."),
     }
 }
@@ -185,6 +189,10 @@ fn pick(w: &mut World, e: &Entry) {
         Kind::Roe => {
             w.menu_click = Some((1, 2));
             w.journal_roe = Some(0);
+        }
+        Kind::Expansions => {
+            w.era_view = true;
+            w.menu = None;
         }
         Kind::Sub(_) => {}
     }
@@ -224,7 +232,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 c.sub = Some(0);
                 w.sounds.push(Se::Select as u32);
             }
-            Kind::Row(..) | Kind::Roe => pick(w, &list_top[k]),
+            Kind::Row(..) | Kind::Roe | Kind::Expansions => pick(w, &list_top[k]),
         }
     }
     w.cmd = c;
