@@ -32,9 +32,40 @@ pub struct List {
     pub cursor: usize,
 }
 
-/// FUN_1022da40: children 2..5 and 7 need Zilart, Promathia, Aht Urhgan, Altana, Adoulin (bits 1..4, 0xb).
-fn menu_off(enabled: u32) -> Vec<u16> {
+/// Ours (client/era.rs): missionm's rows the era lock hides, every category but the nation's (child 1): Zilart 2,
+/// Promathia 3, Aht Urhgan 4, Altana 5, Rhapsodies / Voracious Resurgence 6, Adoulin 7. Retail gates 6 on the base bit
+/// only; the lock hides it too (the layout is re-packed without them, client/eralayout.rs).
+pub(super) const LATER_ROWS: [u16; 6] = [2, 3, 4, 5, 6, 7];
+
+/// FUN_1022da40: children 2..5 and 7 need Zilart, Promathia, Aht Urhgan, Altana, Adoulin (bits 1..4, 0xb). Under the
+/// era lock (`locked`) every later row (`LATER_ROWS`) is off, whatever the bits: the rows greyed where the layout
+/// could not be re-packed.
+fn menu_off_for(enabled: u32, locked: bool) -> Vec<u16> {
+    if locked {
+        return LATER_ROWS.to_vec();
+    }
     [(2u16, 1u32), (3, 2), (4, 3), (5, 4), (7, 0xb)].into_iter().filter(|&(_, b)| enabled >> b & 1 == 0).map(|(c, _)| c).collect()
+}
+
+/// The children disabled now: none when the era lock re-packed missionm without its later rows (they are not in the
+/// layout then), else `menu_off_for`.
+fn menu_off(w: &World) -> Vec<u16> {
+    let locked = super::era::locked(w);
+    if locked && w.era_packed.contains(&MENU) {
+        return Vec::new();
+    }
+    menu_off_for(w.expansions, locked)
+}
+
+/// The log is one the lists offer: past the era lock, a nation's, or one whose expansion is enabled (retail's
+/// `MISSION_BITS`).
+fn log_offered(locked: bool, enabled: u32, log: usize) -> bool {
+    super::era::mission_log_on(locked, log) && (log < 3 || enabled >> journal::MISSION_BITS[log] & 1 != 0)
+}
+
+/// The logs the lists offer, as `shown_logs` and the Left / Right cycle: TVR (11) needs RoV past 340.
+fn offered_logs(locked: bool, enabled: u32, rov: u32) -> Vec<usize> {
+    (0..15).filter(|&l| log_offered(locked, enabled, l) && !(l == 11 && rov < 0x154)).collect()
 }
 
 /// The journal's name files, read on the first open.
@@ -49,7 +80,9 @@ pub(super) fn logs(w: &mut World) -> Option<Arc<crate::dat::journal::Logs>> {
 /// Social child 1: missionm with its cursor on child 1.
 pub fn open_menu(w: &mut World) {
     logs(w);
-    w.missions = Some(Missions { menu: Some(w.cursor_recall(MENU)), list: None });
+    // Under the era lock a remembered cursor on a later row (kept from before the lock) starts on child 1.
+    let sel = Some(w.cursor_recall(MENU)).filter(|s| !(super::era::locked(w) && LATER_ROWS.contains(s))).unwrap_or(1);
+    w.missions = Some(Missions { menu: Some(sel), list: None });
 }
 
 /// FUN_1022dbd0 + miss00's open (FUN_1022dcf0): the list on `log`, or waiting while the store is incomplete.
@@ -62,9 +95,9 @@ pub(super) fn open_list(w: &mut World, log: usize) {
 }
 
 /// The logs the modern page lists: the three nations, then those whose expansion is enabled (TVR once RoV is past
-/// 340), as the Left / Right cycle allows.
+/// 340), as the Left / Right cycle allows; the three nations only under the era lock.
 pub(super) fn shown_logs(w: &World) -> Vec<usize> {
-    (0..15).filter(|&l| (l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0) && !(l == 11 && w.journal.rov < 0x154)).collect()
+    offered_logs(super::era::locked(w), w.expansions, w.journal.rov)
 }
 
 /// The modern page: a log with the cursor on an entry (else the first row that is not a header).
@@ -97,8 +130,9 @@ fn build(w: &mut World, l: &mut List) {
 pub fn command(w: &mut World, gu: &GameUi, arg: Option<&str>) {
     logs(w);
     let nation = w.journal.nation as usize;
+    let locked = super::era::locked(w);
     let log = arg
-        .and_then(|a| (0..15).filter(|&l| l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0).find(|&l| gu.title_msg(journal::MISSION_TITLES[l]).as_deref() == Some(a)))
+        .and_then(|a| (0..15).filter(|&l| log_offered(locked, w.expansions, l)).find(|&l| gu.title_msg(journal::MISSION_TITLES[l]).as_deref() == Some(a)))
         .unwrap_or(nation.min(2));
     w.missions = Some(Missions { menu: None, list: None });
     open_list(w, log);
@@ -183,7 +217,7 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, page: bool) {
             w.sounds.push(Ui::Cancel as u32);
             w.missions = None;
         }
-        egui::Key::Enter if menu_off(w.expansions).contains(&sel) => w.sounds.push(Ui::Error as u32),
+        egui::Key::Enter if menu_off(w).contains(&sel) || (super::era::locked(w) && LATER_ROWS.contains(&sel)) => w.sounds.push(Ui::Error as u32),
         egui::Key::Enter => {
             w.sounds.push(Ui::Select as u32);
             // FUN_1022db00 / FUN_1022dbd0: the category's log.
@@ -233,7 +267,7 @@ fn list_key(w: &mut World, l: &mut List, key: egui::Key, page: bool) {
             }
         }
         (1, egui::Key::ArrowLeft | egui::Key::ArrowRight) => {
-            l.log = journal::next_log(&w.journal, l.log, w.expansions, key == egui::Key::ArrowRight);
+            l.log = journal::next_log(&w.journal, l.log, w.expansions, super::era::locked(w), key == egui::Key::ArrowRight);
             build(w, l);
             w.sounds.push(Ui::Cursor as u32);
         }
@@ -322,7 +356,7 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let mut rects = Vec::new();
     let Some(m) = &w.missions else { return rects };
     if let Some(sel) = m.menu {
-        let off = menu_off(w.expansions);
+        let off = menu_off(w);
         let focused = m.list.is_none() && w.confirm.is_none();
         if let Some(win) = gu.lobby_window_off(MENU, sw, sh, (0.0, 0.0), Some(sel), focused, &off) {
             if let Some((x, y)) = gu.window_xy(MENU, sw, sh) {
@@ -393,4 +427,53 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
     }
     rects
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Retail's gating, unchanged while the lock is off: the rows greyed by the missing bits.
+    #[test]
+    fn menu_rows_unlocked_are_retails() {
+        assert_eq!(menu_off_for(0, false), [2, 3, 4, 5, 7]);
+        assert_eq!(menu_off_for(1, false), [2, 3, 4, 5, 7]);
+        assert_eq!(menu_off_for(0b0110, false), [4, 5, 7]);
+        assert_eq!(menu_off_for(0xfff, false), Vec::<u16>::new());
+        // Child 6 (RoV / TVR) is never grey in retail.
+        assert!(!menu_off_for(0, false).contains(&6));
+    }
+
+    /// The lock hides every category but the nation's, whatever bits the client holds (the installed DATs').
+    #[test]
+    fn menu_rows_locked_leave_the_nation() {
+        for enabled in [0, 1, 0xfff] {
+            assert_eq!(menu_off_for(enabled, true), [2, 3, 4, 5, 6, 7]);
+        }
+        assert!(!LATER_ROWS.contains(&1));
+    }
+
+    #[test]
+    fn logs_unlocked_are_retails() {
+        // The nations alone with no bit; RoV (10) and TVR (11) need only the base bit, TVR waits for RoV 340.
+        assert_eq!(offered_logs(false, 0, 0), [0, 1, 2]);
+        assert_eq!(offered_logs(false, 1, 0), [0, 1, 2, 10]);
+        assert_eq!(offered_logs(false, 1, 0x154), [0, 1, 2, 10, 11]);
+        // Every bit on: all fifteen once RoV is past 340, else all but TVR.
+        assert_eq!(offered_logs(false, 0xfff, 0x154), (0..15).collect::<Vec<_>>());
+        assert_eq!(offered_logs(false, 0xfff, 0), (0..15).filter(|&l| l != 11).collect::<Vec<_>>());
+        // Zilart only: the Zilart log, plus RoV's.
+        assert_eq!(offered_logs(false, 0b11, 0), [0, 1, 2, 3, 10]);
+    }
+
+    #[test]
+    fn logs_locked_are_the_three_nations() {
+        for (enabled, rov) in [(0, 0), (1, 0x154), (0xfff, 0x154), (0b11, 0)] {
+            assert_eq!(offered_logs(true, enabled, rov), [0, 1, 2], "{enabled:#x} {rov:#x}");
+        }
+        // The /mission argument sees the same set.
+        let cmd = |locked: bool, enabled: u32| (0..15).filter(|&l| log_offered(locked, enabled, l)).collect::<Vec<_>>();
+        assert_eq!(cmd(true, 0xfff), [0, 1, 2]);
+        assert_eq!(cmd(false, 0b11), [0, 1, 2, 3, 10, 11]);
+    }
 }

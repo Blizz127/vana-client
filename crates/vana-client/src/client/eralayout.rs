@@ -217,6 +217,12 @@ pub fn specs(locked: bool, modern: bool) -> Vec<Spec> {
         let hidden: Vec<u16> = rows.iter().filter(|r| r.1 == Cat::Mount).map(|r| r.0).collect();
         out.push(Spec { name: menu, rows: Rows::Ids(rows.iter().map(|r| r.0).collect()), hidden, clip: None });
     }
+    // missionm (the Missions row's category menu): only the nation's category (child 1) stays; Zilart 2, Promathia 3,
+    // Aht Urhgan 4, Altana 5, Rhapsodies / Voracious Resurgence 6 and Adoulin 7 go. The rows are one column whose
+    // order is the layout's own down links (1 2 3 4 5 7 6: child 7 sits above child 6), hence `Rows::Chain(1)`.
+    // miss00 and quest01 have no per-log / per-area rows (Left / Right cycle them, client/journal.rs `next_log`,
+    // client/quests.rs `area_on`) and quest00 is the chooser below: nothing to re-pack in them.
+    out.push(Spec { name: super::missions::MENU, rows: Rows::Chain(1), hidden: super::missions::LATER_ROWS.to_vec(), clip: None });
     // quest00 stays whole: Records of Eminence is kept in every era (client/era.rs `has`). Were it hidden, its rows and
     // panel would go and the frame end under row 2: `clip: Some(super::quests::BASE_FRAME_H)`.
     out
@@ -423,12 +429,61 @@ mod tests {
     fn the_lock_off_asks_for_nothing_and_on_names_the_windows() {
         assert!(specs(false, false).is_empty() && specs(false, true).is_empty());
         let names: Vec<&str> = specs(true, false).iter().map(|s| s.name).collect();
-        assert_eq!(names, ["menu    statcom2", "menu    abimenu", "menu    abiselec"]);
+        assert_eq!(names, ["menu    statcom2", "menu    abimenu", "menu    abiselec", "menu    missionm"]);
         // The ability menus drop their Mount child (6 and 5).
         let hidden: Vec<Vec<u16>> = specs(true, false).iter().filter(|s| s.name.contains("abi")).map(|s| s.hidden.clone()).collect();
         assert_eq!(hidden, [vec![6], vec![5]]);
         // Modern: statcom2 stays the file's (its page draws its own rows), the others as before.
         let modern: Vec<&str> = specs(true, true).iter().map(|s| s.name).collect();
-        assert_eq!(modern, ["menu    abimenu", "menu    abiselec"]);
+        assert_eq!(modern, ["menu    abimenu", "menu    abiselec", "menu    missionm"]);
+        // missionm drops every category but the nation's (child 1).
+        let m = specs(true, false).into_iter().find(|s| s.name == "menu    missionm").unwrap();
+        assert_eq!((m.rows, m.hidden, m.clip), (Rows::Chain(1), vec![2, 3, 4, 5, 6, 7], None));
+    }
+
+    /// missionm's shape without the game files: seven rows, child 7 above child 6 (frame 6 + 7 * 16 + 4 = 122 high).
+    #[test]
+    fn missionm_shaped_layout_is_cut_to_the_nation_row() {
+        let ids = [1u16, 2, 3, 4, 5, 7, 6];
+        let m = menu(&ids, 122, 0);
+        let spec = specs(true, false).into_iter().find(|s| s.name == "menu    missionm").unwrap();
+        assert_eq!(chain(&m, 1), ids);
+        let p = packed(apply(&m, &spec));
+        let v = view(&p);
+        assert_eq!(v, [(1, 10, [1, 1, 1, 1])]);
+        // Six 20-high places freed in the helper's layout.
+        assert_eq!(p.elements[0].h, 122 - 6 * 20);
+        // A later era row dropped from the middle of a bigger menu keeps the rest linked: Zilart alone gone.
+        let two = packed(repack(&m, &chain(&m, 1), &[2]));
+        assert_eq!(view(&two).iter().map(|r| r.0).collect::<Vec<_>>(), [1, 3, 4, 5, 7, 6]);
+    }
+
+    /// missionm as the file lays it out (children 1..7 in a column; child 7 above child 6, the down links 1 2 3 4 5 7 6
+    /// 1): the nation row stays alone, the frame shrinks to it, and the cursor has nowhere else to go.
+    #[test]
+    fn missionm_in_the_game_data_keeps_the_nation_row_only() {
+        let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
+        let Ok(file) = index.read(crate::dat::ui::MENU_US) else { return };
+        let ui = crate::dat::ui::UiFile::parse(&file).unwrap();
+        let Some(orig) = ui.menu(super::super::missions::MENU) else { return };
+        // The layout the code counts on: child id == its place in the file, a chain from child 1 through all seven.
+        assert!(orig.elements.iter().enumerate().skip(1).all(|(i, e)| e.id as usize == i), "index == id");
+        // The runtime reads the menu from the merged lobby set, whose first match is taken: the lobby file has no copy.
+        if let Ok(lobby) = index.read(crate::dat::ui::LOBBY_US) {
+            assert!(crate::dat::ui::UiFile::parse(&lobby).unwrap().menu(super::super::missions::MENU).is_none());
+        }
+        assert_eq!(chain(orig, 1), [1, 2, 3, 4, 5, 7, 6]);
+        let spec = specs(true, false).into_iter().find(|s| s.name == super::super::missions::MENU).unwrap();
+        let p = packed(apply(orig, &spec));
+        assert_eq!(view(&p).iter().map(|r| r.0).collect::<Vec<_>>(), [1]);
+        // The row keeps its place (the first); the frame is one row high: its old height less the six rows gone.
+        assert_eq!(p.elements[1].y, orig.elements[1].y);
+        let slot_y = |id: u16| orig.elements[find(orig, id).unwrap()].y;
+        assert_eq!(p.elements[0].h, orig.elements[0].h - (slot_y(6) - slot_y(1)) as u16);
+        // No link of the row names a dropped child: it points at itself, so Up / Down stay where they are.
+        assert!(p.elements[1].links.iter().take(4).all(|&l| l == 1), "{:?}", p.elements[1].links);
+        // Not re-packed again from the pristine layout: the same spec on the same file is the same result.
+        let again = packed(apply(orig, &spec));
+        assert!(same(&p, &again));
     }
 }

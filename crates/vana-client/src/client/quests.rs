@@ -162,8 +162,13 @@ pub(super) fn rows(w: &World, area: usize, mode: usize) -> Vec<usize> {
         .collect()
 }
 
-/// DAT_10386998: areas 5..10 need Zilart, ToAU, WotG, Abyssea (any of 8..10), Adoulin; 0..4 always.
-pub(super) fn area_on(enabled: u32, area: usize) -> bool {
+/// DAT_10386998: areas 5..10 need Zilart, ToAU, WotG, Abyssea (any of 8..10), Adoulin; 0..4 always. Ours (client/era.rs):
+/// under the era lock (`locked`) areas 5..10 are off whatever the bits (the Left / Right cycle skips them, the modern
+/// page and the search do not list them).
+pub(super) fn area_on(locked: bool, enabled: u32, area: usize) -> bool {
+    if !super::era::quest_area_on(locked, area) {
+        return false;
+    }
     match area {
         5 => enabled & 2 != 0,
         6 => enabled & 8 != 0,
@@ -289,7 +294,7 @@ fn list_key(w: &mut World, l: &mut List, key: egui::Key, page: bool) {
             let mut a = l.area;
             for _ in 0..11 {
                 a = if key == egui::Key::ArrowRight { (a + 1) % 11 } else { (a + 10) % 11 };
-                if area_on(w.expansions, a) {
+                if area_on(super::era::locked(w), w.expansions, a) {
                     break;
                 }
             }
@@ -517,6 +522,21 @@ mod tests {
         assert_eq!(r.completed(), 0x73 * 8);
         r.log_part(0, &[0; 128]);
         assert_eq!(r.completed(), 0);
+    }
+
+    /// Unlocked, the areas are retail's (bits); locked, only 0..4 remain whatever the client's bits.
+    #[test]
+    fn areas_follow_the_lock_then_the_bits() {
+        let on = |locked: bool, enabled: u32| (0..11).filter(|&a| area_on(locked, enabled, a)).collect::<Vec<_>>();
+        assert_eq!(on(false, 0), [0, 1, 2, 3, 4]);
+        assert_eq!(on(false, 1), [0, 1, 2, 3, 4]);
+        assert_eq!(on(false, 0b10), [0, 1, 2, 3, 4, 5]);
+        assert_eq!(on(false, 0x100), [0, 1, 2, 3, 4, 8]);
+        assert_eq!(on(false, 0xfff), (0..11).collect::<Vec<_>>());
+        assert_eq!(on(false, 0x800), [0, 1, 2, 3, 4, 9, 10]);
+        for enabled in [0, 1, 0b10, 0x100, 0xfff] {
+            assert_eq!(on(true, enabled), [0, 1, 2, 3, 4], "{enabled:#x}");
+        }
     }
 
     /// The chooser lists Records of Eminence's rows only outside the base era; Vana'Bout only while it is open.
