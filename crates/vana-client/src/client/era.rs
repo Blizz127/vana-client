@@ -6,7 +6,7 @@
 //! systems (mounts, Unity, Merit / Job / Alter Ego Points, Master Levels, Records of Eminence, the Search
 //! menu's Unity and Monstrosity rows) are greyed, the Search menu offers the base jobs only and stops its level fields at
 //! 60. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
-//! or with the config's `era_lock` off, retail behaviour is unchanged.
+//! retail behaviour is unchanged. There is no player switch: only the server's bits decide.
 //!
 //! The era is keyed on the lobby's bits as sent, not on `World.expansions` (those and the installed DATs), so a player
 //! whose game folder lacks an expansion's files still plays the server's era.

@@ -86,6 +86,10 @@ pub struct NamedServer {
     pub loader_version: Option<String>,
 }
 
+fn era_lock_on() -> bool {
+    true
+}
+
 /// Server names compare without case or outer spaces ("PlayOnline", "playonline").
 fn same_server(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
@@ -153,7 +157,9 @@ pub struct Config {
     /// Extra (the clock add-ons): Earth time, the moon and the next day beside the Vana'diel clock (client/clock.rs).
     pub earth_clock: bool,
     /// Ours (not retail, client/era.rs): while the server's lobby bits name no expansion the client hides the windows of
-    /// later systems, offers the base jobs only and caps its own level fields at 60. Off keeps retail's behaviour.
+    /// later systems, offers the base jobs only and caps its own level fields at 60. Always on and never read from the
+    /// file: what a character sees follows only what its server reports (a server unlocks by sending the bits).
+    #[serde(skip, default = "era_lock_on")]
     pub era_lock: bool,
     /// The lobby's expansion bits at the last login by server and account (`era::seen_key`): a bit set that was not
     /// there then is announced once.

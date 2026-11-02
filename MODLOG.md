@@ -12967,13 +12967,14 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
 
 - The lobby's expansions bitmask (u32 @0x20; bit 0 base, bits 1..11 Zilart .. Adoulin) is the only thing a server says
   about its era. With no expansion bit on the era is "base" (client/era.rs, keyed on the bits as sent, not on
-  World.expansions which also needs the installed DATs) and, while the config's `era_lock` (default on, Extras > Misc.)
-  is on, the client greys what did not exist then: mounts (abimenu / abiselec row, `/mount` list), Trust (mgcmenu row,
-  the action menu's Trust, Trust spells in lists), Status' Merit Points / Job Points / Unity / Master Levels / Alter Ego
+  World.expansions which also needs the installed DATs), and the client greys what did not exist then (no player
+  switch; a server unlocks by sending the bits, per character if it wants): mounts (abimenu / abiselec row, `/mount`
+  list), Status' Merit Points / Job Points / Unity / Master Levels / Alter Ego
   Points, Records of Eminence (quest00 rows, the modern Journal tab and command row), Search's Monstrosity, Unity and
-  master level rows. The Search job list offers WAR MNK WHM BLM RDM THF PLD DRK BST BRD RNG, its level fields stop at 60
+  master level rows. Trust is left to the server (a server may keep it as a convenience): the lists show only the Trust
+  spells the server says are known. The Search job list offers WAR MNK WHM BLM RDM THF PLD DRK BST BRD RNG, its level fields stop at 60
   (the only level cap the client computes). Nothing is sent or invented: only the client's own windows change. Any
-  expansion bit on, or `era_lock` off, is retail's behaviour.
+  expansion bit on is retail's behaviour.
 - Expansions view: modern Command Menu > System > Expansions (Locked / Unlocked per bit) or `/expansions` (the same
   list in the log). The last-seen bits are kept per server and account in the config (`expansions_seen`); a bit that
   was not there at the last login is announced once (a log line, and an alert in the modern UI). With no earlier
