@@ -7218,7 +7218,7 @@ impl App {
         }
         if create {
             self.spawn(move || {
-                let req = Request { username: &cfg.username, password: &password, ..Default::default() };
+                let req = Request { username: &cfg.username, password: &password, version: cfg.loader_version(), ..Default::default() };
                 Task::AccountCreated(auth::send(&cfg.server, cfg.auth_port, Command::CreateAccount, &req).map(|_| ()))
             });
             return;
@@ -7227,7 +7227,7 @@ impl App {
         self.netwait = Some(netwait::NetWait::new(netwait::Op::Connect, replies.clone()));
         self.spawn(move || {
             Task::LoggedIn((|| {
-                let req = Request { username: &cfg.username, password: &password, otp: &otp, ..Default::default() };
+                let req = Request { username: &cfg.username, password: &password, otp: &otp, version: cfg.loader_version(), ..Default::default() };
                 let Reply::LoggedIn { account_id, session_hash, .. } = auth::send(&cfg.server, cfg.auth_port, Command::Login, &req)? else {
                     anyhow::bail!("unexpected reply from the login server");
                 };
@@ -7248,7 +7248,7 @@ impl App {
         let cfg = self.cfg.resolved();
         let user = cfg.username.trim().to_string();
         self.spawn(move || {
-            let req = Request { username: &user, password: &password, otp: &otp, ..Default::default() };
+            let req = Request { username: &user, password: &password, otp: &otp, version: cfg.loader_version(), ..Default::default() };
             Task::TwoFa(auth::send(&cfg.server, cfg.auth_port, command, &req))
         });
     }

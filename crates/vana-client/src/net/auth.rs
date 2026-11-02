@@ -28,6 +28,8 @@ pub struct Request<'a> {
     pub new_password: &'a str,
     pub trust_token: &'a str,
     pub trust_this_computer: bool,
+    /// The loader version reported to the server (config `loader_version`); None = LOADER_VERSION.
+    pub version: Option<[u8; 3]>,
 }
 
 #[derive(Debug)]
@@ -63,7 +65,7 @@ pub fn send(host: &str, port: u16, command: Command, req: &Request) -> Result<Re
         "password": req.password,
         "otp": req.otp,
         "new_password": req.new_password,
-        "version": LOADER_VERSION,
+        "version": req.version.unwrap_or(LOADER_VERSION),
     });
     if command == Command::Login {
         body["trust_token"] = json!(req.trust_token);

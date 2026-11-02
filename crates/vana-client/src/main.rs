@@ -1032,7 +1032,7 @@ fn parse_mask(s: &str) -> Result<u32, String> {
 fn login(cfg: &config::Config, creds: &Credentials) -> Result<net::lobby::Lobby> {
     use net::auth::{self, Command, Reply, Request};
     let cfg = &cfg.resolved();
-    let req = Request { username: &creds.username, password: &creds.password, ..Default::default() };
+    let req = Request { username: &creds.username, password: &creds.password, version: cfg.loader_version(), ..Default::default() };
     let Reply::LoggedIn { account_id, session_hash, .. } = auth::send(&cfg.server, cfg.auth_port, Command::Login, &req)? else {
         anyhow::bail!("unexpected login reply");
     };
@@ -1717,7 +1717,7 @@ fn main() -> Result<()> {
             use net::auth::{self, Command, Request};
             let cfg = config::Config::load().resolved();
             let creds = Credentials { username: user, password: random_password()? };
-            let req = Request { username: &creds.username, password: &creds.password, ..Default::default() };
+            let req = Request { username: &creds.username, password: &creds.password, version: cfg.loader_version(), ..Default::default() };
             auth::send(&cfg.server, cfg.auth_port, Command::CreateAccount, &req)?;
             write_private(&credentials, &serde_json::to_vec_pretty(&creds)?)?;
             println!("Created account {}; credentials in {}", creds.username, credentials.display());

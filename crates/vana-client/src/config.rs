@@ -82,6 +82,8 @@ pub struct NamedServer {
     /// The friend list, presence and mail through the server's profile service (xi_profile); unset follows
     /// `social_named_only`.
     pub social: Option<bool>,
+    /// The loader version this server checks for ("2.1.2"); unset keeps the config's.
+    pub loader_version: Option<String>,
 }
 
 /// Server names compare without case or outer spaces ("PlayOnline", "playonline").
@@ -117,6 +119,8 @@ pub struct Config {
     /// Not retail: only named servers with `social` set get the friend list, presence and mail; every other server
     /// gets none of them (no connection to its profile ports).
     pub social_named_only: bool,
+    /// Not retail: the xiloader version reported at login ("2.1.2"); empty = the client's own (net::auth).
+    pub loader_version: String,
     /// Version string sent to the lobby; LSB rejects clients older than its CLIENT_VER.
     pub client_version: String,
     /// cpal output device id ("pipewire:..."); empty = the system default.
@@ -329,6 +333,7 @@ impl Default for Config {
             irc_port: 51240,
             named_servers: Vec::new(),
             social_named_only: false,
+            loader_version: String::new(),
             client_version: "30261006_0".into(),
             audio_device: String::new(),
             frame_limit: 300,
@@ -413,8 +418,17 @@ impl Config {
             c.view_port = n.view_port.unwrap_or(c.view_port);
             c.profile_port = n.profile_port.unwrap_or(c.profile_port);
             c.irc_port = n.irc_port.unwrap_or(c.irc_port);
+            if let Some(v) = &n.loader_version {
+                c.loader_version = v.clone();
+            }
         }
         c
+    }
+
+    /// The loader version to report: `loader_version` as "major.minor.patch", or None for the client's own.
+    pub fn loader_version(&self) -> Option<[u8; 3]> {
+        let v: Vec<u8> = self.loader_version.trim().split('.').map(|p| p.parse().ok()).collect::<Option<_>>()?;
+        v.try_into().ok()
     }
 
     /// Whether this login uses the server's profile service (friend list, presence, mail).
@@ -548,6 +562,20 @@ mod tests {
         // A plain address is left alone.
         c.server = "127.0.0.1".into();
         assert_eq!(c.resolved().server, "127.0.0.1");
+    }
+
+    #[test]
+    fn loader_version_parses_and_follows_the_named_server() {
+        let mut c = Config::default();
+        assert_eq!(c.loader_version(), None);
+        c.loader_version = "2.2.0".into();
+        c.named_servers.push(NamedServer { name: "old".into(), host: "example.invalid".into(), loader_version: Some("2.1.2".into()), ..Default::default() });
+        assert_eq!(c.loader_version(), Some([2, 2, 0]));
+        c.server = "old".into();
+        assert_eq!(c.resolved().loader_version(), Some([2, 1, 2]));
+        c.loader_version = "2.x".into();
+        c.server = "other".into();
+        assert_eq!(c.resolved().loader_version(), None);
     }
 
     #[test]
