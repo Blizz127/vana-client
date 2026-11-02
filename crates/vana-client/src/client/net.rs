@@ -1052,8 +1052,15 @@ enum Outcome {
     Done,
 }
 
+/// The config's `map_host` (client::run sets it): the map address used instead of the lobby's and the zone changes'.
+pub static MAP_HOST: std::sync::OnceLock<Option<std::net::Ipv4Addr>> = std::sync::OnceLock::new();
+
+fn map_addr(a: SocketAddr) -> SocketAddr {
+    MAP_HOST.get().copied().flatten().map_or(a, |h| SocketAddr::from((h, a.port())))
+}
+
 fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats) -> Result<()> {
-    let mut addr = SocketAddr::from((login.map.0, login.map.1));
+    let mut addr = map_addr(SocketAddr::from((login.map.0, login.map.1)));
     // One local UDP port for the whole run, zone changes included (MapSession::with_socket).
     let sock = std::net::UdpSocket::bind("0.0.0.0:0")?;
     loop {
@@ -1061,7 +1068,7 @@ fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>,
             Outcome::Zone(next) => {
                 let counter = u32::from_le_bytes(login.key[16..20].try_into().unwrap()).wrapping_add(2);
                 login.key[16..20].copy_from_slice(&counter.to_le_bytes());
-                addr = next;
+                addr = map_addr(next);
                 tx.send(NetEvent::Zoning)?;
             }
             Outcome::Done => return Ok(()),

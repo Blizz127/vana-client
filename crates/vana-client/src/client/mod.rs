@@ -14418,6 +14418,7 @@ fn area_resample(src: &[u8], from: [u32; 2], to: [u32; 2]) -> Vec<u8> {
 }
 
 pub fn run(cfg: Config, drive: Drive) -> Result<()> {
+    let _ = net::MAP_HOST.set(cfg.map_host);
     let event_loop = EventLoop::new()?;
     let mut app = App::new(cfg, drive);
     event_loop.run_app(&mut app)?;

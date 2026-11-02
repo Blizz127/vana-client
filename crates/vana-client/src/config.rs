@@ -161,6 +161,9 @@ pub struct Config {
     /// file: what a character sees follows only what its server reports (a server unlocks by sending the bits).
     #[serde(skip, default = "era_lock_on")]
     pub era_lock: bool,
+    /// Ours: the map server's address to use instead of the one the lobby (and each zone change) names, its ports
+    /// kept; for a server reached through a proxy or a NAT that hands out an address the client cannot reach.
+    pub map_host: Option<std::net::Ipv4Addr>,
     /// The lobby's expansion bits at the last login by server and account (`era::seen_key`): a bit set that was not
     /// there then is announced once.
     pub expansions_seen: std::collections::BTreeMap<String, u32>,
@@ -368,6 +371,7 @@ impl Default for Config {
             target_hpp: false,
             earth_clock: false,
             era_lock: true,
+            map_host: None,
             expansions_seen: Default::default(),
             lamp_lights: true,
             hide_trust_speech: false,
