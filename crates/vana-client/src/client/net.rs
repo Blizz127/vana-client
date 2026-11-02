@@ -813,13 +813,16 @@ fn std_data(data: &str) -> (u32, [i32; 4], [String; 2]) {
 }
 
 /// Chat text as sent: Shift-JIS cut to 150 bytes at a character's end (a pair or a phrase block is not split).
-fn chat_bytes(text: &str) -> Vec<u8> {
-    let mut out = Vec::new();
+/// Ours: a line too long for one chat packet goes as several, each at most `max` bytes (LSB-style servers read
+/// 128 of a 0x0B5 / 0x0B6 and every client draws 150 of an 0x017), cut after the last space that leaves at least
+/// half a line, else at a character; a character or an auto-translate phrase (four chars) is never split.
+pub(crate) fn chat_lines(text: &str, max: usize) -> Vec<Vec<u8>> {
+    // The units that may not be split: a character, or a whole phrase.
+    let mut units: Vec<(Vec<u8>, bool)> = Vec::new();
     let mut buf = [0u8; 4];
     let mut block = Vec::new();
     for ch in text.chars() {
         let b = crate::dat::font::encode_sjis(ch.encode_utf8(&mut buf));
-        // A phrase is four chars; it goes whole or not at all.
         let cp = ch as u32;
         if (crate::dat::font::PHRASE_BASE..crate::dat::font::PHRASE_BASE + 0x400).contains(&cp) {
             block.extend_from_slice(&b);
@@ -827,14 +830,39 @@ fn chat_bytes(text: &str) -> Vec<u8> {
                 continue;
             }
         }
-        let piece = if block.is_empty() { b } else { std::mem::take(&mut block) };
-        if out.len() + piece.len() > 150 {
-            break;
-        }
-        out.extend_from_slice(&piece);
+        let unit = if block.is_empty() { b } else { std::mem::take(&mut block) };
+        units.push((unit, ch == ' '));
     }
-    out
+    let mut lines = Vec::new();
+    let mut i = 0;
+    while i < units.len() {
+        let (mut len, mut end, mut space) = (0usize, i, None);
+        while end < units.len() && len + units[end].0.len() <= max {
+            len += units[end].0.len();
+            if units[end].1 && len >= max / 2 {
+                space = Some(end);
+            }
+            end += 1;
+        }
+        if end == i {
+            // A unit longer than a line can't go; drop it rather than loop.
+            i += 1;
+            continue;
+        }
+        // Cut after a space when the line is full and there is more to come; the space ends this line.
+        let stop = if end < units.len() { space.map_or(end, |s| s + 1) } else { end };
+        let line: Vec<u8> = units[i..stop].iter().flat_map(|u| u.0.iter().copied()).collect();
+        let trimmed = if line.last() == Some(&b' ') && stop < units.len() { line[..line.len() - 1].to_vec() } else { line };
+        if !trimmed.is_empty() {
+            lines.push(trimmed);
+        }
+        i = stop;
+    }
+    lines
 }
+
+/// What one c2s chat packet carries at most (`chat_lines`).
+const CHAT_LINE: usize = 127;
 
 fn text(p: &SubPacket, at: usize, len: usize) -> String {
     p.str(at, len)
@@ -1448,19 +1476,24 @@ fn session(sock: std::net::UdpSocket, addr: SocketAddr, login: &MapLogin, accoun
             match cmd {
                 // c2s 0x0B5 / 0x0B6 (FUN_100e3400 / the tell sender): the text in Shift-JIS, auto-translate blocks
                 // kept, 150 bytes at most; 0x0B6 @4 = 3 as retail sends it.
+                // Ours: a long line goes as several packets (`chat_lines`), in order.
                 NetCommand::Chat { kind, text } => {
-                    let mut body = vec![kind, 0];
-                    body.extend_from_slice(&chat_bytes(&text));
-                    body.push(0);
-                    queue.push(build(0x0B5, &body));
+                    for line in chat_lines(&text, CHAT_LINE) {
+                        let mut body = vec![kind, 0];
+                        body.extend_from_slice(&line);
+                        body.push(0);
+                        queue.push(build(0x0B5, &body));
+                    }
                 }
                 NetCommand::Tell { name, text } => {
-                    let mut body = vec![0u8; 17];
-                    body[0] = 3;
-                    body[2..2 + name.len().min(15)].copy_from_slice(&name.as_bytes()[..name.len().min(15)]);
-                    body.extend_from_slice(&chat_bytes(&text));
-                    body.push(0);
-                    queue.push(build(0x0B6, &body));
+                    for line in chat_lines(&text, CHAT_LINE) {
+                        let mut body = vec![0u8; 17];
+                        body[0] = 3;
+                        body[2..2 + name.len().min(15)].copy_from_slice(&name.as_bytes()[..name.len().min(15)]);
+                        body.extend_from_slice(&line);
+                        body.push(0);
+                        queue.push(build(0x0B6, &body));
+                    }
                 }
                 NetCommand::Heal(mode) => queue.push(build(0x0E8, &mode.to_le_bytes())),
                 NetCommand::Logout { mode, kind } => {
@@ -1658,5 +1691,35 @@ mod tests {
         }
         // The port is the low word.
         assert_eq!(zone_out(2, 0, 0x1_0000 | 54002, here), ZoneOut::Zone("192.0.2.10:54002".parse().unwrap()));
+    }
+}
+
+#[cfg(test)]
+mod chat_line_tests {
+    use super::chat_lines;
+
+    #[test]
+    fn short_line_is_one_packet() {
+        assert_eq!(chat_lines("hello there", 127), vec![b"hello there".to_vec()]);
+        assert!(chat_lines("", 127).is_empty());
+    }
+
+    #[test]
+    fn long_line_splits_at_spaces_within_the_limit() {
+        let text = "word ".repeat(80);
+        let lines = chat_lines(text.trim_end(), 127);
+        assert!(lines.len() >= 3);
+        assert!(lines.iter().all(|l| l.len() <= 127 && !l.is_empty()));
+        // No piece starts or ends with the space it was cut at, and nothing is lost but those spaces.
+        assert!(lines.iter().all(|l| l[0] != b' ' && *l.last().unwrap() != b' '));
+        let joined: Vec<u8> = lines.join(&b' ');
+        assert_eq!(joined, text.trim_end().as_bytes());
+    }
+
+    #[test]
+    fn no_space_cuts_at_a_character() {
+        let text = "x".repeat(300);
+        let lines = chat_lines(&text, 127);
+        assert_eq!(lines.iter().map(Vec::len).collect::<Vec<_>>(), vec![127, 127, 46]);
     }
 }

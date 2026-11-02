@@ -282,9 +282,11 @@ pub fn tokens(line: &str, tabs: bool) -> Vec<String> {
     out
 }
 
-/// FUN_100769f0: cut to 150 bytes without splitting a character.
+/// FUN_100769f0: cut to 150 bytes without splitting a character; ours keeps up to LONG_LINE (a long chat line goes
+/// out as several packets, client/net.rs `chat_lines`).
+const LONG_LINE: usize = 600;
 fn cut(s: &mut String) {
-    let mut n = s.len().min(150);
+    let mut n = s.len().min(LONG_LINE);
     while !s.is_char_boundary(n) {
         n -= 1;
     }
@@ -2950,12 +2952,12 @@ mod tests {
 
     #[test]
     fn cut_keeps_characters() {
-        let mut s = "é".repeat(100);
+        let mut s = "é".repeat(400);
         cut(&mut s);
-        assert_eq!(s.len(), 150);
-        let mut s = format!("a{}", "é".repeat(100));
+        assert_eq!(s.len(), LONG_LINE);
+        let mut s = format!("a{}", "é".repeat(400));
         cut(&mut s);
-        assert_eq!(s.len(), 149);
+        assert_eq!(s.len(), LONG_LINE - 1);
     }
 
     /// SysMesFilterLevel against table 0x1035b950: level 0 keeps everything.
