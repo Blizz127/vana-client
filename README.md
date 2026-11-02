@@ -113,21 +113,22 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | Select / Back | Open the chat line | | Tab (auto-translate) |
 | Start | Log-out prompt | Main menu | On-screen keyboard (see below) |
 | Left stick click | Walk / run | | |
-| Right stick click | `/map`: open the map (with the map up: close it) | | |
+| Right stick click | `/map`: open the map (with the map up: close it) | Battle menu: the one-button rotation | |
 
 The character-creation name entry is a text field as far as the pad goes: X is Backspace, and LB still asks for a random
 name (with the on-screen keyboard closed).
 
 ### One-button rotation
 
-`/rotation` (or `/rot`, also as a macro line) and D-pad Down while walking about do the next sensible thing in a
+`/rotation` (or `/rot`, also as a macro line), D-pad Down while walking about and R3 with the battle menu up do the next sensible thing in a
 fight, one action per press. They pick it with the same rules as the battle menu's Suggested rows: heal someone low,
 Convert when MP is low and HP high, put Refresh / Haste / Phalanx back, keep an enspell up while meleeing, Dia / Slow
 / Paralyze the target, the strongest weapon skill at 1000 TP, then damage magic while half the MP is left; with
 nothing to do and a monster targeted, attack it. Red Mage is the job it is tuned for so far. It uses only what the
 character has learned and can use now (level, jobs, MP, TP, recasts, silence and the like, and the server's era), and
-sends the same line a macro would, so the server checks it as any other. A press is ignored while casting or within a
-second of the last; an action the server does not start three times in a row is set aside for 30 seconds. After the
+sends the same line a macro would, so the server checks it as any other. A press is ignored while casting, while the last action is unanswered
+and within a second or so of the last; an action the server does not start three times in a row is set aside for 30
+seconds, and a debuff is cast at most three times on one monster. After the
 first press a line at the top of the screen names what the next press does.
 
 When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was

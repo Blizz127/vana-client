@@ -21,7 +21,7 @@
 //! | Select / Back     | Space: open the chat line          | -                          | Tab (auto-translate)   |
 //! | Start             | Pause: the log-out prompt          | - (main menu)              | on-screen keyboard     |
 //! | Left stick click  | Num/: walk / run                   | -                          | -                      |
-//! | Right stick click | the /map command (opens the map)   | the map up: Escape (closes it) | -                  |
+//! | Right stick click | the /map command (opens the map)   | the map up: Escape (closes it); the battle menu up: /rotation | - |
 //!
 //! While LT or RT is held the D-pad and A / B work the palette (Left / Right the cell, Up / Down the set, A runs it,
 //! B closes it), which is the client's own palette code reading the arrows, Enter and Escape.
@@ -34,7 +34,8 @@
 //! Num+ (the random name), which the other text fields drop. With the map window up (`Ctx::Map`) the right stick is its
 //! zoom (up zooms in; `Out.zoom`, read only as axis 0x7c, never by the camera) and the buttons are a window's.
 //!
-//! D-pad Down in the field had nothing in the client: it runs /rotation (ours, client/rotation.rs). Unbound: key functions 0xb7..0xba (the second pad
+//! D-pad Down in the field had nothing in the client: it runs /rotation (ours, client/rotation.rs), as R3 does with the
+//! battle menu up (the D-pad is its cursor there). Unbound: key functions 0xb7..0xba (the second pad
 //! word, inferred to be the gamepad) are not wired.
 
 use egui::{Event, Key, Modifiers};
@@ -192,6 +193,8 @@ pub fn binding(b: Btn, ctx: Ctx) -> Option<Binding> {
         return match ctx {
             Ctx::Field => Some(Binding { key: None, dik: &[], repeat: false, text: None, command: Some("/map") }),
             Ctx::Map => bind(Some(Key::Escape), &[DIK_ESCAPE]),
+            // Ours: with the battle menu up the D-pad is its cursor, so R3 is the one-button rotation there.
+            Ctx::Action => Some(Binding { key: None, dik: &[], repeat: false, text: None, command: Some("/rotation") }),
             _ => None,
         };
     }
@@ -609,7 +612,7 @@ mod tests {
     }
 
     /// R3 is retail's /map: it opens the map walking about (the client's /map only opens), closes it as the map's own
-    /// Escape from the map, and is nothing elsewhere.
+    /// Escape from the map, the rotation with the battle menu up (ours), and is nothing elsewhere.
     #[test]
     fn r3_is_the_map() {
         let r3 = |c| binding(Btn::RightThumb, c);
@@ -617,7 +620,7 @@ mod tests {
         assert_eq!((field.key, field.dik.to_vec(), field.command, field.text), (None, vec![], Some("/map"), None));
         let map = r3(Ctx::Map).unwrap();
         assert_eq!((map.key, map.dik.to_vec(), map.command), (Some(Key::Escape), vec![0x01], None));
-        for c in [Ctx::Menu, Ctx::Action, Ctx::Typing, Ctx::Name, Ctx::Osk] {
+        for c in [Ctx::Menu, Ctx::Typing, Ctx::Name, Ctx::Osk] {
             assert_eq!(r3(c), None, "{c:?}");
         }
         // The press hands the command out once, and sends no key to the game.
@@ -638,6 +641,8 @@ mod tests {
         assert_eq!(binding(Btn::DPadDown, Ctx::Field).and_then(|b| b.command), Some("/rotation"));
         let mut m = Mapper::default();
         assert_eq!(m.step(&pressed(&[Btn::DPadDown]), Ctx::Field, tuning(), 0.016).commands, vec!["/rotation"]);
+        // With the battle menu up, R3.
+        assert_eq!(binding(Btn::RightThumb, Ctx::Action).and_then(|b| b.command), Some("/rotation"));
         assert!(m.step(&pressed(&[Btn::DPadDown]), Ctx::Field, tuning(), 0.016).commands.is_empty());
     }
 

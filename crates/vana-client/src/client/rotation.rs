@@ -6,9 +6,11 @@
 //! closed spells are left out (client/era.rs `spell_closed`). The press goes out as the line a macro would send
 //! (`/ma "Dia" <t>`), so the server checks it as any other.
 //!
-//! Pressed by `/rotation` (alias `/rot`, a macro line too), the pad's D-pad Down in the field (client/gamepad.rs).
-//! A press is ignored while we cast or within `GAP` of the last. An action the server does not start (no 0x028 from us
-//! in `ANSWER`) counts as refused: three in a row set it aside for `ASIDE`, so a refused pick never jams the button.
+//! Pressed by `/rotation` (alias `/rot`, a macro line too) and the pad (client/gamepad.rs: D-pad Down walking about,
+//! R3 with the battle menu up). A press is dropped while we cast, while the last action is unanswered, within `GAP`
+//! of the last one sent and for `LOCK` after an action of ours finishes. An action the server does not start (no
+//! 0x028 from us in `ANSWER`) counts as refused: three in a row set it aside for `ASIDE`, so a refused pick never
+//! jams the button. A debuff is cast at most `TRIES` times on one monster (resisted, or the monster is immune).
 
 use super::World;
 use super::suggest::{self, Action, Suggestion};
@@ -17,11 +19,17 @@ use std::time::{Duration, Instant};
 
 /// Presses closer than this to the last action sent are dropped.
 const GAP: Duration = Duration::from_millis(1000);
+/// After an action of ours finishes, the server's own pause before the next.
+const LOCK: Duration = Duration::from_millis(1500);
 /// How long the server has to start an action before it counts as refused.
 const ANSWER: Duration = Duration::from_millis(3000);
 /// Refusals in a row that set an action aside, and for how long.
 const REFUSALS: u8 = 3;
 const ASIDE: Duration = Duration::from_secs(30);
+/// Casts of one debuff on one monster.
+const TRIES: u8 = 3;
+/// "Nothing to do" at most this often.
+const IDLE_LINE: Duration = Duration::from_secs(5);
 
 /// What a press does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -39,12 +47,26 @@ pub enum On {
     Named(String),
 }
 
+/// An action sent and not answered yet.
+#[derive(Clone, Copy, Debug)]
+struct Sent {
+    step: Step,
+    at: Instant,
+    /// A debuff spell, and the monster it went to.
+    debuff_on: Option<u32>,
+}
+
 #[derive(Debug, Default)]
 pub struct Rotation {
-    /// The last action sent and when.
-    sent: Option<(Step, Instant)>,
+    sent: Option<Sent>,
+    /// When the last action went out; no press before this (after a finish of ours).
+    last: Option<Instant>,
+    lock: Option<Instant>,
     /// Refusals in a row per action, and when a set-aside one comes back.
     refused: HashMap<Step, (u8, Option<Instant>)>,
+    /// Debuff casts the server took, per (monster, spell).
+    tries: HashMap<(u32, u16), u8>,
+    idle_said: Option<Instant>,
     /// Pressed this session: the hint shows from then on.
     used: bool,
     /// The hint (what the next press does, and why) and when it was worked out.
@@ -59,23 +81,47 @@ impl Rotation {
 
     /// The last action got no answer in time: one more refusal.
     fn settle(&mut self, now: Instant) {
-        let Some((s, at)) = self.sent else { return };
-        if now.duration_since(at) < ANSWER {
+        let Some(s) = self.sent else { return };
+        if now.duration_since(s.at) < ANSWER {
             return;
         }
         self.sent = None;
-        let e = self.refused.entry(s).or_insert((0, None));
+        let e = self.refused.entry(s.step).or_insert((0, None));
         e.0 += 1;
         if e.0 >= REFUSALS {
             *e = (0, Some(now + ASIDE));
         }
     }
 
-    /// The server started something of ours: the last action was taken.
-    fn answered(&mut self) {
-        if let Some((s, _)) = self.sent.take() {
-            self.refused.remove(&s);
+    /// A press may go out now: nothing unanswered, past the gap and the lock.
+    fn ready(&mut self, now: Instant) -> bool {
+        self.settle(now);
+        self.sent.is_none() && self.last.is_none_or(|t| now.duration_since(t) >= GAP) && self.lock.is_none_or(|t| now >= t)
+    }
+
+    fn send(&mut self, step: Step, debuff_on: Option<u32>, now: Instant) {
+        self.sent = Some(Sent { step, at: now, debuff_on });
+        self.last = Some(now);
+    }
+
+    /// The server started or finished something of ours: the last action was taken; a finish holds the next press.
+    fn answered(&mut self, finish: bool, now: Instant) {
+        if let Some(s) = self.sent.take() {
+            self.refused.remove(&s.step);
+            if let (Some(foe), Step::Act(Action::Spell(id))) = (s.debuff_on, s.step) {
+                if self.tries.len() > 64 {
+                    self.tries.clear();
+                }
+                *self.tries.entry((foe, id)).or_default() += 1;
+            }
         }
+        if finish {
+            self.lock = Some(now + LOCK);
+        }
+    }
+
+    fn tried_out(&self, foe: u32, spell: u16) -> bool {
+        self.tries.get(&(foe, spell)).is_some_and(|&n| n >= TRIES)
     }
 
     /// The press's pick: the first suggestion not set aside whose target resolves, else engaging.
@@ -87,19 +133,26 @@ impl Rotation {
     }
 }
 
-/// The token for the enemy: the monster targeted, else the party's battle target.
-fn enemy(w: &World) -> Option<&'static str> {
-    let targeted = w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
-    if targeted {
-        return Some("<t>");
+/// The enemy: the monster targeted (`<t>`), else the party's battle target (`<bt>`), and its id.
+fn enemy(w: &World) -> Option<(&'static str, u32)> {
+    if let Some(t) = w.target.filter(|t| w.entities.get(t).is_some_and(|e| e.mob && e.hpp > 0)) {
+        return Some(("<t>", t));
     }
     let party: Vec<u32> = w.party.members().map(|m| m.id).filter(|&id| id != 0).chain([w.my_id]).collect();
-    w.entities.values().any(|e| e.mob && e.hpp > 0 && e.claim != 0 && party.contains(&e.claim)).then_some("<bt>")
+    let mut claimed: Vec<(u16, u32)> = w.entities.iter().filter(|(_, e)| e.mob && e.hpp > 0 && e.claim != 0 && party.contains(&e.claim)).map(|(id, e)| (e.index, *id)).collect();
+    claimed.sort();
+    claimed.first().map(|&(_, id)| ("<bt>", id))
+}
+
+/// A spell that weakens a monster (enfeebling magic, Bio): cast a few times at most on one.
+fn debuff(w: &World, s: Step) -> bool {
+    let Step::Act(Action::Spell(id)) = s else { return false };
+    w.actions.as_ref().and_then(|a| a.spell(id)).is_some_and(|r| r.skill == 35 || (230..=232).contains(&id))
 }
 
 /// Who a suggestion goes to: the member it names; healing and enhancing magic and self-only abilities to us; the rest
-/// to the enemy (None without one).
-fn target_of(w: &World, s: &Suggestion, enemy_ok: bool) -> Option<On> {
+/// to the enemy (None without one, or a debuff tried out on it).
+fn target_of(w: &World, s: &Suggestion, foe: Option<u32>) -> Option<On> {
     if let Some(n) = &s.target {
         return Some(On::Named(n.clone()));
     }
@@ -115,17 +168,23 @@ fn target_of(w: &World, s: &Suggestion, enemy_ok: bool) -> Option<On> {
         }
     };
     if mine {
-        Some(On::Me)
-    } else {
-        enemy_ok.then_some(On::Enemy)
+        return Some(On::Me);
     }
+    let foe = foe?;
+    if let Action::Spell(id) = s.action
+        && debuff(w, Step::Act(s.action))
+        && w.rotation.tried_out(foe, id)
+    {
+        return None;
+    }
+    Some(On::Enemy)
 }
 
 /// The line a press sends.
 pub fn line(w: &World, step: Step, on: &On) -> Option<String> {
     let tok = match on {
         On::Me => "<me>".to_string(),
-        On::Enemy => enemy(w)?.to_string(),
+        On::Enemy => enemy(w)?.0.to_string(),
         On::Named(n) => n.clone(),
     };
     Some(match step {
@@ -146,7 +205,7 @@ fn busy(w: &World) -> bool {
 /// What the next press would do, worked out as `press` does.
 fn next(w: &World, now: Instant) -> Option<(Step, On, String)> {
     let sugg = suggest::all(&suggest::facts(w));
-    let foe = enemy(w).is_some();
+    let foe = enemy(w).map(|e| e.1);
     let engage = w.my_motion.status != 1 && w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
     let (step, on) = w.rotation.pick(&sugg, engage, |s| target_of(w, s, foe), now)?;
     let why = match step {
@@ -202,32 +261,35 @@ pub fn press(w: &mut World) {
     if w.my_motion.status == 1 {
         on_engaged(w);
     }
-    w.rotation.settle(now);
-    if busy(w) || w.rotation.sent.is_some_and(|(_, at)| now.duration_since(at) < GAP) {
+    if busy(w) || !w.rotation.ready(now) {
         return;
     }
     if w.stats.is_none() || matches!(w.my_motion.status, 2 | 3) {
         return;
     }
     let Some((step, on, _)) = next(w, now) else {
-        w.chat.push("Rotation: nothing to do now.".to_string());
+        if w.rotation.idle_said.is_none_or(|t| now.duration_since(t) >= IDLE_LINE) {
+            w.rotation.idle_said = Some(now);
+            w.chat.push("Rotation: nothing to do now.".to_string());
+        }
         return;
     };
     let Some(text) = line(w, step, &on) else { return };
     log::info!("rotation: {text}");
-    w.rotation.sent = Some((step, now));
+    let debuff_on = (on == On::Enemy && debuff(w, step)).then(|| enemy(w).map(|e| e.1)).flatten();
+    w.rotation.send(step, debuff_on, now);
     super::textcmd::run(w, &text, super::textcmd::Mode::Internal);
 }
 
-/// 0x028 from us (combat.rs): an action started or landed, so the last press was taken.
-pub fn on_own_action(w: &mut World) {
-    w.rotation.answered();
+/// 0x028 from us (combat.rs): an action started or finished, so the last press was taken.
+pub fn on_own_action(w: &mut World, finish: bool) {
+    w.rotation.answered(finish, Instant::now());
 }
 
 /// Engaging shows as our status, not as an action.
 pub fn on_engaged(w: &mut World) {
-    if w.rotation.sent.is_some_and(|(s, _)| s == Step::Attack) {
-        w.rotation.answered();
+    if w.rotation.sent.is_some_and(|s| s.step == Step::Attack) {
+        w.rotation.answered(false, Instant::now());
     }
 }
 
@@ -364,19 +426,58 @@ mod tests {
         let stone = Suggestion { action: Action::Spell(159), target: None, reason: String::new() };
         let sugg = [dia, stone];
         let on = |_: &Suggestion| Some(On::Enemy);
-        for k in 0..3u64 {
-            let at = t0 + Duration::from_secs(4 * k);
-            assert_eq!(r.pick(&sugg, false, on, at).unwrap().0, Step::Act(Action::Spell(23)));
-            r.sent = Some((Step::Act(Action::Spell(23)), at));
-            r.settle(at + ANSWER);
+        // Mashed every 1.5 s with no answer: the unanswered press holds the next ones until it counts as refused.
+        let mut sends = 0;
+        let mut at = t0;
+        while at < t0 + Duration::from_secs(12) {
+            if r.ready(at) {
+                let (step, _) = r.pick(&sugg, false, on, at).unwrap();
+                if step == Step::Act(Action::Spell(23)) {
+                    sends += 1;
+                }
+                r.send(step, None, at);
+            }
+            at += Duration::from_millis(1500);
         }
+        assert_eq!(sends, 3);
         let later = t0 + Duration::from_secs(12);
+        assert!(r.aside(Step::Act(Action::Spell(23)), later));
         assert_eq!(r.pick(&sugg, false, on, later).unwrap().0, Step::Act(Action::Spell(159)));
         assert_eq!(r.pick(&sugg, false, on, later + ASIDE).unwrap().0, Step::Act(Action::Spell(23)));
         // An answered action clears its count.
-        r.sent = Some((Step::Act(Action::Spell(159)), later));
-        r.answered();
+        let mut r = Rotation::default();
+        r.send(Step::Act(Action::Spell(159)), None, t0);
+        r.settle(t0 + ANSWER);
+        r.send(Step::Act(Action::Spell(159)), None, t0 + ANSWER);
+        r.answered(false, t0 + ANSWER);
         assert!(r.sent.is_none() && !r.refused.contains_key(&Step::Act(Action::Spell(159))));
+    }
+
+    #[test]
+    fn gap_and_lock_hold_presses_after_an_answer() {
+        let mut r = Rotation::default();
+        let t0 = Instant::now();
+        r.send(Step::Act(Action::Spell(23)), None, t0);
+        // Started at once: still within the gap.
+        r.answered(false, t0 + Duration::from_millis(200));
+        assert!(!r.ready(t0 + Duration::from_millis(500)));
+        assert!(r.ready(t0 + GAP));
+        // A finish holds the next press for the lock, past the gap.
+        r.answered(true, t0 + Duration::from_secs(3));
+        assert!(!r.ready(t0 + Duration::from_secs(4)));
+        assert!(r.ready(t0 + Duration::from_secs(3) + LOCK));
+    }
+
+    #[test]
+    fn a_debuff_is_cast_three_times_at_most_on_one_monster() {
+        let mut r = Rotation::default();
+        let t0 = Instant::now();
+        for k in 0..3 {
+            assert!(!r.tried_out(7, 56));
+            r.send(Step::Act(Action::Spell(56)), Some(7), t0 + Duration::from_secs(5 * k));
+            r.answered(true, t0 + Duration::from_secs(5 * k + 1));
+        }
+        assert!(r.tried_out(7, 56) && !r.tried_out(8, 56));
     }
 
     #[test]
