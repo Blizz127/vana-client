@@ -85,15 +85,13 @@ impl FeedCred {
         Some(Self { url: Self::https(url)?, token: TokenSource::File((!path.is_empty()).then(|| PathBuf::from(path))?) })
     }
 
-    /// The optional "friends_feed" of a launcher's login file: {"url", "token"} or {"url", "token_file"} (the file
-    /// wins when both are there); anything malformed is no feed.
+    /// The optional "friends_feed" of a launcher's login file: {"url", "token"} or {"url", "token_file"} (a usable
+    /// file wins when both are there); anything malformed is no feed.
     pub fn from_login(file: &serde_json::Value) -> Option<Self> {
         let f = file.get("friends_feed")?;
         let url = f.get("url")?.as_str()?;
-        match f.get("token_file").and_then(|v| v.as_str()) {
-            Some(p) => Self::with_token_file(url, p),
-            None => Self::new(url, f.get("token")?.as_str()?),
-        }
+        // A usable token_file wins; an empty or missing one falls back to an inline token.
+        f.get("token_file").and_then(|v| v.as_str()).and_then(|p| Self::with_token_file(url, p)).or_else(|| Self::new(url, f.get("token")?.as_str()?))
     }
 }
 
@@ -414,6 +412,8 @@ mod tests {
         assert!(FeedCred::from_login(&v(r#"{"username":"u","password":"p"}"#)).is_none());
         assert!(FeedCred::from_login(&v(r#"{"friends_feed":{"url":"http://example.invalid/f","token":"t"}}"#)).is_none());
         assert!(FeedCred::from_login(&v(r#"{"friends_feed":{"url":"https://example.invalid/f","token":""}}"#)).is_none());
+        // An empty token_file falls back to the inline token.
+        assert!(FeedCred::from_login(&v(r#"{"friends_feed":{"url":"https://example.invalid/f","token_file":"","token":"t"}}"#)).is_some());
         assert!(FeedCred::from_login(&v(r#"{"friends_feed":{"url":"https://example.invalid/f"}}"#)).is_none());
         assert!(FeedCred::from_login(&v(r#"{"friends_feed":"nope"}"#)).is_none());
     }

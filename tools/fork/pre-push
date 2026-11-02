@@ -6,8 +6,9 @@ zero=0000000000000000000000000000000000000000
 while read -r _local_ref local_sha _remote_ref remote_sha; do
   [[ "$local_sha" == "$zero" ]] && continue
   if [[ "$remote_sha" == "$zero" ]]; then
-    base=$(git merge-base "$local_sha" upstream/master 2>/dev/null || true)
-    range="${base:+$base..}$local_sha"
+    # A new branch: from its merge-base with upstream, else from the empty tree (the whole history is checked).
+    base=$(git merge-base "$local_sha" upstream/master 2>/dev/null || git hash-object -t tree /dev/null)
+    range="$base..$local_sha"
   else
     range="$remote_sha..$local_sha"
   fi

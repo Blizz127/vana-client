@@ -1831,23 +1831,23 @@ fn chat(w: &mut World, cid: u16, msg: &str) -> Done {
     // Ours: one echo per packet the line goes out as (client/net.rs `chat_split`), as the others see it.
     let pieces: Vec<String> = super::net::chat_split(msg, super::net::CHAT_LINE).into_iter().map(|(t, _)| t).collect();
     for msg in pieces.iter().map(String::as_str) {
-    let (line, mode) = match cid {
-        id::YELL => {
-            let zone = w.zone.and_then(|z| w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, z as u32))).unwrap_or_default();
-            (format!("{me}[{zone}]: {msg}"), 3)
-        }
-        id::SHOUT => (format!("{me} : {msg}"), 2),
-        id::PARTY => (format!("({me}) {msg}"), 5),
-        id::LS => (format!("[1]<{me}> {msg}"), 6),
-        id::LS2 => (format!("[2]<{me}> {msg}"), 0xd5),
-        id::UNITY => (format!("{{{me}}} {msg}"), 0xd3),
-        id::ASSISTJ => (format!("{me}(J) : {msg}"), 0xdb),
-        id::ASSISTE => (format!("{me}(E) : {msg}"), 0xdd),
-        // FUN_10078f20 (/emote): "%s %s", mode 7.
-        id::EMOTE_TEXT => (format!("{me} {msg}"), 7),
-        _ => (format!("{me} : {msg}"), 1),
-    };
-    super::push_chat_from(w, line, mode, kind, &me);
+        let (line, mode) = match cid {
+            id::YELL => {
+                let zone = w.zone.and_then(|z| w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, z as u32))).unwrap_or_default();
+                (format!("{me}[{zone}]: {msg}"), 3)
+            }
+            id::SHOUT => (format!("{me} : {msg}"), 2),
+            id::PARTY => (format!("({me}) {msg}"), 5),
+            id::LS => (format!("[1]<{me}> {msg}"), 6),
+            id::LS2 => (format!("[2]<{me}> {msg}"), 0xd5),
+            id::UNITY => (format!("{{{me}}} {msg}"), 0xd3),
+            id::ASSISTJ => (format!("{me}(J) : {msg}"), 0xdb),
+            id::ASSISTE => (format!("{me}(E) : {msg}"), 0xdd),
+            // FUN_10078f20 (/emote): "%s %s", mode 7.
+            id::EMOTE_TEXT => (format!("{me} {msg}"), 7),
+            _ => (format!("{me} : {msg}"), 1),
+        };
+        super::push_chat_from(w, line, mode, kind, &me);
     }
     if send_it {
         send(w, NetCommand::Chat { kind, text: msg.to_string() });

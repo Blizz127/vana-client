@@ -830,7 +830,12 @@ pub(crate) fn chat_split(text: &str, max: usize) -> Vec<(String, Vec<u8>)> {
     for ch in text.chars() {
         let b = crate::dat::font::encode_sjis(ch.encode_utf8(&mut buf));
         let cp = ch as u32;
-        if (crate::dat::font::PHRASE_BASE..crate::dat::font::PHRASE_BASE + 0x400).contains(&cp) {
+        let phrase = (crate::dat::font::PHRASE_BASE..crate::dat::font::PHRASE_BASE + 0x400).contains(&cp);
+        if !phrase && !block.is_empty() {
+            // An unfinished phrase (no closing char) is dropped, not sent half-open; this char goes on as itself.
+            (block, block_text) = (Vec::new(), String::new());
+        }
+        if phrase {
             block.extend_from_slice(&b);
             block_text.push(ch);
             if (cp - crate::dat::font::PHRASE_BASE) / 0x100 < 3 {
@@ -1104,9 +1109,9 @@ fn session(sock: std::net::UdpSocket, addr: SocketAddr, login: &MapLogin, accoun
                         let event = (event_num != 0).then(|| EventStart { target: p.u32(4), index: p.u16(8), zone: event_num, event: event_para, mode: p.u16(0x66), zone2: p.u16(0x40), ..Default::default() });
                         tx.send(NetEvent::ZoneIn { zone: p.u32(48) as u16, pos, dir: p.u8(11), char_id: p.u32(4), index: p.u16(8), name: text(&p, 132, 16), look: look_at(&p, 68), motion: motion_state(&p), game_time: p.u32(0x3C), weather: p.u16(0x68), music: std::array::from_fn(|i| p.u16(0x56 + 2 * i)), event, area: area_line(&p), sub_map: if p.u16(0x60) != scene && myroom.is_none() { p.u16(0x60) } else { 0 }, scene, myroom, room_flag: matches!(p.u32(0x80), 1 | 4 | 5), dead_counter: p.u32(0xA4), play_time: p.u32(0xA0), mog_zone: p.u8(0xaf) & 1 != 0, send_count: p.u16(0xac), ship: ship_data(&p), monstrosity: p.u16(0x7E) != 0 })?;
                     }
-                    // FUN_100fb730: 4 cancels a logout (nothing sent); 2 (zone change) and 3 (Mog House) send 0x00D with
-                    // the old key and reconnect to @8 / @0xC, each kept when 0. Ours: the rest end the session at once, no
-                    // 0x00D (the server has taken the character out of its zone by then and drops it as "outside a zone").
+                    // FUN_100fb730: 4 cancels a logout (nothing sent); every other state sends 0x00D with the old key;
+                    // 2 (zone change) and 3 (Mog House) then reconnect to @8 / @0xC, each kept when 0, the rest end the
+                    // session. (A server may drop that last 0x00D as "outside a zone"; retail sends it all the same.)
                     0x00B => match zone_out(p.u8(4), p.u32(8), p.u32(12), addr) {
                         ZoneOut::Cancelled => log::info!("map: logout cancelled"),
                         ZoneOut::Zone(next) => {
@@ -1115,6 +1120,7 @@ fn session(sock: std::net::UdpSocket, addr: SocketAddr, login: &MapLogin, accoun
                             return Ok(Outcome::Zone(next));
                         }
                         ZoneOut::End(state) => {
+                            let _ = map.send(&[build(0x00D, &[0u8; 4])]);
                             tx.send(NetEvent::Logout { state: state as u32 })?;
                             return Ok(Outcome::Done);
                         }
@@ -1725,6 +1731,14 @@ mod chat_line_tests {
         assert_eq!(texts.join(" "), text.trim_end());
         let joined: Vec<u8> = lines.join(&b' ');
         assert_eq!(joined, text.trim_end().as_bytes());
+    }
+
+    #[test]
+    fn unfinished_phrase_is_dropped_not_the_next_char() {
+        let base = crate::dat::font::PHRASE_BASE;
+        // Two phrase chars (groups 0, 1) with no closing group-3 char, then plain text.
+        let text: String = [char::from_u32(base).unwrap(), char::from_u32(base + 0x100).unwrap()].into_iter().chain("ab".chars()).collect();
+        assert_eq!(chat_lines(&text, 127), vec![b"ab".to_vec()]);
     }
 
     #[test]

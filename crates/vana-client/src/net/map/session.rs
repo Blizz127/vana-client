@@ -68,12 +68,14 @@ pub struct MapSession {
     /// Datagram bytes sent / received on this session, for the Network window.
     pub bytes_out: u64,
     pub bytes_in: u64,
-    /// Sub-packets not yet acked (FUN_100fac80 resends them in every datagram until the server's header u16 @2 reaches
-    /// their first send), and that ack. Sub-packets not acked yet, with the datagram they first went out in (None: queued, not sent yet: it is stamped
-    /// with the sequence of the datagram it first fits in, as retail; a server skips a sub-packet whose sync is not
-    /// newer than the last datagram it handled).
+    /// Sub-packets not yet acked, with the datagram each first went out in (FUN_100fac80 resends them in every datagram
+    /// until the server's ack, header u16 @2, reaches it). None: queued but not sent yet; it takes the sequence of the
+    /// datagram it first fits in, as retail, since a server skips a sub-packet whose sync isn't newer than the last
+    /// datagram it handled.
     unacked: Vec<(Option<u16>, Vec<u8>)>,
     server_ack: u16,
+    /// Datagrams dropped for a failed checksum (`recv`).
+    bad: u32,
     /// Header sequence of the last datagram handled; none before the first.
     last_in: Option<u16>,
     /// Datagrams logged so far each way (the first few of a session are logged).
@@ -102,6 +104,10 @@ fn sub_ids(plain: &[u8]) -> String {
     out.join(" ")
 }
 
+/// Datagrams failing their checksum before the first good one that are dropped as a previous session's, before the
+/// session gives up on its key.
+const BAD_BEFORE_FIRST: u32 = 8;
+
 /// FUN_100fac80's raw payload limit.
 const MAX_PAYLOAD: usize = 4000;
 
@@ -115,7 +121,7 @@ impl MapSession {
     /// single socket; LSB-style servers otherwise make a second session per zone change).
     pub fn with_socket(sock: UdpSocket, server: SocketAddr, key: &[u8; 20], codec: Codec) -> Result<Self> {
         sock.connect(server)?;
-        Ok(Self { sock, cipher: Blowfish::for_session_key(key), key: super::blowfish::session_key(key), codec, seq: 0, server_seq: 0, bytes_out: 0, bytes_in: 0, unacked: Vec::new(), server_ack: 0, last_in: None, logged: (0, 0), cert: None, clock: None })
+        Ok(Self { sock, cipher: Blowfish::for_session_key(key), key: super::blowfish::session_key(key), codec, seq: 0, server_seq: 0, bytes_out: 0, bytes_in: 0, unacked: Vec::new(), server_ack: 0, bad: 0, last_in: None, logged: (0, 0), cert: None, clock: None })
     }
 
     /// @0 our sequence, @2 the last server datagram handled, @4 / @8 the clock's ms and seconds; after the zone-in
@@ -252,7 +258,14 @@ impl MapSession {
         self.cipher.decrypt(&mut dgram[HEADER..]);
         let (data, digest) = dgram[HEADER..].split_at(n - HEADER - 16);
         if Md5::digest(data).as_slice() != digest {
-            bail!("datagram failed its checksum (wrong session key?)");
+            // Ours: the run keeps one socket (with_socket), so a late datagram of the previous zone's session (its
+            // key) can still arrive; it is dropped. Only a session that never gets a good one is a wrong key.
+            self.bad += 1;
+            if self.last_in.is_none() && self.bad > BAD_BEFORE_FIRST {
+                bail!("datagram failed its checksum (wrong session key?)");
+            }
+            log::warn!("dropped a datagram that failed its checksum ({} so far, a previous session's?)", self.bad);
+            return Ok(None);
         }
         let bits = u32::from_le_bytes(data[data.len() - 4..].try_into().unwrap());
         let plain = self.codec.decompress(&data[..data.len() - 4], bits).context("decompressing datagram")?;
@@ -299,6 +312,40 @@ impl MapSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Set FFXI_MAIN_DLL to run: a datagram under another key (the previous zone's, on the shared socket) is dropped,
+    /// and the session goes on with the next good one.
+    #[test]
+    fn stale_key_datagram_is_dropped() {
+        let Ok(dll) = std::env::var("FFXI_MAIN_DLL") else { return };
+        let codec = Codec::from_ffximain(&std::fs::read(dll).unwrap()).unwrap();
+        let server = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let mut s = MapSession::connect(server.local_addr().unwrap(), &[7u8; 20], codec.clone()).unwrap();
+        let dgram = |key: [u8; 20], seq: u16| {
+            let cipher = Blowfish::for_session_key(&key);
+            let mut sub = build(0x029, &[0u8; 24]);
+            sub[2..4].copy_from_slice(&seq.to_le_bytes());
+            let (mut body, bits) = codec.compress(&sub);
+            body.extend_from_slice(&bits.to_le_bytes());
+            let digest = Md5::digest(&body);
+            body.extend_from_slice(&digest);
+            cipher.encrypt(&mut body);
+            let mut d = vec![0u8; HEADER];
+            d[..2].copy_from_slice(&seq.to_le_bytes());
+            d.extend_from_slice(&body);
+            d
+        };
+        let to = s.sock.local_addr().unwrap();
+        server.send_to(&dgram([9u8; 20], 3), to).unwrap();
+        server.send_to(&dgram([7u8; 20], 5), to).unwrap();
+        assert!(s.recv(Duration::from_secs(1)).unwrap().is_none());
+        assert_eq!(s.recv(Duration::from_secs(1)).unwrap().unwrap().len(), 1);
+        // After a good one, stale datagrams never end the session.
+        for seq in 6..20 {
+            server.send_to(&dgram([9u8; 20], seq), to).unwrap();
+            assert!(s.recv(Duration::from_secs(1)).unwrap().is_none());
+        }
+    }
 
     /// Set FFXI_MAIN_DLL to run: sub-packets that don't fit a datagram wait unstamped and take the sequence of the
     /// datagram they first go out in; an ack never drops one not sent yet.
