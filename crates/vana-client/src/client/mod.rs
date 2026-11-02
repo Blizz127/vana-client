@@ -6392,6 +6392,9 @@ pub struct Drive {
     pub login: Option<(String, String)>,
     /// A launcher's one-time login (main.rs launcher_login): a normal session, not a test drive.
     pub autologin: Option<(String, String)>,
+    /// A launcher's read-only friends feed (net/friends_feed.rs), for a server with no profile service. Unlike the
+    /// autologin it stays after the login: the world takes a copy.
+    pub friends_feed: Option<crate::net::friends_feed::FeedCred>,
     pub character: Option<String>,
     pub walk_secs: f32,
     /// Waypoints (x, z) to run through in order once in the world.
@@ -7731,7 +7734,7 @@ impl App {
                             page_from: None,
                             rem_open_at: None,
                             assist_name: String::new(),
-                            friends: friends::Friends::new(pol),
+                            friends: friends::Friends::new(pol, self.drive.friends_feed.clone()),
                             friendui: None,
                             polmail: Default::default(),
                             log_find: None,

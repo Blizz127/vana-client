@@ -3,6 +3,7 @@
 //! friends' presence from the IRC notices.
 
 use super::World;
+use crate::net::friends_feed::{self, FeedCred, FeedFriend};
 use crate::net::profile::{self, Cred, FriendInfo, Irc, IrcLink};
 use crate::net::search::Record;
 use std::sync::mpsc;
@@ -28,9 +29,22 @@ pub struct Friend {
     pub fresh: bool,
     /// An unread message from them (+0xfc bit 1).
     pub mail: bool,
+    /// From the launcher's friends feed (net/friends_feed.rs): read-only, no account, no messages. `place` is the
+    /// location column's text ("<character> - <zone>" or the game's title).
+    pub feed: bool,
+    pub place: String,
 }
 
 impl Friend {
+    /// A feed friend; None without a name.
+    fn from_feed(i: usize, f: &FeedFriend) -> Option<Self> {
+        // The service's text goes to the game's font: no control characters, bounded.
+        let clean = |s: &str, n: usize| s.chars().filter(|c| !c.is_control()).take(n).collect::<String>().trim().to_string();
+        let name = clean(f.username.as_deref()?, 32);
+        let index = i.min(199) as u8;
+        (!name.is_empty()).then(|| Self { index, order: index, name, status: f.status(), feed: true, place: clean(&f.location(), 64), ..Default::default() })
+    }
+
     fn from_info(f: &FriendInfo) -> Self {
         Self { black: f.black, index: f.num, order: f.order, account: f.pol, name: f.name.clone(), pending: f.pending, ..Default::default() }
     }
@@ -63,6 +77,9 @@ pub struct Mail {
 #[derive(Default)]
 pub struct Friends {
     cred: Option<Cred>,
+    /// The launcher's friends feed: only for a server with no profile service (`cred` none); started in game.
+    feed_cred: Option<FeedCred>,
+    feed: Option<friends_feed::Feed>,
     irc: Option<IrcLink>,
     jobs: Vec<mpsc::Receiver<Done>>,
     pub list: Vec<Friend>,
@@ -92,8 +109,10 @@ pub struct Friends {
 }
 
 impl Friends {
-    pub fn new(cred: Option<Cred>) -> Self {
-        Self { cred, ..Default::default() }
+    pub fn new(cred: Option<Cred>, feed_cred: Option<FeedCred>) -> Self {
+        // With a profile service the feed is ignored: the two lists are never mixed.
+        let feed_cred = feed_cred.filter(|_| cred.is_none());
+        Self { cred, feed_cred, ..Default::default() }
     }
 
     /// A friend by account, on the friend list.
@@ -114,7 +133,16 @@ fn spawn(w: &mut World, job: impl FnOnce(&Cred) -> Done + Send + 'static) {
 /// In game: the IRC sign-on and the loads (as xiloader's login: our status first, then the lists).
 pub fn start(w: &mut World) {
     let f = &mut w.friends;
-    if f.started || f.cred.is_none() {
+    if f.cred.is_none() {
+        // No profile service: the launcher's feed, polled until the world is gone (logout drops it).
+        if f.feed.is_none()
+            && let Some(c) = f.feed_cred.clone()
+        {
+            f.feed = Some(friends_feed::spawn(c));
+        }
+        return;
+    }
+    if f.started {
         return;
     }
     f.started = true;
@@ -144,8 +172,43 @@ pub fn set_status(w: &mut World, open: u8) {
     spawn(w, move |c| Done::Status(profile::change_my_status(c, s, Some(open)), Some(open)));
 }
 
+/// The feed's newest snapshot becomes the list (read-only entries, sorted by the list's own rules).
+fn feed_poll(w: &mut World) {
+    let f = &mut w.friends;
+    if f.cred.is_some() {
+        return;
+    }
+    let Some(snap) = f.feed.as_ref().and_then(|d| d.snapshots.try_iter().last()) else { return };
+    let list = feed_entries(&snap.friends);
+    let same = |a: &[Friend], b: &[Friend]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (&x.name, x.status, &x.place) == (&y.name, y.status, &y.place));
+    if f.loaded && same(&f.list, &list) {
+        return;
+    }
+    // An open list holds row indexes into the old one: rebuilt, the cursor kept on its friend.
+    let keep = super::friendlist::cursor_name(w);
+    w.friends.list = list;
+    w.friends.loaded = true;
+    super::friendlist::refresh_rows(w, keep.as_deref());
+    log::info!("friends feed: {} friends", w.friends.list.len());
+}
+
+/// The feed's friends as list entries: nameless ones and repeats of a name dropped, 200 at most.
+fn feed_entries(friends: &[FeedFriend]) -> Vec<Friend> {
+    let mut out: Vec<Friend> = Vec::new();
+    for f in friends {
+        if let Some(e) = Friend::from_feed(out.len(), f)
+            && out.len() < 200
+            && !out.iter().any(|o| o.name.eq_ignore_ascii_case(&e.name))
+        {
+            out.push(e);
+        }
+    }
+    out
+}
+
 /// Each frame: the jobs' answers and the IRC session's notices.
 pub fn poll(w: &mut World) {
+    feed_poll(w);
     let mut done = Vec::new();
     w.friends.jobs.retain(|rx| match rx.try_recv() {
         Ok(d) => {
@@ -493,6 +556,9 @@ fn line10(w: &mut World, id: usize, code: i32) {
 
 /// Ignore (FUN_10200280): a friend's entry copied to the block list, else a new one; 9 0x18, then `then`.
 pub fn ignore(w: &mut World, account: u64, name: &str, then: impl FnOnce(&mut World) + Send + 'static) {
+    if w.friends.cred.is_none() {
+        return;
+    }
     let e = new_entry(w, true, account, name);
     let list = w.friends.list.clone();
     w.friends.busy = true;
@@ -516,6 +582,11 @@ pub fn ignore(w: &mut World, account: u64, name: &str, then: impl FnOnce(&mut Wo
 /// the composer for a request (its name box filled with theirs); listed -> 7 0xa1 from /befriend, a plain message from
 /// Befriend; ourselves or not found -> 7 0xa2 *(inf)*. Busy: 7 0x7a.
 pub fn befriend(w: &mut World, char_id: u32, char_name: String, from_command: bool) {
+    // No profile service (the launcher's feed is read-only): nothing to add to.
+    if w.friends.cred.is_none() {
+        super::textcmd::refuse(w, 0xa2);
+        return;
+    }
     if w.friends.busy {
         super::textcmd::refuse(w, 0x7a);
         return;
@@ -545,4 +616,38 @@ pub fn befriend(w: &mut World, char_id: u32, char_name: String, from_command: bo
             }
         }))
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn friend(name: Option<&str>, state: &str) -> FeedFriend {
+        FeedFriend { username: name.map(Into::into), state: Some(state.into()), ..Default::default() }
+    }
+
+    #[test]
+    fn feed_entries_are_read_only_list_entries() {
+        let mut a = friend(Some("alice"), "online");
+        a.game = Some("Example Game".into());
+        let list = feed_entries(&[a, friend(Some("bob"), "away"), friend(None, "online"), friend(Some("BOB"), "offline"), friend(Some("carol"), "offline")]);
+        let names: Vec<&str> = list.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["alice", "bob", "carol"]);
+        assert_eq!(list.iter().map(|f| f.status).collect::<Vec<_>>(), [1, 2, 0]);
+        assert!(list.iter().all(|f| f.feed && !f.black && !f.pending && !f.mail && f.account == 0 && f.record.is_none()));
+        assert_eq!(list[0].place, "Example Game");
+        assert_eq!(list[2].place, "");
+        // Control characters and length are cleaned before the game's font sees them.
+        let odd = feed_entries(&[friend(Some("a\u{1b}[31mb\n"), "online"), friend(Some(&"x".repeat(100)), "online")]);
+        assert_eq!(odd[0].name, "a[31mb");
+        assert_eq!(odd[1].name.len(), 32);
+    }
+
+    #[test]
+    fn the_feed_is_dropped_when_a_profile_service_exists() {
+        let feed = FeedCred::new("https://example.invalid/feed", "t");
+        assert!(Friends::new(None, feed.clone()).feed_cred.is_some());
+        let cred = Cred { host: "example.invalid".into(), port: 1, irc_port: 2, account: 3, hash: [0; 16] };
+        assert!(Friends::new(Some(cred), feed).feed_cred.is_none());
+    }
 }

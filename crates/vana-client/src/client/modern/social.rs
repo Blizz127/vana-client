@@ -407,7 +407,8 @@ fn friends(p: &mut Panels, w: &mut World, gu: &GameUi) {
                     icon: ic.and_then(icon),
                     name: f.name.clone(),
                     colour: m.theme.color("text"),
-                    jobs: rec.map(|r| r.name.clone()).unwrap_or_default(),
+                    // A launcher's feed entry carries its location text instead of a character record.
+                    jobs: if f.feed && cat == 0 { f.place.clone() } else { rec.map(|r| r.name.clone()).unwrap_or_default() },
                     who: String::new(),
                     zone: rec.filter(|r| r.zone != w.pos_zone).map(|r| crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(r.zone)))).unwrap_or_default(),
                 }
