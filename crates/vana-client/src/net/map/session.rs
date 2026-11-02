@@ -105,7 +105,13 @@ const MAX_PAYLOAD: usize = 4000;
 
 impl MapSession {
     pub fn connect(server: SocketAddr, key: &[u8; 20], codec: Codec) -> Result<Self> {
-        let sock = UdpSocket::bind("0.0.0.0:0")?;
+        Self::with_socket(UdpSocket::bind("0.0.0.0:0")?, server, key, codec)
+    }
+
+    /// On a socket the game keeps for its whole run, as FFXiMain does: zone changes reach the next server from the
+    /// same local port, so a server keying sessions on the client's address sees one client (inferred from retail's
+    /// single socket; LSB-style servers otherwise make a second session per zone change).
+    pub fn with_socket(sock: UdpSocket, server: SocketAddr, key: &[u8; 20], codec: Codec) -> Result<Self> {
         sock.connect(server)?;
         Ok(Self { sock, cipher: Blowfish::for_session_key(key), key: super::blowfish::session_key(key), codec, seq: 0, server_seq: 0, bytes_out: 0, bytes_in: 0, unacked: Vec::new(), server_ack: 0, last_in: None, logged: (0, 0), cert: None, clock: None })
     }

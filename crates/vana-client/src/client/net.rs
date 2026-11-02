@@ -1013,8 +1013,10 @@ enum Outcome {
 
 fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats) -> Result<()> {
     let mut addr = SocketAddr::from((login.map.0, login.map.1));
+    // One local UDP port for the whole run, zone changes included (MapSession::with_socket).
+    let sock = std::net::UdpSocket::bind("0.0.0.0:0")?;
     loop {
-        match session(addr, &login, account, codec, tx, rx, me, stats)? {
+        match session(sock.try_clone()?, addr, &login, account, codec, tx, rx, me, stats)? {
             Outcome::Zone(next) => {
                 let counter = u32::from_le_bytes(login.key[16..20].try_into().unwrap()).wrapping_add(2);
                 login.key[16..20].copy_from_slice(&counter.to_le_bytes());
@@ -1027,9 +1029,9 @@ fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats) -> Result<Outcome> {
+fn session(sock: std::net::UdpSocket, addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats) -> Result<Outcome> {
     use std::sync::atomic::Ordering::Relaxed;
-    let mut map = MapSession::connect(addr, &login.key, codec.clone())?;
+    let mut map = MapSession::with_socket(sock, addr, &login.key, codec.clone())?;
     let (mut rx_seen, mut tx_seen) = (0u64, 0u64);
     // FFXiMain sends the plain login every 400 ms until the zone-in (s2c 0x00A) is handled, not just any datagram.
     let mut tries = 1u32;
