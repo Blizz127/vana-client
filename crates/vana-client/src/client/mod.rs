@@ -7567,7 +7567,8 @@ impl App {
                             area_lights: HashMap::new(),
                             ground: None,
                             name: login.name.clone(),
-                            search_addr: login.search,
+                            // Ours: the config's map_host (a proxy or NAT) stands for the search server's address too.
+                            search_addr: (net::MAP_HOST.get().copied().flatten().unwrap_or(login.search.0), login.search.1),
                             searches: Vec::new(),
                             search: None,
                             search_words: self.search_words.clone(),

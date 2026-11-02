@@ -240,7 +240,7 @@ The friend list, presence and PlayOnline-style mail use the server's profile ser
 A named server can turn them on or off with `"social": true` or `false`; with `"social_named_only": true` in the
 config, only named servers with `"social": true` use them and no other server's profile ports are contacted.
 
-`"map_host": "<address>"` sends the map (zone) session to that address instead of the one the lobby and each zone change
+`"map_host": "<address>"` sends the map (zone) session and the search server to that address instead of the one the lobby and each zone change
 name, keeping their ports: for a server reached through a proxy or NAT that hands out an address the client cannot
 reach.
 
