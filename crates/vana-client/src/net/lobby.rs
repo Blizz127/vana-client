@@ -459,9 +459,12 @@ impl Lobby {
             if msg[0] != 0x02 {
                 bail!("lobby asked for 0x{:02X} instead of the key", msg[0]);
             }
-            // xi_connect derives the real key itself; these bytes are xiloader's placeholders.
+            // The key value: xi_connect replaces it with MD5(session hash) when xi_profile handed that to the client,
+            // and a server that only does so then (or never) keeps the loader's bytes. Sending the same 16 bytes
+            // makes both give the key the map login hashes (key20 below); the rest are xiloader's placeholders.
             let mut key_msg = [0u8; 28];
             key_msg[0] = 0xA2;
+            key_msg[1..17].copy_from_slice(&self.k16);
             key_msg[17..21].copy_from_slice(&[0x58, 0xE0, 0x5D, 0xAD]);
             self.data.as_mut().unwrap().write_all(&key_msg)?;
         }
