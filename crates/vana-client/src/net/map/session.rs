@@ -68,9 +68,11 @@ pub struct MapSession {
     /// Datagram bytes sent / received on this session, for the Network window.
     pub bytes_out: u64,
     pub bytes_in: u64,
-    /// Sub-packets not yet acked, stamped with the sequence of their first send (FUN_100fac80 resends them in
-    /// every datagram until the server's header u16 @2 reaches it), and that ack.
-    unacked: Vec<(u16, Vec<u8>)>,
+    /// Sub-packets not yet acked (FUN_100fac80 resends them in every datagram until the server's header u16 @2 reaches
+    /// their first send), and that ack. Sub-packets not acked yet, with the datagram they first went out in (None: queued, not sent yet: it is stamped
+    /// with the sequence of the datagram it first fits in, as retail; a server skips a sub-packet whose sync is not
+    /// newer than the last datagram it handled).
+    unacked: Vec<(Option<u16>, Vec<u8>)>,
     server_ack: u16,
     /// Header sequence of the last datagram handled; none before the first.
     last_in: Option<u16>,
@@ -193,20 +195,20 @@ impl MapSession {
     pub fn send(&mut self, packets: &[Vec<u8>]) -> Result<()> {
         let mut dgram = self.header();
         let (seq, ack) = (self.seq, self.server_ack);
-        self.unacked.retain(|(s, _)| ack.wrapping_sub(*s) >= 0x8000);
+        self.unacked.retain(|(s, _)| s.is_none_or(|s| ack.wrapping_sub(s) >= 0x8000));
         let id = |p: &[u8]| u16::from_le_bytes([p[0], p[1]]) & 0x1ff;
         if packets.iter().any(|p| id(p) == 0x015) {
             self.unacked.retain(|(_, p)| id(p) != 0x015);
         }
-        for p in packets {
-            let mut p = p.clone();
-            p[2..4].copy_from_slice(&seq.to_le_bytes());
-            self.unacked.push((seq, p));
-        }
+        self.unacked.extend(packets.iter().map(|p| (None, p.clone())));
         let mut raw = Vec::new();
-        for (_, p) in &self.unacked {
+        for (sent, p) in &mut self.unacked {
             if raw.len() + p.len() > MAX_PAYLOAD {
                 break;
+            }
+            if sent.is_none() {
+                p[2..4].copy_from_slice(&seq.to_le_bytes());
+                *sent = Some(seq);
             }
             raw.extend_from_slice(p);
         }
@@ -297,6 +299,28 @@ impl MapSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Set FFXI_MAIN_DLL to run: sub-packets that don't fit a datagram wait unstamped and take the sequence of the
+    /// datagram they first go out in; an ack never drops one not sent yet.
+    #[test]
+    fn overflow_is_stamped_when_first_sent() {
+        let Ok(dll) = std::env::var("FFXI_MAIN_DLL") else { return };
+        let codec = Codec::from_ffximain(&std::fs::read(dll).unwrap()).unwrap();
+        let server = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let mut s = MapSession::connect(server.local_addr().unwrap(), &[7u8; 20], codec).unwrap();
+        let big: Vec<Vec<u8>> = (0..12).map(|_| build(0x0B6, &[0u8; 400])).collect();
+        s.send(&big).unwrap();
+        let first = s.seq;
+        let stamped = s.unacked.iter().filter(|(sent, _)| *sent == Some(first)).count();
+        assert!(stamped > 0 && stamped < 12, "{stamped}");
+        assert!(s.unacked.iter().skip(stamped).all(|(sent, _)| sent.is_none()));
+        // The server acks the first datagram: its sub-packets go, the unsent ones stay and go out next, stamped anew.
+        s.server_ack = first;
+        s.send(&[]).unwrap();
+        let second = s.seq;
+        assert_eq!(s.unacked.len(), 12 - stamped);
+        assert!(s.unacked.iter().all(|(sent, p)| *sent == Some(second) && p[2..4] == second.to_le_bytes()));
+    }
 
     /// Set FFXI_MAIN_DLL to run: a resent datagram (same header sequence) and an older one carry nothing.
     #[test]
