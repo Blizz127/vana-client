@@ -504,7 +504,19 @@ pub fn facts(w: &World) -> Facts {
         let effects = w.party_buffs.get(&m.id).map_or(Vec::new(), |row| row.iter().copied().filter(|&b| b != 0 && b != 0xffff).collect());
         party.push(Member { name: m.name.clone(), me: false, here: m.away == 0 && m.zone == w.pos_zone, hp: m.hp, hp_max: max, job: m.jobs[0], effects });
     }
-    let own = super::buffs::icons(w).into_iter().map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0))).collect();
+    // A time left that is negative or over a day means our clock does not match the server's (seen on a server whose
+    // 0x00A left its game time unset): unknown, never "wears off now".
+    let mut own: Vec<(u16, Option<f32>)> = super::buffs::icons(w).into_iter().map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0).filter(|l| (0.0..86_400.0).contains(l)))).collect();
+    // Ours: an effect the action messages say landed on us (timers.rs) counts before the server's icon list shows it
+    // (or when a server sends that list late).
+    if let Some(b) = w.timers.on.get(&w.my_id) {
+        let at = std::time::Instant::now();
+        for e in &b.effects {
+            if !own.iter().any(|(id, _)| *id == e.status) {
+                own.push((e.status, e.secs.map(|s| s - at.duration_since(e.start).as_secs_f32())));
+            }
+        }
+    }
     let known: Vec<u16> = (0..1024u16).filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0)).collect();
     let spells = known
         .into_iter()
