@@ -58,6 +58,8 @@ mod items;
 pub mod select;
 pub mod net;
 pub mod script;
+pub mod gamepad;
+mod osk;
 mod subarea;
 mod myroom;
 mod bump;
@@ -305,6 +307,12 @@ fn text_field_open(w: &World) -> bool {
 /// A window that has the focus or blocks targeting (FUN_101585f0's T+0x74 bit 0 / T+0x6a; ours the open windows).
 fn world_window_open(w: &World) -> bool {
     w.action_menu.is_some() || window_over_actions(w)
+}
+
+/// A window has the keys (keys_spec "window" state): arrows go to it, not to the camera. The log counts only while
+/// focused: Escape or another window unfocuses it and leaves the 0x78 state at 1.
+fn keys_in_window(w: &World) -> bool {
+    world_window_open(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some()
 }
 
 /// The open windows but the action menu (playermo), which stays up while engaged: macros run while it is the only one
@@ -6470,6 +6478,14 @@ pub struct App {
     numpad_slash: bool,
     /// Retail key functions (DAT_103619f0 and FUN_1011ff30).
     input: input::Input,
+    /// The gamepad (gamepad.rs), its egui key events for the next frame, and the on-screen keyboard's trigger (osk.rs).
+    pads: gamepad::Pads,
+    pad_events: Vec<egui::Event>,
+    osk: osk::Edge,
+    /// The window has the focus (the pad reads while another window has it).
+    focused: bool,
+    /// The login screen's focus is on a text field (its fields draw as the login window's, not egui's).
+    login_text: bool,
     /// Frames per second, 0 = unlimited (config frame_limit), and the present mode must be picked again.
     frame_limit: u32,
     present_dirty: bool,
@@ -6714,6 +6730,11 @@ impl App {
             next_frame: None,
             numpad_slash: false,
             input: input::Input::default(),
+            pads: gamepad::Pads::default(),
+            pad_events: Vec::new(),
+            osk: osk::Edge::default(),
+            focused: true,
+            login_text: false,
             frame_limit,
             present_dirty: false,
             window_dirty: false,
@@ -10217,7 +10238,7 @@ impl App {
             f.keyboard = w.game.get(0x42);
             // A window has the keys: arrows go to it, not to the camera (keys_spec "window" state). The log counts only
             // while focused: Escape or another window unfocuses it and leaves the 0x78 state at 1.
-            f.window = world_window_open(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some();
+            f.window = keys_in_window(w);
             f.assigning = w.config.as_ref().and_then(|c| c.stack.last()).is_some_and(|t| t.name == "k1assign" || t.name == "k2assign");
         }
         let window = f.window;
@@ -10860,6 +10881,7 @@ impl App {
                     let mut view = None;
                     let help_over = self.twofa.as_ref().map(|t| t.help());
                     let chosen = login_window(lu, shown, size, &mut fields, playonline, combo, &mut self.cfg.remember_password, focus, busy, &status, help_over, &self.cfg.client_version, &mut sounds, modern_ui.then_some(&mut view), ctx.native_pixels_per_point().unwrap_or(1.0));
+                    self.login_text = fields.get(*focus).is_some_and(|f| !f.read_only);
                     drop(fields);
                     // A server typed over to or from PlayOnline: the passwords are the other service's, never sent there.
                     if is_playonline(&self.cfg.server) != playonline {
@@ -12256,6 +12278,50 @@ impl App {
     }
 
     /// Any input during the opening: the movie stops and its music fades over 60 ticks.
+    /// What the gamepad's buttons act on: a text field has the keys, a window / menu / event / the lobby screens, or the
+    /// field (walking about).
+    fn pad_ctx(&self) -> gamepad::Ctx {
+        use gamepad::Ctx;
+        match &self.phase {
+            Phase::World(w) if text_field_open(w) => Ctx::Typing,
+            Phase::World(w) if keys_in_window(w) || event::active(w) || w.prompt.is_some() => Ctx::Menu,
+            Phase::World(_) => Ctx::Field,
+            Phase::Login { .. } if self.login_text => Ctx::Typing,
+            _ => Ctx::Menu,
+        }
+    }
+
+    /// Once a frame, before the key functions: reads the gamepad (a no-op with none connected), holds its keys and
+    /// sticks in the input state, queues its egui key events, and raises the on-screen keyboard when a text field opens
+    /// under it.
+    fn poll_gamepad(&mut self) {
+        let dt = self.last_frame.elapsed().as_secs_f32().min(0.1);
+        let tuning = gamepad::Tuning { deadzone: self.cfg.gamepad_deadzone, camera_speed: self.cfg.gamepad_camera_speed };
+        let ctx = self.pad_ctx();
+        let out = self.pads.frame(self.cfg.gamepad, self.focused, ctx, tuning, dt);
+        self.input.set_pad(&out.keys, out.sticks);
+        if out.pressed {
+            // Other key presses hide the cursor.
+            if !self.dragging && !self.left_down {
+                self.mouse.visible = false;
+            }
+            // The opening movie ends on any key; the press is not passed on.
+            if self.opening.is_some() {
+                self.skip_opening();
+                return;
+            }
+        }
+        self.pad_events.extend(out.events);
+        let (open, field) = match &self.phase {
+            Phase::World(w) => (text_field_open(w), if w.typing { osk::Field::Chat } else { osk::Field::Other }),
+            Phase::Login { .. } => (self.login_text, osk::Field::Login),
+            _ => (false, osk::Field::Other),
+        };
+        if self.osk.update(open, self.pads.in_use()) {
+            osk::request(field);
+        }
+    }
+
     fn skip_opening(&mut self) {
         if self.opening.as_mut().is_some_and(|o| o.skip()) {
             log::info!("opening: skipped");
@@ -12426,6 +12492,7 @@ impl App {
             resttick::update(w);
             servmes::frame(w);
         }
+        self.poll_gamepad();
         // Config 0022: the opening movie before the title, which loads behind it.
         if self.opening.is_some() {
             self.draw_opening();
@@ -12576,6 +12643,8 @@ impl App {
                 }
             }
         }
+        // The gamepad's key events, as the window's keys would arrive.
+        raw.events.extend(std::mem::take(&mut self.pad_events));
         // A Print Screen shot from the game (key function 0x55).
         let mut game_shot = false;
         if script_shot.is_none()
@@ -13910,6 +13979,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                self.pads.other_input();
                 if let PhysicalKey::Code(code) = event.physical_key {
                     // Other key functions hide the cursor (FUN_10125f70(0)), except during a drag.
                     let modifier = matches!(code, KeyCode::ShiftLeft | KeyCode::ShiftRight | KeyCode::ControlLeft | KeyCode::ControlRight | KeyCode::AltLeft | KeyCode::AltRight | KeyCode::SuperLeft | KeyCode::SuperRight);
@@ -13939,6 +14009,7 @@ impl ApplicationHandler for App {
             WindowEvent::CursorLeft { .. } => self.cursor_in = false,
             // Config-tool 0035 = 0: no sound while the window is not focused (no DSBCAPS_GLOBALFOCUS).
             WindowEvent::Focused(f) => {
+                self.focused = f;
                 if !f {
                     self.input.clear();
                 }
@@ -13954,6 +14025,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } if !consumed || state == ElementState::Released => {
+                self.pads.other_input();
                 self.mouse_button(button, state == ElementState::Pressed, consumed);
             }
             WindowEvent::CursorMoved { position, .. } => {

@@ -44,6 +44,10 @@ pub struct Settings {
     pub monitor: String,
     pub gpu: String,
     pub cursor_size: u32,
+    /// The Gamepad page: on, the sticks' deadzone and the camera's speed, in percent.
+    pub gamepad: bool,
+    pub gamepad_deadzone: u32,
+    pub gamepad_camera: u32,
     pub modern_ui: bool,
     pub modern_scale: u32,
     pub modern_opacity: u32,
@@ -89,6 +93,9 @@ impl Settings {
             monitor: c.monitor.clone(),
             gpu: c.gpu.clone(),
             cursor_size: c.cursor_size,
+            gamepad: c.gamepad,
+            gamepad_deadzone: pct(c.gamepad_deadzone),
+            gamepad_camera: (c.gamepad_camera_speed * 100.0).round().clamp(10.0, 500.0) as u32,
             modern_ui: c.modern_ui,
             modern_scale: c.modern_scale,
             modern_opacity: pct(c.modern_opacity),
@@ -127,6 +134,9 @@ impl Settings {
         c.minimap_size = self.minimap_size;
         c.retail_aspect = self.retail_aspect;
         c.cursor_size = self.cursor_size;
+        c.gamepad = self.gamepad;
+        c.gamepad_deadzone = self.gamepad_deadzone as f32 / 100.0;
+        c.gamepad_camera_speed = self.gamepad_camera as f32 / 100.0;
         c.modern_ui = self.modern_ui;
         c.modern_scale = self.modern_scale;
         c.modern_opacity = self.modern_opacity as f32 / 100.0;
@@ -183,6 +193,9 @@ enum Val {
     Effects,
     RetailAspect,
     CursorSize,
+    Gamepad,
+    GamepadDeadzone,
+    GamepadCamera,
     /// The monitor for full screen, from the list the app passes in.
     Monitor,
     /// The graphics adapter ("Default" then the app's list).
@@ -210,15 +223,19 @@ struct Row {
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
+const DEADZONES: &[(u32, &str)] = &[(5, "5%"), (10, "10%"), (15, "15%"), (20, "20%"), (25, "25%"), (30, "30%"), (35, "35%"), (40, "40%"), (50, "50%"), (60, "60%")];
+const CAMERA_SPEEDS: &[(u32, &str)] = &[(25, "0.25x"), (50, "0.5x"), (75, "0.75x"), (100, "1x"), (125, "1.25x"), (150, "1.5x"), (200, "2x"), (250, "2.5x"), (300, "3x"), (400, "4x")];
 const MODERN_SCALES: &[(u32, &str)] = &[(50, "50%"), (55, "55%"), (60, "60%"), (65, "65%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%"), (100, "100%"), (105, "105%"), (110, "110%"), (115, "115%"), (120, "120%"), (125, "125%"), (130, "130%"), (135, "135%"), (140, "140%"), (145, "145%"), (150, "150%")];
 
 const fn row(label: &'static str, help: &'static str, val: Val, choices: &'static [(u32, &'static str)], when: When) -> Row {
     Row { label, help, val, choices, when }
 }
 
-const TABS: [&str; 8] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Mods"];
+const TABS: [&str; 9] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Gamepad", "Mods"];
+/// The Gamepad page (client/gamepad.rs).
+const GAMEPAD: usize = 7;
 /// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
-const MODS: usize = 7;
+const MODS: usize = 8;
 const EXTRA_TABS: [&str; 3] = ["Maps", "Timers", "Misc."];
 
 /// `in_game`: the volumes are the Gameplay page's there, so the Sound page leaves them out. `modern`: the minimap's and
@@ -276,6 +293,11 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [Row] {
         row("Panel Opacity", "How opaque the modern interface's window backgrounds are (not retail).", ModernOpacity, &[], Now),
         row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now),
     ];
+    const GAMEPAD_ROWS: &[Row] = &[
+        row("Gamepad", "A connected gamepad plays the game: the left stick walks, the right one turns the camera, the buttons are the keys' (not retail). Off, a pad does nothing.", Gamepad, OFF_ON, Now),
+        row("Stick Deadzone", "How far a stick must be pushed before it counts; raise it if the character or camera drifts on its own.", GamepadDeadzone, DEADZONES, Now),
+        row("Camera Speed", "How fast the right stick turns the camera, against the keys' speed.", GamepadCamera, CAMERA_SPEEDS, Now),
+    ];
     const MAPS: &[Row] = &[
         row("Map Overlay", "Ctrl / Alt + O shows the zone map over the screen, as the map add-ons do.", MapOverlay, OFF_ON, Now),
         row("Map Overlay Opacity", "How opaque the map overlay is.", MapOpacity, &[], Now),
@@ -310,6 +332,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [Row] {
         Kind::Extras => [MAPS, TIMERS, EXTRA_MISC][tab.min(2)],
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
+        Kind::Settings if tab == GAMEPAD => GAMEPAD_ROWS,
         // Panel Places (the last Linux row) is a character's: in game only.
         Kind::Settings if !in_game && tab == 6 => &CLIENT[..CLIENT.len() - 1],
         Kind::Settings => [GENERAL, SCREEN, TEXTURES, EFFECTS, SOUND, MISC, CLIENT][tab.min(6)],
@@ -460,6 +483,9 @@ impl SettingsUi {
             Val::Effects => self.s.effects,
             Val::RetailAspect => self.s.retail_aspect as u32,
             Val::CursorSize => self.s.cursor_size,
+            Val::Gamepad => self.s.gamepad as u32,
+            Val::GamepadDeadzone => self.s.gamepad_deadzone,
+            Val::GamepadCamera => self.s.gamepad_camera,
         }
     }
 
@@ -494,6 +520,9 @@ impl SettingsUi {
             Val::MinimapSize => self.s.minimap_size = x,
             Val::RetailAspect => self.s.retail_aspect = x != 0,
             Val::CursorSize => self.s.cursor_size = x,
+            Val::Gamepad => self.s.gamepad = x != 0,
+            Val::GamepadDeadzone => self.s.gamepad_deadzone = x,
+            Val::GamepadCamera => self.s.gamepad_camera = x,
             _ => {}
         }
     }

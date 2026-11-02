@@ -113,6 +113,11 @@ pub struct Input {
     consumed: bool,
     /// NumLock, from the last numpad digit's logical key (winit reports no toggle state).
     numlock: bool,
+    /// The gamepad (client/gamepad.rs): the DIK keys its buttons hold, and its sticks as the axes read them
+    /// (movement x / y, camera x / y; y is positive down, as the arrow keys' axes are). The pad is another keyboard
+    /// here: the keys go through the same state as the window's.
+    pad_down: [bool; 256],
+    pad_sticks: [f32; 4],
 }
 
 impl Default for Input {
@@ -138,6 +143,8 @@ impl Default for Input {
             window: false,
             consumed: false,
             numlock: true,
+            pad_down: [false; 256],
+            pad_sticks: [0.0; 4],
         }
     }
 }
@@ -252,6 +259,17 @@ impl Input {
     pub fn clear(&mut self) {
         self.down = [false; 256];
         self.tapped = [false; 256];
+        self.set_pad(&[], [0.0; 4]);
+    }
+
+    /// The gamepad's state for the next frame: the DIK keys its buttons hold (an empty list when none is in use) and
+    /// its sticks. Call it before `begin_frame`.
+    pub fn set_pad(&mut self, keys: &[u8], sticks: [f32; 4]) {
+        self.pad_down = [false; 256];
+        for &k in keys {
+            self.pad_down[k as usize] = true;
+        }
+        self.pad_sticks = sticks;
     }
 
     /// The frame's key state (FUN_10005520), the chat line's Enter / Esc, then the compact pad (FUN_1011fbc0).
@@ -264,7 +282,7 @@ impl Input {
         let frames = (self.clock / FRAME_TICKS).floor();
         self.clock -= frames * FRAME_TICKS;
         for k in 0..256 {
-            let now = self.down[k] || self.tapped[k];
+            let now = self.down[k] || self.tapped[k] || self.pad_down[k];
             self.tapped[k] = false;
             let s = &mut self.keys[k];
             if now {
@@ -378,6 +396,15 @@ impl Input {
             6 => (if arrows { key(0xcd, 0xcb) } else { 0.0 }, stick(0x2_0000, 0x4_0000)),
             _ => (if arrows { key(0xd0, 0xc8) } else { 0.0 }, stick(0x10_0000, 0x8_0000)),
         };
+        // The gamepad's stick, the same axis (movement x / y, camera x / y; the map's scroll and zoom use the same two
+        // sticks). Typing: no walking, as the numpad movement above.
+        let analog = match id {
+            4 | 0x79 | 0x9d => self.pad_sticks[0],
+            5 | 0x7a | 0x9e => self.pad_sticks[1],
+            6 => self.pad_sticks[2],
+            _ => self.pad_sticks[3],
+        };
+        let pad = if analog.abs() > pad.abs() && !(self.typing && matches!(id, 4 | 5)) { analog } else { pad };
         if keys.abs() >= pad.abs() { keys } else { pad }
     }
 
@@ -685,6 +712,39 @@ mod tests {
         assert_eq!(i.compact[6], Compact { key: 0x23, rule: 0, states: 4, bits: 0x400 });
         assert_eq!((i.k1.len(), i.k1[4].as_slice()), (28, &[11u8, 15, 19, 23][..]));
         assert_eq!((i.k2.len(), i.k2[0].as_slice()), (K2_ROWS, &[0x3bu16][..]));
+    }
+
+    /// The gamepad is another keyboard: its held keys press and repeat as the window's do, its sticks are axes the
+    /// keys can outvote, and nothing changes while no pad is in use.
+    #[test]
+    fn gamepad_keys_and_sticks() {
+        let mut i = Input::default();
+        i.masks = vec![0xffff; IDS];
+        i.begin_frame(frame());
+        assert_eq!((i.axis(4), i.axis(5), i.axis(6), i.axis(7)), (0.0, 0.0, 0.0, 0.0));
+        i.set_pad(&[0x1c], [0.5, -1.0, 0.25, 0.0]);
+        i.begin_frame(frame());
+        assert!(i.pressed(0x1c) && i.held(0x1c));
+        assert_eq!((i.axis(4), i.axis(5), i.axis(6), i.axis(7)), (0.5, -1.0, 0.25, 0.0));
+        // The map's scroll reads the left stick, its zoom the right one.
+        assert_eq!((i.axis(0x79), i.axis(0x7a), i.axis(0x7c)), (0.5, -1.0, 0.0));
+        i.begin_frame(frame());
+        assert!(!i.pressed(0x1c) && i.held(0x1c));
+        // A key beats a weaker stick (the larger wins), a stronger stick beats a key.
+        i.set_pad(&[], [0.5, 0.0, 0.0, 0.0]);
+        i.key(KeyCode::Numpad6, true, &winit::keyboard::Key::Character("6".into()));
+        i.begin_frame(frame());
+        assert!(!i.held(0x1c) && i.axis(4) == 1.0);
+        // Typing: the stick does not walk.
+        i.set_pad(&[], [1.0, 1.0, 0.0, 0.0]);
+        i.key(KeyCode::Numpad6, false, &winit::keyboard::Key::Character("6".into()));
+        i.begin_frame(Frame { typing: true, ..frame() });
+        assert_eq!((i.axis(4), i.axis(5)), (0.0, 0.0));
+        // Losing the window's focus drops the pad's keys too.
+        i.set_pad(&[0x1d], [0.0; 4]);
+        i.clear();
+        i.begin_frame(frame());
+        assert!(!i.held(0x1d));
     }
 
     #[test]
