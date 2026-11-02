@@ -62,6 +62,12 @@ impl Status {
 
 pub type Shared = Arc<Mutex<Status>>;
 
+/// VANA_MANAGED (not retail): a launcher owns the game files and the client's own updates, so neither update check
+/// runs (no patch server or release lookups, no Update buttons).
+pub fn managed() -> bool {
+    std::env::var_os("VANA_MANAGED").is_some_and(|v| !v.is_empty() && v != "0")
+}
+
 /// Starts both checks in the background.
 pub fn start(root: PathBuf) -> Shared {
     let s: Shared = Arc::new(Mutex::new(Status { game: Game::Checking, client: Client::Checking }));

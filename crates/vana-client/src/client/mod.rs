@@ -6678,7 +6678,7 @@ impl App {
         let _ = updater::exe();
         // A test drive checks for updates only with FFXI_UPDATE_CHECK set.
         let drive_checks = drive.login.is_none() || std::env::var_os("FFXI_UPDATE_CHECK").is_some();
-        let updates = (drive_checks && cfg.ffxi_dir().join("VTABLE.DAT").is_file()).then(|| {
+        let updates = (drive_checks && !updater::managed() && cfg.ffxi_dir().join("VTABLE.DAT").is_file()).then(|| {
             updater::tidy();
             updater::start(cfg.ffxi_dir())
         });
@@ -10787,7 +10787,7 @@ impl App {
                     if let Err(e) = self.cfg.save() {
                         log::warn!("saving the config: {e:#}");
                     }
-                    self.updates = Some(updater::start(self.cfg.ffxi_dir()));
+                    self.updates = (!updater::managed()).then(|| updater::start(self.cfg.ffxi_dir()));
                 }
                 firstrun::Action::Begin(dir) => {
                     self.cfg.game_dir = dir;

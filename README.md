@@ -119,6 +119,9 @@ A launcher can log in for the player: start the client with `VANA_LOGIN_FILE` na
 `password` (mode 0600). The client reads it once, deletes it and logs in as from the login screen; a failed login
 leaves the player on the login screen with the error.
 
+A launcher that manages the game files and the client's own updates sets `VANA_MANAGED=1`: the client then makes no
+update checks (neither the PlayOnline patch server nor its own releases) and shows no Update buttons.
+
 The same file may carry `"friends_feed": {"url": "<https URL>", "token": "<bearer token>"}`, a read-only snapshot of the
 launcher's friends. While the game server has no profile service, the client fetches it every 20 s in the world
 (every 60 s after an error) and shows it in the Friend List: name, online or away, and where they play. Those entries
