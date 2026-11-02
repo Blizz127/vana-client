@@ -109,7 +109,7 @@ pub struct Cats {
 
 /// Rows (child id, opens) top to bottom: mgcmenu FUN_1013f750 (list mode), magselec FUN_1013f680 (cast mode, no
 /// Trust), abimenu FUN_1013fa70, abiselec FUN_1013f7f0 (Mount sits above Pet in both).
-pub(super) fn cat_rows(menu: &str) -> &'static [(u16, Cat)] {
+pub(super) fn cat_rows_all(menu: &str) -> &'static [(u16, Cat)] {
     match menu {
         "menu    mgcmenu" => &[(1, Cat::Magic(1, true)), (2, Cat::Magic(2, true)), (3, Cat::Magic(5, true)), (4, Cat::Magic(4, true)), (5, Cat::Magic(3, true)), (6, Cat::Magic(6, true)), (7, Cat::Magic(7, true)), (8, Cat::Magic(8, true))],
         "menu    magselec" => &[(1, Cat::Magic(1, false)), (2, Cat::Magic(2, false)), (3, Cat::Magic(5, false)), (4, Cat::Magic(4, false)), (5, Cat::Magic(3, false)), (6, Cat::Magic(6, false)), (7, Cat::Magic(7, false))],
@@ -123,6 +123,24 @@ pub(super) fn cat_rows(menu: &str) -> &'static [(u16, Cat)] {
         "menu    mp_mnabi" => &[(1, Cat::Ability(4)), (2, Cat::Ability(0x14)), (3, Cat::Ability(1))],
         _ => &[],
     }
+}
+
+/// Ours (client/era.rs): the rows with the Mount row dropped when `no_mount`; the others keep their order, so Pet moves
+/// up under Weapon Skills and the cursor index of every row below the Mount row falls by one.
+pub(super) fn cat_rows_with(menu: &str, no_mount: bool) -> Vec<(u16, Cat)> {
+    cat_rows_all(menu).iter().copied().filter(|r| !(no_mount && r.1 == Cat::Mount)).collect()
+}
+
+/// The Mount row is not in this window now: the base era's (the era lock), once the classic layout has been re-packed
+/// without it (`w.era_packed`, client/eralayout.rs; a layout that could not be, keeps the row greyed) or in the modern
+/// panel, which draws its own rows.
+pub(super) fn mount_dropped(w: &World, menu: &str) -> bool {
+    era::hidden(w, Feature::Mounts) && (w.modern || w.era_packed.iter().any(|n| *n == menu))
+}
+
+/// The rows a category window lists now (child id, opens), top to bottom.
+pub(super) fn cat_rows(w: &World, menu: &str) -> Vec<(u16, Cat)> {
+    cat_rows_with(menu, mount_dropped(w, menu))
 }
 
 /// A category row's name (the windows draw them as sprites): spell types 1 White .. 8 Trust, ability types 4 traits,
@@ -428,13 +446,19 @@ pub(super) fn mount_name(w: &World, id: u16) -> String {
 }
 
 /// The cursor row's child id (the cursor memory is by child).
-pub(super) fn cat_child(c: &Cats) -> u16 {
-    cat_rows(c.menu).get(c.sel).map_or(1, |r| r.0)
+pub(super) fn cat_child(w: &World, c: &Cats) -> u16 {
+    cat_rows(w, c.menu).get(c.sel).map_or(1, |r| r.0)
+}
+
+/// The cursor row for a remembered child: its place in the rows, the first row when it is not there (a Mount row the
+/// era lock dropped).
+pub(super) fn cat_sel(rows: &[(u16, Cat)], child: u16) -> usize {
+    rows.iter().position(|r| r.0 == child).unwrap_or(0)
 }
 
 pub fn open_cats(w: &mut World, menu: &'static str) {
     let child = w.cursor_recall(menu);
-    let sel = cat_rows(menu).iter().position(|r| r.0 == child).unwrap_or(0);
+    let sel = cat_sel(&cat_rows(w, menu), child);
     w.cats = Some(Cats { menu, sel });
     w.menu = None;
     // An action menu still up is suspended under the list (shared group bit) and comes back when it is done.
@@ -533,7 +557,7 @@ pub(super) fn cat_ready(w: &World, cat: Cat) -> bool {
 
 /// Ours: an action menu or main menu command has something usable now (Magic, Abilities, Trust, Items).
 pub(super) fn command_ready(w: &World, c: u8) -> bool {
-    let any = |menu: &str| cat_rows(menu).iter().any(|&(_, cat)| !matches!(cat, Cat::Ability(4)) && cat_ready(w, cat));
+    let any = |menu: &str| cat_rows(w, menu).iter().any(|&(_, cat)| !matches!(cat, Cat::Ability(4)) && cat_ready(w, cat));
     match c {
         7 => any("menu    abiselec"),
         0x44 => any("menu    mp_abisc"),
@@ -742,7 +766,7 @@ pub fn key(w: &mut World, key: egui::Key) -> bool {
         return false;
     }
     if let Some(c) = w.cats {
-        let rows = cat_rows(c.menu);
+        let rows = cat_rows(w, c.menu);
         let n = rows.len().max(1);
         match key {
             egui::Key::ArrowDown => w.cats = Some(Cats { sel: (c.sel + 1) % n, ..c }),
@@ -1097,7 +1121,7 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         })
     };
     if let Some(c) = w.cats {
-        let Some(k) = cat_rows(c.menu).iter().position(|r| hit(c.menu, r.0)) else { return };
+        let Some(k) = cat_rows(w, c.menu).iter().position(|r| hit(c.menu, r.0)) else { return };
         gu.hover.set(true);
         if clicked && k == c.sel {
             key(w, egui::Key::Enter);
@@ -1135,11 +1159,21 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let mut rects = Vec::new();
     let frame = gu.cursor_frame();
     if let Some(c) = w.cats {
-        let child = cat_rows(c.menu).get(c.sel).map_or(1, |r| r.0 as usize);
-        let m = gu.stacked_menu(c.menu, sw, sh).filter(|_| gu.gate_layout(c.menu, sw, sh, None));
+        let child = cat_rows(w, c.menu).get(c.sel).map_or(1, |r| r.0 as usize);
+        // Ours (client/era.rs): a Mount row the layout could not be re-packed without stays, drawn disabled.
+        let grey: Vec<u16> = if era::hidden(w, Feature::Mounts) && !mount_dropped(w, c.menu) { cat_rows_all(c.menu).iter().filter(|r| r.1 == Cat::Mount).map(|r| r.0).collect() } else { Vec::new() };
+        let mut m = gu.stacked_menu(c.menu, sw, sh).filter(|_| gu.gate_layout(c.menu, sw, sh, None));
+        if let Some(m) = m.as_mut() {
+            for e in m.elements.iter_mut().skip(1).filter(|e| grey.contains(&e.id)) {
+                e.refs.clear();
+            }
+        }
         let (b, ui, style, _) = gu.parts();
         if let Some(m) = &m {
             push_category(b, ui, style, m, child, sw, sh, frame);
+        }
+        if m.is_some() && !grey.is_empty() && let Some((x, y)) = gu.window_xy(c.menu, sw, sh) {
+            gu.disabled_children(c.menu, x, y, &grey, None);
         }
         rects.extend(gu.window_rect(c.menu, sw, sh));
     }
@@ -1256,7 +1290,7 @@ pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
         return;
     }
     if let Some(c) = w.cats {
-        let child = cat_rows(c.menu).get(c.sel).map_or(1, |r| r.0);
+        let child = cat_rows(w, c.menu).get(c.sel).map_or(1, |r| r.0);
         let [help, title] = gu.focus_text(c.menu, child);
         (bars.help[1], bars.title[1]) = (help.unwrap_or_default(), title.unwrap_or_default());
     }
@@ -1322,6 +1356,44 @@ mod tests {
         // All known ids by key: 9 7 5 3 1; the others (9, 7) zeroed, then refilled in their old order.
         assert_eq!(&o.list[..5], &[9, 7, 5, 3, 1]);
         assert_eq!(o.count, 5);
+    }
+
+    /// The base era's category windows list no Mount row: the rows below it move up, the cursor index follows.
+    #[test]
+    fn mount_row_drops_and_pet_moves_up() {
+        let ids = |menu, no_mount| cat_rows_with(menu, no_mount).iter().map(|r| r.0).collect::<Vec<_>>();
+        // abimenu: Mount (child 6) sits above Pet (child 5); abiselec: Mount 5 above Pet 4.
+        assert_eq!(ids("menu    abimenu", false), [1, 2, 3, 4, 6, 5]);
+        assert_eq!(ids("menu    abimenu", true), [1, 2, 3, 4, 5]);
+        assert_eq!(ids("menu    abiselec", false), [1, 2, 3, 5, 4]);
+        assert_eq!(ids("menu    abiselec", true), [1, 2, 3, 4]);
+        let pet = |rows: &[(u16, Cat)]| rows.iter().position(|r| r.1 == Cat::Ability(2));
+        assert_eq!(pet(&cat_rows_with("menu    abimenu", false)), Some(5));
+        assert_eq!(pet(&cat_rows_with("menu    abimenu", true)), Some(4));
+        // No Mount row anywhere in the result, and every other row kept in order.
+        for menu in ["menu    abimenu", "menu    abiselec"] {
+            let rows = cat_rows_with(menu, true);
+            assert!(rows.iter().all(|r| r.1 != Cat::Mount));
+            assert_eq!(rows.len(), cat_rows_all(menu).len() - 1);
+        }
+        // The lock off (any expansion bit on) is the retail table, and the other windows never change.
+        assert_eq!(cat_rows_with("menu    abimenu", false), cat_rows_all("menu    abimenu").to_vec());
+        for menu in ["menu    mgcmenu", "menu    magselec", "menu    commenu", "menu    mp_abisc", "menu    mp_mnabi"] {
+            assert_eq!(cat_rows_with(menu, true), cat_rows_all(menu).to_vec(), "{menu}");
+        }
+    }
+
+    #[test]
+    fn cursor_memory_maps_by_child() {
+        let base = cat_rows_with("menu    abimenu", true);
+        let retail = cat_rows_with("menu    abimenu", false);
+        // Pet, remembered by its child, is the fifth row in the base era and the sixth in retail's.
+        assert_eq!((cat_sel(&base, 5), cat_sel(&retail, 5)), (4, 5));
+        // A remembered Mount cursor (from a retail session) falls to the first row, and so does nothing remembered.
+        assert_eq!((cat_sel(&base, 6), cat_sel(&retail, 6)), (0, 4));
+        assert_eq!(cat_sel(&base, 0), 0);
+        // The child a row index gives back is the same table's.
+        assert_eq!(base.get(4).map(|r| r.0), Some(5));
     }
 
     #[test]

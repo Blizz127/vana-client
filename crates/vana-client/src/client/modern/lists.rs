@@ -105,7 +105,7 @@ pub(super) fn search_rows(ui: &mut Ui, m: &super::Modern, w: &World, icons: &[Op
     for (k, h) in hits.iter().enumerate().take(listsearch::MAX) {
         // From a category window, the list each hit is in.
         let right = match (h.cat, w.cats) {
-            (Some(c), Some(cats)) => magic::cat_rows(cats.menu).get(c).map_or("", |r| magic::cat_label(cats.menu, r.1)),
+            (Some(c), Some(cats)) => magic::cat_rows(w, cats.menu).get(c).map_or("", |r| magic::cat_label(cats.menu, r.1)),
             _ => &h.note,
         };
         // A recent pick says so (it ranks first among the matches).
@@ -166,7 +166,7 @@ pub(super) fn search_mouse(w: &mut World, mouse: &Mouse, hits: &[Hit]) {
 fn cats(p: &mut Panels, w: &mut World) {
     let Some(c) = w.cats else { return };
     let m = p.m;
-    let rows = magic::cat_rows(c.menu);
+    let rows = magic::cat_rows(w, c.menu);
     let title = match c.menu {
         "menu    mgcmenu" | "menu    magselec" => "Magic",
         "menu    commenu" => "Communication",

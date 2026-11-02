@@ -97,6 +97,7 @@ mod auction;
 mod tilt;
 mod aepoints;
 mod era;
+mod eralayout;
 mod jobpoints;
 mod merits;
 mod plate;
@@ -1843,6 +1844,12 @@ fn window_closes(w: &mut World, events: &[egui::Event]) {
 fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2], keys: &mut HashSet<KeyCode>, view_proj: glam::Mat4, numpad_slash: bool) -> Vec<[f32; 4]> {
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     world.ui_wh = (sw, sh);
+    // Ours (client/eralayout.rs): the classic windows' layouts follow the era lock.
+    let locked = era::locked(world);
+    if world.era_synced != Some(locked) || gu.era_for != Some(locked) {
+        world.era_packed = gu.sync_era(&eralayout::specs(locked));
+        (world.era_synced, gu.era_for) = (Some(locked), Some(locked));
+    }
     // The focused list's scroll bar and the wheel, before the windows see the press.
     let taken = scrollbar::frame(gu, world, input);
     let input = taken.as_ref().unwrap_or(input);
@@ -5777,6 +5784,10 @@ struct World {
     era_lock: bool,
     era_view: bool,
     era_new: u32,
+    /// The classic windows the era lock re-packed without their later-era rows (client/eralayout.rs), and the lock state
+    /// that was last synced to the layouts.
+    era_packed: Vec<&'static str>,
+    era_synced: Option<bool>,
     /// The Status row's windows (client/status.rs); s2c 0x063 type 2 (limit points, bits, max merits), type 5 (job point
     /// access), types 3 / 4 (Monstrosity: the types seen as bits, type 3's rank word and prestige); 0x067 @0x25.
     status: Option<status::StatusUi>,
@@ -6336,7 +6347,7 @@ impl World {
             kept.push((missions::MENU, sel));
         }
         if let Some(c) = &self.cats {
-            kept.push((c.menu, magic::cat_child(c)));
+            kept.push((c.menu, magic::cat_child(self, c)));
         }
         if let Some(s) = &self.pupset {
             kept.extend(pupset::kept(s));
@@ -7697,6 +7708,8 @@ impl App {
                             era_lock: self.cfg.era_lock,
                             era_view: false,
                             era_new,
+                            era_packed: Vec::new(),
+                            era_synced: None,
                             status: None,
                             merits: None,
                             jp_access: None,

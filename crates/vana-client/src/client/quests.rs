@@ -13,6 +13,25 @@ const CURSOR: u32 = 0x8080_3040;
 const GREY: u32 = 0x8040_4040;
 /// FUN_1022f670: the chooser's rows moved to these y (window-relative; child 1 35 high).
 const ROW_Y: [f32; 5] = [14.0, 46.0, 110.0, 142.0, 174.0];
+/// Ours (client/era.rs): in the base era the chooser has its two rows only, no Records of Eminence rows or panel, and
+/// its frame ends under the second row (client/eralayout.rs clips quest00 to this; the height is a guess from the rows'
+/// places, the file's own being unread here: the first row's 14 above and below the 35-high plate).
+pub(super) const BASE_FRAME_H: u16 = 46 + 35 + 14;
+
+/// The chooser's rows: Current, Completed, then Records of Eminence's Current objectives, Objective List and (while
+/// open) Vana'Bout; none of those in the base era.
+pub(super) fn chooser_rows(roe_hidden: bool, vanabout: bool) -> usize {
+    match (roe_hidden, vanabout) {
+        (true, _) => 2,
+        (false, true) => 5,
+        (false, false) => 4,
+    }
+}
+
+fn roe_hidden(w: &World) -> bool {
+    super::era::hidden(w, super::era::Feature::RecordsOfEminence)
+}
+
 /// Titles (group 0xd) by area: current, completed (FUN_10231c60).
 pub(super) const TITLES: [[usize; 11]; 2] = [[0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x88, 0x91, 0x9c, 0xa0, 0xa3], [0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x89, 0x92, 0x9d, 0xa1, 0xa4]];
 
@@ -219,7 +238,7 @@ pub fn key(w: &mut World, key: egui::Key, page: bool) {
         }
         return;
     }
-    let total = if w.roe.vanabout() { 5 } else { 4 };
+    let total = chooser_rows(roe_hidden(w), w.roe.vanabout());
     match (q.state, key) {
         (_, egui::Key::Escape) => {
             w.sounds.push(Ui::Cancel as u32);
@@ -338,7 +357,7 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         return;
     }
     let Some((x, y)) = gu.window_xy(CHOOSER, sw, sh) else { return };
-    let total = if w.roe.vanabout() { 5 } else { 4 };
+    let total = chooser_rows(roe_hidden(w), w.roe.vanabout());
     let Some(r) = (0..total).find(|&k| {
         let (ex, ey) = (x + 39.0, y + ROW_Y[k]);
         p.0 >= ex && p.0 < ex + 320.0 && p.1 >= ey && p.1 < ey + if k == 0 { 35.0 } else { 18.0 }
@@ -404,7 +423,7 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 gu.lobby_msg(0xc, 0x6e, ""),
                 gu.lobby_msg(0xc, 0x208, ""),
             ];
-            for (k, label) in labels.iter().enumerate() {
+            for (k, label) in labels.iter().enumerate().take(chooser_rows(roe_hidden(w), van)) {
                 let (cx, cy) = (x + 39.0, y + ROW_Y[k]);
                 let on = k == q.sel;
                 gu.sprite("menu    quest", 0, cx - on as u8 as f32, cy - on as u8 as f32, if on { 0x8080_5020 } else { WHITE });
@@ -415,7 +434,10 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                     gu.cursor(cx, cy);
                 }
             }
-            // FUN_10233560: the Records of Eminence panel.
+            // FUN_10233560: the Records of Eminence panel (not in the base era).
+            if roe_hidden(w) {
+                return rects;
+            }
             let accolades = if w.recasts_seen { w.stats.as_ref().map_or(0, |s| s.unity >> 10 & 0x1ffff) } else { 0 };
             text(gu, &gu.lobby_msg(0xc, 0x6c, ""), x + 20.0, y + 78.0, WHITE);
             for (label, v, lx, vx, ly) in [
@@ -495,5 +517,17 @@ mod tests {
         assert_eq!(r.completed(), 0x73 * 8);
         r.log_part(0, &[0; 128]);
         assert_eq!(r.completed(), 0);
+    }
+
+    /// The chooser lists Records of Eminence's rows only outside the base era; Vana'Bout only while it is open.
+    #[test]
+    fn chooser_rows_follow_the_era() {
+        assert_eq!(chooser_rows(false, false), 4);
+        assert_eq!(chooser_rows(false, true), 5);
+        // Base era: Current and Completed, whatever the RoE store says.
+        assert_eq!(chooser_rows(true, false), 2);
+        assert_eq!(chooser_rows(true, true), 2);
+        // The rows left are the first two places; the frame ends under the second.
+        assert!(ROW_Y[1] + 35.0 < BASE_FRAME_H as f32 && (BASE_FRAME_H as f32) < ROW_Y[2] + 35.0);
     }
 }

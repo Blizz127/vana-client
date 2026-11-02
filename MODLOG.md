@@ -13231,7 +13231,7 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
 
 - The lobby's expansions bitmask (u32 @0x20; bit 0 base, bits 1..11 Zilart .. Adoulin) is the only thing a server says
   about its era. With no expansion bit on the era is "base" (client/era.rs, keyed on the bits as sent, not on
-  World.expansions which also needs the installed DATs), and the client greys what did not exist then (no player
+  World.expansions which also needs the installed DATs), and the client hides or greys what did not exist then (no player
   switch; a server unlocks by sending the bits, per character if it wants): mounts (abimenu / abiselec row, `/mount`
   list), Status' Merit Points / Job Points / Unity / Master Levels / Alter Ego
   Points, Records of Eminence (quest00 rows, the modern Journal tab and command row), Search's Monstrosity, Unity and
@@ -13245,6 +13245,38 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   login on record the bits become the baseline and nothing is announced.
 - Names are a static list (the client reads no expansion names from the game's files). Tests: era::tests,
   searchmenu::tests.
+- Classic menus drop the rows instead of greying them (2026-11-02; client/eralayout.rs). The DAT-drawn windows draw
+  every row from the layout's children (label sprite at the child's place, the hand at the cursor child, the cursor
+  links between them), so in the base era the layout itself is rewritten from the pristine file's, in `data.lobby`
+  where every reader sees it (draw, hit tests, links, window_rect), by `GameUi::sync_era` at the top of `world_hud`
+  whenever the lock state changes; lifting it puts the file's own menus back (tested exactly):
+  - the dropped children go; each kept row keeps its x and takes the y of the place its position in the list had (no
+    gap), the frame is shorter by the freed span (a window anchored to the screen's bottom, head byte 0x13 bit 1,
+    keeps its bottom edge); a cursor link naming a dropped child follows that child's own link of the same slot until
+    a row that stays (so the file's wrap, or its lack of one, is kept).
+  - Status (statcom2): children 7 Merit Points, 8 Job Points, 11 Unity, 12 Master Levels, 13 Alter Ego Points. The
+    rows are the layout's own chain of down links from child 1 (1 2 12 3 4 5 6 10 11 9 7 8 13), so Down / Up walk
+    1 2 3 4 5 6 10 9. The cursor starts on Profile when it was remembered on a dropped child. The disabled
+    marking (`StatusUi.off`) stays for the case below.
+  - Abilities (abimenu child 6, abiselec child 5): the Mounts row. Pet moves up (index 5 -> 4 in abimenu, 4 -> 3 in
+    abiselec); `magic::cat_rows(w, menu)` is the one row list for the keys, hit tests, cursor memory (by child), the
+    type-to-search hits (`Hit.cat` is an index into it) and the modern panel (which now lists no Mounts row either).
+    `push_category` now finds the hand's child by id, not by its place in the layout.
+  - Journal (quest00, the classic chooser, which draws its rows in code at ROW_Y): Current and Completed only; the
+    three Records of Eminence rows and the panel (its "Records of Eminence" heading, Sparks, Accolades, Deeds,
+    Completed, Plaudits) are not drawn, the key and mouse code see two rows (`quests::chooser_rows`), and the frame is
+    clipped to 95 px (row 2's 46 + the 35-high plate + the first row's 14). That height is a guess from the code's
+    own row places, not the file's; a layout already shorter is left. Unity's quest00 modes cannot open in the base
+    era (the only way in is Status child 11), so the shared layout is safe to clip.
+  - Not safe to re-pack means greyed, as before: a layout whose listed rows are not all children, are not one column
+    in list order, would leave no row or whose frame would vanish is left as the file has it (logged, "era lock: ...
+    left as the file has it") and the row stays, disabled: Status keeps its disabled children (the retail disabled
+    sprite, SE 0004 on Enter); the abilities windows redraw the Mounts label dimmed (`disabled_children`) and refuse
+    with SE 0004. Nothing here is checked against the real DATs yet: the sandbox has none and no display, so the
+    frames' heights, the hand's place and the labels after the shift are untested visually.
+  - The Search menu is a fixed layout and keeps greying its rows (disabled, as above); its job rows are `off`
+    children, not removed. Tests: eralayout::tests (re-pack, links, anchor, refusal, restore), magic::tests
+    (rows and cursor mapping), quests::tests, status::tests.
 
 ## Gamepad (client/gamepad.rs, client/osk.rs; ours, NOT retail) (2026-11-02)
 What the retail binary tells us (sources are the Input layer and Config notes above), and what is a choice:

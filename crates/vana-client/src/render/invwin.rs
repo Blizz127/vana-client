@@ -258,7 +258,10 @@ pub fn push_action_list(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &
 pub fn push_category(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, cursor_child: usize, w: f32, h: f32, frame: usize) {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     push_children(b, ui, m, wx, wy);
-    push_cursor(b, ui, m, wx, wy, cursor_child, frame);
+    // By child id, not by place: the era lock drops children from the layout (client/eralayout.rs).
+    if let Some(at) = m.elements.iter().skip(1).position(|e| e.id as usize == cursor_child) {
+        push_cursor(b, ui, m, wx, wy, at + 1, frame);
+    }
 }
 
 /// subwindo (FUN_1014f960): label lines at (+5, +8) and (+5, +0x1a), their values right-aligned at +0x69.

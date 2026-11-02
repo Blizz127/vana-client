@@ -35,7 +35,7 @@ pub fn pick_action(w: &mut World, action: Action) {
             Action::Spell(s) => w.actions.as_ref()?.spell(s)?.kind,
             Action::Ability(a) => w.actions.as_ref()?.abilities.get(a as usize)?.kind as u16,
         };
-        magic::cat_rows(c.menu).iter().position(|&(_, cat)| match cat {
+        magic::cat_rows(w, c.menu).iter().position(|&(_, cat)| match cat {
             Cat::Magic(t, _) => kind == Kind::Magic && t == ty,
             Cat::Ability(t) => kind == Kind::Ability && (t == ty || (t == 3 && ty == 3)),
             _ => false,
@@ -336,7 +336,7 @@ fn matches(w: &World, query: &str) -> Vec<Hit> {
     if let Some(win) = w.ability.as_ref().or(w.magic.as_ref()) {
         add(win.kind, None, win.rows.clone());
     } else if let Some(c) = w.cats {
-        for (k, &(_, cat)) in magic::cat_rows(c.menu).iter().enumerate() {
+        for (k, &(_, cat)) in magic::cat_rows(w, c.menu).iter().enumerate() {
             match cat {
                 Cat::Magic(ty, list) => add(Kind::Magic, Some(k), magic::magic_rows(w, ty, list && !super::monstrosity::active(w), 0)),
                 Cat::Ability(ty) => add(Kind::Ability, Some(k), magic::ability_rows(w, ty)),

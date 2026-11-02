@@ -4,8 +4,11 @@
 //! u32 @0x20 of the lobby reply: bit 0 the base game, bits 1..11 the expansions in release order). When no expansion bit
 //! is on the server runs the base game's era, and the client hides what did not exist then: the windows of later
 //! systems (mounts, Unity, Merit / Job / Alter Ego Points, Master Levels, Records of Eminence, the Search
-//! menu's Unity and Monstrosity rows) are greyed, the Search menu offers the base jobs only and stops its level fields at
-//! 60. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
+//! menu's Unity and Monstrosity rows) are hidden or greyed, the Search menu offers the base jobs only and stops its
+//! level fields at 60. The classic (DAT-drawn) windows that list those rows drop them and re-pack the rest the way a
+//! menu with fewer rows is laid out (client/eralayout.rs: the abilities menus' Mounts row, Status' five rows, the
+//! journal chooser's Records of Eminence rows and panel); a row whose window cannot be re-packed safely stays, greyed.
+//! The Search menu's rows (greyed, not dropped) are its own fixed layout. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
 //! retail behaviour is unchanged. There is no player switch: only the server's bits decide.
 //!
 //! The era is keyed on the lobby's bits as sent, not on `World.expansions` (those and the installed DATs), so a player
