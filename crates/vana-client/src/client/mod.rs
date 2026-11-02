@@ -12757,6 +12757,11 @@ impl App {
                 let id = world.entities.iter().filter(|(_, e)| e.name == name).min_by(|a, b| (a.1.pos - pos).length().total_cmp(&(b.1.pos - pos).length())).map(|(id, _)| *id);
                 target::set(world, id);
             }
+            // Test drives only: act:goto:X,Z/X,Z sets new waypoints mid-script (in the zone we are in now).
+            if let Some(points) = action.as_deref().and_then(|a| a.strip_prefix("goto:")) {
+                self.drive.goto = points.split('/').filter_map(|p| p.split_once(',').and_then(|(x, z)| Some((x.trim().parse().ok()?, z.trim().parse().ok()?)))).collect();
+                self.drive.goto_zone = None;
+            }
             // Test drives only: act:autorun toggles autorun toward the camera's view (script keys never reach the key
             // functions).
             if let (Some("autorun"), Phase::World(world)) = (action.as_deref(), &mut self.phase) {
