@@ -15,8 +15,9 @@
 //! Autocast (on by default, config `rotation_autocast`; `/autocast on | off` flips the session): the rotation presses
 //! itself every `TICK` while we are engaged, or a monster we target is fighting us, under the same rules, `SETTLE`
 //! after it may. It never engages (a press does that) and never acts outside a fight, so nothing fires in town. It
-//! pauses while dead, resting, mounted, fishing, in an event, while moving and `PAUSE` after, and `PAUSE` after any
-//! line we run ourselves (a macro, a menu pick, a typed command).
+//! pauses while dead, resting, mounted, fishing, in an event, while we pick a spell, ability or target or type, while
+//! moving and `PAUSE` after, and `PAUSE` after any line we run ourselves (a macro, a menu pick, a typed command).
+//! A monster's debuff count goes when it dies or leaves (a respawn has the same id).
 
 use super::World;
 use super::suggest::{self, Action, Suggestion};
@@ -150,6 +151,11 @@ impl Rotation {
         }
     }
 
+    /// A monster that died or left takes its count with it (a respawn has the same id).
+    fn forget_gone(&mut self, alive: impl Fn(u32) -> bool) {
+        self.tries.retain(|&(id, _), _| alive(id));
+    }
+
     fn tried_out(&self, foe: u32, spell: u16) -> bool {
         self.tries.get(&(foe, spell)).is_some_and(|&n| n >= TRIES)
     }
@@ -260,6 +266,10 @@ fn hint_text(w: &World, step: Step, why: &str) -> String {
 /// does (worked out again every half second; drawn by `draw`).
 pub fn tick(w: &mut World) {
     let now = Instant::now();
+    if !w.rotation.tries.is_empty() {
+        let alive: std::collections::HashSet<u32> = w.entities.iter().filter(|(_, e)| e.hpp > 0).map(|(id, _)| *id).collect();
+        w.rotation.forget_gone(|id| alive.contains(&id));
+    }
     if w.moving {
         w.rotation.moved_at = Some(now);
     }
@@ -292,9 +302,11 @@ fn in_fight(w: &World) -> bool {
     w.my_motion.status == 1 || w.target.filter(|t| w.entities.get(t).is_some_and(|e| e.mob && e.hpp > 0)).is_some_and(|t| super::skillchain::hitting(w, t) == Some(w.my_id))
 }
 
-/// Not dead, casting, resting, mounted, fishing, sitting or in an event.
+/// Not dead, casting, resting, mounted, fishing, sitting or in an event, and not in the middle of something of our
+/// own: a target prompt, the magic or ability categories or list, typing (the battle menu itself does not count).
 fn may_act(w: &World) -> bool {
-    w.stats.is_some() && !matches!(w.my_motion.status, 2 | 3) && !busy(w) && super::magic::status_check(w).is_none() && !super::event::active(w)
+    let choosing = super::target::sub_up(w) || w.cats.is_some() || w.magic.is_some() || w.ability.is_some() || w.typing;
+    w.stats.is_some() && !matches!(w.my_motion.status, 2 | 3) && !busy(w) && super::magic::status_check(w).is_none() && !super::event::active(w) && !choosing
 }
 
 /// `/autocast [on | off]`: the session's autocast (alone: flipped).
@@ -574,6 +586,9 @@ mod tests {
             r.answered(true, t0 + Duration::from_secs(5 * k + 1));
         }
         assert!(r.tried_out(7, 56) && !r.tried_out(8, 56));
+        // It died: the respawn (same id) gets its debuffs again.
+        r.forget_gone(|id| id != 7);
+        assert!(!r.tried_out(7, 56));
     }
 
     #[test]
