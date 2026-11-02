@@ -4,7 +4,7 @@
 use super::ground::Ground;
 use crate::render::shadow::MAX_CASTERS;
 use glam::Vec3;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// What the actor loop gathers per drawn skinned actor: its drawn position, box corners (world), the farthest
 /// corner's view depth.
@@ -43,8 +43,39 @@ impl Slots {
     }
 }
 
-/// FUN_100c9da0's mode: 1 silhouette, 0 projected blob (2, the quad, past view depth 20), 2 quad, None no shadow.
-/// What the mode gate reads of the world: the ground, config 0x3a (0 Normal, 1 Off, 2 High), our id, the zone,
+/// The view depth at which a blob turns into the quad (retail's 20), and the one the quad goes back to the blob
+/// under. Retail tests a bare `depth >= 20` every frame; an actor standing near 20 (its skeleton box's farthest
+/// corner moves with every animation frame, and the camera turns) then swapped between the small blob and the quad
+/// twice its width from one frame to the next. *(ours: a 2-yalm band, no retail equivalent)*
+pub const FAR_DEPTH: f32 = 20.0;
+pub const NEAR_DEPTH: f32 = 18.0;
+
+/// The casters in the quad's range: past `FAR_DEPTH`, until back under `NEAR_DEPTH`. *(ours, see above)*
+#[derive(Default)]
+pub struct Far {
+    ids: HashSet<u32>,
+}
+
+impl Far {
+    /// Whether `id` at view `depth` is far this frame; remembered for the next.
+    pub fn test(&mut self, id: u32, depth: f32) -> bool {
+        let far = depth >= FAR_DEPTH || (depth >= NEAR_DEPTH && self.ids.contains(&id));
+        if far {
+            self.ids.insert(id);
+        } else {
+            self.ids.remove(&id);
+        }
+        far
+    }
+
+    /// Forgets the actors not seen this frame.
+    fn keep(&mut self, seen: &HashMap<u32, Seen>) {
+        self.ids.retain(|id| seen.contains_key(id));
+    }
+}
+
+/// FUN_100c9da0's mode: 1 silhouette, 0 projected blob (2, the quad, when `far`: past view depth 20), 2 quad, None
+/// no shadow. What the mode gate reads of the world: the ground, config 0x3a (0 Normal, 1 Off, 2 High), our id, the zone,
 /// whether an actor exists, an actor's no-shadow / no-blob latches, and the silhouette layers this frame can have.
 pub struct Ctx<'a> {
     pub ground: &'a Ground,
@@ -56,7 +87,7 @@ pub struct Ctx<'a> {
     pub layers: u32,
 }
 
-pub fn mode(c: &Ctx, id: u32, s: &Seen, eye: Vec3) -> Option<u8> {
+pub fn mode(c: &Ctx, id: u32, s: &Seen, eye: Vec3, far: bool) -> Option<u8> {
     use super::chair::CHAIR;
     use super::fishrod::ROD;
     use super::indi::AURA;
@@ -68,7 +99,7 @@ pub fn mode(c: &Ctx, id: u32, s: &Seen, eye: Vec3) -> Option<u8> {
         return None;
     }
     // +0x670 drops the blobs (modes 0 / 2), not the silhouette.
-    let blob = || (!noblob).then_some(if covered || s.depth >= 20.0 { 2 } else { 0 });
+    let blob = || (!noblob).then_some(if covered || far { 2 } else { 0 });
     if c.setting == 2 {
         return Some(1);
     }
@@ -88,8 +119,11 @@ pub fn mode(c: &Ctx, id: u32, s: &Seen, eye: Vec3) -> Option<u8> {
 
 /// This frame's casters among the drawn actors `seen`: (id, mode, what was seen), ours first then nearest, the
 /// silhouettes past the layers turned to blobs.
-pub fn modes(c: &Ctx, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, Seen)> {
-    let mut list: Vec<(u32, u8, Seen)> = seen.iter().filter_map(|(&id, s)| Some((id, mode(c, id, s, eye)?, *s))).collect();
+pub fn modes(c: &Ctx, far: &mut Far, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, Seen)> {
+    far.keep(seen);
+    // Every seen actor takes its turn through `far`, shadow or not, so its band memory is current.
+    let tested: Vec<(u32, bool, &Seen)> = seen.iter().map(|(&id, s)| (id, far.test(id, s.depth), s)).collect();
+    let mut list: Vec<(u32, u8, Seen)> = tested.into_iter().filter_map(|(id, f, s)| Some((id, mode(c, id, s, eye, f)?, *s))).collect();
     list.sort_by(|a, b| (a.0 != c.me).cmp(&(b.0 != c.me)).then(a.2.pos.distance(eye).total_cmp(&b.2.pos.distance(eye))));
     list.truncate(MAX_CASTERS);
     let mut layer = 0u32;
@@ -99,7 +133,7 @@ pub fn modes(c: &Ctx, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, See
                 layer += 1;
             } else {
                 let (_, covered) = c.ground.surface(s.pos);
-                *m = if (c.flags)(*id).1 { 3 } else if covered || s.depth >= 20.0 { 2 } else { 0 };
+                *m = if (c.flags)(*id).1 { 3 } else if covered || far.ids.contains(id) { 2 } else { 0 };
             }
         }
     }
@@ -146,7 +180,35 @@ pub fn kage_texture(index: &crate::dat::DatIndex) -> Option<crate::dat::zone::Te
 
 #[cfg(test)]
 mod tests {
-    use super::Slots;
+    use super::{Far, Seen, Slots};
+    use glam::Vec3;
+    use std::collections::HashMap;
+
+    /// Retail's bare `depth >= 20` swaps the blob and the quad on every wobble around 20; ours turns far at 20 and
+    /// back only under 18.
+    #[test]
+    fn far_band() {
+        let mut f = Far::default();
+        assert!(!f.test(1, 19.9));
+        assert!(f.test(1, 20.0));
+        // Wobbling inside the band keeps the quad.
+        assert!(f.test(1, 19.5) && f.test(1, 18.0) && f.test(1, 19.99));
+        assert!(!f.test(1, 17.99));
+        // Back near, it needs 20 again.
+        assert!(!f.test(1, 19.9) && f.test(1, 20.1));
+        // An actor starting inside the band is near (it was never far); each id has its own memory.
+        assert!(!f.test(2, 19.0) && f.test(1, 19.0));
+    }
+
+    #[test]
+    fn far_forgets_unseen() {
+        let mut f = Far::default();
+        assert!(f.test(7, 25.0));
+        let seen: HashMap<u32, Seen> = HashMap::from([(8, Seen { pos: Vec3::ZERO, corners: [Vec3::ZERO; 8], depth: 0.0 })]);
+        f.keep(&seen);
+        // 7 went out of sight: back to the blob until 20.
+        assert!(!f.test(7, 19.0));
+    }
 
     #[test]
     fn slots_kept_and_freed() {
