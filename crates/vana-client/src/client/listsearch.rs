@@ -271,7 +271,7 @@ fn matches(w: &World, query: &str) -> Vec<Hit> {
     // The quests we have or have done, in every area (current or completed as the note).
     if quest_list(w) {
         let logs = w.logs.clone();
-        for area in (0..11).filter(|&a| quests::area_on(w.expansions, a)) {
+        for area in (0..11).filter(|&a| quests::area_on(super::era::locked(w), w.expansions, a)) {
             let Some(f) = logs.as_ref().and_then(|l| l.quests.get(area)) else { continue };
             let (rows, split) = quests::merged(w, area);
             for (k, i) in rows.into_iter().enumerate() {

@@ -212,13 +212,14 @@ pub fn mission_rows(s: &Store, log: usize, f: &LogFile) -> Vec<Row> {
 }
 
 /// The log after `log` in the Right / Left cycle (FUN_1022e760 messages 3 / 4): logs 3 and up need their expansion
-/// bit, TVR (11) needs RoV past 340.
-pub fn next_log(s: &Store, log: usize, enabled: u32, forward: bool) -> usize {
+/// bit, TVR (11) needs RoV past 340. Ours (client/era.rs): under the era lock (`locked`) only the three nations' logs
+/// are in the cycle, whatever the bits.
+pub fn next_log(s: &Store, log: usize, enabled: u32, locked: bool, forward: bool) -> usize {
     let mut l = log;
     for _ in 0..15 {
         l = if forward { (l + 1) % 15 } else { (l + 14) % 15 };
         let bit_ok = l < 3 || enabled >> MISSION_BITS[l] & 1 != 0;
-        if bit_ok && !(l == 11 && s.rov < 0x154) {
+        if bit_ok && !(l == 11 && s.rov < 0x154) && super::era::mission_log_on(locked, l) {
             return l;
         }
     }
@@ -291,9 +292,25 @@ mod tests {
     fn log_cycle() {
         let s = Store { rov: 100, ..Default::default() };
         // Only bit 0 (and 1 Zilart): 0 1 2 3 10 then back to 0 (TVR waits for RoV 340).
-        let order: Vec<usize> = std::iter::successors(Some(0), |&l| Some(next_log(&s, l, 0b11, true))).take(6).collect();
+        let order: Vec<usize> = std::iter::successors(Some(0), |&l| Some(next_log(&s, l, 0b11, false, true))).take(6).collect();
         assert_eq!(order, [0, 1, 2, 3, 10, 0]);
-        assert_eq!(next_log(&s, 0, 0b11, false), 10);
+        assert_eq!(next_log(&s, 0, 0b11, false, false), 10);
         assert_eq!(indent("__Name"), ("Name", 2));
+    }
+
+    /// The era lock: Left / Right cycle the three nation logs only, whatever expansion bits the client holds.
+    #[test]
+    fn log_cycle_under_the_lock() {
+        // Every bit on (the installed DATs) and RoV past 340: unlocked, all 15 logs are in the cycle.
+        let s = Store { rov: 0x200, ..Default::default() };
+        let all = 0xfff;
+        let walk = |locked: bool, forward: bool| -> Vec<usize> { std::iter::successors(Some(0), |&l| Some(next_log(&s, l, all, locked, forward))).take(16).collect() };
+        assert_eq!(walk(false, true), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0]);
+        // Locked: San d'Oria, Bastok, Windurst, and round again, both ways.
+        assert_eq!(walk(true, true)[..7], [0, 1, 2, 0, 1, 2, 0]);
+        assert_eq!(walk(true, false)[..7], [0, 2, 1, 0, 2, 1, 0]);
+        // Started on a hidden log (the lock came on while one was open), the next step lands on a nation log.
+        assert_eq!(next_log(&s, 9, all, true, true), 0);
+        assert_eq!(next_log(&s, 9, all, true, false), 2);
     }
 }

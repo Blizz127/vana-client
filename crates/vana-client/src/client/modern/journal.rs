@@ -374,7 +374,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         Tab::Quests => {
             let Some(q) = w.quests.clone() else { return };
             waiting = q.state == 0;
-            let areas: Vec<usize> = (0..11).filter(|&a| quests::area_on(w.expansions, a)).collect();
+            let areas: Vec<usize> = (0..11).filter(|&a| quests::area_on(super::super::era::locked(w), w.expansions, a)).collect();
             for &a in &areas {
                 let (cur, done) = (quests::rows(w, a, 0).len(), quests::rows(w, a, 1).len());
                 nav.push((area_title(gu, a), format!("{cur}/{done}"), cur + done == 0));
@@ -533,7 +533,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 }
             }
             Tab::Quests => {
-                if let Some(a) = (0..11).filter(|&a| quests::area_on(w.expansions, a)).nth(k) {
+                if let Some(a) = (0..11).filter(|&a| quests::area_on(super::super::era::locked(w), w.expansions, a)).nth(k) {
                     quests::show_area(w, a, None);
                 }
             }

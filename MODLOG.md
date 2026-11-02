@@ -13280,6 +13280,32 @@ Specs: `~/ffxi/lab/research/pol_map_session_spec.md`, `entity_update_spec.md` (a
   - The Search menu is a fixed layout and keeps greying its rows (disabled, as above); its job rows are `off`
     children, not removed. Tests: eralayout::tests (re-pack, links, anchor, refusal, restore), magic::tests
     (rows and cursor mapping), quests::tests, status::tests.
+- Mission and quest lists keep the base era's (2026-11-02; ours; owner: "hide the missions for the other expansion in
+  the mission list and quest list (zilart promathia etc)"). Gated on `era::locked(w)` on top of retail's expansion-bit
+  checks (`era::mission_log_on(locked, log)`, `era::quest_area_on(locked, area)`); with the lock off every check is
+  retail's, unchanged (greyed missionm rows included). Lifting the lock (the server's bits appear) brings every row back.
+  - Mission logs: 0..2 (San d'Oria, Bastok, Windurst) stay. Hidden: 3 Zilart, 4 Promathia, 5 Assault, 6 Aht Urhgan,
+    7 Campaign, 8 WotG, 9 SoA, 10 and 11 (RoV, TVR: the per-log bit table DAT_10386984 gates both on bit 0, the
+    base game only; missionm's FUN_1022da40 never greys their category, child 6), 12..14 the add-on scenarios. Left / Right (`journal::next_log`) cycles the nations only and
+    steps off a hidden log onto one; `missions::shown_logs` (modern Journal nav, mouse nav, type-to-search hits),
+    `/mission <title>` (`missions::command`) and the missionm Enter guard take the same set.
+  - Quest areas: 0..4 stay (San d'Oria, Bastok, Windurst, Jeuno, Other Areas). Hidden: 5 Outlands / Zilart, 6 Aht
+    Urhgan, 7 WotG, 8 Abyssea, 9 and 10 Adoulin. `quests::area_on`
+    (Left / Right in quest01, the modern Journal's nav and mouse nav, listsearch's quest hits) takes the lock first.
+  - Classic menus: only missionm (the category menu over the social menu) is a child-row menu. Children 1 nation, 2
+    Zilart, 3 Promathia, 4 Aht Urhgan, 5 Altana, 6 RoV / TVR, 7 Adoulin sit in one column, child 7 above child 6; the
+    down links run 1 2 3 4 5 7 6 (read from the 1.2.2 game data: index == id for every child), so the spec is
+    `Rows::Chain(1)` with 2..7 hidden: the nation row alone, the frame cut from 122 to 26 px, the cursor links of
+    row 1 pointing at itself. If the layout cannot be re-packed the six rows stay greyed (`menu_off_for`, with the
+    warn log of eralayout). missionm's remembered cursor on a later row starts on child 1 under the lock. miss00
+    (one log, Left / Right and its two arrow children 9 / 10 cycle logs) and quest01 (one area, same) have no
+    per-log / per-area rows to re-pack, and quest00 (the chooser: Current, Completed, the RoE rows) is untouched, so
+    Records of Eminence stays in every era. The spec is kept while the modern UI is on too (modern draws no missionm).
+  - Tests: era::tests (the two helpers), journal::tests::log_cycle_under_the_lock, missions::tests (menu rows, offered
+    logs, locked and not), quests::tests::areas_follow_the_lock_then_the_bits, eralayout::tests (the spec; a
+    missionm-shaped layout; the real missionm from the game files, skipped without them). Not seen on screen: the
+    one-row missionm window's frame height (26 px, from the file's rows), its look with the hand and the social menu
+    beside it, miss00's heading / arrows after a cycle, and the modern Journal's nav lists with the lock on.
 
 ## Gamepad (client/gamepad.rs, client/osk.rs; ours, NOT retail) (2026-11-02)
 What the retail binary tells us (sources are the Input layer and Config notes above), and what is a choice:

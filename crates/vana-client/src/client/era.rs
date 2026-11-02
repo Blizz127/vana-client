@@ -7,7 +7,10 @@
 //! menu's Unity and Monstrosity rows) are hidden or greyed, the Search menu offers the base jobs only and stops its
 //! level fields at 60. The classic (DAT-drawn) windows that list those rows drop them and re-pack the rest the way a
 //! menu with fewer rows is laid out (client/eralayout.rs: the abilities menus' Mounts row, Status' five rows, the
-//! classic menus); a row whose window cannot be re-packed safely stays, greyed.
+//! classic menus); a row whose window cannot be re-packed safely stays, greyed. The Missions and Quests lists keep the
+//! three nations' mission logs and quest areas 0..4 (`mission_log_on`, `quest_area_on`): the other logs and areas are
+//! not offered in the classic or the modern Journal, nor in the type-to-search, nor by Left / Right, and missionm's
+//! rows for them are dropped like any other classic menu's.
 //! The Search menu's rows (greyed, not dropped) are its own fixed layout. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
 //! retail behaviour is unchanged. There is no player switch: only the server's bits decide.
 //!
@@ -89,6 +92,24 @@ pub fn locked(w: &World) -> bool {
 /// The feature is not available now (the era lock hides it).
 pub fn hidden(w: &World, f: Feature) -> bool {
     locked(w) && !has(Era::Base, f)
+}
+
+/// The mission logs the base era keeps: the three nations' (San d'Oria, Bastok, Windurst). Every log from index 3 up
+/// (Zilart, Promathia, Aht Urhgan, WotG, Campaign, SoA, RoV, TVR, the add-on scenarios) is later.
+pub const BASE_MISSION_LOGS: usize = 3;
+
+/// The quest areas the base era keeps: 0..4 (San d'Oria, Bastok, Windurst, Jeuno, Other Areas). Areas 5..10 (Outlands /
+/// Zilart, Aht Urhgan, WotG, Abyssea, Adoulin) are later.
+pub const BASE_QUEST_AREAS: usize = 5;
+
+/// The mission log is not hidden by the era lock (`locked` is `locked(w)`); the retail expansion checks come on top.
+pub fn mission_log_on(locked: bool, log: usize) -> bool {
+    !locked || log < BASE_MISSION_LOGS
+}
+
+/// The quest area is not hidden by the era lock; the retail expansion checks come on top.
+pub fn quest_area_on(locked: bool, area: usize) -> bool {
+    !locked || area < BASE_QUEST_AREAS
 }
 
 /// The level cap for the client's own level fields under the lock.
@@ -216,6 +237,16 @@ mod tests {
         // The base jobs are the first eleven of the client's job names.
         let names: Vec<&str> = (1..=11).map(|j| super::super::items::JOBS[j]).collect();
         assert_eq!(names, ["WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG"]);
+    }
+
+    #[test]
+    fn the_lock_keeps_the_nation_logs_and_the_base_quest_areas() {
+        // Unlocked: nothing is hidden here, every log and area is left to the retail checks.
+        assert!((0..15).all(|l| mission_log_on(false, l)));
+        assert!((0..11).all(|a| quest_area_on(false, a)));
+        // Locked: logs 0..2 (the nations) and quest areas 0..4 stay, all the rest go (logs 3..14, areas 5..10).
+        assert_eq!((0..15).filter(|&l| mission_log_on(true, l)).collect::<Vec<_>>(), [0, 1, 2]);
+        assert_eq!((0..11).filter(|&a| quest_area_on(true, a)).collect::<Vec<_>>(), [0, 1, 2, 3, 4]);
     }
 
     #[test]
