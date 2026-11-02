@@ -79,6 +79,9 @@ pub struct NamedServer {
     pub view_port: Option<u16>,
     pub profile_port: Option<u16>,
     pub irc_port: Option<u16>,
+    /// The friend list, presence and mail through the server's profile service (xi_profile); unset follows
+    /// `social_named_only`.
+    pub social: Option<bool>,
 }
 
 /// Server names compare without case or outer spaces ("PlayOnline", "playonline").
@@ -111,6 +114,9 @@ pub struct Config {
     pub irc_port: u16,
     /// Named servers with their own address and ports (not retail; `resolved`).
     pub named_servers: Vec<NamedServer>,
+    /// Not retail: only named servers with `social` set get the friend list, presence and mail; every other server
+    /// gets none of them (no connection to its profile ports).
+    pub social_named_only: bool,
     /// Version string sent to the lobby; LSB rejects clients older than its CLIENT_VER.
     pub client_version: String,
     /// cpal output device id ("pipewire:..."); empty = the system default.
@@ -322,6 +328,7 @@ impl Default for Config {
             profile_port: 51220,
             irc_port: 51240,
             named_servers: Vec::new(),
+            social_named_only: false,
             client_version: "30261006_0".into(),
             audio_device: String::new(),
             frame_limit: 300,
@@ -408,6 +415,12 @@ impl Config {
             c.irc_port = n.irc_port.unwrap_or(c.irc_port);
         }
         c
+    }
+
+    /// Whether this login uses the server's profile service (friend list, presence, mail).
+    pub fn social_enabled(&self) -> bool {
+        let named = self.named_servers.iter().find(|n| same_server(&n.name, &self.server));
+        named.and_then(|n| n.social).unwrap_or(!self.social_named_only)
     }
 
     /// The servers logged in to, most recent first, then the named servers not logged in to yet.
@@ -535,5 +548,17 @@ mod tests {
         // A plain address is left alone.
         c.server = "127.0.0.1".into();
         assert_eq!(c.resolved().server, "127.0.0.1");
+    }
+
+    #[test]
+    fn social_follows_the_named_server() {
+        let mut c = Config::default();
+        c.named_servers.push(NamedServer { name: "on".into(), social: Some(true), ..Default::default() });
+        c.named_servers.push(NamedServer { name: "off".into(), social: Some(false), ..Default::default() });
+        c.named_servers.push(NamedServer { name: "unset".into(), ..Default::default() });
+        let on = |c: &Config, s: &str| Config { server: s.into(), ..c.clone() }.social_enabled();
+        assert!(on(&c, "on") && !on(&c, "off") && on(&c, "unset") && on(&c, "10.0.0.1"));
+        c.social_named_only = true;
+        assert!(on(&c, "on") && !on(&c, "off") && !on(&c, "unset") && !on(&c, "10.0.0.1"));
     }
 }

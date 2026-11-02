@@ -7408,7 +7408,8 @@ impl App {
                         self.status = format!("Connecting to {}:{}...", login.map.0, login.map.1);
                         let features = if let Phase::Characters { lobby: Some(l), .. } = &self.phase { l.features } else { 0 };
                         let ep = self.cfg.resolved();
-                        let pol = login.lsb.map(|(account, hash)| crate::net::profile::Cred { host: ep.server, port: ep.profile_port, irc_port: ep.irc_port, account, hash });
+                        // Servers without a profile service (config social_enabled) get no friend list, presence or mail.
+                        let pol = login.lsb.filter(|_| self.cfg.social_enabled()).map(|(account, hash)| crate::net::profile::Cred { host: ep.server, port: ep.profile_port, irc_port: ep.irc_port, account, hash });
                         let world_name = match &self.phase {
                             Phase::Characters { chars, selected: Some(s), .. } => chars.get(*s).map(|c| c.world.clone()).unwrap_or_default(),
                             _ => String::new(),

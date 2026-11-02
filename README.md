@@ -157,6 +157,10 @@ above):
 ]
 ```
 
+The friend list, presence and PlayOnline-style mail use the server's profile service (`profile_port`, `irc_port`).
+A named server can turn them on or off with `"social": true` or `false`; with `"social_named_only": true` in the
+config, only named servers with `"social": true` use them and no other server's profile ports are contacted.
+
 ## For developers
 
 - `MODLOG.md` records every reverse-engineered fact the code relies on: addresses in the original executable,
