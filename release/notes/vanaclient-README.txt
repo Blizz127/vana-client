@@ -10,13 +10,16 @@ What it is
 
 Please note
 - Do not play the same account in both clients at the same time: the server signs the first one out.
-- This is an early test. It can crash or show things wrong. Keep "Play Original" for anything important.
+- This is an early test. It can crash or show things wrong. If it gives you trouble, use PLAY ORIGINAL in the
+  launcher: it is always there as the fallback.
+- The Windows version is a test build: it has had little testing on real Windows PCs so far, so please tell us how
+  it goes.
 - Gamepads work (Xbox / PlayStation style). Config > Settings > Gamepad turns it off or changes the sticks.
 - /rot is a one-button helper that does the next sensible action in a fight (one action per press). Its autocast is
   off here; /autocast on turns it on for the session if you want it.
 
 Known gaps
-- The Windows build has not had much testing on real Windows PCs yet; Linux has had more.
+- Windows: see above (test build). Linux has had more testing.
 - Some event mini-games and rare event script steps are not done yet.
 - Controller use with the on-screen keyboard is new; tell us where it gets in the way.
 - The search (/sea) may time out on some servers until their side is updated.
