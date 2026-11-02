@@ -7,8 +7,9 @@ use super::game_ui::GameUi;
 use crate::audio::Ui as Se;
 use crate::dat::font::PHRASE_BASE;
 
-/// Raw and expanded limits of the chat line (E+0xa54 = 0x78).
-pub(super) const MAX: usize = 120;
+/// Raw and expanded limits of the chat line (retail E+0xa54 = 0x78, 120). Ours: 600, as the text command cut
+/// (client/textcmd.rs LONG_LINE); a longer chat line goes out as several packets (client/net.rs `chat_lines`).
+pub(super) const MAX: usize = 600;
 /// Rows a page (FUN_1018f550).
 pub(super) const ROWS: usize = 7;
 
@@ -103,7 +104,7 @@ fn spliced(line: &str, at: usize, text: &str) -> String {
 }
 
 /// Typed or pasted text at the caret (FUN_101abc50): in whole only while the raw and the expanded line stay within
-/// 120 bytes.
+/// MAX bytes.
 pub(super) fn insert(w: &mut World, text: &str) {
     // A selection is replaced, when the result fits.
     let (line, at) = match selection(w) {
