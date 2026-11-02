@@ -7940,6 +7940,10 @@ impl App {
                             if let Some(text) = era::notice(w.era_new) {
                                 w.chat.push(text);
                             }
+                            // The alert is the modern UI's; the classic one has the log line.
+                            if !self.cfg.modern_ui {
+                                w.era_new = 0;
+                            }
                         }
                         if let Ok((index, _)) = self.game_data() {
                             if let Phase::World(w) = &mut self.phase {

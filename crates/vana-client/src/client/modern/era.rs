@@ -24,7 +24,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             (era::Era::Base, false) => "Base game (the era lock is off).",
             (era::Era::Expanded, _) => "Expansions on: retail's windows.",
         };
-        p.panel("window", Some(Title { icon: Some("icons/info"), text: "Expansions", note: None }), W + 44.0, |ui| {
+        p.panel("expansions", Some(Title { icon: Some("icons/info"), text: "Expansions", note: None }), W + 44.0, |ui| {
             for (name, on) in &rows {
                 let (r, _) = ui.allocate_exact_size(vec2(W, ROW), Sense::hover());
                 super::rows::face(ui.painter(), m, r, if *on { "controls/list_row_normal" } else { "controls/list_row_disabled" }, egui::Color32::WHITE);
@@ -39,7 +39,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             done = button(ui, m, "OK", 110.0, true, false);
         });
     } else if let Some(text) = era::notice(w.era_new) {
-        p.framed("window", Some(Title { icon: Some("icons/info"), text: "Expansions", note: None }), W + 44.0, "window_alert", |ui| {
+        p.framed("expansions", Some(Title { icon: Some("icons/info"), text: "Expansions", note: None }), W + 44.0, "window_alert", |ui| {
             ui.label(egui::RichText::new(text).size(m.theme.ui).color(m.theme.color("gold")));
             ui.add_space(8.0);
             done = button(ui, m, "OK", 110.0, true, false);

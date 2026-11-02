@@ -410,6 +410,7 @@ fn focus_panel(w: &World) -> Option<&'static str> {
     use super::{event, searchmenu, treasure};
     Some(match () {
         _ if w.confirm.is_some() => "confirm",
+        _ if w.era_view || w.era_new != 0 => "expansions",
         _ if w.typing => "chat",
         _ if w.palette.0 != 0 => "macro palette",
         _ if w.ko_offer == 2 && w.dead() => "raise",
@@ -500,7 +501,7 @@ fn default_place(id: &str) -> Place {
         "minimap" => at(-0.001, 0.0353),
         // The command window: every window the command menu opens shows here. The item info rides the log as retail's
         // (mode 0, flag 0x1000).
-        "window" => at(0.0047, 0.0347),
+        "window" | "expansions" => at(0.0047, 0.0347),
         "iteminfo" => on("combat"),
         // The treasure pool rides the action menu it is opened from, over the item info of its cursor's row.
         "loot" => on("iteminfo"),

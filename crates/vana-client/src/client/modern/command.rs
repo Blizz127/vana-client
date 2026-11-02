@@ -190,7 +190,10 @@ fn pick(w: &mut World, e: &Entry) {
             w.menu_click = Some((1, 2));
             w.journal_roe = Some(0);
         }
-        Kind::Expansions => w.era_view = true,
+        Kind::Expansions => {
+            w.era_view = true;
+            w.menu = None;
+        }
         Kind::Sub(_) => {}
     }
 }
