@@ -962,6 +962,10 @@ fn track_cast(w: &mut World, a: &Action) {
 fn one_action(w: &mut World, a: &Action) {
     track_cast(w, a);
     super::skillchain::on_action(w, a);
+    // Ours: a spell, ability or weapon skill of ours started or landed, so the rotation's last press was taken.
+    if a.actor == w.my_id && matches!(a.category, category::SKILL_FINISH | category::MAGIC_FINISH | category::ABILITY_FINISH | category::SKILL_START | category::MAGIC_START | category::ABILITY_START) {
+        super::rotation::on_own_action(w);
+    }
     // Our cast finished (category 4, magic file 0xaf0): the spell's recast (asm 0x100a900d).
     if a.actor == w.my_id && a.category == category::MAGIC_FINISH {
         super::magic::set_recast(w, a.arg as u16, a.info);

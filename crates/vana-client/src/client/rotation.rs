@@ -1,0 +1,409 @@
+//! Ours (not retail): the one-button rotation, as the other Forever games have it (Benilla's Single-Button Assistant).
+//! Each press does one thing: the first of the battle menu's suggestions (client/suggest.rs, one rule set for both)
+//! it has not set aside, else it engages the monster targeted. The suggestions only name what the server says we
+//! have and can use now: learned spells (0x0AA) and known abilities and weapon skills (0x0AC), at our level and jobs
+//! (the DAT's job / level rule), with the MP, TP and recasts for them, and not silenced, amnesic or asleep. The era's
+//! closed spells are left out (client/era.rs `spell_closed`). The press goes out as the line a macro would send
+//! (`/ma "Dia" <t>`), so the server checks it as any other.
+//!
+//! Pressed by `/rotation` (alias `/rot`, a macro line too), the pad's D-pad Down in the field (client/gamepad.rs).
+//! A press is ignored while we cast or within `GAP` of the last. An action the server does not start (no 0x028 from us
+//! in `ANSWER`) counts as refused: three in a row set it aside for `ASIDE`, so a refused pick never jams the button.
+
+use super::World;
+use super::suggest::{self, Action, Suggestion};
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+/// Presses closer than this to the last action sent are dropped.
+const GAP: Duration = Duration::from_millis(1000);
+/// How long the server has to start an action before it counts as refused.
+const ANSWER: Duration = Duration::from_millis(3000);
+/// Refusals in a row that set an action aside, and for how long.
+const REFUSALS: u8 = 3;
+const ASIDE: Duration = Duration::from_secs(30);
+
+/// What a press does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Step {
+    Act(Action),
+    /// `/attack <t>`: engage the monster targeted.
+    Attack,
+}
+
+/// Who an action goes to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum On {
+    Me,
+    Enemy,
+    Named(String),
+}
+
+#[derive(Debug, Default)]
+pub struct Rotation {
+    /// The last action sent and when.
+    sent: Option<(Step, Instant)>,
+    /// Refusals in a row per action, and when a set-aside one comes back.
+    refused: HashMap<Step, (u8, Option<Instant>)>,
+    /// Pressed this session: the hint shows from then on.
+    used: bool,
+    /// The hint (what the next press does, and why) and when it was worked out.
+    hint: Option<String>,
+    hint_at: Option<Instant>,
+}
+
+impl Rotation {
+    fn aside(&self, s: Step, now: Instant) -> bool {
+        self.refused.get(&s).is_some_and(|(_, until)| until.is_some_and(|u| now < u))
+    }
+
+    /// The last action got no answer in time: one more refusal.
+    fn settle(&mut self, now: Instant) {
+        let Some((s, at)) = self.sent else { return };
+        if now.duration_since(at) < ANSWER {
+            return;
+        }
+        self.sent = None;
+        let e = self.refused.entry(s).or_insert((0, None));
+        e.0 += 1;
+        if e.0 >= REFUSALS {
+            *e = (0, Some(now + ASIDE));
+        }
+    }
+
+    /// The server started something of ours: the last action was taken.
+    fn answered(&mut self) {
+        if let Some((s, _)) = self.sent.take() {
+            self.refused.remove(&s);
+        }
+    }
+
+    /// The press's pick: the first suggestion not set aside whose target resolves, else engaging.
+    fn pick(&self, sugg: &[Suggestion], engage: bool, on: impl Fn(&Suggestion) -> Option<On>, now: Instant) -> Option<(Step, On)> {
+        sugg.iter()
+            .filter(|s| !self.aside(Step::Act(s.action), now))
+            .find_map(|s| on(s).map(|o| (Step::Act(s.action), o)))
+            .or_else(|| (engage && !self.aside(Step::Attack, now)).then_some((Step::Attack, On::Enemy)))
+    }
+}
+
+/// The token for the enemy: the monster targeted, else the party's battle target.
+fn enemy(w: &World) -> Option<&'static str> {
+    let targeted = w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
+    if targeted {
+        return Some("<t>");
+    }
+    let party: Vec<u32> = w.party.members().map(|m| m.id).filter(|&id| id != 0).chain([w.my_id]).collect();
+    w.entities.values().any(|e| e.mob && e.hpp > 0 && e.claim != 0 && party.contains(&e.claim)).then_some("<bt>")
+}
+
+/// Who a suggestion goes to: the member it names; healing and enhancing magic and self-only abilities to us; the rest
+/// to the enemy (None without one).
+fn target_of(w: &World, s: &Suggestion, enemy_ok: bool) -> Option<On> {
+    if let Some(n) = &s.target {
+        return Some(On::Named(n.clone()));
+    }
+    let acts = w.actions.as_ref()?;
+    let mine = match s.action {
+        Action::Spell(id) => {
+            let r = acts.spell(id)?;
+            matches!(r.skill, 33 | 34) || r.targets & 0x20 == 0
+        }
+        Action::Ability(i) => {
+            let a = acts.abilities.get(i as usize)?;
+            a.kind != 3 && a.targets & 0x20 == 0
+        }
+    };
+    if mine {
+        Some(On::Me)
+    } else {
+        enemy_ok.then_some(On::Enemy)
+    }
+}
+
+/// The line a press sends.
+pub fn line(w: &World, step: Step, on: &On) -> Option<String> {
+    let tok = match on {
+        On::Me => "<me>".to_string(),
+        On::Enemy => enemy(w)?.to_string(),
+        On::Named(n) => n.clone(),
+    };
+    Some(match step {
+        Step::Attack => format!("/attack {tok}"),
+        Step::Act(Action::Spell(id)) => format!("/ma \"{}\" {tok}", super::magic::spell_name(w, id)),
+        Step::Act(Action::Ability(i)) => {
+            let ws = w.actions.as_ref().and_then(|a| a.abilities.get(i as usize)).is_some_and(|a| a.kind == 3);
+            format!("{} \"{}\" {tok}", if ws { "/ws" } else { "/ja" }, super::magic::ability_name(w, i))
+        }
+    })
+}
+
+/// Busy: casting (our cast bar, or a cast of ours the server started).
+fn busy(w: &World) -> bool {
+    w.cast_bar.is_some() || w.casts.contains_key(&w.my_id)
+}
+
+/// What the next press would do, worked out as `press` does.
+fn next(w: &World, now: Instant) -> Option<(Step, On, String)> {
+    let sugg = suggest::all(&suggest::facts(w));
+    let foe = enemy(w).is_some();
+    let engage = w.my_motion.status != 1 && w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
+    let (step, on) = w.rotation.pick(&sugg, engage, |s| target_of(w, s, foe), now)?;
+    let why = match step {
+        Step::Act(a) => sugg.iter().find(|s| s.action == a).map_or(String::new(), |s| s.reason.clone()),
+        Step::Attack => "Engage the target.".to_string(),
+    };
+    Some((step, on, why))
+}
+
+/// The hint's text: the action's name and why.
+fn hint_text(w: &World, step: Step, why: &str) -> String {
+    let name = match step {
+        Step::Attack => "Attack".to_string(),
+        Step::Act(Action::Spell(id)) => super::magic::spell_name(w, id),
+        Step::Act(Action::Ability(i)) => super::magic::ability_name(w, i),
+    };
+    if why.is_empty() { format!("Rotation: {name}") } else { format!("Rotation: {name} - {why}") }
+}
+
+/// Once the rotation has been pressed: while fighting or with a monster targeted, the hint names what the next press
+/// does (worked out again every half second; drawn by `draw`).
+pub fn tick(w: &mut World) {
+    if !w.rotation.used {
+        return;
+    }
+    let now = Instant::now();
+    let fighting = w.my_motion.status == 1 || w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
+    if !fighting {
+        w.rotation.hint = None;
+        return;
+    }
+    if w.rotation.hint_at.is_none_or(|t| now.duration_since(t) >= Duration::from_millis(500)) {
+        w.rotation.hint = next(w, now).map(|(s, _, why)| hint_text(w, s, &why));
+        w.rotation.hint_at = Some(now);
+    }
+}
+
+/// The hint, centred at the top of the screen.
+pub fn draw(gu: &mut super::game_ui::GameUi, r: &Rotation, sw: f32) {
+    if let Some(h) = &r.hint {
+        gu.text(h, sw / 2.0, HINT_Y, 1, [0x80, 0x80, 0x80, 0x80]);
+    }
+}
+
+/// The hint's line (below the cast bar, which sits at 47 or 94).
+const HINT_Y: f32 = 128.0;
+
+/// One press: one action, or a line saying why none.
+pub fn press(w: &mut World) {
+    let now = Instant::now();
+    w.rotation.used = true;
+    w.rotation.hint_at = None;
+    if w.my_motion.status == 1 {
+        on_engaged(w);
+    }
+    w.rotation.settle(now);
+    if busy(w) || w.rotation.sent.is_some_and(|(_, at)| now.duration_since(at) < GAP) {
+        return;
+    }
+    if w.stats.is_none() || matches!(w.my_motion.status, 2 | 3) {
+        return;
+    }
+    let Some((step, on, _)) = next(w, now) else {
+        w.chat.push("Rotation: nothing to do now.".to_string());
+        return;
+    };
+    let Some(text) = line(w, step, &on) else { return };
+    log::info!("rotation: {text}");
+    w.rotation.sent = Some((step, now));
+    super::textcmd::run(w, &text, super::textcmd::Mode::Internal);
+}
+
+/// 0x028 from us (combat.rs): an action started or landed, so the last press was taken.
+pub fn on_own_action(w: &mut World) {
+    w.rotation.answered();
+}
+
+/// Engaging shows as our status, not as an action.
+pub fn on_engaged(w: &mut World) {
+    if w.rotation.sent.is_some_and(|(s, _)| s == Step::Attack) {
+        w.rotation.answered();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::suggest::{AbilityFact, Facts, Member, SpellFact, TargetFact};
+
+    /// A Red Mage of `level` (support `sub`): the spells it would know and be able to cast at that level from the RDM
+    /// 1..60 list, the way the server's 0x0AA bits and the DAT's level rule leave them, and the target it fights.
+    fn rdm(level: u8, sub: (u8, u8), hp: u32, mp: u32, tp: u32) -> Facts {
+        // (id, RDM level, skill, targets, MP, name); elemental magic is skill 36, enfeebling 35, healing 33, enhancing 34.
+        const RDM: &[(u16, u8, u16, u16, u16, &str)] = &[
+            (1, 3, 33, 0x3f, 8, "Cure"),
+            (23, 1, 35, 0x20, 7, "Dia"),
+            (159, 4, 36, 0x20, 4, "Stone"),
+            (43, 7, 34, 0x1f, 9, "Protect"),
+            (2, 14, 33, 0x3f, 24, "Cure II"),
+            (58, 6, 35, 0x20, 6, "Paralyze"),
+            (56, 13, 35, 0x20, 15, "Slow"),
+            (48, 17, 34, 0x1f, 18, "Shell"),
+            (144, 19, 36, 0x20, 7, "Fire"),
+            (100, 24, 34, 0x01, 12, "Enfire"),
+            (104, 16, 34, 0x01, 12, "Enthunder"),
+            (3, 26, 33, 0x3f, 46, "Cure III"),
+            (24, 31, 35, 0x20, 30, "Dia II"),
+            (164, 29, 36, 0x20, 9, "Thunder"),
+            (160, 35, 36, 0x20, 16, "Stone II"),
+            (109, 41, 34, 0x1f, 40, "Refresh"),
+            (57, 48, 34, 0x1f, 40, "Haste"),
+            (165, 60, 36, 0x20, 37, "Thunder II"),
+        ];
+        let mut spells: Vec<SpellFact> = RDM.iter().filter(|r| r.1 <= level).map(|&(id, _, skill, targets, mp, name)| SpellFact { id, name: name.into(), skill, element: 0, mp, targets }).collect();
+        // A Black Mage support's own spells at its level.
+        if sub.0 == 4 && sub.1 >= 15 {
+            spells.push(SpellFact { id: 149, name: "Blizzard".into(), skill: 36, element: 1, mp: 8, targets: 0x20 });
+        }
+        spells.retain(|s| s.mp as u32 <= mp);
+        let mp_max = 20 + level as u32 * 6;
+        let abilities = if level >= 40 { vec![AbilityFact { index: 0x200 + 40, name: "Convert".into(), ..Default::default() }] } else { Vec::new() };
+        Facts {
+            party: vec![Member { name: "Blizz".into(), me: true, here: true, hp, hp_max: 1000, job: 5, ..Default::default() }],
+            tp,
+            engaged: true,
+            spells,
+            abilities,
+            target: Some(TargetFact { name: "Crab".into(), hpp: 90, ..Default::default() }),
+            main: (5, level),
+            sub,
+            mp,
+            mp_max,
+            ..Default::default()
+        }
+    }
+
+    fn first(f: &Facts) -> Option<Action> {
+        suggest::all(f).first().map(|s| s.action)
+    }
+
+    #[test]
+    fn level_1_only_dia_then_nothing_it_lacks() {
+        let mut f = rdm(1, (0, 0), 1000, 26, 0);
+        assert_eq!(first(&f), Some(Action::Spell(23)));
+        // Dia on: no Stone (level 4), no Cure (3): nothing it does not have.
+        f.target.as_mut().unwrap().ours = vec![134];
+        assert!(suggest::all(&f).iter().all(|s| s.action != Action::Spell(159) && s.action != Action::Spell(1)));
+    }
+
+    #[test]
+    fn level_12_dia_paralyze_then_stone_and_cures_when_low() {
+        let mut f = rdm(12, (3, 6), 1000, 80, 0);
+        f.target.as_mut().unwrap().ours = vec![134];
+        // Slow comes at 13: Paralyze (6), then the filler nuke.
+        assert_eq!(first(&f), Some(Action::Spell(58)));
+        f.target.as_mut().unwrap().ours = vec![134, 4];
+        assert_eq!(first(&f), Some(Action::Spell(159)));
+        f.party[0].hp = 400;
+        assert_eq!(first(&f), Some(Action::Spell(1)));
+    }
+
+    #[test]
+    fn level_25_enspell_then_debuffs_in_order() {
+        let mut f = rdm(25, (4, 12), 1000, 170, 0);
+        // Out of MP-heavy needs: the enspell while meleeing comes before the debuffs.
+        assert_eq!(first(&f), Some(Action::Spell(104)));
+        f.own = vec![(94 + 4, None)];
+        assert_eq!(first(&f), Some(Action::Spell(23)));
+        f.target.as_mut().unwrap().ours = vec![134];
+        assert_eq!(first(&f), Some(Action::Spell(56)));
+        f.target.as_mut().unwrap().ours = vec![134, 13];
+        assert_eq!(first(&f), Some(Action::Spell(58)));
+        // Bio does not overwrite Dia: with Dia on, no Bio even if known.
+        f.spells.push(SpellFact { id: 230, name: "Bio".into(), skill: 37, mp: 15, targets: 0x20, ..Default::default() });
+        f.target.as_mut().unwrap().ours = vec![134, 13, 4];
+        assert!(suggest::all(&f).iter().all(|s| s.action != Action::Spell(230)));
+    }
+
+    #[test]
+    fn level_40_refresh_first_and_convert_when_dry() {
+        let mut f = rdm(40, (3, 20), 1000, 200, 0);
+        f.spells.retain(|s| s.id != 109);
+        // Refresh is 41: not offered at 40.
+        assert!(suggest::all(&f).iter().all(|s| s.action != Action::Spell(109)));
+        // Convert at 40 with MP under a quarter and HP high.
+        let mut f = rdm(40, (3, 20), 950, 30, 0);
+        f.own = vec![(98, None)];
+        assert_eq!(first(&f), Some(Action::Ability(0x200 + 40)));
+    }
+
+    #[test]
+    fn level_60_keeps_refresh_haste_then_weapon_skill() {
+        let mut f = rdm(60, (4, 30), 1000, 380, 1100);
+        f.weapon_skills = vec![AbilityFact { index: 33, name: "Red Lotus Blade".into(), power: 50, ..Default::default() }];
+        assert_eq!(first(&f), Some(Action::Spell(109)));
+        f.own = vec![(43, None)];
+        assert_eq!(first(&f), Some(Action::Spell(57)));
+        f.own = vec![(43, None), (33, None), (98, None)];
+        f.target.as_mut().unwrap().ours = vec![134, 13, 4];
+        assert_eq!(first(&f), Some(Action::Ability(33)));
+        // TP spent, MP high: Thunder II, the costliest nuke ready (the Black Mage support's Blizzard is cheaper).
+        f.tp = 0;
+        assert_eq!(first(&f), Some(Action::Spell(165)));
+        // Half the MP gone: no nuke, nothing left to do.
+        f.mp = 150;
+        f.spells.retain(|s| s.mp as u32 <= 150);
+        assert!(first(&f).is_none());
+    }
+
+    #[test]
+    fn refusals_set_an_action_aside_then_it_comes_back() {
+        let mut r = Rotation::default();
+        let t0 = Instant::now();
+        let dia = Suggestion { action: Action::Spell(23), target: None, reason: String::new() };
+        let stone = Suggestion { action: Action::Spell(159), target: None, reason: String::new() };
+        let sugg = [dia, stone];
+        let on = |_: &Suggestion| Some(On::Enemy);
+        for k in 0..3u64 {
+            let at = t0 + Duration::from_secs(4 * k);
+            assert_eq!(r.pick(&sugg, false, on, at).unwrap().0, Step::Act(Action::Spell(23)));
+            r.sent = Some((Step::Act(Action::Spell(23)), at));
+            r.settle(at + ANSWER);
+        }
+        let later = t0 + Duration::from_secs(12);
+        assert_eq!(r.pick(&sugg, false, on, later).unwrap().0, Step::Act(Action::Spell(159)));
+        assert_eq!(r.pick(&sugg, false, on, later + ASIDE).unwrap().0, Step::Act(Action::Spell(23)));
+        // An answered action clears its count.
+        r.sent = Some((Step::Act(Action::Spell(159)), later));
+        r.answered();
+        assert!(r.sent.is_none() && !r.refused.contains_key(&Step::Act(Action::Spell(159))));
+    }
+
+    #[test]
+    fn nothing_suggested_engages_and_enemy_spells_wait_for_an_enemy() {
+        let r = Rotation::default();
+        let now = Instant::now();
+        let dia = Suggestion { action: Action::Spell(23), target: None, reason: String::new() };
+        assert_eq!(r.pick(&[], true, |_| None, now), Some((Step::Attack, On::Enemy)));
+        assert_eq!(r.pick(&[dia], false, |_| None, now), None);
+    }
+}
+
+#[cfg(test)]
+mod data {
+    use crate::dat::actions::Actions;
+
+    /// The spell ids the rules name are the Red Mage spells they mean (the game's data, when the install is there):
+    /// RDM levels (job 5) of Dia, Paralyze, Slow, Enthunder, Enfire, Phalanx, Refresh, Haste, Thunder II.
+    #[test]
+    fn rdm_spell_ids_in_the_game_data() {
+        let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
+        let Ok(a) = Actions::load(&index) else { return };
+        let rdm = |id: u16| a.spell(id).map(|s| s.levels[5]);
+        let got: Vec<_> = [23, 58, 56, 104, 100, 106, 109, 57, 165].iter().map(|&id| (id, rdm(id))).collect();
+        eprintln!("RDM levels: {got:?}");
+        for (id, lv) in got {
+            assert!(lv.is_some_and(|l| (1..=60).contains(&l)), "spell {id}: RDM level {lv:?}");
+        }
+    }
+}

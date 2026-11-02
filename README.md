@@ -57,6 +57,7 @@ Playable on a local LSB server. Working today:
 - Fishing, chocobo racing, Monstrosity, Mog House layout, gardening and mannequins
 - The in-game and lobby Config menus, with an Extras page for additions such as a map overlay, a minimap, timers, a
   skillchain helper and chat timestamps
+- A one-button rotation (`/rotation`, D-pad Down; see below)
 - Game updates from the PlayOnline patch server, an Update button for the client itself, and a mod manager for HD
   texture packs (install from an archive, order, enable, uninstall). Our HD pack, the game's textures upscaled 4x, is
   on the [releases page](https://github.com/lenonk/vana-client/releases/tag/hd-pack-1)
@@ -102,7 +103,7 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 |---|---|---|---|
 | Left stick | Move | Cursor | Caret |
 | Right stick | Camera | Map window: zoom (up zooms in) | |
-| D-pad | Left / right: previous / next target; up: yourself | Cursor | Caret, line history |
+| D-pad | Left / right: previous / next target; up: yourself; down: the one-button rotation | Cursor | Caret, line history |
 | A / Cross | Enter: talk, confirm, action menu | Confirm | Send |
 | B / Circle | Escape: cancel, clear target | Cancel | Cancel |
 | X / Square | Main menu | Main menu | Backspace |
@@ -115,7 +116,19 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | Right stick click | `/map`: open the map (with the map up: close it) | | |
 
 The character-creation name entry is a text field as far as the pad goes: X is Backspace, and LB still asks for a random
-name (with the on-screen keyboard closed). D-pad Down while walking about is unbound.
+name (with the on-screen keyboard closed).
+
+### One-button rotation
+
+`/rotation` (or `/rot`, also as a macro line) and D-pad Down while walking about do the next sensible thing in a
+fight, one action per press. They pick it with the same rules as the battle menu's Suggested rows: heal someone low,
+Convert when MP is low and HP high, put Refresh / Haste / Phalanx back, keep an enspell up while meleeing, Dia / Slow
+/ Paralyze the target, the strongest weapon skill at 1000 TP, then damage magic while half the MP is left; with
+nothing to do and a monster targeted, attack it. Red Mage is the job it is tuned for so far. It uses only what the
+character has learned and can use now (level, jobs, MP, TP, recasts, silence and the like, and the server's era), and
+sends the same line a macro would, so the server checks it as any other. A press is ignored while casting or within a
+second of the last; an action the server does not start three times in a row is set aside for 30 seconds. After the
+first press a line at the top of the screen names what the next press does.
 
 When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was
 started by Steam (Game Mode, a non-Steam shortcut), else the client's built-in one, a small keyboard drawn over the field
