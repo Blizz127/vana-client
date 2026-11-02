@@ -407,7 +407,7 @@ mod tests {
         let mp_max = 20 + level as u32 * 6;
         let abilities = if level >= 40 { vec![AbilityFact { index: 0x200 + 40, name: "Convert".into(), ..Default::default() }] } else { Vec::new() };
         Facts {
-            party: vec![Member { name: "Blizz".into(), me: true, here: true, hp, hp_max: 1000, job: 5, ..Default::default() }],
+            party: vec![Member { name: "Lenon".into(), me: true, here: true, hp, hp_max: 1000, job: 5, ..Default::default() }],
             tp,
             engaged: true,
             spells,
