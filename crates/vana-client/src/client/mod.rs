@@ -6467,6 +6467,8 @@ pub struct Drive {
     pub chase: bool,
     /// The zone the waypoints belong to; zoning drops the rest.
     pub(crate) goto_zone: Option<u16>,
+    /// When the quit last asked to leave a fight (`/attack off`).
+    pub(crate) disengage_at: Option<Instant>,
     pub(crate) started: bool,
     pub(crate) zone_ready_at: Option<Instant>,
     pub(crate) shot_taken: bool,
@@ -12189,7 +12191,15 @@ impl App {
             }
             Phase::World(world) if world.renderer.is_some() && world.zone_uploading.is_none() => {
                 // Test runs end with "/shutdown on" (0x0E7 mode 3, kind 3); the server refuses it in an event, so once that is over.
-                if self.drive.quit && drive_done && !world.logging_out && !event::active(world) {
+                // Ours: the rotation's autocast is off first and a fight is left (an action would cancel the countdown).
+                if self.drive.quit && drive_done && !world.logging_out && world.my_motion.status == 1 {
+                    world.rotation_autocast_off();
+                    if self.drive.disengage_at.is_none_or(|t| t.elapsed().as_secs_f32() > 2.0) {
+                        self.drive.disengage_at = Some(Instant::now());
+                        textcmd::run(world, "/attack off", textcmd::Mode::Internal);
+                    }
+                } else if self.drive.quit && drive_done && !world.logging_out && !event::active(world) {
+                    world.rotation_autocast_off();
                     world.logging_out = true;
                     world.shutdown = true;
                     let _ = world.net.commands.send(NetCommand::Logout { mode: 3, kind: 3 });

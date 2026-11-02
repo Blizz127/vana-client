@@ -15,7 +15,7 @@
 //! Autocast (on by default, config `rotation_autocast`; `/autocast on | off` flips the session): the rotation presses
 //! itself every `TICK` while we are engaged, or a monster we target is fighting us, under the same rules, `SETTLE`
 //! after it may. It never engages (a press does that) and never acts outside a fight, so nothing fires in town. It
-//! pauses while dead, resting, mounted, fishing, in an event, while we pick a spell, ability or target or type, while
+//! pauses while logging out, dead, resting, mounted, fishing, in an event, while we pick a spell, ability or target or type, while
 //! moving and `PAUSE` after, and `PAUSE` after any line we run ourselves (a macro, a menu pick, a typed command).
 //! A monster's debuff count goes when it dies or leaves (a respawn has the same id).
 
@@ -302,11 +302,12 @@ fn in_fight(w: &World) -> bool {
     w.my_motion.status == 1 || w.target.filter(|t| w.entities.get(t).is_some_and(|e| e.mob && e.hpp > 0)).is_some_and(|t| super::skillchain::hitting(w, t) == Some(w.my_id))
 }
 
-/// Not dead, casting, resting, mounted, fishing, sitting or in an event, and not in the middle of something of our
+/// Not logging out, dead, casting, resting, mounted, fishing, sitting or in an event, and not in the middle of something of our
 /// own: a target prompt, the magic or ability categories or list, typing (the battle menu itself does not count).
 fn may_act(w: &World) -> bool {
     let choosing = super::target::sub_up(w) || w.cats.is_some() || w.magic.is_some() || w.ability.is_some() || w.typing;
-    w.stats.is_some() && !matches!(w.my_motion.status, 2 | 3) && !busy(w) && super::magic::status_check(w).is_none() && !super::event::active(w) && !choosing
+    // A logout or shutdown asked for: any action would cancel its countdown.
+    w.stats.is_some() && !w.logging_out && !matches!(w.my_motion.status, 2 | 3) && !busy(w) && super::magic::status_check(w).is_none() && !super::event::active(w) && !choosing
 }
 
 /// `/autocast [on | off]`: the session's autocast (alone: flipped).
@@ -318,6 +319,13 @@ pub fn autocast_command(w: &mut World, arg: Option<&str>) {
     };
     w.rotation.ready_since = None;
     w.chat.push(format!("Rotation autocast {}.", if w.rotation.autocast { "on: it acts by itself while you fight" } else { "off: press /rotation" }));
+}
+
+impl World {
+    /// Autocast off for the session (a test drive's quit).
+    pub(super) fn rotation_autocast_off(&mut self) {
+        self.rotation.autocast = false;
+    }
 }
 
 /// A line we ran ourselves (not the rotation's): autocast holds off a moment.
