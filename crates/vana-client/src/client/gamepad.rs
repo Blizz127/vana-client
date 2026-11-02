@@ -91,6 +91,9 @@ pub enum Ctx {
     Field,
     /// A window, menu, event or the login / lobby screens.
     Menu,
+    /// Only the action menu (playermo) is up, as it is all through a fight: its keys are the Menu's, but the sticks
+    /// still walk and turn the camera, as the keyboard's movement keys do.
+    Action,
     /// A text field has the keys (the chat line, the login's fields).
     Typing,
 }
@@ -137,6 +140,7 @@ const fn arrow(key: Key, dik: &'static [u8]) -> Option<Binding> {
 /// The default mapping (the table in the module docs).
 pub fn binding(b: Btn, ctx: Ctx) -> Option<Binding> {
     use Btn::*;
+    let ctx = if ctx == Ctx::Action { Ctx::Menu } else { ctx };
     let typing = ctx == Ctx::Typing;
     match (b, ctx) {
         (South, _) => bind(Some(Key::Enter), &[DIK_ENTER]),
@@ -253,9 +257,12 @@ impl Mapper {
     pub fn step(&mut self, s: &Snapshot, ctx: Ctx, tuning: Tuning, dt: f32) -> Out {
         let mut out = Out::default();
         let mut now = s.buttons;
-        // A held trigger is a palette: the D-pad works it with arrows.
-        let ctx = if ctx == Ctx::Field && (s.get(Btn::LeftTrigger) || s.get(Btn::RightTrigger)) { Ctx::Menu } else { ctx };
-        if ctx != Ctx::Field {
+        // A held trigger is a palette: the D-pad works it with arrows, and the character stands (Ctrl / Alt held
+        // take no movement keys either).
+        let palette = s.get(Btn::LeftTrigger) || s.get(Btn::RightTrigger);
+        let walks = matches!(ctx, Ctx::Field | Ctx::Action) && !palette;
+        let ctx = if matches!(ctx, Ctx::Field | Ctx::Action) && palette { Ctx::Menu } else { ctx };
+        if !walks {
             // The left stick walks no longer; it moves the cursor.
             let (x, y) = deadzone(s.left.0, s.left.1, tuning.deadzone);
             for (b, on) in [(Btn::DPadLeft, x <= -STICK_AS_DPAD), (Btn::DPadRight, x >= STICK_AS_DPAD), (Btn::DPadUp, y >= STICK_AS_DPAD), (Btn::DPadDown, y <= -STICK_AS_DPAD)] {
@@ -401,7 +408,9 @@ impl Pads {
         let Some(p) = self.active.and_then(|id| g.connected_gamepad(id)).filter(|_| focused) else { return Snapshot::default() };
         use gilrs::{Axis, Button};
         let mut s = Snapshot::default();
-        let trigger = |b: Button, z: Axis| p.is_pressed(b) || p.button_data(b).is_some_and(|d| d.value() > TRIGGER) || p.value(z) > TRIGGER;
+        // Analog triggers read as buttons by value. Not the LeftZ / RightZ axes: on pads gilrs has no mapping for, those
+        // are often the right stick.
+        let trigger = |b: Button| p.is_pressed(b) || p.button_data(b).is_some_and(|d| d.value() > TRIGGER);
         for (b, on) in [
             (Btn::South, p.is_pressed(Button::South)),
             (Btn::East, p.is_pressed(Button::East)),
@@ -409,8 +418,8 @@ impl Pads {
             (Btn::North, p.is_pressed(Button::North)),
             (Btn::LeftBumper, p.is_pressed(Button::LeftTrigger)),
             (Btn::RightBumper, p.is_pressed(Button::RightTrigger)),
-            (Btn::LeftTrigger, trigger(Button::LeftTrigger2, Axis::LeftZ)),
-            (Btn::RightTrigger, trigger(Button::RightTrigger2, Axis::RightZ)),
+            (Btn::LeftTrigger, trigger(Button::LeftTrigger2)),
+            (Btn::RightTrigger, trigger(Button::RightTrigger2)),
             (Btn::Select, p.is_pressed(Button::Select)),
             (Btn::Start, p.is_pressed(Button::Start)),
             (Btn::LeftThumb, p.is_pressed(Button::LeftThumb)),
@@ -479,7 +488,7 @@ mod tests {
         assert_eq!(f(DPadLeft, Ctx::Field), Some((None, vec![0x2a, 0x0f], false)));
         assert_eq!(f(DPadUp, Ctx::Field), Some((None, vec![0x3b], false)));
         assert_eq!(f(DPadDown, Ctx::Field), None);
-        for c in [Ctx::Menu, Ctx::Typing] {
+        for c in [Ctx::Menu, Ctx::Typing, Ctx::Action] {
             assert_eq!(f(DPadUp, c), Some((Some(Key::ArrowUp), vec![0xc8], true)));
             assert_eq!(f(DPadDown, c), Some((Some(Key::ArrowDown), vec![0xd0], true)));
             assert_eq!(f(DPadLeft, c), Some((Some(Key::ArrowLeft), vec![0xcb], true)));
@@ -602,6 +611,33 @@ mod tests {
         let mut m = Mapper::default();
         s.left = (0.4, 0.0);
         assert!(m.step(&s, Ctx::Menu, tuning(), 0.016).events.is_empty());
+    }
+
+    /// All through a fight the action menu is up: the sticks keep walking and turning the camera, the buttons are the
+    /// menu's (arrows, Enter, Escape).
+    #[test]
+    fn action_menu_keeps_the_sticks() {
+        let mut m = Mapper::default();
+        let mut s = pressed(&[Btn::DPadDown]);
+        s.left = (0.0, 1.0);
+        s.right = (1.0, 0.0);
+        let out = m.step(&s, Ctx::Action, tuning(), 0.016);
+        assert_eq!(out.sticks, [0.0, -1.0, 1.0, 0.0]);
+        assert_eq!(keys(&out), vec![(Key::ArrowDown, true, false)]);
+        assert_eq!(out.keys, vec![0xd0]);
+        // A and B are Enter / Escape as in any menu.
+        let out = m.step(&pressed(&[Btn::DPadDown, Btn::South]), Ctx::Action, tuning(), 0.016);
+        assert_eq!(keys(&out), vec![(Key::Enter, true, false)]);
+        // A held palette trigger stands the character and the D-pad works the palette.
+        let mut m = Mapper::default();
+        let mut s = pressed(&[Btn::LeftTrigger]);
+        s.left = (0.0, 1.0);
+        let out = m.step(&s, Ctx::Action, tuning(), 0.016);
+        assert_eq!(out.sticks, [0.0; 4]);
+        assert!(out.keys.contains(&0x1d));
+        // The same in the field: a trigger stands the character too.
+        let mut m = Mapper::default();
+        assert_eq!(m.step(&s, Ctx::Field, tuning(), 0.016).sticks, [0.0; 4]);
     }
 
     #[test]

@@ -12987,7 +12987,7 @@ What the retail binary tells us (sources are the Input layer and Config notes ab
 - Retail has a pad: key functions test a pad word with the callback bits of `PAD` in input.rs, and 0xb7..0xba test a
   *second* pad word, *(inferred: the gamepad's)*. They are not wired here; nothing else is known of them.
 - Config > Misc. 4 (conf13wi) keeps its 0xce rows only while FUN_101bced0() > 0 *(inferred: a connected-pad count)*;
-  the lobby Config's Gamepad row (configwi child 13) takes no cursor. Both stay as they are; our own page is Settings >
+  the in-game Config's Gamepad row (configwi child 13) takes no cursor. Both stay as they are; our own page is Settings >
   Gamepad.
 - The retail PC pad's button-to-key table is not in FFXiMain's data tables we read, so the layout below is a choice
   that reaches the keys the client already has (everything marked *(inferred)*). Nothing about retail's own button
@@ -13012,7 +13012,9 @@ What the retail binary tells us (sources are the Input layer and Config notes ab
   retail's third speed. Stick up = axis 5 negative (the W key). Camera speed multiplies after the deadzone. Config
   `gamepad` (true), `gamepad_deadzone` (0.2, kept 0..0.8), `gamepad_camera_speed` (1.0, kept 0.1..5).
 - Context: in a window, menu, event or the lobby screens the left stick is the D-pad (past 0.6) and neither stick walks
-  or turns; typing the same. gilrs keeps reporting while another window has the focus: the pad reads only while ours
+  or turns; typing the same. With only the action menu up (it stays up while engaged) the buttons are the menu's but
+  the sticks still walk and turn the camera, as the keyboard's movement keys do. A held LT / RT (Ctrl / Alt) stands the
+  character, as Ctrl / Alt stop the movement keys (flag 0x80). gilrs keeps reporting while another window has the focus: the pad reads only while ours
   has it. Unplugging, losing focus or turning the setting off hands the mapper an empty state, which lifts every held
   key (a stuck Ctrl would leave the palette open). The pad in use is the first found, then the last one a button went
   down on. gilrs starts lazily and not at all with the setting off; a failed start is logged once.

@@ -12284,7 +12284,9 @@ impl App {
         use gamepad::Ctx;
         match &self.phase {
             Phase::World(w) if text_field_open(w) => Ctx::Typing,
-            Phase::World(w) if keys_in_window(w) || event::active(w) || w.prompt.is_some() => Ctx::Menu,
+            // The action menu stays up through a fight: walking goes on under it, as the keyboard's movement keys do.
+            Phase::World(w) if window_over_actions(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some() || event::active(w) || w.prompt.is_some() => Ctx::Menu,
+            Phase::World(w) if w.action_menu.is_some() => Ctx::Action,
             Phase::World(_) => Ctx::Field,
             Phase::Login { .. } if self.login_text => Ctx::Typing,
             _ => Ctx::Menu,
