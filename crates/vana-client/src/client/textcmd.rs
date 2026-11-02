@@ -612,6 +612,15 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
         }
         return;
     }
+    // Ours (not retail, client/era.rs): /expansions opens the Expansions view (modern), else lists them in the log.
+    if first.eq_ignore_ascii_case("/expansions") {
+        if w.modern {
+            w.era_view = true;
+        } else {
+            super::era::print(w);
+        }
+        return;
+    }
     // Ours (not retail; the find-all add-ons): /find <words> lists the bags holding each item whose name has them.
     if first.eq_ignore_ascii_case("/find") {
         find(w, line[first.len()..].trim());

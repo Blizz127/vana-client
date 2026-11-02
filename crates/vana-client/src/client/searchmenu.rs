@@ -5,6 +5,7 @@
 //! arealist_spec section 2) and the windows opened from it work on the last search's condition instead.
 
 use super::World;
+use super::era::{self, Feature};
 use super::game_ui::GameUi;
 use crate::audio::Ui;
 use crate::net::search::{COMMENT, Cond, JOB, LEVEL, LS1, LS2, MLEVEL, NAME, NATION, RACE, RANK, STATUS};
@@ -68,6 +69,7 @@ pub fn open(w: &mut World) {
     if ls_id(w, 2) == 0 {
         win.off.push(15);
     }
+    era_off(w, &mut win.off, [13, 14, 17]);
     w.search_status0 = 0;
     w.searchmenu = Some(SearchMenu { stack: vec![win], return_menu: w.menu, refine_at: None });
     w.menu = None;
@@ -98,7 +100,19 @@ fn refine_off(w: &World) -> Vec<u16> {
     if s & 0x2000_0000 != 0 {
         off.extend([12, 14, 10]);
     }
+    era_off(w, &mut off, [0, 12, 15]);
     off
+}
+
+/// Ours (client/era.rs): the rows of later systems stay disabled in the base era. `rows` are Monstrosity (searchma only),
+/// Unity and master level (0 = none).
+fn era_off(w: &World, off: &mut Vec<u16>, rows: [u16; 3]) {
+    let [mon, unity, master] = rows;
+    for (row, f) in [(mon, Feature::Monstrosity), (unity, Feature::Unity), (master, Feature::MasterLevels)] {
+        if row != 0 && era::hidden(w, f) && !off.contains(&row) {
+            off.push(row);
+        }
+    }
 }
 
 /// FUN_1020c250: Enter on the results header opens scsibori (over searchma when it is up, else alone).
@@ -154,12 +168,16 @@ fn push(w: &mut World, name: &'static str) {
 fn push_mode(w: &mut World, name: &'static str, mode: u8, base: u8) {
     let mut win = Win::new(name, w.cursor_recall(name));
     (win.mode, win.base) = (mode, base);
+    // Ours (client/era.rs): the job list offers the base jobs only (a child's id is its job id).
+    if name == JOBS {
+        win.off = (1..=22).filter(|&j| !era::job_on(w, j as u8)).collect();
+    }
     // scchar / scmlev ask for fresh stats when shown (c2s 0x061); the reply sets both values to our main level (or the
     // master level, 0 without one).
     if matches!(name, LEVELS | MLEVELS) {
         let _ = w.net.commands.send(super::net::NetCommand::StatusRequest(0));
         let st = w.stats.as_ref();
-        let v = if name == LEVELS { st.map_or(1, |s| s.main.1) } else { st.filter(|s| s.ml.1 & 1 != 0).map_or(0, |s| s.ml.0) };
+        let v = if name == LEVELS { st.map_or(1, |s| s.main.1.min(era::cap(w))) } else { st.filter(|s| s.ml.1 & 1 != 0).map_or(0, |s| s.ml.0) };
         win.vals = (v, v);
     }
     if let Some(m) = w.searchmenu.as_mut() {
@@ -189,9 +207,9 @@ fn run(w: &mut World, set: impl FnOnce(&mut Cond)) {
 
 /// FUN_1020db80 / FUN_1020dec0: a field steps within 1..99 (master level 0..99); raising the minimum pushes the maximum
 /// up, lowering the maximum pushes the minimum down.
-fn step_field(vals: &mut (u8, u8), field: u16, up: bool, low: u8) {
+fn step_field(vals: &mut (u8, u8), field: u16, up: bool, low: u8, cap: u8) {
     let v = if field == 1 { &mut vals.0 } else { &mut vals.1 };
-    *v = if up { (*v + 1).min(99) } else { v.saturating_sub(1).max(low) };
+    *v = if up { (*v + 1).min(cap) } else { v.saturating_sub(1).max(low) };
     if field == 1 && vals.0 > vals.1 {
         vals.1 = vals.0;
     }
@@ -281,10 +299,12 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
     // An edited number field (FUN_1020dd50): Up / Down step it, Left / Right edit the other one, Enter / Escape stop.
     if let (LEVELS | MLEVELS, Some(f)) = (top.name, top.edit) {
         let low = if top.name == LEVELS { 1 } else { 0 };
+        // Ours (client/era.rs): 60 in the base era.
+        let cap = if top.name == LEVELS { era::cap(w) } else { 99 };
         let Some(t) = w.searchmenu.as_mut().and_then(|m| m.stack.last_mut()) else { return };
         match key {
             egui::Key::ArrowUp | egui::Key::ArrowDown => {
-                step_field(&mut t.vals, f, key == egui::Key::ArrowUp, low);
+                step_field(&mut t.vals, f, key == egui::Key::ArrowUp, low, cap);
                 w.sounds.push(Ui::Cursor as u32);
             }
             egui::Key::ArrowLeft | egui::Key::ArrowRight => {
@@ -465,4 +485,24 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
     }
     rects
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn level_fields_stop_at_the_cap() {
+        let mut v = (59, 60);
+        step_field(&mut v, 2, true, 1, 60);
+        assert_eq!(v, (59, 60));
+        step_field(&mut v, 1, true, 1, 60);
+        step_field(&mut v, 1, true, 1, 60);
+        assert_eq!(v, (60, 60));
+        // Retail's cap.
+        let mut r = (98, 98);
+        step_field(&mut r, 2, true, 1, 99);
+        step_field(&mut r, 2, true, 1, 99);
+        assert_eq!(r, (98, 99));
+    }
 }

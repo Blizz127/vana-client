@@ -18,6 +18,7 @@ mod command;
 mod config;
 mod craft;
 mod equip;
+mod era;
 mod extras;
 mod gametext;
 mod hud;
@@ -268,6 +269,7 @@ impl Modern {
         inspect::draw(&mut p, w);
         inspect::dress(&mut p, w);
         minor::draw(&mut p, w);
+        era::draw(&mut p, w);
         bluset::draw(&mut p, w);
         pupset::draw(&mut p, w);
         maze::draw(&mut p, w);
