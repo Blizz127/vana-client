@@ -122,6 +122,28 @@ pub fn job_on(w: &World, job: u8) -> bool {
     !locked(w) || job_offered(Era::Base, job)
 }
 
+/// Spells whose expansion the era keeps closed, with the lobby bit that opens each (the Forever server's stage list:
+/// Dispel and Phalanx came with Zilart, the enspell II tier with the Goddess, Distract / Frazzle / Flurry with Adoulin).
+/// The server never lets them be learned while closed; a character that learned one before still has its bit.
+const SPELL_ERAS: [(u16, u32); 11] = [
+    (260, 1 << 1),
+    (106, 1 << 1),
+    (312, 1 << 4),
+    (313, 1 << 4),
+    (314, 1 << 4),
+    (315, 1 << 4),
+    (316, 1 << 4),
+    (317, 1 << 4),
+    (841, 1 << 11),
+    (843, 1 << 11),
+    (845, 1 << 11),
+];
+
+/// The spell's expansion is not open on this server (the client's own picks, client/suggest.rs, leave it out).
+pub fn spell_closed(w: &World, spell: u16) -> bool {
+    w.era_lock && SPELL_ERAS.iter().any(|&(id, bit)| id == spell && w.lobby_expansions & bit == 0)
+}
+
 /// The key of a server and account in the config's last-seen bits.
 pub fn seen_key(server: &str, account: &str) -> String {
     format!("{}|{}", server.trim().to_ascii_lowercase(), account.trim().to_ascii_lowercase())

@@ -34,6 +34,7 @@ mod game_ui;
 mod hudtop;
 mod listsearch;
 mod suggest;
+mod rotation;
 mod augment;
 mod iteminfo;
 mod map;
@@ -1842,6 +1843,7 @@ fn window_closes(w: &mut World, events: &[egui::Event]) {
 }
 
 fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2], keys: &mut HashSet<KeyCode>, view_proj: glam::Mat4, numpad_slash: bool) -> Vec<[f32; 4]> {
+    rotation::tick(world);
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     world.ui_wh = (sw, sh);
     // Ours (client/eralayout.rs): the classic windows' layouts follow the era lock.
@@ -3072,6 +3074,7 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
     timers::draw(gu, &mut world.timers, sw);
     regime::draw(gu, &mut world.regime, sw);
     skillchain::draw(gu, &mut world.skillchain, sw);
+    rotation::draw(gu, &world.rotation, sw);
     let slots = gu.hud(sw, sh, &st);
 
     // Target cursor (FUN_10149900): anc_l at the target's point, 6 frames of 4 ticks, tint 0xe0808080;
@@ -5949,6 +5952,8 @@ struct World {
     recent_save: bool,
     /// The battle menu's suggestions (suggest.rs::refresh_root), when they were taken, and the one the cursor is on.
     root_sugg: Vec<suggest::Suggestion>,
+    /// The one-button rotation's state (rotation.rs).
+    rotation: rotation::Rotation,
     root_sugg_at: Option<Instant>,
     suggest_sel: Option<usize>,
     /// Party and alliance members' HP as last seen at 100 % (their max; the server sends only HP and HP %).
@@ -7839,6 +7844,7 @@ impl App {
                             recent_picks: self.cfg.modern_recent.get(&login.name).cloned().unwrap_or_default(),
                             recent_save: false,
                             root_sugg: Vec::new(),
+                            rotation: rotation::Rotation::new(self.cfg.rotation_autocast),
                             root_sugg_at: None,
                             suggest_sel: None,
                             party_hp_max: HashMap::new(),

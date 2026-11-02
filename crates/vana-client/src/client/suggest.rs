@@ -6,7 +6,7 @@ use super::World;
 use crate::dat::skillchains::{self as sc, Prop};
 
 /// What a suggestion uses: a spell id, or an ability table index (job abilities and weapon skills).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Action {
     Spell(u16),
     Ability(u16),
@@ -95,6 +95,11 @@ pub struct Facts {
     pub target: Option<TargetFact>,
     pub resonance: Option<ResonanceFact>,
     pub partners: Vec<Partner>,
+    /// Our main and support jobs (id, level).
+    pub main: (u8, u8),
+    pub sub: (u8, u8),
+    pub mp: u32,
+    pub mp_max: u32,
 }
 
 impl Facts {
@@ -112,6 +117,14 @@ impl Facts {
 
     fn has(&self, status: u16) -> bool {
         self.own.iter().any(|(e, _)| *e == status)
+    }
+
+    fn hp_pct(&self) -> u32 {
+        self.party.first().map_or(100, |m| if m.hp_max > 0 { m.hp * 100 / m.hp_max } else { 100 })
+    }
+
+    fn mp_pct(&self) -> u32 {
+        if self.mp_max > 0 { self.mp * 100 / self.mp_max } else { 0 }
     }
 
     /// Fighting: engaged, or a monster is on us.
@@ -164,7 +177,19 @@ const RENEW: [(u16, &[u16], &str); 10] = [
 ];
 
 /// Effects worth having up between fights when missing, and their spells (strongest first).
-const BETWEEN: [(u16, &[u16], &str); 3] = [(40, &[47, 46, 45, 44, 43], "Protect"), (41, &[52, 51, 50, 49, 48], "Shell"), (113, &[848, 142, 141, 135], "Reraise")];
+const BETWEEN: [(u16, &[u16], &str); 4] = [(40, &[47, 46, 45, 44, 43], "Protect"), (41, &[52, 51, 50, 49, 48], "Shell"), (43, &[894, 473, 109], "Refresh"), (113, &[848, 142, 141, 135], "Reraise")];
+
+/// Effects worth putting back as soon as they are missing while fighting (Refresh, Haste, Phalanx), strongest first.
+const KEEP: [(u16, &[u16], &str); 3] = [(43, &[894, 473, 109], "Refresh"), (33, &[511, 57], "Haste"), (116, &[106], "Phalanx")];
+
+/// The enspells (Enthunder .. Enwater, then the II tier) and the statuses they give (94..99, 277..282).
+const ENSPELLS: [u16; 12] = [104, 101, 100, 102, 103, 105, 316, 313, 312, 314, 315, 317];
+const ENSPELL_STATUS: [u16; 12] = [94, 95, 96, 97, 98, 99, 277, 278, 279, 280, 281, 282];
+
+/// MP (percent) a filler nuke leaves alone: a Black Mage nukes with all of it, the others keep half for cures.
+fn nuke_floor(main: u8) -> u32 {
+    if main == 4 { 0 } else { 50 }
+}
 
 /// Seconds left under which an effect is worth renewing.
 const SOON: f32 = 30.0;
@@ -233,6 +258,13 @@ fn nuke(s: &SpellFact) -> bool {
 /// The rules in their order: raise, shadows, ailments, heal, close the open chain, burst it, pull the monster off
 /// someone, job abilities, debuffs, open a chain with a partner, the strongest weapon skill, renew what wears off.
 pub fn suggest(f: &Facts) -> Vec<Suggestion> {
+    let mut out = all(f);
+    out.truncate(MAX);
+    out
+}
+
+/// Every suggestion in rule order (the one-button rotation, client/rotation.rs, takes the first it has not set aside).
+pub fn all(f: &Facts) -> Vec<Suggestion> {
     let mut out: Vec<Suggestion> = Vec::new();
     let push = |out: &mut Vec<Suggestion>, s: Suggestion| {
         if !out.iter().any(|o| o.action == s.action) {
@@ -280,6 +312,15 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
         {
             push(&mut out, Suggestion { action: Action::Ability(a.index), target: who(m), reason });
         }
+    }
+    // Convert (RDM): MP low and HP high swaps them; the cures above then mend the HP.
+    if f.fighting()
+        && f.mp_max > 0
+        && f.mp_pct() < 25
+        && f.hp_pct() > 75
+        && let Some(a) = f.ability("Convert")
+    {
+        push(&mut out, Suggestion { action: Action::Ability(a.index), target: None, reason: format!("MP at {}%: swap it for HP.", f.mp_pct()) });
     }
     // Close the open chain, or burst the one made.
     if let Some(r) = &f.resonance {
@@ -343,12 +384,30 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
             push(&mut out, Suggestion { action: Action::Ability(a.index), target: None, reason: "No samba up.".into() });
         }
     }
+    // Refresh, Haste and Phalanx back on as soon as they are missing in a fight.
+    if f.fighting() {
+        for &(effect, spells, name) in &KEEP {
+            if !f.has(effect)
+                && let Some(&id) = spells.iter().find(|&&s| f.can(s))
+            {
+                push(&mut out, Suggestion { action: Action::Spell(id), target: None, reason: format!("{name} is not on you.") });
+            }
+        }
+    }
+    // An enspell while meleeing.
+    if f.engaged
+        && !ENSPELL_STATUS.iter().any(|&s| f.has(s))
+        && let Some(&id) = ENSPELLS.iter().find(|&&s| f.can(s))
+    {
+        push(&mut out, Suggestion { action: Action::Spell(id), target: None, reason: "No enspell on your weapon.".into() });
+    }
     // Debuffs on what we fight, while it has the HP for them to matter.
     if f.engaged
         && let Some(t) = f.target.as_ref().filter(|t| t.hpp > 30)
     {
         for &(status, spells, word) in &DEBUFFS {
-            if t.ours.contains(&status) {
+            // Dia and Bio overwrite each other: either one counts for both.
+            if t.ours.contains(&status) || (matches!(status, 134 | 135) && t.ours.iter().any(|s| matches!(s, 134 | 135))) {
                 continue;
             }
             if let Some(&id) = spells.iter().find(|&&s| f.can(s)) {
@@ -383,6 +442,15 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
     {
         push(&mut out, Suggestion { action: Action::Ability(a.index), target: None, reason: format!("Your strongest weapon skill (TP {}).", f.tp) });
     }
+    // Damage magic while the MP allows: the costliest elemental spell ready (the strongest).
+    if f.fighting()
+        && f.target.as_ref().is_some_and(|t| t.hpp > 0)
+        && f.mp_max > 0
+        && f.mp_pct() >= nuke_floor(f.main.0)
+        && let Some(s) = f.spells.iter().filter(|s| s.skill == 36 && nuke(s)).max_by_key(|s| s.mp)
+    {
+        push(&mut out, Suggestion { action: Action::Spell(s.id), target: None, reason: format!("Damage while your MP allows ({}%).", f.mp_pct()) });
+    }
     // Renew what wears off soon; between fights, put back what is missing.
     for &(effect, spells, name) in &RENEW {
         if let Some(&(_, Some(left))) = f.own.iter().find(|(e, _)| *e == effect)
@@ -401,7 +469,6 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
             }
         }
     }
-    out.truncate(MAX);
     out
 }
 
@@ -437,18 +504,30 @@ pub fn facts(w: &World) -> Facts {
         let effects = w.party_buffs.get(&m.id).map_or(Vec::new(), |row| row.iter().copied().filter(|&b| b != 0 && b != 0xffff).collect());
         party.push(Member { name: m.name.clone(), me: false, here: m.away == 0 && m.zone == w.pos_zone, hp: m.hp, hp_max: max, job: m.jobs[0], effects });
     }
-    let own = super::buffs::icons(w).into_iter().map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0))).collect();
+    // A time left that is negative or over a day means our clock does not match the server's (seen on a server whose
+    // 0x00A left its game time unset): unknown, never "wears off now".
+    let mut own: Vec<(u16, Option<f32>)> = super::buffs::icons(w).into_iter().map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0).filter(|l| (0.0..86_400.0).contains(l)))).collect();
+    // Ours: an effect the action messages say landed on us (timers.rs) counts before the server's icon list shows it
+    // (or when a server sends that list late).
+    if let Some(b) = w.timers.on.get(&w.my_id) {
+        let at = std::time::Instant::now();
+        for e in &b.effects {
+            if !own.iter().any(|(id, _)| *id == e.status) {
+                own.push((e.status, e.secs.map(|s| s - at.duration_since(e.start).as_secs_f32())));
+            }
+        }
+    }
     let known: Vec<u16> = (0..1024u16).filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0)).collect();
     let spells = known
         .into_iter()
-        .filter(|&s| magic::magic_check(w, s).is_none())
+        .filter(|&s| magic::spell_ready(w, s) && !super::era::spell_closed(w, s))
         .filter_map(|s| {
             let r = w.actions.as_ref()?.spell(s)?;
             Some(SpellFact { id: s, name: magic::spell_name(w, s), skill: r.skill, element: r.element, mp: r.mp, targets: r.targets })
         })
         .collect();
     let d = sc::data();
-    let ready = |ty: u16| magic::ability_rows(w, ty).into_iter().filter(|&a| magic::ability_check(w, a).is_none());
+    let ready = |ty: u16| magic::ability_rows(w, ty).into_iter().filter(|&a| magic::ability_ready(w, a));
     let abilities = ready(1).map(|i| AbilityFact { index: i, name: magic::ability_name(w, i), ..Default::default() }).collect();
     let weapon_skills = ready(3)
         .map(|i| {
@@ -470,7 +549,9 @@ pub fn facts(w: &World) -> Facts {
     });
     let resonance = target_id.and_then(|t| w.skillchain.on.get(&t)).filter(|r| r.left() > 0.0).map(|r| ResonanceFact { against: r.against(), chain: r.chain, age: r.age(), left: r.left() });
     let partners = super::skillchain::members(w).into_iter().filter(|m| !m.me).map(|m| Partner { name: m.name.clone(), tp: m.tp, skills: m.skills.iter().map(|&s| (super::skillchain::name(w, s), d.props(s))).collect() }).collect();
-    Facts { party, own, tp: w.vitals.map_or(0, |v| v.2), engaged: w.my_motion.status == 1, spells, abilities, weapon_skills, target, resonance, partners }
+    let (main, sub) = w.stats.as_ref().map_or(((0, 0), (0, 0)), |s| (s.main, s.sub));
+    let (mp, mp_max) = (w.vitals.map_or(0, |v| v.1), w.stats.as_ref().map_or(0, |s| s.mp_max));
+    Facts { party, own, tp: w.vitals.map_or(0, |v| v.2), engaged: w.my_motion.status == 1, spells, abilities, weapon_skills, target, resonance, partners, main, sub, mp, mp_max }
 }
 
 #[cfg(test)]

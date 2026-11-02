@@ -628,6 +628,19 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
         find(w, line[first.len()..].trim());
         return;
     }
+    // Ours (the Forever games' one-button rotation): /rotation (or /rot) does the next thing, /autocast [on | off] lets
+    // it press itself in a fight (client/rotation.rs). Any other line we run ourselves holds autocast off a moment.
+    if first.eq_ignore_ascii_case("/rotation") || first.eq_ignore_ascii_case("/rot") {
+        super::rotation::press(w);
+        return;
+    }
+    if first.eq_ignore_ascii_case("/autocast") {
+        super::rotation::autocast_command(w, line.split_whitespace().nth(1));
+        return;
+    }
+    if mode != Mode::Internal {
+        super::rotation::manual(w);
+    }
     // Ours (the DPS-meter add-ons): /dps prints the party's damage since the last /dps reset (client/dps.rs).
     if first.eq_ignore_ascii_case("/dps") {
         super::dps::command(w, line.split_whitespace().nth(1));
