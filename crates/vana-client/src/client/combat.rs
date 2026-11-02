@@ -39,6 +39,17 @@ pub struct ChatLog {
     folds: u64,
     /// Lines restored from the last session (with their divider): never saved again.
     restored: usize,
+    /// Ours (docs/lua-mods.md 4.3): the mods' filters, run on every line before it is kept, and each mode's colour for
+    /// a line a filter moves to another mode.
+    pub filter: Option<std::rc::Rc<dyn Fn(&str, u16) -> Filtered>>,
+    pub mode_colours: Option<std::rc::Rc<[[u8; 4]; 256]>>,
+}
+
+/// What the mods' filters made of a line.
+pub enum Filtered {
+    Keep,
+    Block,
+    Replace(String, u16),
 }
 
 pub const NO_MODE: u16 = 0xffff;
@@ -97,7 +108,21 @@ impl ChatLog {
         }
     }
 
-    fn push_line(&mut self, s: String, colour: [u8; 4], chat: bool, indent: bool, mode: u16) {
+    fn push_line(&mut self, mut s: String, mut colour: [u8; 4], chat: bool, indent: bool, mut mode: u16) {
+        if let Some(f) = self.filter.clone() {
+            match f(&s, mode) {
+                Filtered::Keep => {}
+                Filtered::Block => return,
+                Filtered::Replace(t, m) => {
+                    if m != mode
+                        && let Some(c) = &self.mode_colours
+                    {
+                        colour = c[(m & 0xff) as usize];
+                    }
+                    (s, mode) = (t, m);
+                }
+            }
+        }
         log::debug!(target: "chat", "{}", crate::dat::font::strip_codes(&s));
         // Players' lines are never folded; system and battle lines are, when the last one is the same.
         if self.fold
@@ -629,11 +654,13 @@ fn print(w: &mut World, m: Msg) {
         log::info!("battle message {} before the message tables loaded", m.id);
         return;
     };
-    // Ours: the /dps tally, whatever the filters show (a damage number's message, main and proc records).
+    // Ours: a damage number's message (main and proc records), whatever the filters show, for the mods' `damage`
+    // event (the bundled dps mod tallies it).
     if let Some(which @ (0 | 1)) = m.which
         && bt.screen_kind(m.id) == 1
     {
-        super::dps::add(w, m.actor, m.work[1 + which as usize]);
+        let value = m.work[1 + which as usize];
+        w.lua.raise("damage", vec![m.actor.into(), m.target.into(), value.into(), m.id.into()]);
     }
     // Chat Filters (0x32 / 0x33) hide battle messages on the client, number and line.
     if bt.filtered(m.id, filter_relation(w, m.actor, m.target), &w.game) {
@@ -986,7 +1013,7 @@ fn one_action(w: &mut World, a: &Action) {
     if w.hide_ready_lines
         && matches!(a.category, category::SKILL_START | category::MAGIC_START | category::ITEM_START | category::RANGED_START)
         && a.actor != w.my_id
-        && (super::dps::ours(w, a.actor) || !w.entities.get(&a.actor).is_some_and(|e| e.mob))
+        && (ours(w, a.actor) || !w.entities.get(&a.actor).is_some_and(|e| e.mob))
     {
         messages.clear();
     }
@@ -1029,7 +1056,7 @@ fn one_action(w: &mut World, a: &Action) {
     w.effects.on_action(a, attack.as_ref().map(|(_, n, _, _)| n.clone()));
     let delay = attack.map(|(d, _, _, _)| d);
     match delay {
-        // dada at T: atpr waits 4, then op 0x2b prints (triggers.md 2.2).
+        // dada at T: atpr waits 4, then op 0x2b prints (MODLOG "Effect schedulers").
         Some(d) => {
             let tick = Duration::from_secs_f32(1.0 / 60.0);
             w.pending.push(Pending { at: Instant::now() + d + tick * 4, messages });
@@ -1913,7 +1940,7 @@ mod tests {
         assert_eq!(rel(0x0100_0999, ME), Relation::Other);
     }
 
-    /// knockback_spec 1.2: from DAT_1035bc60, level 1 runs 47 ticks over 1.41 units (bf1 at tick 5), level 7 123 ticks
+    /// MODLOG "Knockback": from DAT_1035bc60, level 1 runs 47 ticks over 1.41 units (bf1 at tick 5), level 7 123 ticks
     /// over 10.61 (bf1 at 45); the same at 60 and 300 fps.
     #[test]
     fn knockback_levels() {
@@ -2142,4 +2169,13 @@ mod queue_tests {
         assert_eq!(crate::client::net::battle_message2(&pkt(0x2d, 0x32b)).queued, 0x32b);
         assert_eq!(crate::client::net::battle_message2(&pkt(0x2d, 6)).queued, 0);
     }
+}
+
+/// Us, a party member, or the pet of either (its master's ActIndex).
+pub(super) fn ours(w: &World, actor: u32) -> bool {
+    if actor == w.my_id || w.party.party().any(|m| m.id == actor) {
+        return true;
+    }
+    let Some(master) = w.entities.get(&actor).map(|e| e.master).filter(|&m| m != 0) else { return false };
+    master == w.my_index || w.party.party().any(|m| w.entities.get(&m.id).is_some_and(|e| e.index == master))
 }

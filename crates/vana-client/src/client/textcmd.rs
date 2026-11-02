@@ -439,7 +439,7 @@ fn expand(w: &World, line: &str, target_cmd: bool) -> String {
 
 /// FUN_1007a1c0(text, fallback, wide): a target tag, a player's name (with `wide` also our trusts and pet), a
 /// server id from a menu line, else with `fallback` the current target.
-fn resolve(w: &World, text: Option<&str>, fallback: bool, wide: bool, mode: Mode) -> Option<(u32, u16)> {
+pub(super) fn resolve(w: &World, text: Option<&str>, fallback: bool, wide: bool, mode: Mode) -> Option<(u32, u16)> {
     if let Some(s) = text {
         let t = match s {
             "<t>" => current_target(w),
@@ -601,6 +601,17 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
     if line.is_empty() {
         return;
     }
+    // Ours (docs/lua-mods.md): //anything, /lua and the mods' own commands go to the mods.
+    if line.starts_with('/') && w.lua.takes(line) {
+        w.lua.type_line(line);
+        return;
+    }
+    // The mods' typed-line filters may rewrite or block it (once: not again when a sub-target prompt completes it).
+    let Some(filtered) = (if mode == Mode::SubTarget { Some(line.to_string()) } else { super::lua::filter_typed(w, line) }) else { return };
+    let line = filtered.trim();
+    if line.is_empty() {
+        return;
+    }
     // A line without a command goes to the chat mode (/chatmode).
     let line = if line.starts_with('/') { line.to_string() } else { format!("{}{line}", w.chat_prefix) };
     let first = line.split([' ', '\t']).next().unwrap_or("");
@@ -640,11 +651,6 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
     }
     if mode != Mode::Internal {
         super::rotation::manual(w);
-    }
-    // Ours (the DPS-meter add-ons): /dps prints the party's damage since the last /dps reset (client/dps.rs).
-    if first.eq_ignore_ascii_case("/dps") {
-        super::dps::command(w, line.split_whitespace().nth(1));
-        return;
     }
     let first_flags = table().get(first).map_or(0, |e| e.1);
     let target_cmd = first_flags & flag::TARGET != 0;

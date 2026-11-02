@@ -198,8 +198,6 @@ pub struct Config {
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub minimap_span: f32,
-    /// Ours (the wheel, as modern MMOs): the camera's rest distance as a share of retail's.
-    pub cam_dist: f32,
     /// Not retail (client/gamepad.rs): gamepad input on; the sticks' deadzone as a share of their travel (0..0.8) and
     /// the right stick's camera speed as a multiple of the keys'.
     pub gamepad: bool,
@@ -391,7 +389,6 @@ impl Default for Config {
             minimap_dock: 0,
             minimap_size: 1,
             minimap_span: 160.0,
-            cam_dist: 1.0,
             gamepad: true,
             gamepad_deadzone: crate::client::gamepad::DEFAULT_DEADZONE,
             gamepad_camera_speed: crate::client::gamepad::DEFAULT_CAMERA_SPEED,
