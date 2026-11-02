@@ -217,6 +217,28 @@ pub struct Macros {
     book_copied: Option<[u8; 16]>,
 }
 
+/// The folder whose `USER/<content id>` holds a character's files (macros, equipment sets, map markers, ...): the game
+/// folder as retail, so they stay shared with it, unless a launcher manages the install (VANA_MANAGED) or the game
+/// folder can't be written. Then the client's data folder, seeded once from the game folder's copy (not retail).
+pub fn user_root(game: &Path, content_id: u32) -> PathBuf {
+    let writable = || {
+        let probe = game.join("USER").join(".vana-write-probe");
+        std::fs::create_dir_all(game.join("USER")).is_ok() && std::fs::write(&probe, b"").is_ok() && std::fs::remove_file(&probe).is_ok()
+    };
+    if !super::updater::managed() && writable() {
+        return game.to_path_buf();
+    }
+    let root = crate::config::data_dir();
+    let sub = format!("{content_id:x}");
+    let (from, to) = (game.join("USER").join(&sub), root.join("USER").join(&sub));
+    if !to.exists() && from.is_dir() && std::fs::create_dir_all(&to).is_ok() {
+        for e in std::fs::read_dir(&from).into_iter().flatten().flatten().filter(|e| e.path().is_file()) {
+            let _ = std::fs::copy(e.path(), to.join(e.file_name()));
+        }
+    }
+    root
+}
+
 impl Macros {
     /// FUN_101c3d00: `<game>/USER/<content id, lowercase hex>`; everything is read at field entry.
     pub fn load(game: &Path, content_id: u32, group9: Box<dyn Fn(usize) -> Option<String>>) -> Self {

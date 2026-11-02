@@ -8491,7 +8491,7 @@ impl App {
                     world.macroedit = None;
                     // Field entry reads every macro file (FUN_101ba030); LSB's content id is the character id.
                     let bt = world.battle.clone();
-                    world.macros = Some(macros::Macros::load(&self.cfg.ffxi_dir(), world.my_id, Box::new(move |id| bt.as_ref().and_then(|b| b.group9(id)))));
+                    world.macros = Some(macros::Macros::load(&macros::user_root(&self.cfg.ffxi_dir(), world.my_id), world.my_id, Box::new(move |id| bt.as_ref().and_then(|b| b.group9(id)))));
                     if world.equipsets.is_none()
                         && let Some(dir) = world.macros.as_ref().map(|m| m.dir().to_path_buf())
                     {
