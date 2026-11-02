@@ -115,6 +115,10 @@ target/release/vana-client play
 
 You log in on the game's login screen. The server address and ports come from the config file.
 
+A launcher can log in for the player: start the client with `VANA_LOGIN_FILE` naming a JSON file with `username` and
+`password` (mode 0600). The client reads it once, deletes it and logs in as from the login screen; a failed login
+leaves the player on the login screen with the error.
+
 To add it to your desktop's application menu with its icon, put the binary on your `PATH` and install the desktop
 entry. Wayland compositors find the icon through this entry rather than through the window:
 

@@ -6381,6 +6381,8 @@ struct Gfx {
 #[derive(Default)]
 pub struct Drive {
     pub login: Option<(String, String)>,
+    /// A launcher's one-time login (main.rs launcher_login): a normal session, not a test drive.
+    pub autologin: Option<(String, String)>,
     pub character: Option<String>,
     pub walk_secs: f32,
     /// Waypoints (x, z) to run through in order once in the world.
@@ -11973,6 +11975,12 @@ impl App {
         }
         let drive_done = self.drive_done();
         match &mut self.phase {
+            Phase::Login { .. } if self.drive.autologin.is_some() => {
+                if let Some((user, pass)) = self.drive.autologin.take() {
+                    self.cfg.username = user;
+                    self.login(pass, String::new(), false);
+                }
+            }
             Phase::Login { .. } if !self.drive.started => {
                 if let (Some((user, pass)), false) = (self.drive.login.clone(), self.drive.input.as_ref().is_some_and(|s| s.logs_in)) {
                     self.drive.started = true;

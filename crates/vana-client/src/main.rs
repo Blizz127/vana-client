@@ -991,6 +991,16 @@ fn zone_in(cfg: &config::Config, m: &net::lobby::MapLogin, account: &str, stay: 
     anyhow::bail!("no logout confirmation from the zone server")
 }
 
+/// A launcher's login: VANA_LOGIN_FILE names a JSON file with "username" and "password" that the client reads once
+/// and deletes, then logs in with as the player would (not a test drive). Unreadable or missing: the login screen.
+fn launcher_login() -> Option<(String, String)> {
+    let path = PathBuf::from(std::env::var_os("VANA_LOGIN_FILE")?);
+    let bytes = std::fs::read(&path).ok();
+    let _ = std::fs::remove_file(&path);
+    let c: Credentials = serde_json::from_slice(&bytes?).ok()?;
+    Some((c.username, c.password))
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Credentials {
     username: String,
@@ -1077,7 +1087,7 @@ fn main() -> Result<()> {
     }
     log.init();
     let Some(cmd) = cli.cmd else {
-        return client::run(config::Config::load(), client::Drive::default());
+        return client::run(config::Config::load(), client::Drive { autologin: launcher_login(), ..Default::default() });
     };
     match cmd {
         Cmd::Play { credentials, character, walk, goto, screenshot, after, quit, input, chase } => {
