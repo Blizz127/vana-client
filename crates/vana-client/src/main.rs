@@ -993,12 +993,15 @@ fn zone_in(cfg: &config::Config, m: &net::lobby::MapLogin, account: &str, stay: 
 
 /// A launcher's login: VANA_LOGIN_FILE names a JSON file with "username" and "password" that the client reads once
 /// and deletes, then logs in with as the player would (not a test drive). Unreadable or missing: the login screen.
-fn launcher_login() -> Option<(String, String)> {
+/// The file may also carry "friends_feed" (net/friends_feed.rs): the launcher's read-only friends snapshot.
+fn launcher_login() -> Option<((String, String), Option<net::friends_feed::FeedCred>)> {
     let path = PathBuf::from(std::env::var_os("VANA_LOGIN_FILE")?);
     let bytes = std::fs::read(&path).ok();
     let _ = std::fs::remove_file(&path);
-    let c: Credentials = serde_json::from_slice(&bytes?).ok()?;
-    Some((c.username, c.password))
+    let bytes = bytes?;
+    let c: Credentials = serde_json::from_slice(&bytes).ok()?;
+    let feed = serde_json::from_slice::<serde_json::Value>(&bytes).ok().and_then(|v| net::friends_feed::FeedCred::from_login(&v));
+    Some(((c.username, c.password), feed))
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -1087,7 +1090,8 @@ fn main() -> Result<()> {
     }
     log.init();
     let Some(cmd) = cli.cmd else {
-        return client::run(config::Config::load(), client::Drive { autologin: launcher_login(), ..Default::default() });
+        let (autologin, friends_feed) = launcher_login().map_or((None, None), |(login, feed)| (Some(login), feed));
+        return client::run(config::Config::load(), client::Drive { autologin, friends_feed, ..Default::default() });
     };
     match cmd {
         Cmd::Play { credentials, character, walk, goto, screenshot, after, quit, input, chase } => {

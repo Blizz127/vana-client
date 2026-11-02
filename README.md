@@ -119,6 +119,14 @@ A launcher can log in for the player: start the client with `VANA_LOGIN_FILE` na
 `password` (mode 0600). The client reads it once, deletes it and logs in as from the login screen; a failed login
 leaves the player on the login screen with the error.
 
+The same file may carry `"friends_feed": {"url": "<https URL>", "token": "<bearer token>"}`, a read-only snapshot of the
+launcher's friends. While the game server has no profile service, the client fetches it every 20 s in the world
+(every 60 s after an error) and shows it in the Friend List: name, online or away, and where they play. Those entries
+cannot be added to, removed, blocked or messaged. A server with a profile service ignores the feed. A launcher
+that renews its token can give `"token_file": "<path>"` instead of `token`: the client reads the token from that file
+(a bare token or `{"token": ...}`) and never deletes it. After a 401 or 403 it does not send the old token again;
+it waits, without contacting the URL, until the file holds a new one. With an inline `token` a 401 ends the feed.
+
 To add it to your desktop's application menu with its icon, put the binary on your `PATH` and install the desktop
 entry. Wayland compositors find the icon through this entry rather than through the window:
 

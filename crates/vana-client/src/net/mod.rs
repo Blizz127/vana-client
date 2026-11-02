@@ -1,5 +1,6 @@
 pub mod action;
 pub mod auth;
+pub mod friends_feed;
 pub mod lobby;
 pub mod map;
 pub mod pol;

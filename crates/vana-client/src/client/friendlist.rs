@@ -105,6 +105,10 @@ fn mes_friend(w: &World) -> Option<&Friend> {
 /// the Ignore List, 3 View Messages with no unread message from them.
 pub fn mes_off(w: &World) -> Vec<u16> {
     let Some(f) = mes_friend(w) else { return vec![1, 2, 3] };
+    // The launcher's feed is read-only: no Tell (no character record), no messages either way.
+    if f.feed {
+        return vec![1, 2, 3];
+    }
     let mut off = Vec::new();
     if !(category(f) == 0 && f.fresh && f.record.is_some()) {
         off.push(1);
@@ -431,7 +435,12 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                             gu.sprite("menu    keytops3", s, cell(0), y + 2.0, WHITE);
                         }
                         paren(gu, &f.name, cell(1), y + 4.0, 106.0);
-                        if cat == 0 {
+                        if cat == 0 && f.feed {
+                            // The launcher's feed: "<character> - <zone>" or the game's title, in the character and zone columns.
+                            if !f.place.is_empty() {
+                                gu.shape_fit(&f.place, cell(4), y + 2.0, COL[6] - COL[4] - 8.0, WHITE);
+                            }
+                        } else if cat == 0 {
                             // The game they are in (contents class 1, FFXI: "menu    contents" sprite 0).
                             gu.sprite("menu    contents", 0, cell(2), y + 2.0, WHITE);
                             if let Some(r) = f.record.as_ref().filter(|_| f.fresh) {
