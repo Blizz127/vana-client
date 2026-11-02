@@ -13279,10 +13279,89 @@ What the retail binary tells us (sources are the Input layer and Config notes ab
   down on. gilrs starts lazily and not at all with the setting off; a failed start is logged once.
 - On-screen keyboard: osk::request(field) on the frame a text field opens with the pad the last device used (a
   keyboard or mouse press clears it). Under Steam (`SteamAppId` / `SteamGameId` set) it opens `steam://open/keyboard`
-  through xdg-open / ShellExecute without waiting; elsewhere it does nothing (TODO: our own keyboard).
+  through xdg-open / ShellExecute without waiting; elsewhere it opens our own (next section).
 - Linux builds link libudev (gilrs-core). Not tested with hardware (gilrs cannot be driven without a device): the
   mapping table, deadzone, stick vectors, repeat, release-on-unplug and the Input integration are unit tests
   (gamepad::tests, input::tests::gamepad_keys_and_sticks, osk::tests).
+
+## Built-in on-screen keyboard (client/osk.rs `Keyboard`; ours, NOT retail) (2026-11-02)
+Outside Steam the pad had no way to type. `osk::request` now answers `Raised::Steam` (URL opened as before) or
+`Raised::Builtin`, and the app opens its own `osk::Keyboard`.
+- Fields are egui-event fields, not widgets: every retail-style field (chat line, login, searches, event inputs, the
+  creator's name) reads `Event::Text` / `Event::Key` from the raw input, so the keyboard just queues the same events
+  the window's keys would (client/script.rs's `type:` / `key:` steps are the model): one `Text` per character, key
+  press + release for Backspace and Enter, Space as key + `Text(" ")`, no modifiers on any. Clicking its keys with the
+  mouse does not take a focus from the field, for the same reason. The events go to the next frame's raw input with
+  the pad's (`pad_events`).
+- Layout, fixed (no config): ten columns; digits, `qwertyuiop`, `asdfghjkl'`, `zxcvbnm,./`, then Shift, 123, Space,
+  Backspace, Enter (widths 1.5 / 1.5 / 4 / 1.5 / 1.5). Pages: letters, capitals, symbols; every page has the same
+  shape, and digits on every page (the world pass takes only those). The shift is one-shot, as on a phone. Up / down
+  moves to the key whose middle is nearest the column left (first on a tie); everything wraps.
+- Pad: its own mapper context (`Ctx::Osk`, `osk_binding`): the keys are virtual (D-pad arrows repeating, A Enter =
+  type, B Backspace repeating, X Space, Y Tab = next page, Start F2 = send Enter, Select Escape = close), no DIK is
+  held, no Ctrl / Alt from the triggers, the sticks neither walk nor turn (the left one is a D-pad as in any menu), and
+  every mapper event goes to the keyboard, none to the game. Releases of buttons bound before it opened land on the
+  keyboard and are dropped. Start sends Enter and leaves the keyboard up: the chat line closes with its field, a
+  login field moves to the next one and keeps it. Select closes it; with the field still open, Start (Typing
+  context; the game bound nothing there) opens it again (`Out.open_osk`).
+- poll_gamepad order: the field is decided first (no field closes the keyboard before it takes the frame's pad input),
+  then the context, then the mapper.
+- Drawn after `ui()` in the same egui pass, `Order::Tooltip`, anchored top for the chat line (*(inferred)*: the chat
+  line is taken to sit at the bottom, not checked against a screenshot) and bottom otherwise; keys sized from the window width (28..60 points, at most half the height). The
+  game's windows get no click or wheel while the pointer is over it (`mine`, every phase), and the system cursor shows
+  there (the game's drawn one would be under the egui mesh).
+- Not tested: a display or a pad (no hardware here). Unit tests: key grid, cursor movement and wrapping, paging,
+  events, the pad's button table (gamepad::tests::osk_*, osk::tests).
+
+## Linux release build in the sandbox (release/sniper.Dockerfile, release/build-linux-sandbox.sh; ours) (2026-11-02)
+Upstream's release/build-linux.sh mounts the host's rustup into the sniper SDK container. The sandbox flow needs no host
+toolchain and no network at build time.
+- Image `vana-sniper:build`: `registry.gitlab.steamos.cloud/steamrt/sniper/sdk:latest` (pulled by tag, not pinned; the
+  pull in this run was digest sha256:bb30053d3cd19d35c76ae69b2790dbaa1430448006f8240cb6d7e723f2d1940e), then rustup-init
+  1.29.0 (sha256 pinned in the file) with toolchain 1.95.0 in /usr/local/rustup, world-readable, `RUSTUP_TOOLCHAIN` set so
+  a `--network none` run never looks for another channel. Image-build time is the only network use (the pull and rustup).
+- No apt step: the SDK already has every development file the client links (libudev, PipeWire, PulseAudio, ALSA, Vulkan,
+  X11 / XCB / Wayland / xkbcommon, clang 11 with libclang.so.1, cmake, gcc 10). The Dockerfile checks them with
+  pkg-config and fails the image build if one is missing, rather than installing anything.
+- Build: `--network none --user 1000:1000 --cap-drop ALL --tmpfs /tmp:rw,exec,size=8g`, the repo at /src, the host's
+  cargo registry at /cargo/registry, CARGO_HOME=/cargo, CARGO_NET_OFFLINE=true, CARGO_TARGET_DIR=/src/target/steamrt (apart
+  from the sandbox image's glibc-newer target/), `-C target-cpu=x86-64-v2` as upstream, `cargo build --profile dist`
+  (fat LTO): 16 min on this box. Output copied to target/assets/vana-client-linux-x86_64. No cpuset (upstream pinned cores
+  0..11 for a map server that is not ours; `VANA_BUILD_CPUS` sets one).
+- Checks, run inside the SDK image against the shipped file (the wrapper does them every build): highest GLIBC symbol
+  needed 2.30 (list 2.2.5 .. 2.30) against the runtime's 2.31 (`ldd --version`); GLIBCXX at most 3.4.21, CXXABI 1.3.9;
+  `ldd` lists libstdc++, libpthread, libudev.so.1, libdl, libpipewire-0.3.so.0, libasound.so.2, libgcc_s, libm, libc and
+  nothing missing; `--help` runs. Not covered: libraries opened at run time (the Vulkan loader, X11 / Wayland through
+  winit) are not in `ldd`, and the SDK has more libraries than the runtime, so a clean `ldd` there is the weaker check.
+- release/steam-deck.md: the non-Steam-game steps. Borderless is not the client's default (0034 = 1, a 1280x800
+  window); the page has the Deck config set 0034 = 3 through FFXI_CONFIG rather than changing the default.
+
+## Gamepad gaps: the creator's name entry, R3 and the map's zoom (client/gamepad.rs, mod.rs; ours, NOT retail) (2026-11-02)
+- Creator name entry (step 5 with no world list up): it is a text field read from raw events like the others, but
+  `pad_ctx` called it a menu, so X was `-` and the keyboard never opened. It is now `Ctx::Name`: Typing's buttons (X
+  Backspace, Y Space, Select Tab = the view cycle, Start = on-screen keyboard) plus LB = Num+ (DIK 0x4e), because that is
+  retail's random name there (FUN_102384d0, mod.rs step 5) and the other text fields drop LB (the log views would
+  fire). The world list is still a menu; its Gold World Pass entry (digits only) is `Ctx::Typing`. The on-screen
+  keyboard (`osk::Field::Name`) opens for both. With the keyboard up LB is the keyboard's (nothing): close it (Select)
+  to ask for a random name.
+- R3 (`Btn::RightThumb`, gilrs `RightThumb`; 16 buttons now, the arrays sized from `BUTTONS.len()`, a test keeps
+  `Btn as usize` equal to the list's place): the client has the retail `/map` command (textcmd.rs `id::MAP`, opens the
+  main-menu map window, a no-op while one is up), so in the field R3 runs it (`Binding.command`, `Out.commands`,
+  `send_chat`, which is how the key functions run /heal and the like). It does not toggle by itself, so with the map
+  up (`Ctx::Map`) R3 is Escape, the map's own close key (map.rs `key`; not the main menu's return, `return_menu` is
+  only set by the main menu's own entry). Nothing in the other contexts.
+- D-pad Down in the field: left unbound (no key function of ours wants it; Up is F1 = ourselves, Left / Right cycle
+  targets).
+- Right stick over the map: axis 0x7c is the map's zoom stick (map.rs `update`, `zoom_by(-a ...)`: negative zooms in;
+  the keys 0xa4 / 0xa5 give -1 / +1). A window context zeroes the sticks, and `Input::axis` fed 0x7c from
+  `pad_sticks[3]`, the same value as the camera's axis 7, so feeding it there would have pitched the camera under the
+  map. `Ctx::Map` (a window with the map up) puts the right stick's Y (camera deadzone, speed 1) in `Out.zoom`,
+  `Input::set_pad_zoom`, read only by axis 0x7c (`set_pad` clears it each frame). Stick up zooms in. In the field axis 0x7c
+  no longer reads the camera stick (the map is never up there).
+- Not tested here: all of it on hardware (no pad or display). Unit tests: gamepad::tests (r3_is_the_map,
+  name_entry_is_typing_plus_random_name, map_zoom_on_the_right_stick, buttons_are_indexed_by_discriminant,
+  dpad_down_in_the_field_is_unbound), input::tests::gamepad_keys_and_sticks (axis 0x7c vs 7). The Ctx choice in
+  `App::pad_ctx` and the `/map` dispatch are not covered by a test (App needs a window).
 
 ## Language slots differ between client builds: battle text showed status names on 30260703_1 (2026-11-02)
 

@@ -89,6 +89,8 @@ The binary is `target/release/vana-client`. Release builds are incremental, with
 
 Published releases are built with `release/build-linux.sh` (in the Steam Runtime 3 "sniper" SDK container, so one binary runs on every current distro) and `release/build-windows.sh` (a MinGW cross build), then `release/publish.sh VERSION` tags them and creates the GitHub release that the in-app Update offers.
 
+`release/build-linux-sandbox.sh` is the same Linux build with no network: an image from the sniper SDK plus the pinned Rust toolchain (`release/sniper.Dockerfile`, built once), then the build runs in it with `--network none` from a populated cargo registry and checks the binary's glibc requirement, `ldd` and `--help` inside the SDK image. `release/steam-deck.md` covers adding the client as a non-Steam game in Game Mode.
+
 ## Gamepad
 
 A connected gamepad works with no setup (Linux evdev; Windows Gaming Input, so Xbox, PlayStation and most other
@@ -99,7 +101,7 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | Button | Walking about | In a window or menu | In a text field |
 |---|---|---|---|
 | Left stick | Move | Cursor | Caret |
-| Right stick | Camera | | |
+| Right stick | Camera | Map window: zoom (up zooms in) | |
 | D-pad | Left / right: previous / next target; up: yourself | Cursor | Caret, line history |
 | A / Cross | Enter: talk, confirm, action menu | Confirm | Send |
 | B / Circle | Escape: cancel, clear target | Cancel | Cancel |
@@ -108,11 +110,27 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | LB / RB | Numpad + (log and window views) / Numpad - (page) | same | |
 | LT / RT (held) | Ctrl / Alt macro palette: D-pad picks, A runs, B closes | same | same |
 | Select / Back | Open the chat line | | Tab (auto-translate) |
-| Start | Log-out prompt | Main menu | |
+| Start | Log-out prompt | Main menu | On-screen keyboard (see below) |
 | Left stick click | Walk / run | | |
+| Right stick click | `/map`: open the map (with the map up: close it) | | |
 
-When a text field opens and the pad was the last thing used, the client asks Steam to raise its on-screen keyboard if
-the game was started by Steam. Outside Steam there is no on-screen keyboard yet.
+The character-creation name entry is a text field as far as the pad goes: X is Backspace, and LB still asks for a random
+name (with the on-screen keyboard closed). D-pad Down while walking about is unbound.
+
+When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was
+started by Steam (Game Mode, a non-Steam shortcut), else the client's built-in one, a small keyboard drawn over the field
+(at the top of the screen for the chat line, at the bottom otherwise). The layout is fixed. The pad drives it, and the
+mouse can click its keys.
+
+| Button | On-screen keyboard |
+|---|---|
+| D-pad / left stick | Move the cursor |
+| A / Cross | Type the key under the cursor |
+| B / Circle | Backspace (repeats) |
+| X / Square | Space |
+| Y / Triangle | Next key page: letters, capitals (one letter), symbols |
+| Start | Enter (the chat line sends; the login moves to the next field) |
+| Select / Back | Close the keyboard (in a text field, Start opens it again) |
 
 ## Install the game data
 
