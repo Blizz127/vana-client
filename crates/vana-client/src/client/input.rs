@@ -118,6 +118,9 @@ pub struct Input {
     /// here: the keys go through the same state as the window's.
     pad_down: [bool; 256],
     pad_sticks: [f32; 4],
+    /// The gamepad's map zoom (axis 0x7c): the right stick's Y while the map has the pad, nothing else reads it (axis 7,
+    /// the camera's, would pitch the view under the map).
+    pad_zoom: f32,
 }
 
 impl Default for Input {
@@ -145,6 +148,7 @@ impl Default for Input {
             numlock: true,
             pad_down: [false; 256],
             pad_sticks: [0.0; 4],
+            pad_zoom: 0.0,
         }
     }
 }
@@ -270,6 +274,13 @@ impl Input {
             self.pad_down[k as usize] = true;
         }
         self.pad_sticks = sticks;
+        self.pad_zoom = 0.0;
+    }
+
+    /// The pad's map zoom for the next frame (call after `set_pad`, which clears it): negative zooms in (the zoom key
+    /// 0xa4's sign, map.rs `update`), as the right stick pushed up does.
+    pub fn set_pad_zoom(&mut self, zoom: f32) {
+        self.pad_zoom = zoom;
     }
 
     /// The frame's key state (FUN_10005520), the chat line's Enter / Esc, then the compact pad (FUN_1011fbc0).
@@ -402,6 +413,7 @@ impl Input {
             4 | 0x79 | 0x9d => self.pad_sticks[0],
             5 | 0x7a | 0x9e => self.pad_sticks[1],
             6 => self.pad_sticks[2],
+            0x7c => self.pad_zoom,
             _ => self.pad_sticks[3],
         };
         let pad = if analog.abs() > pad.abs() && !(self.typing && matches!(id, 4 | 5)) { analog } else { pad };
@@ -728,6 +740,20 @@ mod tests {
         assert_eq!((i.axis(4), i.axis(5), i.axis(6), i.axis(7)), (0.5, -1.0, 0.25, 0.0));
         // The map's scroll reads the left stick, its zoom the right one.
         assert_eq!((i.axis(0x79), i.axis(0x7a), i.axis(0x7c)), (0.5, -1.0, 0.0));
+        // The zoom is its own value: the camera stick (axis 7) no longer moves it, and it does not tilt the camera.
+        i.set_pad(&[], [0.0, 0.0, 0.0, 0.75]);
+        i.begin_frame(frame());
+        assert_eq!((i.axis(7), i.axis(0x7c)), (0.75, 0.0));
+        i.set_pad(&[], [0.0; 4]);
+        i.set_pad_zoom(-0.5);
+        i.begin_frame(frame());
+        assert_eq!((i.axis(7), i.axis(0x7c)), (0.0, -0.5));
+        // The next set_pad (every frame) clears it.
+        i.set_pad(&[], [0.0; 4]);
+        i.begin_frame(frame());
+        assert_eq!(i.axis(0x7c), 0.0);
+        i.set_pad(&[0x1c], [0.5, -1.0, 0.25, 0.0]);
+        i.begin_frame(frame());
         i.begin_frame(frame());
         assert!(!i.pressed(0x1c) && i.held(0x1c));
         // A key beats a weaker stick (the larger wins), a stronger stick beats a key.

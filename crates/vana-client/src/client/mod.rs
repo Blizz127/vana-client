@@ -12340,12 +12340,27 @@ impl App {
         match &self.phase {
             Phase::World(w) if text_field_open(w) => Ctx::Typing,
             // The action menu stays up through a fight: walking goes on under it, as the keyboard's movement keys do.
-            Phase::World(w) if window_over_actions(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some() || event::active(w) || w.prompt.is_some() => Ctx::Menu,
+            // With the map window up the right stick zooms it.
+            Phase::World(w) if window_over_actions(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some() || event::active(w) || w.prompt.is_some() => {
+                if w.map.is_some() { Ctx::Map } else { Ctx::Menu }
+            }
             Phase::World(w) if w.action_menu.is_some() => Ctx::Action,
             Phase::World(_) => Ctx::Field,
             Phase::Login { .. } if self.login_text => Ctx::Typing,
+            Phase::Characters { .. } if self.creating_name() => Ctx::Name,
+            Phase::Characters { .. } if self.creating_pass() => Ctx::Typing,
             _ => Ctx::Menu,
         }
+    }
+
+    /// The character-creation name entry has the keys (step 5, before the world list).
+    fn creating_name(&self) -> bool {
+        matches!(&self.phase, Phase::Characters { screen: LobbyScreen::Create, .. }) && self.creator_step == 5 && self.creator_world.is_none()
+    }
+
+    /// The creator's Gold World Pass entry (digits) has the keys.
+    fn creating_pass(&self) -> bool {
+        matches!(&self.phase, Phase::Characters { screen: LobbyScreen::Create, .. }) && self.creator_step == 5 && self.creator_world.as_ref().is_some_and(|w| w.pass.is_some())
     }
 
     /// The text field that has the keys, if any, for the on-screen keyboard.
@@ -12353,6 +12368,8 @@ impl App {
         match &self.phase {
             Phase::World(w) => text_field_open(w).then_some(if w.typing { osk::Field::Chat } else { osk::Field::Other }),
             Phase::Login { .. } => self.login_text.then_some(osk::Field::Login),
+            Phase::Characters { .. } if self.creating_name() => Some(osk::Field::Name),
+            Phase::Characters { .. } if self.creating_pass() => Some(osk::Field::Other),
             _ => None,
         }
     }
@@ -12378,6 +12395,7 @@ impl App {
         let ctx = if self.kb.is_open() { gamepad::Ctx::Osk } else { self.pad_ctx() };
         let out = self.pads.frame(self.cfg.gamepad, self.focused, ctx, tuning, dt);
         self.input.set_pad(&out.keys, out.sticks);
+        self.input.set_pad_zoom(out.zoom);
         if out.pressed {
             // Other key presses hide the cursor.
             if !self.dragging && !self.left_down {
@@ -12387,6 +12405,12 @@ impl App {
             if self.opening.is_some() {
                 self.skip_opening();
                 return;
+            }
+        }
+        // R3's "/map" and the like: chat commands, run as the typed ones are.
+        if let Phase::World(w) = &mut self.phase {
+            for cmd in &out.commands {
+                send_chat(w, (*cmd).into());
             }
         }
         if ctx == gamepad::Ctx::Osk {

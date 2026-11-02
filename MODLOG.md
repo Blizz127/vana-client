@@ -13313,6 +13313,33 @@ Outside Steam the pad had no way to type. `osk::request` now answers `Raised::St
 - Not tested: a display or a pad (no hardware here). Unit tests: key grid, cursor movement and wrapping, paging,
   events, the pad's button table (gamepad::tests::osk_*, osk::tests).
 
+## Gamepad gaps: the creator's name entry, R3 and the map's zoom (client/gamepad.rs, mod.rs; ours, NOT retail) (2026-11-02)
+- Creator name entry (step 5 with no world list up): it is a text field read from raw events like the others, but
+  `pad_ctx` called it a menu, so X was `-` and the keyboard never opened. It is now `Ctx::Name`: Typing's buttons (X
+  Backspace, Y Space, Select Tab = the view cycle, Start = on-screen keyboard) plus LB = Num+ (DIK 0x4e), because that is
+  retail's random name there (FUN_102384d0, mod.rs step 5) and the other text fields drop LB (the log views would
+  fire). The world list is still a menu; its Gold World Pass entry (digits only) is `Ctx::Typing`. The on-screen
+  keyboard (`osk::Field::Name`) opens for both. With the keyboard up LB is the keyboard's (nothing): close it (Select)
+  to ask for a random name.
+- R3 (`Btn::RightThumb`, gilrs `RightThumb`; 16 buttons now, the arrays sized from `BUTTONS.len()`, a test keeps
+  `Btn as usize` equal to the list's place): the client has the retail `/map` command (textcmd.rs `id::MAP`, opens the
+  main-menu map window, a no-op while one is up), so in the field R3 runs it (`Binding.command`, `Out.commands`,
+  `send_chat`, which is how the key functions run /heal and the like). It does not toggle by itself, so with the map
+  up (`Ctx::Map`) R3 is Escape, the map's own close key (map.rs `key`; not the main menu's return, `return_menu` is
+  only set by the main menu's own entry). Nothing in the other contexts.
+- D-pad Down in the field: left unbound (no key function of ours wants it; Up is F1 = ourselves, Left / Right cycle
+  targets).
+- Right stick over the map: axis 0x7c is the map's zoom stick (map.rs `update`, `zoom_by(-a ...)`: negative zooms in;
+  the keys 0xa4 / 0xa5 give -1 / +1). A window context zeroes the sticks, and `Input::axis` fed 0x7c from
+  `pad_sticks[3]`, the same value as the camera's axis 7, so feeding it there would have pitched the camera under the
+  map. `Ctx::Map` (a window with the map up) puts the right stick's Y (camera deadzone, speed 1) in `Out.zoom`,
+  `Input::set_pad_zoom`, read only by axis 0x7c (`set_pad` clears it each frame). Stick up zooms in. In the field axis 0x7c
+  no longer reads the camera stick (the map is never up there).
+- Not tested here: all of it on hardware (no pad or display). Unit tests: gamepad::tests (r3_is_the_map,
+  name_entry_is_typing_plus_random_name, map_zoom_on_the_right_stick, buttons_are_indexed_by_discriminant,
+  dpad_down_in_the_field_is_unbound), input::tests::gamepad_keys_and_sticks (axis 0x7c vs 7). The Ctx choice in
+  `App::pad_ctx` and the `/map` dispatch are not covered by a test (App needs a window).
+
 ## Language slots differ between client builds: battle text showed status names on 30260703_1 (2026-11-02)
 
 Observed: with FFXiMain 30260703_1 (July 2026) `battle-dump 1 6 8 15 78` printed "weakness" / "silence" / "disease" /

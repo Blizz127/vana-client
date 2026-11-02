@@ -99,7 +99,7 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | Button | Walking about | In a window or menu | In a text field |
 |---|---|---|---|
 | Left stick | Move | Cursor | Caret |
-| Right stick | Camera | | |
+| Right stick | Camera | Map window: zoom (up zooms in) | |
 | D-pad | Left / right: previous / next target; up: yourself | Cursor | Caret, line history |
 | A / Cross | Enter: talk, confirm, action menu | Confirm | Send |
 | B / Circle | Escape: cancel, clear target | Cancel | Cancel |
@@ -110,6 +110,10 @@ keys as the keyboard. Config > Settings > Gamepad turns it off and sets the stic
 | Select / Back | Open the chat line | | Tab (auto-translate) |
 | Start | Log-out prompt | Main menu | On-screen keyboard (see below) |
 | Left stick click | Walk / run | | |
+| Right stick click | `/map`: open the map (with the map up: close it) | | |
+
+The character-creation name entry is a text field as far as the pad goes: X is Backspace, and LB still asks for a random
+name (with the on-screen keyboard closed). D-pad Down while walking about is unbound.
 
 When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was
 started by Steam (Game Mode, a non-Steam shortcut), else the client's built-in one, a small keyboard drawn over the field
