@@ -1099,7 +1099,7 @@ fn main() -> Result<()> {
     log.init();
     let Some(cmd) = cli.cmd else {
         let (autologin, friends_feed) = launcher_login().map_or((None, None), |(login, feed)| (Some(login), feed));
-        return client::run(config::Config::load(), client::Drive { autologin, friends_feed, ..Default::default() });
+        return client::run(config::Config::load(), client::Drive { launcher_creds: autologin.clone(), autologin, friends_feed, ..Default::default() });
     };
     match cmd {
         Cmd::Play { credentials, character, walk, goto, screenshot, after, quit, input, chase } => {

@@ -5530,6 +5530,10 @@ struct World {
     zoning_since: Option<Instant>,
     /// A zone line touched in an event, asked for once it ends (DAT_1048098e = 1).
     zone_touch: Option<zone::Region>,
+    /// Ours: `zone_touch` was found while an event ran (its pose against our place), and the server has set our place
+    /// since (0x05B / 0x065). Such a touch is dropped at the event's end unless the line still touches us.
+    zone_touch_in_event: bool,
+    zone_touch_moved: bool,
     zone_hold: Option<zonefade::Hold>,
     /// The limited-time RoE record last seen in slot 63 this login (DAT_10487eec), and "New Challenge" waiting to play
     /// (DAT_104807ec bit 3).
@@ -6434,6 +6438,12 @@ pub struct Drive {
     pub login: Option<(String, String)>,
     /// A launcher's one-time login (main.rs launcher_login): a normal session, not a test drive.
     pub autologin: Option<(String, String)>,
+    /// The launcher's login kept in memory only (never written), to log in again after a disconnect (`to_login`).
+    pub launcher_creds: Option<(String, String)>,
+    /// When the next automatic login may start (a dropped session needs a moment to clear on the server), and how
+    /// many reconnects this run has made.
+    pub autologin_at: Option<std::time::Instant>,
+    pub reconnects: u32,
     /// A launcher's read-only friends feed (net/friends_feed.rs), for a server with no profile service. Unlike the
     /// autologin it stays after the login: the world takes a copy.
     pub friends_feed: Option<crate::net::friends_feed::FeedCred>,
@@ -7029,6 +7039,15 @@ impl App {
         if error {
             log::warn!("back to the login screen: {}", self.status);
             self.login_error = Some(self.status.clone());
+            // Ours: a launcher player doesn't know the game password, so a dropped connection (not a refused login)
+            // logs in again by itself, a few times a run, after the server has had time to end the old session.
+            const RECONNECTS: u32 = 3;
+            if self.status.starts_with("Disconnected") && self.drive.reconnects < RECONNECTS && let Some(c) = self.drive.launcher_creds.clone() {
+                self.drive.reconnects += 1;
+                self.drive.autologin = Some(c);
+                self.drive.autologin_at = Some(Instant::now() + std::time::Duration::from_secs(10));
+                log::info!("reconnecting in 10 s (launcher login, {} of {RECONNECTS})", self.drive.reconnects);
+            }
         }
     }
 
@@ -7537,6 +7556,8 @@ impl App {
                             lift_wait: None,
                             zoning_since: None,
                             zone_touch: None,
+                            zone_touch_in_event: false,
+                            zone_touch_moved: false,
                             zone_hold: None,
                             roe_timed: 0,
                             new_challenge: false,
@@ -9038,6 +9059,7 @@ impl App {
                     if id == world.my_id && matches!(mode, 0 | 1 | 3 | 5 | 6 | 0x0a) {
                         if mode != 0x0a {
                             world.pos = Vec3::from(pos);
+                            world.zone_touch_moved |= world.zone_touch.is_some();
                         }
                         let f = forward_from_dir(dir);
                         camera::face(world, f.x.atan2(f.z));
@@ -10266,6 +10288,16 @@ impl App {
         if settled && !world.dead() && world.zone_touch.is_none() && world.zoning_since.is_none_or(|t| t.elapsed().as_secs_f32() > 5.0) {
             let (at, drawn) = (world.pos.to_array(), event::own_pose(world).unwrap_or(world.pos).to_array());
             world.zone_touch = world.zone_lines.iter().find(|r| r.touches(at, drawn)).cloned();
+            (world.zone_touch_in_event, world.zone_touch_moved) = (in_event && world.zone_touch.is_some(), false);
+        }
+        // Ours: a line an event's pose crossed, after which the server placed us elsewhere (an opening that ends with a
+        // setPos near a zone line), is stale: asking for it would walk us out of the zone the server just put us in.
+        if !in_event && world.zone_touch_in_event && world.zone_touch_moved {
+            let here = world.pos.to_array();
+            if let Some(line) = world.zone_touch.take_if(|l| !l.touches(here, here)) {
+                log::info!("zone line {} dropped: the server placed us away from it during the event", line.name);
+            }
+            (world.zone_touch_in_event, world.zone_touch_moved) = (false, false);
         }
         if !in_event && let Some(line) = world.zone_touch.take() {
             world.zoning_since = Some(Instant::now());
@@ -12096,8 +12128,9 @@ impl App {
         }
         let drive_done = self.drive_done();
         match &mut self.phase {
-            Phase::Login { .. } if self.drive.autologin.is_some() => {
+            Phase::Login { .. } if self.drive.autologin.is_some() && self.drive.autologin_at.is_none_or(|t| Instant::now() >= t) => {
                 if let Some((user, pass)) = self.drive.autologin.take() {
+                    (self.drive.autologin_at, self.login_error) = (None, None);
                     self.cfg.username = user;
                     self.login(pass, String::new(), false);
                 }
