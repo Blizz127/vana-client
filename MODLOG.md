@@ -85,6 +85,11 @@ xiloader (`~/ffxi/lab/xiloader`, ceb79a0), Ghidra on the installer. Decompiled o
 - Client sends 0x05E {u32 tag (first 4 chars), x, y, z (wire order), u16 ActIndex, u8 exit bit, u8 mode}.
   Server: 0x00B {u8 state @4 (2 = zone change, 1 = logout), u32 ip @8, u32 port @12}; reply 0x00D with the
   old key, then key counter += 2 and reconnect with 0x00A retries (server logs the session move).
+  Ours, not retail (2026-11-02): the 0x00D goes out only for a zone change (state 2) or the Mog House (3). After a
+  logout / shutdown 0x00B (any other state but 4, which cancels) the session ends with nothing more sent: the server has
+  taken the character out of its zone by then and dropped that last datagram as "outside a zone". The decision is
+  `zone_out` in client/net.rs (tests: net::tests::zone_out_states, which also keep the zone-line and Mog House
+  reconnect with each address word kept when 0).
 - Zone change fade (user, 2026-10-25: a fade to black, then the new zone; a crossfade tried first was dropped): a
   touched zone line or the 0x00B arms a hold once a world frame was drawn (client/zonefade.rs). The next frame first
   copies the scene texture (still the last frame drawn, before the zone-in: 0x00B and 0x00A can come in one drain)

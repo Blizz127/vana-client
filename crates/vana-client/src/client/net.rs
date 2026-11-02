@@ -974,6 +974,37 @@ pub fn spawn(login: MapLogin, account: String, codec: Codec) -> NetHandle {
     NetHandle { events, commands, me, stats }
 }
 
+/// What a zone-out s2c 0x00B asks of the session.
+#[derive(Debug, PartialEq, Eq)]
+enum ZoneOut {
+    /// State 4: the logout was cancelled; the session goes on.
+    Cancelled,
+    /// State 2 (zone line) or 3 (Mog House): acknowledge with 0x00D and reconnect here.
+    Zone(SocketAddr),
+    /// A logout or shutdown (any other state): the session is over, nothing more is sent.
+    End(u8),
+}
+
+/// FUN_100fb730's reading of 0x00B: the state @4, the next zone server's address @8 and port @0xC (each kept as `here`'s
+/// when 0).
+fn zone_out(state: u8, ip: u32, port: u32, here: SocketAddr) -> ZoneOut {
+    match state {
+        4 => ZoneOut::Cancelled,
+        2 | 3 => {
+            let ip = match ip {
+                0 => here.ip(),
+                ip => Ipv4Addr::from(ip.to_le_bytes()).into(),
+            };
+            let port = match port as u16 {
+                0 => here.port(),
+                port => port,
+            };
+            ZoneOut::Zone(SocketAddr::new(ip, port))
+        }
+        s => ZoneOut::End(s),
+    }
+}
+
 enum Outcome {
     /// Moved to another zone server; the key advances by two per zone.
     Zone(SocketAddr),
@@ -1035,27 +1066,21 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         let event = (event_num != 0).then(|| EventStart { target: p.u32(4), index: p.u16(8), zone: event_num, event: event_para, mode: p.u16(0x66), zone2: p.u16(0x40), ..Default::default() });
                         tx.send(NetEvent::ZoneIn { zone: p.u32(48) as u16, pos, dir: p.u8(11), char_id: p.u32(4), index: p.u16(8), name: text(&p, 132, 16), look: look_at(&p, 68), motion: motion_state(&p), game_time: p.u32(0x3C), weather: p.u16(0x68), music: std::array::from_fn(|i| p.u16(0x56 + 2 * i)), event, area: area_line(&p), sub_map: if p.u16(0x60) != scene && myroom.is_none() { p.u16(0x60) } else { 0 }, scene, myroom, room_flag: matches!(p.u32(0x80), 1 | 4 | 5), dead_counter: p.u32(0xA4), play_time: p.u32(0xA0), mog_zone: p.u8(0xaf) & 1 != 0, send_count: p.u16(0xac), ship: ship_data(&p), monstrosity: p.u16(0x7E) != 0 })?;
                     }
-                    // FUN_100fb730: 4 cancels a logout (nothing sent); otherwise 0x00D goes out with the old key, and 2
-                    // (zone change) and 3 (Mog House) reconnect to @8 / @0xC, each kept when 0; the rest end the session.
-                    0x00B if p.u8(4) == 4 => log::info!("map: logout cancelled"),
-                    0x00B => {
-                        let state = p.u8(4);
-                        map.send(&[build(0x00D, &[0u8; 4])])?;
-                        if matches!(state, 2 | 3) {
-                            let ip = match p.u32(8) {
-                                0 => addr.ip(),
-                                ip => Ipv4Addr::from(ip.to_le_bytes()).into(),
-                            };
-                            let port = match p.u32(12) as u16 {
-                                0 => addr.port(),
-                                port => port,
-                            };
-                            log::info!("map: zone change (0x00B state {state}) to {ip}:{port}");
-                            return Ok(Outcome::Zone(SocketAddr::new(ip, port)));
+                    // FUN_100fb730: 4 cancels a logout (nothing sent); 2 (zone change) and 3 (Mog House) send 0x00D with
+                    // the old key and reconnect to @8 / @0xC, each kept when 0. Ours: the rest end the session at once, no
+                    // 0x00D (the server has taken the character out of its zone by then and drops it as "outside a zone").
+                    0x00B => match zone_out(p.u8(4), p.u32(8), p.u32(12), addr) {
+                        ZoneOut::Cancelled => log::info!("map: logout cancelled"),
+                        ZoneOut::Zone(next) => {
+                            map.send(&[build(0x00D, &[0u8; 4])])?;
+                            log::info!("map: zone change (0x00B state {}) to {next}", p.u8(4));
+                            return Ok(Outcome::Zone(next));
                         }
-                        tx.send(NetEvent::Logout { state: state as u32 })?;
-                        return Ok(Outcome::Done);
-                    }
+                        ZoneOut::End(state) => {
+                            tx.send(NetEvent::Logout { state: state as u32 })?;
+                            return Ok(Outcome::Done);
+                        }
+                    },
                     0x00D => tx.send(NetEvent::Entity(entity(&p, EntityKind::Player)))?,
                     0x037 => {
                         let status = p.u8(0x30);
@@ -1609,5 +1634,27 @@ mod tests {
         assert_eq!(&b[4..8], &0x4000_0000u32.to_le_bytes());
         assert_eq!(&b[8..10], &0x7eu16.to_le_bytes());
         assert_eq!(&b[12..16], &[230, 0, 0x67, 2]);
+    }
+
+    /// A logout (or shutdown) ends the session with nothing more sent; a zone line or the Mog House still reconnects
+    /// (after the 0x00D the session code sends); a cancel goes on.
+    #[test]
+    fn zone_out_states() {
+        let here: SocketAddr = "192.0.2.10:54230".parse().unwrap();
+        assert_eq!(zone_out(4, 0, 0, here), ZoneOut::Cancelled);
+        // Logout (1), shutdown (and anything else): over, whatever address the packet carries.
+        for state in [0u8, 1, 5, 7, 0xff] {
+            assert_eq!(zone_out(state, 0x0a00_0001, 54231, here), ZoneOut::End(state), "state {state}");
+        }
+        // A zone line and the Mog House reconnect: the packet's address, each kept when 0.
+        let next = u32::from_le_bytes([198, 51, 100, 7]);
+        for state in [2u8, 3] {
+            assert_eq!(zone_out(state, next, 54001, here), ZoneOut::Zone("198.51.100.7:54001".parse().unwrap()));
+            assert_eq!(zone_out(state, 0, 54001, here), ZoneOut::Zone("192.0.2.10:54001".parse().unwrap()));
+            assert_eq!(zone_out(state, next, 0, here), ZoneOut::Zone("198.51.100.7:54230".parse().unwrap()));
+            assert_eq!(zone_out(state, 0, 0, here), ZoneOut::Zone(here));
+        }
+        // The port is the low word.
+        assert_eq!(zone_out(2, 0, 0x1_0000 | 54002, here), ZoneOut::Zone("192.0.2.10:54002".parse().unwrap()));
     }
 }
