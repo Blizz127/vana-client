@@ -27,8 +27,16 @@ pub fn slot_file(ffximain: &[u8], lang: u8, slot: usize) -> Option<u32> {
     Some(u32::from_le_bytes(ffximain.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// File id in a language's slot table numbered as in this build (slots SE added since 2019, e.g. 0x3b).
+/// File id in a language's slot table, the slot numbered as in retail 30261006_0 (slots SE added since 2019, e.g. 0x3b; this
+/// build's table may hold it a slot lower: `Tables::build_slot`).
 pub fn current_slot_file(ffximain: &[u8], lang: u8, slot: usize) -> Option<u32> {
+    let t = super::tables::of(ffximain).map_err(|e| log::warn!("{e:#}")).ok()?;
+    let at = t.lang_at.get(lang as usize)? + t.build_slot(slot) * 4;
+    Some(u32::from_le_bytes(ffximain.get(at..at + 4)?.try_into().ok()?))
+}
+
+/// File id at a slot of a language's table as this build numbers it (no translation).
+pub fn table_file(ffximain: &[u8], lang: u8, slot: usize) -> Option<u32> {
     let t = super::tables::of(ffximain).map_err(|e| log::warn!("{e:#}")).ok()?;
     let at = t.lang_at.get(lang as usize)? + slot * 4;
     Some(u32::from_le_bytes(ffximain.get(at..at + 4)?.try_into().ok()?))

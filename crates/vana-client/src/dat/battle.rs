@@ -7,9 +7,10 @@ use super::DatIndex;
 use super::dialog::Dialog;
 use super::font::{decode_sjis, encode_sjis};
 use super::msg::{Messages, slot_file};
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
-/// Language slots (FUN_10250e50): message kinds of FUN_10094d20 and the name tables.
+/// Language slots (FUN_10250e50) numbered as in the 2019 base, which `slot_file` carries to this build's table (retail
+/// inserted slots, and builds differ: tables.rs `SlotShift`): message kinds of FUN_10094d20 and the name tables.
 const SLOT_BASIC: usize = 0x63; // kind 5
 const SLOT_SKILLS: usize = 0x60; // kind 2: combat skills ({05})
 const SLOT_LISTS: usize = 0x61; // kind 3: 7f 84 bit names
@@ -18,7 +19,8 @@ pub(crate) const SLOT_SPELLS: usize = 0x5a; // FUN_10221f40
 pub(crate) const SLOT_ABILITIES: usize = 0x5c; // FUN_10219c20
 const SLOT_SYSTEM: usize = 0x65; // kind 6: s2c 0x053 (FUN_10094d20(6, n))
 const SLOT_EMOTES: usize = 0x62; // s2c 0x05A's lines (LAB_100a06e0)
-/// Status names (grammar kind 0x13, FUN_1021d5f0); file inferred from content, slot not traced.
+/// Status names (grammar kind 0x13, FUN_1021d5f0); file inferred from content, slot not traced (inferred: base slot 0x64,
+/// the plain-word Dialog file 7029 between the emote and system kinds, is the same list in another format).
 const STATUS_FILE: u32 = 55725;
 
 // Mode tables (1024 bytes each, by message id, FUN_1009cda0's order), mode -> colour id {u16 mode, u8 colour,
@@ -178,12 +180,41 @@ pub fn va_bytes(pe: &[u8], va: u32, len: usize) -> Option<&[u8]> {
     })
 }
 
+/// Whether a message set is the basic battle text (kind 5) by content: its damage, defeat and experience lines
+/// (1, 6, 8) carry expander codes ("{actor} hits {target} for {n} points of damage."), where the status names
+/// next to it (1024 plain words) and the other kinds' lines have none.
+pub(crate) fn is_basic(d: &Dialog) -> bool {
+    let coded = |id| d.raw(id).is_some_and(|r| r.split(|&b| b == 0).next().unwrap_or_default().iter().any(|&b| b == 0x7f || (1..0x20).contains(&b)));
+    d.len() >= 1024 && [1, 6, 8].into_iter().all(coded)
+}
+
 impl BattleText {
+    /// The basic battle messages: the file of language slot 0x63 as this build numbers it, checked by content. When
+    /// the slot layout was not recognised (an unknown build) the table's neighbouring slots are searched for it.
+    fn basic(index: &DatIndex, ffximain: &[u8]) -> Result<Dialog> {
+        let read = |file: u32| index.read(file).ok().and_then(|b| Dialog::parse(&b).ok()).filter(is_basic);
+        let named = slot_file(ffximain, 1, SLOT_BASIC);
+        if let Some(d) = named.and_then(read) {
+            return Ok(d);
+        }
+        let tables = super::tables::of(ffximain)?;
+        let at = tables.slot(SLOT_BASIC);
+        log::warn!("language slot {at:#x} ({named:?}) is not the battle messages; searching the table");
+        for slot in (at.saturating_sub(6)..at + 7).filter(|&s| s != at) {
+            let file = super::msg::table_file(ffximain, 1, slot);
+            if let Some(d) = file.and_then(read) {
+                log::warn!("battle messages found in language slot {slot:#x} (file {})", file.unwrap_or_default());
+                return Ok(d);
+            }
+        }
+        bail!("no battle message file near language slot {at:#x}")
+    }
+
     pub fn load(index: &DatIndex, ffximain: &[u8]) -> Result<Self> {
         let file = |slot| slot_file(ffximain, 1, slot).with_context(|| format!("language slot {slot:#x}"));
         let dialog = |slot| -> Result<Dialog> { Dialog::parse(&index.read(file(slot)?)?) };
         let msgs = |id: u32| Messages::load(index, id).map_err(|e| log::warn!("names {id}: {e:#}")).ok();
-        let basic = dialog(SLOT_BASIC).context("battle messages")?;
+        let basic = Self::basic(index, ffximain).context("battle messages")?;
         let t = super::tables::of(ffximain)?;
         let modes = t.mode_tables.iter().map(|&va| va_bytes(ffximain, va, 1024).and_then(|b| b.try_into().ok()).context("mode table")).collect::<Result<Vec<[u8; 1024]>>>()?;
         let mut mode_colours: Vec<(u16, u8)> = Vec::new();
@@ -789,6 +820,55 @@ mod tests {
         let index = DatIndex::open(&cfg.ffxi_dir()).ok()?;
         let dll = std::fs::read(cfg.ffxi_dir().join("FFXiMain.dll")).ok()?;
         Some(BattleText::load(&index, &dll).unwrap())
+    }
+
+    /// A message file as `Dialog` reads it: u32 `size | 0x10000000`, then the XOR 0x80 offset table and strings.
+    fn dialog_of(strings: &[&[u8]]) -> Dialog {
+        let table = strings.len() * 4;
+        let mut body: Vec<u8> = Vec::new();
+        let mut at = table;
+        for s in strings {
+            body.extend(at.to_le_bytes().iter().take(4));
+            at += s.len() + 1;
+        }
+        for s in strings {
+            body.extend_from_slice(s);
+            body.push(0);
+        }
+        let mut file = vec![0, 0, 0, 0x10];
+        file.extend(body.iter().map(|b| b ^ 0x80));
+        Dialog::parse(&file).unwrap()
+    }
+
+    /// The basic message file is told from its neighbours by content: coded damage / defeat / experience lines, not
+    /// plain words (the status names), and not a short set.
+    #[test]
+    fn basic_by_content() {
+        let coded: &[u8] = b"\x7f\x88\x00[The /]\x01\x01\x10 hits";
+        let mut basic: Vec<&[u8]> = vec![b"" as &[u8]; 1024];
+        (basic[1], basic[6], basic[8]) = (coded, coded, coded);
+        assert!(is_basic(&dialog_of(&basic)));
+        let mut words: Vec<&[u8]> = vec![b"" as &[u8]; 1024];
+        (words[1], words[6], words[8]) = (b"weakness", b"silence", b"disease");
+        assert!(!is_basic(&dialog_of(&words)));
+        assert!(!is_basic(&dialog_of(&basic[..200])));
+        basic[8] = b"plain";
+        assert!(!is_basic(&dialog_of(&basic)));
+    }
+
+    /// Messages 1, 6, 8, 15 and 78 read as the battle lines, not as status names (the slot 0x63 lookup once landed on
+    /// the status name file in the July 2026 build).
+    #[test]
+    fn standard_lines() {
+        let Some(b) = load() else { return };
+        let who = |n: &str, pc| Some(Who { name: n.into(), pc, ..Default::default() });
+        let ctx = Ctx { actor: who("Actor", true), target: who("Wild Rabbit", false), me: "Actor".into(), work: [11, 12, 13, 14, 15], ..Default::default() };
+        let line = |id| b.expand(id, &ctx).unwrap().plain().join(" ");
+        assert_eq!(line(1), "Actor hits the Wild Rabbit for 12 points of damage.");
+        assert!(line(6).contains("defeats the Wild Rabbit"), "{}", line(6));
+        assert!(line(8).contains("experience point"), "{}", line(8));
+        assert!(line(15).contains("misses"), "{}", line(15));
+        assert!(line(78).to_lowercase().contains("too far"), "{}", line(78));
     }
 
     /// The on-screen kinds (0x1035cae0): 1 hit damage, 15 miss, 24 recovers HP, 6 "defeats" none; Screen mode keeps
