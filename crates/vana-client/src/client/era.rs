@@ -3,7 +3,7 @@
 //! A server tells the client which expansions it runs only through the lobby's expansions bitmask (`Lobby.expansions`,
 //! u32 @0x20 of the lobby reply: bit 0 the base game, bits 1..11 the expansions in release order). When no expansion bit
 //! is on the server runs the base game's era, and the client hides what did not exist then: the windows of later
-//! systems (mounts, Trust, Unity, Merit / Job / Alter Ego Points, Master Levels, Records of Eminence, the Search
+//! systems (mounts, Unity, Merit / Job / Alter Ego Points, Master Levels, Records of Eminence, the Search
 //! menu's Unity and Monstrosity rows) are greyed, the Search menu offers the base jobs only and stops its level fields at
 //! 60. Nothing is invented: only the client's own windows change, whatever the server sends. With any expansion bit on,
 //! or with the config's `era_lock` off, retail behaviour is unchanged.
@@ -58,9 +58,10 @@ pub enum Feature {
     Monstrosity,
 }
 
-pub fn has(era: Era, _feature: Feature) -> bool {
-    // Every feature listed is later than the base game; the table is here so one can be given back by a bit.
-    era == Era::Expanded
+pub fn has(era: Era, feature: Feature) -> bool {
+    // Every feature listed is later than the base game, but a server may keep some as conveniences. Trust is left to
+    // the server: the lists only ever show the Trust spells it says the character knows, so its own rules gate it.
+    era == Era::Expanded || feature == Feature::Trust
 }
 
 /// The level cap the client shows itself (its Search level fields): 60 in the base era, else retail's 99.
@@ -195,10 +196,12 @@ mod tests {
 
     #[test]
     fn base_features_jobs_and_cap() {
-        for f in [Feature::Mounts, Feature::Trust, Feature::Unity, Feature::MeritPoints, Feature::JobPoints, Feature::MasterLevels, Feature::AlterEgoPoints, Feature::RecordsOfEminence, Feature::Monstrosity] {
+        for f in [Feature::Mounts, Feature::Unity, Feature::MeritPoints, Feature::JobPoints, Feature::MasterLevels, Feature::AlterEgoPoints, Feature::RecordsOfEminence, Feature::Monstrosity] {
             assert!(!has(Era::Base, f), "{f:?}");
             assert!(has(Era::Expanded, f), "{f:?}");
         }
+        // Server-gated in every era: shown when the server lists the spells.
+        assert!(has(Era::Base, Feature::Trust) && has(Era::Expanded, Feature::Trust));
         assert_eq!(level_cap(Era::Base), 60);
         assert_eq!(level_cap(Era::Expanded), 99);
         // WAR .. RNG are offered, SAM (12) onwards are not, while expansions leave every job.
