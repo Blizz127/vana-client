@@ -7534,6 +7534,7 @@ impl App {
                     Ok(codec) => {
                         let net = net::spawn(login.clone(), self.cfg.username.clone(), codec);
                         self.status = format!("Connecting to {}:{}...", login.map.0, login.map.1);
+                        log::info!("map server from the lobby: {}:{} (map_host {:?})", login.map.0, login.map.1, self.cfg.map_host);
                         let features = if let Phase::Characters { lobby: Some(l), .. } = &self.phase { l.features } else { 0 };
                         let ep = self.cfg.resolved();
                         // Servers without a profile service (config social_enabled) get no friend list, presence or mail.
