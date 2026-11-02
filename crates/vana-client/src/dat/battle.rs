@@ -129,7 +129,7 @@ pub struct BattleText {
     /// Group 0x11: the moon phase names.
     moons: Option<Messages>,
     /// Grammar kinds 0x87 / 0x88 / 0x8a (FUN_100bdc50 cases 6 / 7 / 9): expander tables +0x788 / +0x858 / +0x8c0, this
-    /// build's language slots 0x1c / 0x22 / 0x1b (0x22: trust party lines, s2c 0x02D message 711).
+    /// retail's language slots 0x1c / 0x22 / 0x1b (0x22: trust party lines, s2c 0x02D message 711).
     tables: [Option<Messages>; 3],
     modes: Vec<[u8; 1024]>,
     mode_colours: Vec<(u16, u8)>,

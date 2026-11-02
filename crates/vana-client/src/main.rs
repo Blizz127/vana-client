@@ -231,7 +231,7 @@ enum Cmd {
     },
     /// Print English client messages of a group (thunk_FUN_1014c660(group, id)); all when no ids given.
     MsgDump { group: u8, ids: Vec<usize> },
-    /// Print the English d_msg file of a language slot (this build's numbering), or of a file id from 0x1000: every field of each entry.
+    /// Print the English d_msg file of a language slot (numbered as in retail 30261006_0, carried to this build's table), or of a file id from 0x1000: every field of each entry.
     DmsgDump {
         #[arg(value_parser = parse_num)]
         slot: u32,
