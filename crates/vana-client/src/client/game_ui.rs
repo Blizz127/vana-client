@@ -237,6 +237,10 @@ pub struct GameUi {
     pub hover: std::cell::Cell<bool>,
     /// Ours: the retail windows the modern layer draws as one column this frame, their children top to bottom.
     pub modern_order: std::cell::RefCell<std::collections::HashMap<String, Vec<u16>>>,
+    /// The era lock's rewritten layouts (client/eralayout.rs).
+    era: super::eralayout::Layouts,
+    /// The lock and modern state the layouts were last synced to (a new GameUi has the file's own).
+    pub era_for: Option<(bool, bool)>,
     /// The focused lists' bars drawn this frame, and a press held on one (client/scrollbar.rs).
     pub bars: Vec<super::scrollbar::Site>,
     pub bar_hold: Option<super::scrollbar::Hold>,
@@ -331,7 +335,7 @@ pub struct WorldView<'a> {
 impl GameUi {
     pub fn new(data: GameUiData) -> Self {
         crate::render::ui::set_caption_words(caption_words(&data));
-        Self { data, renderer: None, scene_depth: None, batch: UiBatch::default(), modern_frame: None, skin_on: false, modern_scale: 1.0, modern_help: None, started: Instant::now(), pending: Vec::new(), images: Default::default(), help: HelpScroll::default(), party_window: "menu    ptw0".into(), log_top: None, style_index: 0, replaced: Vec::new(), style_saved: Default::default(), scroll_seen: Default::default(), hover: Default::default(), modern_order: Default::default(), bars: Vec::new(), bar_hold: None, anims: Default::default(), contents: Default::default(), anim_frame: 1, anim_acc: 0.0, open_ticks: 25.0, log_faded: false, log_bottom: None, target_up: false, walk: Walk::default(), focus: (None, None), presses: Default::default() }
+        Self { data, renderer: None, scene_depth: None, batch: UiBatch::default(), modern_frame: None, skin_on: false, modern_scale: 1.0, modern_help: None, started: Instant::now(), pending: Vec::new(), images: Default::default(), help: HelpScroll::default(), party_window: "menu    ptw0".into(), log_top: None, style_index: 0, replaced: Vec::new(), style_saved: Default::default(), scroll_seen: Default::default(), hover: Default::default(), modern_order: Default::default(), era: Default::default(), era_for: None, bars: Vec::new(), bar_hold: None, anims: Default::default(), contents: Default::default(), anim_frame: 1, anim_acc: 0.0, open_ticks: 25.0, log_faded: false, log_bottom: None, target_up: false, walk: Walk::default(), focus: (None, None), presses: Default::default() }
     }
 
     /// FUN_1015e530 / FUN_101177d0 for a window drawn this frame with frame rect `r`: false while it opens (only the
@@ -899,6 +903,13 @@ impl GameUi {
     /// A window's layout (menu DAT 39542 and its companions).
     pub fn layout(&self, name: &str) -> Option<&crate::dat::ui::Menu> {
         self.data.lobby.menu(name)
+    }
+
+    /// Ours (client/eralayout.rs): puts the layouts `specs` name in the shape the base era draws (rows dropped, the
+    /// rest packed up) and every other one back as the file has it. Returns the windows rewritten; a layout that is not
+    /// as the code lists it is left alone (and logged), its caller keeping the row disabled.
+    pub fn sync_era(&mut self, specs: &[super::eralayout::Spec]) -> Vec<&'static str> {
+        self.era.sync(&mut self.data.lobby.menus, specs)
     }
 
     pub fn menu(&mut self, name: &str, w: f32, h: f32, sel: usize) -> Vec<[f32; 4]> {

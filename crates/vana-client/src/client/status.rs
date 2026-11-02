@@ -66,12 +66,20 @@ pub fn open(w: &mut World) {
         }
     }
     let _ = w.net.commands.send(NetCommand::StatusRequest(0));
-    w.status = Some(StatusUi { sel: w.cursor_recall(STATCOM), shown: None, off, once: false, busy: true, return_menu: w.menu, cur: [None, None], cur_wait: None, m_page: 0 });
+    let sel = start_sel(w.cursor_recall(STATCOM), &era_off(w));
+    w.status = Some(StatusUi { sel, shown: None, off, once: false, busy: true, return_menu: w.menu, cur: [None, None], cur_wait: None, m_page: 0 });
     w.menu = None;
 }
 
-/// Ours (client/era.rs): the children of the systems the base era lacks, kept disabled: 7 Merit Points, 8 Job Points,
-/// 11 Unity, 12 Master Levels, 13 Alter Ego Points.
+/// Ours: the cursor starts on its remembered child, but not on one the era lock took away (the layout has re-packed
+/// without it, client/eralayout.rs): the first row, Profile.
+fn start_sel(recalled: u16, era_off: &[u16]) -> u16 {
+    if era_off.contains(&recalled) { 1 } else { recalled }
+}
+
+/// Ours (client/era.rs): the children of the systems the base era lacks, hidden by the re-packed layout (kept disabled
+/// as well, for a layout that could not be re-packed): 7 Merit Points, 8 Job Points, 11 Unity, 12 Master Levels,
+/// 13 Alter Ego Points.
 fn era_off(w: &World) -> Vec<u16> {
     [(7, Feature::MeritPoints), (8, Feature::JobPoints), (11, Feature::Unity), (12, Feature::MasterLevels), (13, Feature::AlterEgoPoints)]
         .into_iter()
@@ -509,5 +517,17 @@ mod tests {
     fn numbers() {
         assert_eq!([grouped(0, ","), grouped(999, ","), grouped(1234, ","), grouped(12_345_678, ",")], ["0", "999", "1,234", "12,345,678"]);
         assert!(exists(0) && exists(0x8005) && !exists(0x8000));
+    }
+
+    /// The cursor does not start on a child the era lock took away; retail's own memory is kept.
+    #[test]
+    fn cursor_starts_on_a_row_that_is_there() {
+        let base = [7, 8, 11, 12, 13];
+        for gone in base {
+            assert_eq!(start_sel(gone, &base), 1);
+        }
+        assert_eq!((start_sel(6, &base), start_sel(1, &base), start_sel(10, &base)), (6, 1, 10));
+        // Any expansion bit on: nothing is taken away.
+        assert_eq!((start_sel(7, &[]), start_sel(13, &[])), (7, 13));
     }
 }

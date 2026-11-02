@@ -159,7 +159,7 @@ pub struct MenuElement {
     pub strings: [String; 2],
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Menu {
     pub name: String,
     pub elements: Vec<MenuElement>,
