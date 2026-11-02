@@ -311,7 +311,8 @@ impl Mapper {
         out
     }
 
-    /// Whether any button is held.
+    /// Whether any button is held (tests).
+    #[cfg(test)]
     pub fn any_down(&self) -> bool {
         self.down.iter().any(|&d| d)
     }
