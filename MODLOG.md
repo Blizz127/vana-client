@@ -9958,7 +9958,7 @@ PS2-era system, statuses 6 / 0x26.. and 0x081 / 0x066, is not done: LSB never se
   file ids (slots 0x1d..0x21) moved from GameUi to World.point_files. Expanded.sounds go to the UI sound queue.
 - Not done: 0x1e inline colours (since done: "Log lines: in-line colours and indents") (the log keeps one colour per line;
   being researched); 0x17 (a player emote motion), 0x1d (the speaker's compass direction), 0x13 (Japanese).
-- `vana-client dmsg-dump SLOT [IDS]` prints a language slot's d_msg file (this build's slot numbers).
+- `vana-client dmsg-dump SLOT [IDS]` prints a language slot's d_msg file (retail 30261006_0 slot numbers, since 2026-11-02 carried to the build's own table, see "Language slots differ between client builds").
 
 ## Mog House furniture: the l_01 light (2026-10-26; spec ~/ffxi/lab/research/furniture_light_spec.md)
 
@@ -13283,3 +13283,45 @@ What the retail binary tells us (sources are the Input layer and Config notes ab
 - Linux builds link libudev (gilrs-core). Not tested with hardware (gilrs cannot be driven without a device): the
   mapping table, deadzone, stick vectors, repeat, release-on-unplug and the Input integration are unit tests
   (gamepad::tests, input::tests::gamepad_keys_and_sticks, osk::tests).
+
+## Language slots differ between client builds: battle text showed status names on 30260703_1 (2026-11-02)
+
+Observed: with FFXiMain 30260703_1 (July 2026) `battle-dump 1 6 8 15 78` printed "weakness" / "silence" / "disease" /
+"doom" / "Divine Seal" for the hit / defeat / EXP / miss / too-far-away lines.
+- Cause: `Tables::slot` turned the 2019 base slot 0x63 into retail 30261006_0's 0x66 (+3) and read that slot of the
+  build's English table. The language tables sit where they always do (same hints and MD5s, en at file offset 0x61940, one
+  u32 file id per slot) and have the same entry size, but 30260703_1 holds every file from the middle block on one slot
+  lower than 30261006_0: retail added a slot there. Slot 0x66 of the July table is file 7029 (1024 plain words: the status
+  names), the basic messages (file 7027) are at 0x65.
+- July English table, by retail slot (July slot + 1): 0x3a 87 and 0x3b 39557 (status info 32 / 16 px), 0x3f 55705 (key
+  items), 0x5d 55702 (spells), 0x5f 55701 (abilities), 0x63 7021 (combat skills), 0x64 7023 (kind 3 lists), 0x65 7025
+  (emotes), 0x66 7027 (basic battle), 0x67 7029 (status names, plain words; inferred: the list `STATUS_FILE` 55725 holds
+  in d_msg form), 0x68 7031 (system), 0x69 7035 (mob skills), 0x6a 7039 (event text). Slots 0x18, 0x1a, 0x1b, 0x1c,
+  0x1d..0x22, 0x24 and 0x26 hold the files the retail notes name, with the content they describe (dmsg-dump on the July
+  install: dictionary 55665, BLU help 55685, augments 55692, item formats 55688, merits 55686, job points 55694, gifts
+  55674, 55683, Monstrosity 55689 "Main Job: Warrior", 55693, command help 55687, rune texts 55691); so the first
+  difference from retail is between 0x27 and 0x39.
+- Affected on that build before the fix: every slot from 0x3a up. Spells (0x5a base) read file 55734, abilities (0x5c)
+  55733, skills (0x60) the lists file, lists (0x61) the emotes, emotes (0x62) the basic file, basic (0x63) the status
+  names, system (0x65) the mob skills, mob skills (0x66) the event text; group 0x1a (base 0x3b) read the key item file
+  55704 instead of 55679 (the help text file of the "Objectives" ticker; checked with msg-dump 26); the status info
+  files (0x3a / 0x3b) were 39557 / 55669.
+- Fix (dat/tables.rs): the layout is read from FFXiMain itself. `SlotShift::detect` takes retail slots with the English
+  DAT file each holds (MID_ANCHORS 0x3a / 0x3b / 0x3f, TAIL_ANCHORS 0x5d / 0x5f / 0x66 / 0x68 / 0x69 / 0x6a; ids from this
+  and the 2019 tables) and finds, per block, the shift (retail slot minus the build's) that puts most anchors at their
+  slot (-4..=4, smallest first, 0 when none match). `Tables::build_slot(retail)` applies it; `Tables::slot(base)` is
+  `build_slot(retail_slot(base))`; `msg::current_slot_file` (callers use retail numbers) goes through `build_slot`
+  too, so the status info, point, message kind and event text slots follow. Retail 30261006_0 matches its anchors at
+  shift 0 (by construction from the traced slots above), so nothing moves there.
+- Inferred: the middle block's shift starts at retail slot 0x2a (retail's second inserted slot) and the tail's at 0x57;
+  the July table has one slot fewer than retail somewhere in 0x27..=0x39 which I did not place (no consumer in between).
+  The ja / fr / de tables are taken to have the same layout as the English one.
+- Left alone: `retail_slot` puts base 0x20..0x28 one slot up, yet the callers that use 0x20 / 0x21 (alter ego, Monstrosity
+  texts) are numbered in retail and July alike, and the notes above give the same numbers for the 2019 build. No
+  base-numbered consumer sits in that range; check it against the content before adding one.
+- Safety net (dat/battle.rs): `BattleText::basic` checks the resolved file by content (`is_basic`: >= 1024 entries, lines
+  1 / 6 / 8 carry expander codes; the status names are plain words) and otherwise searches the six slots either side.
+- FFXiMain's .text section is packed on disk (raw size 0, the code is in the POL1 section), so the slot numbers the code
+  passes cannot be read from the file; the table's ids are the only layout evidence.
+- Tests: tables.rs `slot_shift_from_a_table`, `build_slots` (synthetic tables) and `language_slots_of_the_installed_build`;
+  battle.rs `basic_by_content` and `standard_lines` (skip without game data).

@@ -123,6 +123,8 @@ pub struct Tables {
     pub regions: u32,
     /// The 2019 base's language slot numbering (identity there; SE inserted slots since).
     base_slots: bool,
+    /// How this build's language slots sit against retail 30261006_0's numbering, found from the table's file ids.
+    shift: SlotShift,
 }
 
 /// File offset of the first place `sig` matches.
@@ -388,6 +390,7 @@ impl Tables {
         let mode_tables = [low + 0x400, low, low + 0x800, low + 0xc00, low + 0x1000, low + 0x1400, low + 0x1800];
         let filter_kinds = va(&FILTER_KINDS)?;
         let count = va(&COUNT_FMT)?;
+        let lang_en = find(dll, &LANGS[1])?;
         Ok(Self {
             key1_at,
             key2_at,
@@ -414,24 +417,88 @@ impl Tables {
             count_fmt: [count, count - 0x24, count - 0x48, count - 0x6c],
             regions: va(&REGIONS)?,
             base_slots: dll.len() == 2_869_840,
+            shift: SlotShift::detect(dll, lang_en),
         })
     }
 
-    /// A language slot numbered as in the 2019 base (FUN_10250e50(slot)) for this build. Retail since inserted
-    /// slots: from the file ids of both tables, checked against retail FUN_1025b580's callers (0x3b -> 0x3d,
-    /// 0x57 -> 0x5a, 0x5a -> 0x5d, 0x5c -> 0x5f).
+    /// A language slot numbered as in the 2019 base (FUN_10250e50(slot)) for this build: first as retail
+    /// 30261006_0 numbers it (`retail_slot`), then as this build's own table does (`build_slot`).
     pub fn slot(&self, base: usize) -> usize {
         if self.base_slots {
             return base;
         }
-        match base {
-            0..0x20 => base,
-            0x20..0x29 => base + 1,
-            0x29..0x55 => base + 2,
-            0x55..0x97 => base + 3,
-            _ => base + 4,
+        self.build_slot(retail_slot(base))
+    }
+
+    /// A language slot numbered as in retail 30261006_0 (the numbering the client's code was traced in; FUN_1025b580's
+    /// callers), as this build's table holds it.
+    pub fn build_slot(&self, retail: usize) -> usize {
+        if self.base_slots {
+            return retail;
+        }
+        retail.saturating_add_signed(-self.shift.of(retail))
+    }
+}
+
+/// A 2019 base language slot as retail 30261006_0 numbers it. Retail inserted slots: from the file ids of both
+/// tables, checked against retail FUN_1025b580's callers (0x3b -> 0x3d, 0x57 -> 0x5a, 0x5a -> 0x5d, 0x5c -> 0x5f).
+pub fn retail_slot(base: usize) -> usize {
+    match base {
+        0..0x20 => base,
+        0x20..0x29 => base + 1,
+        0x29..0x55 => base + 2,
+        0x55..0x97 => base + 3,
+        _ => base + 4,
+    }
+}
+
+/// Retail 30261006_0 slots with the English file each holds (from the retail table, and the 2019 one for the
+/// others). The ids are the game's own DAT numbers, so a build that keeps those files holds them at its own slot,
+/// which is how the slot layout of an older build is found. Inferred: July 2026 (30260703_1) holds the same files one
+/// slot lower from the middle block on; the slot that retail added in between is not located.
+const MID_ANCHORS: [(usize, u32); 3] = [(0x3a, 87), (0x3b, 39557), (0x3f, 55705)];
+const TAIL_ANCHORS: [(usize, u32); 6] = [(0x5d, 55702), (0x5f, 55701), (0x66, 7027), (0x68, 7031), (0x69, 7035), (0x6a, 7039)];
+/// Retail slots from which each block's shift applies: 0x2a is where retail inserted its second extra slot (base
+/// 0x29 -> 0x2b), 0x57 its third (base 0x55 -> 0x58). Slots below keep retail's numbers (checked in July 2026: 0x1b,
+/// 0x1c and 0x22 are the same files).
+const MID_FROM: usize = 0x2a;
+const TAIL_FROM: usize = 0x57;
+
+/// How many slots a build's numbering lies below retail 30261006_0's, per block of the table.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SlotShift {
+    mid: isize,
+    tail: isize,
+}
+
+impl SlotShift {
+    /// The shift at a retail slot.
+    fn of(&self, retail: usize) -> isize {
+        match retail {
+            0..MID_FROM => 0,
+            MID_FROM..TAIL_FROM => self.mid,
+            _ => self.tail,
         }
     }
+
+    /// From the English table (u32 file ids) at file offset `at`.
+    pub fn detect(dll: &[u8], at: usize) -> Self {
+        let table: Vec<u32> = dll.get(at..).unwrap_or_default().chunks_exact(4).take(0x100).map(|c| u32::from_le_bytes(c.try_into().unwrap())).collect();
+        Self::from_table(&table)
+    }
+
+    fn from_table(table: &[u32]) -> Self {
+        Self { mid: block_shift(table, &MID_ANCHORS), tail: block_shift(table, &TAIL_ANCHORS) }
+    }
+}
+
+/// The shift (retail slot minus this build's) that puts most of a block's anchor files at their slots, 0 when none
+/// is found; ties go to the smaller shift.
+fn block_shift(table: &[u32], anchors: &[(usize, u32)]) -> isize {
+    let hits = |d: isize| anchors.iter().filter(|&&(slot, file)| slot.checked_add_signed(-d).and_then(|s| table.get(s)) == Some(&file)).count();
+    let mut order: Vec<isize> = (-4..=4).collect();
+    order.sort_by_key(|d| d.abs());
+    order.into_iter().fold((0, 0), |best, d| if hits(d) > best.1 { (d, hits(d)) } else { best }).0
 }
 
 /// A conquest map marker (cnqframe's 0x20-byte entries, menu_rows2_spec R3) with its 8-byte record.
@@ -527,7 +594,96 @@ pub fn conquest(dll: &[u8]) -> Result<CnqTables> {
 
 #[cfg(test)]
 mod tests {
-    use super::Tables;
+    use super::{MID_ANCHORS, MID_FROM, SlotShift, TAIL_ANCHORS, TAIL_FROM, Tables, block_shift, retail_slot};
+
+    /// A language table of `len` slots holding the anchor files `shift` slots below retail's numbers, filler between.
+    fn table(len: usize, mid: isize, tail: isize) -> Vec<u32> {
+        let mut t: Vec<u32> = (0..len as u32).map(|i| 1_000_000 + i).collect();
+        for (anchors, d) in [(&MID_ANCHORS[..], mid), (&TAIL_ANCHORS[..], tail)] {
+            for &(slot, file) in anchors {
+                t[slot.checked_add_signed(-d).unwrap()] = file;
+            }
+        }
+        t
+    }
+
+    /// Retail's own layout (anchors at their retail slots) is no shift; an older build with the files one slot
+    /// lower, or a layout with only one block moved, is found without game data.
+    #[test]
+    fn slot_shift_from_a_table() {
+        assert_eq!(SlotShift::from_table(&table(0x100, 0, 0)), SlotShift { mid: 0, tail: 0 });
+        assert_eq!(SlotShift::from_table(&table(0x100, 1, 1)), SlotShift { mid: 1, tail: 1 });
+        assert_eq!(SlotShift::from_table(&table(0x100, 0, 2)), SlotShift { mid: 0, tail: 2 });
+        assert_eq!(SlotShift::from_table(&table(0x100, -1, 1)), SlotShift { mid: -1, tail: 1 });
+        // One anchor off its slot does not move the block; an unknown table (no anchors) keeps retail's numbers.
+        let mut t = table(0x100, 1, 1);
+        t[TAIL_ANCHORS[2].0 - 1] = 5;
+        assert_eq!(SlotShift::from_table(&t).tail, 1);
+        assert_eq!(SlotShift::from_table(&[0; 0x100]), SlotShift::default());
+        assert_eq!(SlotShift::from_table(&[]), SlotShift::default());
+        assert_eq!(block_shift(&[], &MID_ANCHORS), 0);
+    }
+
+    /// Where the shift starts: a slot below the middle block, or one that a block moved past the table's end, stays
+    /// put or saturates; the 2019 -> retail numbering is unchanged.
+    #[test]
+    fn build_slots() {
+        let shifted = Tables { shift: SlotShift { mid: 1, tail: 1 }, ..empty() };
+        assert_eq!([0x1c, 0x22, 0x29].map(|s| shifted.build_slot(s)), [0x1c, 0x22, 0x29]);
+        assert_eq!([MID_FROM, 0x3a, TAIL_FROM - 1, TAIL_FROM, 0x66].map(|s| shifted.build_slot(s)), [0x29, 0x39, 0x55, 0x56, 0x65]);
+        // 2019 base slots: the battle message kinds (0x63 basic, 0x65 system, 0x5a spells) reach retail 0x66 / 0x68 / 0x5d.
+        assert_eq!([0x63, 0x65, 0x5a, 0x5c, 0x3b].map(retail_slot), [0x66, 0x68, 0x5d, 0x5f, 0x3d]);
+        assert_eq!([0x63, 0x65, 0x5a, 0x5c, 0x3b].map(|s| shifted.slot(s)), [0x65, 0x67, 0x5c, 0x5e, 0x3c]);
+        let retail = Tables { shift: SlotShift::default(), ..empty() };
+        assert_eq!([0x63, 0x65, 0x5a, 0x5c, 0x3b].map(|s| retail.slot(s)), [0x66, 0x68, 0x5d, 0x5f, 0x3d]);
+        let base = Tables { base_slots: true, shift: SlotShift { mid: 1, tail: 1 }, ..empty() };
+        assert_eq!([0x63, 0x3b].map(|s| base.slot(s)), [0x63, 0x3b]);
+        assert_eq!(base.build_slot(0x66), 0x66);
+    }
+
+    fn empty() -> Tables {
+        Tables {
+            key1_at: 0,
+            key2_at: 0,
+            widths_at: 0,
+            png_fonts_at: 0,
+            lang_at: [0; 4],
+            mode_tables: [0; 7],
+            filter_kinds: 0,
+            filter_tables: [0; 11],
+            screen_kinds: 0,
+            knockback_at: 0,
+            calls_at: 0,
+            mode_colours: 0,
+            palette: 0,
+            bindings: 0,
+            masks: 0,
+            compact: 0,
+            k1: 0,
+            k2: 0,
+            stats: 0,
+            cmd_help: 0,
+            errors: 0,
+            count_fmt: [0; 4],
+            regions: 0,
+            base_slots: false,
+            shift: SlotShift::default(),
+        }
+    }
+
+    /// The installed build's English battle files sit at the slots its layout names: the message kinds (0x66..0x6a in
+    /// retail's numbers) are consecutive DAT ids, and the 2019 numbering reaches the same files.
+    #[test]
+    fn language_slots_of_the_installed_build() {
+        let Ok(dll) = std::fs::read(crate::config::Config::load().ffxi_dir().join("FFXiMain.dll")) else { return };
+        let t = Tables::find(&dll).unwrap();
+        let file = |slot: usize| u32::from_le_bytes(dll[t.lang_at[1] + slot * 4..][..4].try_into().unwrap());
+        for &(slot, id) in MID_ANCHORS.iter().chain(&TAIL_ANCHORS) {
+            assert_eq!(file(t.build_slot(slot)), id, "retail slot {slot:#x}");
+        }
+        assert_eq!(file(t.slot(0x63)), 7027);
+        assert_eq!(file(t.slot(0x5a)), 55702);
+    }
 
     /// The installed build's tables are found, and model key 1 is the copy next to key 2.
     #[test]
