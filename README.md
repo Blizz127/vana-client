@@ -147,6 +147,16 @@ changed from the in-game Config menus. The fields you may need to set by hand:
 | `gpu` | empty | Graphics adapter by name; empty picks the high-performance one |
 | `audio_device` | empty | Output device; empty uses the system default |
 
+Servers with their own ports can be named in `named_servers` (not retail). The name is then typed or picked in the
+login screen's Server field, and the client connects to `host` with the ports given (the others come from the fields
+above):
+
+```json
+"named_servers": [
+  { "name": "My server", "host": "game.example.org", "auth_port": 54231, "data_port": 54230, "view_port": 54001 }
+]
+```
+
 ## For developers
 
 - `MODLOG.md` records every reverse-engineered fact the code relies on: addresses in the original executable,

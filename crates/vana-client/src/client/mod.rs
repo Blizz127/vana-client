@@ -7209,7 +7209,7 @@ impl App {
             self.status = if password.is_empty() { "Enter your password.".into() } else { "Passwords must be 1-32 plain ASCII characters (no accents or symbols outside ASCII).".into() };
             return;
         }
-        let cfg = self.cfg.clone();
+        let cfg = self.cfg.resolved();
         // Test drives log in with their own account; keep the user's saved one.
         if self.drive.login.is_none() {
             let _ = self.cfg.save();
@@ -7243,7 +7243,7 @@ impl App {
 
     /// A two-factor request with the form's account and password (client/twofa.rs).
     fn twofa_send(&mut self, command: Command, password: String, otp: String) {
-        let cfg = self.cfg.clone();
+        let cfg = self.cfg.resolved();
         let user = cfg.username.trim().to_string();
         self.spawn(move || {
             let req = Request { username: &user, password: &password, otp: &otp, ..Default::default() };
@@ -7407,7 +7407,8 @@ impl App {
                         let net = net::spawn(login.clone(), self.cfg.username.clone(), codec);
                         self.status = format!("Connecting to {}:{}...", login.map.0, login.map.1);
                         let features = if let Phase::Characters { lobby: Some(l), .. } = &self.phase { l.features } else { 0 };
-                        let pol = login.lsb.map(|(account, hash)| crate::net::profile::Cred { host: self.cfg.server.clone(), port: self.cfg.profile_port, irc_port: self.cfg.irc_port, account, hash });
+                        let ep = self.cfg.resolved();
+                        let pol = login.lsb.map(|(account, hash)| crate::net::profile::Cred { host: ep.server, port: ep.profile_port, irc_port: ep.irc_port, account, hash });
                         let world_name = match &self.phase {
                             Phase::Characters { chars, selected: Some(s), .. } => chars.get(*s).map(|c| c.world.clone()).unwrap_or_default(),
                             _ => String::new(),

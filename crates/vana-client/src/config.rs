@@ -67,6 +67,20 @@ pub struct SavedLogin {
     pub saved_password: String,
 }
 
+/// A named server (not retail): its name goes in the login screen's Server field, and its address and ports are used
+/// to connect. Ports left out fall back to the config's own (`auth_port` and the rest).
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NamedServer {
+    pub name: String,
+    pub host: String,
+    pub auth_port: Option<u16>,
+    pub data_port: Option<u16>,
+    pub view_port: Option<u16>,
+    pub profile_port: Option<u16>,
+    pub irc_port: Option<u16>,
+}
+
 /// Server names compare without case or outer spaces ("PlayOnline", "playonline").
 fn same_server(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
@@ -95,6 +109,8 @@ pub struct Config {
     pub view_port: u16,
     pub profile_port: u16,
     pub irc_port: u16,
+    /// Named servers with their own address and ports (not retail; `resolved`).
+    pub named_servers: Vec<NamedServer>,
     /// Version string sent to the lobby; LSB rejects clients older than its CLIENT_VER.
     pub client_version: String,
     /// cpal output device id ("pipewire:..."); empty = the system default.
@@ -305,6 +321,7 @@ impl Default for Config {
             view_port: 54001,
             profile_port: 51220,
             irc_port: 51240,
+            named_servers: Vec::new(),
             client_version: "30261006_0".into(),
             audio_device: String::new(),
             frame_limit: 300,
@@ -378,12 +395,27 @@ impl Config {
         c
     }
 
-    /// The servers logged in to, most recent first.
+    /// A copy to connect with: when `server` names one of `named_servers`, its address and ports replace the
+    /// config's. Saved logins and passwords stay keyed by the name.
+    pub fn resolved(&self) -> Self {
+        let mut c = self.clone();
+        if let Some(n) = self.named_servers.iter().find(|n| same_server(&n.name, &self.server)) {
+            c.server = n.host.trim().to_string();
+            c.auth_port = n.auth_port.unwrap_or(c.auth_port);
+            c.data_port = n.data_port.unwrap_or(c.data_port);
+            c.view_port = n.view_port.unwrap_or(c.view_port);
+            c.profile_port = n.profile_port.unwrap_or(c.profile_port);
+            c.irc_port = n.irc_port.unwrap_or(c.irc_port);
+        }
+        c
+    }
+
+    /// The servers logged in to, most recent first, then the named servers not logged in to yet.
     pub fn servers(&self) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
-        for l in &self.logins {
-            if !out.iter().any(|s| same_server(s, &l.server)) {
-                out.push(l.server.clone());
+        for l in self.logins.iter().map(|l| &l.server).chain(self.named_servers.iter().map(|n| &n.name)) {
+            if !l.trim().is_empty() && !out.iter().any(|s| same_server(s, l)) {
+                out.push(l.clone());
             }
         }
         out
@@ -486,5 +518,22 @@ impl Config {
     /// The frame limit in effect: FFXI_FRAME_LIMIT overrides the file (test runs), 0 = unlimited.
     pub fn frame_limit(&self) -> u32 {
         std::env::var("FFXI_FRAME_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(self.frame_limit)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn named_server_resolves_address_and_ports() {
+        let mut c = Config { server: " Example ".into(), ..Default::default() };
+        c.named_servers.push(NamedServer { name: "example".into(), host: "example.invalid".into(), auth_port: Some(1), view_port: Some(3), ..Default::default() });
+        let r = c.resolved();
+        assert_eq!((r.server.as_str(), r.auth_port, r.data_port, r.view_port), ("example.invalid", 1, c.data_port, 3));
+        assert!(c.servers().iter().any(|s| s == "example"));
+        // A plain address is left alone.
+        c.server = "127.0.0.1".into();
+        assert_eq!(c.resolved().server, "127.0.0.1");
     }
 }
