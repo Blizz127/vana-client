@@ -11,6 +11,12 @@
 //! of the last one sent and for `LOCK` after an action of ours finishes. An action the server does not start (no
 //! 0x028 from us in `ANSWER`) counts as refused: three in a row set it aside for `ASIDE`, so a refused pick never
 //! jams the button. A debuff is cast at most `TRIES` times on one monster (resisted, or the monster is immune).
+//!
+//! Autocast (on by default, config `rotation_autocast`; `/autocast on | off` flips the session): the rotation presses
+//! itself every `TICK` while we are engaged, or a monster we target is fighting us, under the same rules, `SETTLE`
+//! after it may. It never engages (a press does that) and never acts outside a fight, so nothing fires in town. It
+//! pauses while dead, resting, mounted, fishing, in an event, while moving and `PAUSE` after, and `PAUSE` after any
+//! line we run ourselves (a macro, a menu pick, a typed command).
 
 use super::World;
 use super::suggest::{self, Action, Suggestion};
@@ -30,6 +36,10 @@ const ASIDE: Duration = Duration::from_secs(30);
 const TRIES: u8 = 3;
 /// "Nothing to do" at most this often.
 const IDLE_LINE: Duration = Duration::from_secs(5);
+/// Autocast: how often it looks, how long after it may act it does, and its pause after our own input or moving.
+const TICK: Duration = Duration::from_millis(500);
+const SETTLE: Duration = Duration::from_millis(300);
+const PAUSE: Duration = Duration::from_secs(1);
 
 /// What a press does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -72,9 +82,29 @@ pub struct Rotation {
     /// The hint (what the next press does, and why) and when it was worked out.
     hint: Option<String>,
     hint_at: Option<Instant>,
+    /// Autocast on for this session; when it last looked, since when it may act, our own input or moving last.
+    autocast: bool,
+    auto_at: Option<Instant>,
+    ready_since: Option<Instant>,
+    manual_at: Option<Instant>,
+    moved_at: Option<Instant>,
 }
 
 impl Rotation {
+    pub fn new(autocast: bool) -> Rotation {
+        Rotation { autocast, ..Default::default() }
+    }
+
+    /// Autocast may act now: on, not paused by our own input or moving, and `SETTLE` past the moment it could.
+    fn auto_due(&mut self, now: Instant) -> bool {
+        let paused = [self.manual_at, self.moved_at].iter().flatten().any(|&t| now.duration_since(t) < PAUSE);
+        if !self.autocast || paused || !self.ready(now) {
+            self.ready_since = None;
+            return false;
+        }
+        now.duration_since(*self.ready_since.get_or_insert(now)) >= SETTLE
+    }
+
     fn aside(&self, s: Step, now: Instant) -> bool {
         self.refused.get(&s).is_some_and(|(_, until)| until.is_some_and(|u| now < u))
     }
@@ -203,10 +233,10 @@ fn busy(w: &World) -> bool {
 }
 
 /// What the next press would do, worked out as `press` does.
-fn next(w: &World, now: Instant) -> Option<(Step, On, String)> {
+fn next(w: &World, now: Instant, may_engage: bool) -> Option<(Step, On, String)> {
     let sugg = suggest::all(&suggest::facts(w));
     let foe = enemy(w).map(|e| e.1);
-    let engage = w.my_motion.status != 1 && w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
+    let engage = may_engage && w.my_motion.status != 1 && w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
     let (step, on) = w.rotation.pick(&sugg, engage, |s| target_of(w, s, foe), now)?;
     let why = match step {
         Step::Act(a) => sugg.iter().find(|s| s.action == a).map_or(String::new(), |s| s.reason.clone()),
@@ -222,25 +252,65 @@ fn hint_text(w: &World, step: Step, why: &str) -> String {
         Step::Act(Action::Spell(id)) => super::magic::spell_name(w, id),
         Step::Act(Action::Ability(i)) => super::magic::ability_name(w, i),
     };
-    if why.is_empty() { format!("Rotation: {name}") } else { format!("Rotation: {name} - {why}") }
+    let who = if w.rotation.autocast && in_fight(w) { "Autocast" } else { "Rotation" };
+    if why.is_empty() { format!("{who}: {name}") } else { format!("{who}: {name} - {why}") }
 }
 
 /// Once the rotation has been pressed: while fighting or with a monster targeted, the hint names what the next press
 /// does (worked out again every half second; drawn by `draw`).
 pub fn tick(w: &mut World) {
-    if !w.rotation.used {
+    let now = Instant::now();
+    if w.moving {
+        w.rotation.moved_at = Some(now);
+    }
+    if w.my_motion.status == 1 {
+        on_engaged(w);
+    }
+    if w.rotation.autocast && in_fight(w) && w.rotation.auto_at.is_none_or(|t| now.duration_since(t) >= TICK) {
+        w.rotation.auto_at = Some(now);
+        if w.rotation.auto_due(now) && may_act(w) {
+            fire(w, now, false);
+        }
+    }
+    if !w.rotation.used && !(w.rotation.autocast && in_fight(w)) {
         return;
     }
-    let now = Instant::now();
     let fighting = w.my_motion.status == 1 || w.target.and_then(|t| w.entities.get(&t)).is_some_and(|e| e.mob && e.hpp > 0);
     if !fighting {
         w.rotation.hint = None;
         return;
     }
     if w.rotation.hint_at.is_none_or(|t| now.duration_since(t) >= Duration::from_millis(500)) {
-        w.rotation.hint = next(w, now).map(|(s, _, why)| hint_text(w, s, &why));
+        let may_engage = !(w.rotation.autocast && in_fight(w));
+        w.rotation.hint = next(w, now, may_engage).map(|(s, _, why)| hint_text(w, s, &why));
         w.rotation.hint_at = Some(now);
     }
+}
+
+/// In a fight, for autocast: engaged, or the monster we target is on us.
+fn in_fight(w: &World) -> bool {
+    w.my_motion.status == 1 || w.target.filter(|t| w.entities.get(t).is_some_and(|e| e.mob && e.hpp > 0)).is_some_and(|t| super::skillchain::hitting(w, t) == Some(w.my_id))
+}
+
+/// Not dead, casting, resting, mounted, fishing, sitting or in an event.
+fn may_act(w: &World) -> bool {
+    w.stats.is_some() && !matches!(w.my_motion.status, 2 | 3) && !busy(w) && super::magic::status_check(w).is_none() && !super::event::active(w)
+}
+
+/// `/autocast [on | off]`: the session's autocast (alone: flipped).
+pub fn autocast_command(w: &mut World, arg: Option<&str>) {
+    w.rotation.autocast = match arg.map(str::to_ascii_lowercase).as_deref() {
+        Some("on") => true,
+        Some("off") => false,
+        _ => !w.rotation.autocast,
+    };
+    w.rotation.ready_since = None;
+    w.chat.push(format!("Rotation autocast {}.", if w.rotation.autocast { "on: it acts by itself while you fight" } else { "off: press /rotation" }));
+}
+
+/// A line we ran ourselves (not the rotation's): autocast holds off a moment.
+pub fn manual(w: &mut World) {
+    w.rotation.manual_at = Some(Instant::now());
 }
 
 /// The hint, centred at the top of the screen.
@@ -267,15 +337,21 @@ pub fn press(w: &mut World) {
     if w.stats.is_none() || matches!(w.my_motion.status, 2 | 3) {
         return;
     }
-    let Some((step, on, _)) = next(w, now) else {
-        if w.rotation.idle_said.is_none_or(|t| now.duration_since(t) >= IDLE_LINE) {
+    fire(w, now, true);
+}
+
+/// The action a press (`pressed`: it may engage, and says when there is nothing) or autocast sends.
+fn fire(w: &mut World, now: Instant, pressed: bool) {
+    let Some((step, on, _)) = next(w, now, pressed) else {
+        if pressed && w.rotation.idle_said.is_none_or(|t| now.duration_since(t) >= IDLE_LINE) {
             w.rotation.idle_said = Some(now);
             w.chat.push("Rotation: nothing to do now.".to_string());
         }
         return;
     };
     let Some(text) = line(w, step, &on) else { return };
-    log::info!("rotation: {text}");
+    log::info!("rotation{}: {text}", if pressed { "" } else { " (autocast)" });
+    w.rotation.hint_at = None;
     let debuff_on = (on == On::Enemy && debuff(w, step)).then(|| enemy(w).map(|e| e.1)).flatten();
     w.rotation.send(step, debuff_on, now);
     super::textcmd::run(w, &text, super::textcmd::Mode::Internal);
@@ -466,6 +542,26 @@ mod tests {
         r.answered(true, t0 + Duration::from_secs(3));
         assert!(!r.ready(t0 + Duration::from_secs(4)));
         assert!(r.ready(t0 + Duration::from_secs(3) + LOCK));
+    }
+
+    #[test]
+    fn autocast_waits_to_settle_and_pauses_for_our_own_input() {
+        let t0 = Instant::now();
+        let mut r = Rotation::new(false);
+        assert!(!r.auto_due(t0) && !r.auto_due(t0 + SETTLE));
+        let mut r = Rotation::new(true);
+        assert!(!r.auto_due(t0));
+        assert!(r.auto_due(t0 + SETTLE));
+        // Sent: nothing until it is answered and the gap is past, then the settle again.
+        r.send(Step::Act(Action::Spell(23)), None, t0 + SETTLE);
+        assert!(!r.auto_due(t0 + SETTLE * 2));
+        r.answered(true, t0 + SETTLE * 3);
+        let after = t0 + SETTLE * 3 + LOCK;
+        assert!(!r.auto_due(after) && r.auto_due(after + SETTLE));
+        // A line of our own, or moving: a pause.
+        r.manual_at = Some(after + SETTLE);
+        assert!(!r.auto_due(after + SETTLE * 2) && !r.auto_due(after + SETTLE + PAUSE / 2));
+        assert!(!r.auto_due(after + SETTLE + PAUSE) && r.auto_due(after + SETTLE * 2 + PAUSE));
     }
 
     #[test]

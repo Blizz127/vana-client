@@ -186,6 +186,9 @@ pub struct Config {
     pub regime_out: bool,
     /// Extra (the skillchain add-ons): in a party, the chains it can make and the open one on our target.
     pub skillchain_helper: bool,
+    /// Ours (client/rotation.rs): the one-button rotation presses itself while engaged; each session starts so, and
+    /// /autocast on | off flips only the session.
+    pub rotation_autocast: bool,
     /// Extra (the minimap add-ons): the minimap, its place (0 top right, 1 top left), size (0..2) and the map pixels
     /// across (the wheel's zoom).
     pub minimap: bool,
@@ -378,6 +381,7 @@ impl Default for Config {
             timers_folded: 0,
             regime: false,
             skillchain_helper: false,
+            rotation_autocast: true,
             regime_out: true,
             minimap: false,
             minimap_dock: 0,

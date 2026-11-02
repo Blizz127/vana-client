@@ -131,6 +131,12 @@ and within a second or so of the last; an action the server does not start three
 seconds, and a debuff is cast at most three times on one monster. After the
 first press a line at the top of the screen names what the next press does.
 
+Autocast is on by default: while you are engaged (or the monster you target is attacking you) the rotation presses
+itself, under the same rules, about every half second once the last action is done. It never starts a fight (a press
+or `/attack` does) and does nothing outside one, so nothing fires in town. It pauses while you move, rest, are in an
+event, and for a second after any command, macro or menu pick of your own. `/autocast off` (or `on`, or alone to
+flip it) changes it for the session; `rotation_autocast` in config.json sets how each session starts.
+
 When a text field opens and the pad was the last thing used, an on-screen keyboard comes up: Steam's own if the game was
 started by Steam (Game Mode, a non-Steam shortcut), else the client's built-in one, a small keyboard drawn over the field
 (at the top of the screen for the chat line, at the bottom otherwise). The layout is fixed. The pad drives it, and the

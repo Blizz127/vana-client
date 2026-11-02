@@ -7844,7 +7844,7 @@ impl App {
                             recent_picks: self.cfg.modern_recent.get(&login.name).cloned().unwrap_or_default(),
                             recent_save: false,
                             root_sugg: Vec::new(),
-                            rotation: Default::default(),
+                            rotation: rotation::Rotation::new(self.cfg.rotation_autocast),
                             root_sugg_at: None,
                             suggest_sel: None,
                             party_hp_max: HashMap::new(),
