@@ -70,7 +70,7 @@ mod dps;
 mod skillchain;
 mod clock;
 mod lamps;
-mod shadows;
+pub mod shadows;
 pub use lamps::Lamps;
 mod mousecur;
 mod party;
@@ -5914,6 +5914,7 @@ struct World {
     lamps: lamps::Lamps,
     /// The actor shadows' light-state slots (client/shadows.rs).
     shadow_slots: shadows::Slots,
+    shadow_far: shadows::Far,
     /// Config `earth_clock` (an extra, client/clock.rs), `hide_trust_speech` and `hide_ready_lines`.
     earth_clock: bool,
     hide_trust_speech: bool,
@@ -7640,6 +7641,7 @@ impl App {
                             earth_clock: self.cfg.earth_clock,
                             lamps: Default::default(),
                             shadow_slots: Default::default(),
+                            shadow_far: Default::default(),
                             hide_trust_speech: self.cfg.hide_trust_speech,
                             hide_ready_lines: self.cfg.hide_ready_lines,
                             short_battle: self.cfg.short_battle,
@@ -13616,7 +13618,7 @@ impl App {
                 let has = |id: u32| w.actors.contains_key(&id);
                 let flags = |id: u32| w.actors.get(&id).map_or((false, false), |a| (a.shadow_off, a.noblob));
                 let shadow_modes = match w.ground.as_ref() {
-                    Some(g) => shadows::modes(&shadows::Ctx { ground: g, setting: w.game.get(0x3a), me: w.my_id, zone: w.pos_zone, has: &has, flags: &flags, layers: r.shadow_layers(bg) }, &seen, camera.eye),
+                    Some(g) => shadows::modes(&shadows::Ctx { ground: g, setting: w.game.get(0x3a), me: w.my_id, zone: w.pos_zone, has: &has, flags: &flags, layers: r.shadow_layers(bg) }, &mut w.shadow_far, &seen, camera.eye),
                     None => Vec::new(),
                 };
                 let drawn_map: HashMap<u32, &crate::render::ActorGpu> = w.actors.iter().filter(|(id, a)| !a.vanished() && !hidden.contains(id) && !far_out.contains(id) && !culled(id, a)).filter_map(|(id, a)| Some((*id, a.gpu.as_ref()?))).filter(|(_, g)| g.alpha >= 1e-4).collect();

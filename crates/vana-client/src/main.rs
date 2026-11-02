@@ -13,6 +13,7 @@ mod flashshot;
 mod fx;
 mod event_vm;
 mod itemshot;
+mod shadowshot;
 mod creatorshot;
 mod dialogshot;
 mod dat;
@@ -852,6 +853,30 @@ enum Cmd {
         #[arg(long)]
         voyage: Option<String>,
     },
+    /// Render a zone offscreen with ground shadows under actors (positions only; blobs and quads, client/shadows.rs's
+    /// gate and render/shadow.rs), for checking them on the software renderer.
+    ShadowShot {
+        zone: u32,
+        #[arg(long)]
+        out: PathBuf,
+        /// Camera position as x,y,z (Y points down).
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        eye: Vec<f32>,
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        target: Vec<f32>,
+        /// An actor's feet x,y,z (y snapped to the floor under it); repeat the option for more.
+        #[arg(long, value_delimiter = ',', allow_hyphen_values = true)]
+        actor: Vec<f32>,
+        #[arg(long, default_value_t = 12.0)]
+        hour: f32,
+        /// Also write the kage texture (as uploaded) to this PNG.
+        #[arg(long)]
+        dump_kage: Option<PathBuf>,
+        #[arg(long, default_value_t = 1280)]
+        width: u32,
+        #[arg(long, default_value_t = 720)]
+        height: u32,
+    },
     /// Dump every table of an MSI as TSV, for inspection.
     DumpMsi { msi: PathBuf, out: PathBuf },
     /// Create an account; writes a generated password to the credentials file.
@@ -1260,6 +1285,12 @@ fn main() -> Result<()> {
             Ok(())
         }
         Cmd::CsShot { zone, file, scheduler, out_dir, steps, width, height } => eventdump::cs_shot(zone, file, &scheduler, steps, &out_dir, width, height),
+        Cmd::ShadowShot { zone, out, eye, target, actor, hour, dump_kage, width, height } => {
+            let v3 = |v: &[f32]| glam::Vec3::new(v[0], v[1], v[2]);
+            anyhow::ensure!(eye.len() == 3 && target.len() == 3 && actor.len() % 3 == 0, "--eye and --target take x,y,z; --actor x,y,z each");
+            let actors = actor.chunks(3).map(v3).collect();
+            shadowshot::run(&shadowshot::Shot { zone, out: &out, eye: v3(&eye), target: v3(&target), hour, actors, size: [width, height], dump_kage: dump_kage.as_deref() })
+        }
         Cmd::NpcShot { model, look, anim, frame, yaw, motions, out } => npc_shot(model, look, &anim, frame, yaw, &motions, &out),
         Cmd::TextShot { text, font, lang, color, bg, alpha, zoom, out } => text_shot(&text, &font, &lang, &color, &bg, alpha, zoom, &out),
         Cmd::FxShot { zone, out, eye, caster, victim, category, anim, frames, every, hour, dust, file, walk, despawn } => fx_shot(zone, &out, &eye, &caster, &victim, (category, anim, dust, file), &walk, frames, every, hour, despawn),

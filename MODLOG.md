@@ -13470,3 +13470,39 @@ Observed: with FFXiMain 30260703_1 (July 2026) `battle-dump 1 6 8 15 78` printed
   passes cannot be read from the file; the table's ids are the only layout evidence.
 - Tests: tables.rs `slot_shift_from_a_table`, `build_slots` (synthetic tables) and `language_slots_of_the_installed_build`;
   battle.rs `basic_by_content` and `standard_lines` (skip without game data).
+
+## Ground shadow artifact: dark squares on the ground, popping (render/shadow.rs, client/shadows.rs; 2026-11-02)
+
+- Owner (real GPU, Linux / Vulkan): "shadow artifacts ... popping around with shadows on the ground in squares or others".
+- Root cause 1, seen on the software renderer (lavapipe) with the new `shadow-shot`: `fs_blob` sampled kage_tex with
+  CLAMP and no bound on the UV. The blob is painted on every collision face of the 3 x 3 cells around the actor
+  (12 x 12 yalms), almost all of them far outside the image. Level 0's edge texels are black, so retail's CLAMP paints
+  nothing there; but the sampler also reaches the mips (render/mipgen.rs builds a chain for every texture), and on a far
+  or grazing face (LOD 4 and up: a 0.3 yalm blob across 256 texels) the coarse levels are averages with the blob in
+  them. CLAMP repeats that over the whole face: flat dark triangles / rectangles the size of the faces, which appear and
+  go with the camera's angle and distance and move a whole 4-yalm cell when the actor changes cell. The same view with
+  the sampler held to level 0 had none. Fix: past [0, 1] the blob draws nothing (a black border, which is what level 0's
+  edge gave).
+  Quads (mode 2, depth 21 to 27, open grass in 101, high and grazing eyes): no hard squares after, a few dark pixels
+  each. Whether retail mipped kage_tex is not known; the bound is ours, the alternative (a LOD cap on the sampler, or
+  level 0 only with linear filtering, since point-sampled level 0 shimmers) was not needed for these shots.
+- Cause 2 (retail's, softened): FUN_100c9da0's `depth >= 20` blob / quad switch has no hysteresis. The depth is the
+  skeleton box's farthest corner, which changes with every animation frame, and the quad is twice the blob's width
+  (side 2 size_b against diameter size_b), so an actor near 20 swapped shape and size from frame to frame. Ours: the quad
+  from 20, the blob again only under 18 (`shadows::Far`, one memory per actor seen; a covered face still takes the quad
+  at any depth). Unit tests `far_band`, `far_forgets_unseen`. This stops the flapping, not the jump: crossing 20 once
+  still doubles the shadow's width, as retail's draws do.
+- Hardening: a silhouette caster that is not posed this frame now still clears its layer (it kept the previous actor's
+  silhouette, which the ground pass laid down). Not seen live.
+- Looked at, not changed: the z bias (`to_clip`: -7.5e-5 NDC like the effects' ZBIAS 15, inferred) is a constant in NDC
+  depth with Depth32Float and standard Z, far above the format's resolution (6e-8) on any GPU, so it does not depend on
+  the vendor; in view units it grows as d^2 (0.02 yalm at 5, 0.3 at 20, 1.9 at 50). No z-fighting showed at depths 3
+  to 19 in the shots. The light slots (`fresh`) only skip an easing step when a slot is reassigned.
+- Tool: `vana-client shadow-shot ZONE --out F.png --eye x,y,z --target x,y,z --actor x,y,z [--actor ...] [--dump-kage
+  K.png]`: a zone with blobs / quads from `shadows::modes` and render/shadow.rs under actor positions (no models, so no
+  silhouettes). East Ronfaure (101) courtyard, eye (80, -62, 232) looking at (80, -60, 246), actors at (80, -60, 246),
+  (84, -60, 248), (76, -60, 243): before, large dark polygons on the grass; after, none. kage_tex is 256 x 256 DXT3
+  (edges black in RGB).
+- Only a real GPU can say whether this is all of what the owner sees (LOD selection and anisotropy differ by vendor; the
+  shape of the artifact should be the same). Also unchecked: the blob's size itself (sb = S / 3, about 0.3 yalm for a 1 x
+  3.5 box, small beside retail's look; as read from FUN_1017e0b0 per the notes above, not re-verified).

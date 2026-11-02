@@ -242,7 +242,12 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 @fragment
 fn fs_blob(i: VOut) -> @location(0) vec4<f32> {
     let t = textureSample(kage, samp, i.uv).rgb;
-    return vec4<f32>(clamp(t * i.c * 2.0, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
+    // Past the image there is nothing: its edge texels are black at level 0, but the coarse mips this sampler
+    // reaches on a far or grazing face are averages with the blob in them, and CLAMP repeats those over the whole
+    // face (dark squares of the collision faces around the actor, popping with the camera's angle and the actor's
+    // cell). *(ours: a black border, as the level 0 edge gives)*
+    let inside = all(i.uv >= vec2<f32>(0.0)) && all(i.uv <= vec2<f32>(1.0));
+    return vec4<f32>(select(vec3<f32>(0.0), clamp(t * i.c * 2.0, vec3<f32>(0.0), vec3<f32>(1.0)), inside), 1.0);
 }
 
 @fragment
@@ -537,7 +542,6 @@ impl ZoneRenderer {
         if let (Some((_, poses, _)), Some(sil)) = (&self.pose_gpu, s.sil.as_ref().filter(|_| sils > 0)) {
             for (i, c) in casters.iter().enumerate().filter(|(_, c)| c.mode == 1) {
                 let (Some(a), Some(view)) = (c.actor, sil.views.get(c.layer as usize)) else { continue };
-                let Some(skin) = a.skin.as_ref().filter(|k| k.frame == self.pose_frame) else { continue };
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("shadow silhouette"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store } })],
@@ -546,6 +550,9 @@ impl ZoneRenderer {
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
+                // An actor not posed this frame still clears its layer (ours: it kept the last actor's silhouette,
+                // which the ground pass then laid down under this one).
+                let Some(skin) = a.skin.as_ref().filter(|k| k.frame == self.pose_frame) else { continue };
                 pass.set_pipeline(&self.sil_pipeline);
                 pass.set_bind_group(0, &self.globals, &[]);
                 pass.set_bind_group(2, poses, &[skin.offset]);
