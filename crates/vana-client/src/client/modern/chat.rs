@@ -119,8 +119,17 @@ fn tabs(ui: &mut Ui, m: &Modern, alpha: f32, unread: &[u32; 11]) -> (Rect, bool)
     // The tabs on a baseline up to the settings button; the open one painted last, over the baseline.
     super::tabs::baseline(ui.painter(), m, Rect::from_min_max(row.min, pos2(row.max.x - row.height() - 4.0, row.min.y + super::tabs::H)), alpha);
     let mut open_tab = None;
+    // Ours: the tabs shrink to the room (their least width, then every width by the same share) before they run under
+    // the settings button, in a window narrower than they are.
+    let room = row.width() - row.height() - 8.0;
+    let mut widths: Vec<f32> = TABS.iter().map(|(name, _)| super::tabs::width(ui, name, &font, 56.0)).collect();
+    let total = |w: &[f32]| w.iter().sum::<f32>() + 3.0 * (w.len() - 1) as f32;
+    if total(&widths) > room {
+        widths = TABS.iter().map(|(name, _)| super::tabs::width(ui, name, &font, 0.0)).collect();
+    }
+    let squeeze = (room / total(&widths)).min(1.0);
     for (i, (name, _)) in TABS.iter().enumerate() {
-        let r = Rect::from_min_size(pos2(x, row.min.y), vec2(super::tabs::width(ui, name, &font, 56.0), super::tabs::H));
+        let r = Rect::from_min_size(pos2(x, row.min.y), vec2(widths[i] * squeeze, super::tabs::H));
         x = r.max.x + 3.0;
         let resp = ui.interact(r, ui.scope_id().with(("chat tab", i)), Sense::click());
         let state = super::tabs::State { open: i == tab as usize, hover: resp.hovered(), cursor: false };
@@ -719,6 +728,10 @@ pub fn draw(p: &mut Panels, v: &ChatView, s: Shown, lift: bool) {
         button = tabs(ui, m, 1.0, &v.unread);
         ui.add_space(GAP);
         let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), lines_h), Sense::click_and_drag());
+        // Ours: a faint well under the lines, so a log with few lines reads as a part of the window, not a hole in it.
+        if lines_h > 1.0 {
+            ui.painter().rect(area.expand2(vec2(10.0, 3.0)), 4.0, Color32::from_black_alpha(48), egui::Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.3)), egui::StrokeKind::Inside);
+        }
         let wrap = wrap_width(room);
         let input_r = v.input.as_ref().map(|_| Rect::from_min_max(pos2(area.min.x, floor - row - 5.0), pos2(area.max.x, floor + 5.0)));
         let base = floor - if lift { 2.0 * row } else { 0.0 } + s.slide as f32 * row / 16.0;

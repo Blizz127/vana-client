@@ -401,7 +401,10 @@ fn rows_and_cost(ui: &mut Ui, m: &super::Modern, rows: &[RowView], empty_text: &
     let track = Rect::from_min_max(pos2(ui.max_rect().max.x + 6.0, top.y), pos2(ui.max_rect().max.x + 14.0, ui.cursor().min.y));
     kit::bar(ui.painter(), m, track, total, VISIBLE, scroll);
     if !lines.is_empty() || hint.is_some() {
-        ui.add_space(6.0);
+        // A rule over the cost box, as every panel's title has one under it.
+        ui.add_space(8.0);
+        let y = ui.cursor().min.y - 4.0;
+        super::paint::fade_rule(ui.painter(), ui.max_rect().min.x, ui.max_rect().max.x, y, m.theme.color("bronze").gamma_multiply(0.6));
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 18.0;
             for (label, value) in lines {

@@ -1210,6 +1210,8 @@ fn title_row_in(ui: &mut Ui, m: &Modern, t: &Title, colour: egui::Color32) {
     if let Some(n) = t.note {
         p.text(pos2(r.max.x, r.center().y), egui::Align2::RIGHT_CENTER, n, FontId::proportional(m.theme.small), m.theme.color("muted"));
     }
+    // Ours: a rule under every title, fading out to the right (the panels' one chrome).
+    paint::fade_rule(p, r.min.x, r.max.x, r.max.y + 2.0, m.theme.color("bronze").gamma_multiply(0.6));
 }
 
 /// `text` on one line of at most `width`, cut with an ellipsis.

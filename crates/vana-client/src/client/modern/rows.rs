@@ -155,7 +155,7 @@ fn more(p: &Painter, m: &Modern, r: Rect, s: State, style: Style) {
 /// The label's colour.
 fn ink(m: &Modern, s: State, style: Style) -> Color32 {
     match () {
-        _ if s.off => m.theme.color("muted"),
+        _ if s.off => m.theme.color("dim"),
         _ if s.on && matches!(style, Style::Hairline | Style::Gilt) => m.theme.color("gold"),
         _ => m.theme.color("text"),
     }

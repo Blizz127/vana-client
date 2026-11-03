@@ -556,3 +556,39 @@ Milestone 1:
 - The target panel's name in retail's name colour (FUN_1008db40 as the plates: unclaimed monster pale yellow, our
   party's claim red, another's magenta).
 - Not yet: alliance rows live.
+
+## Polish pass (2026-11-03, branch modern-polish)
+
+User, after seeing Modern next to Classic in game: "I love the new UI. Let's clean it up a bit, but I like where it's
+going." Modern stays the base; this pass restyles and re-places, and changes no flow (the Magic menu is still Magic,
+category, spell list, same rows and keys).
+
+- **One layout source (theme.rs).** `SCREEN_GAP` 12 (screen edge to a frame), `PANEL_GAP` 6 (frame to frame), `BAR_H`
+  46, `COLUMN_W` 340 (party and target), `TEXT_PAD` 18, `BELOW_BAR`; the type scale `TITLE` 18, `BODY` 16, `SMALL`
+  14.5 (the bars' labels and numbers, the top bar and the options' help use it instead of 14 / 13.5 / 18 by hand).
+  All in points before egui's zoom.
+- **Default places are laid out in points from the screen's edges** (mod.rs `default_place(id, screen)`), not as
+  fractions of the width: the chat window and the party window stand `SCREEN_GAP` from the bottom, the chat window is
+  as wide as the room left of the party column (chat.rs `default_room`; it ran under the party window at the larger
+  Interface Sizes, its gear and grip over the party's rows: the user's report, "too overlapping"), the main menu, the
+  command window, `/check`, the effect icons and the minimap's place start under the top bar's boxes (the menu covered
+  the Network box). A place the player saved stays as saved and is kept on the screen (egui's constrain); the chat
+  window's width, saved or default, also gives way to the party window while it stands in its way (`chat_width`), and
+  the tab row shrinks its tabs before they run under the settings button. Tests: `layout_tests.rs` (the default places
+  at 1280x800 .. 3840x2160 and Interface Size 50 / 60 / 100 / 150: on the margin, none over another, none under the
+  top bar, the chat window ending a gap short of the party column; saved places kept and on screen).
+- **Readable at every size.** The zoom's floor is 0.66 (was 0.4): 1280x800 at Interface Size 50 gave seven-pixel
+  body text. Below about 89 % on a 1280x800 window the setting therefore changes nothing; above it, as before.
+- **Chrome.** Every panel title has a rule under it fading out to the right (mod.rs `title_row_in`, paint.rs
+  `fade_rule`), the chat log a faint well behind its lines (the empty log read as a hole), the magic list's cost box a
+  rule over it, the party window's rest strip lines up with its title. Muted text is lighter (#a8b5be, was #8f9da6) for
+  captions, help and numbers; disabled rows use a new `dim` (#7b8892) so off still differs from quiet.
+- **Graphics & Interface window.** Controls column 280 (was 320) so the help text has room and wraps less, help text
+  in the small size, more air between rows and above the first (its ring was cut), the category chosen has a gold bar
+  and the strong face, the category's name under the window's title is a body-size heading with a rule (it repeated
+  the title's size and colour).
+- **modern-shot.** `--panel magic` / `--panel cats` draw the magic list (through the helpers the game's lists use,
+  lists.rs `rows_and_cost`) and its category window; a shot over `--backdrop` leaves out the frames strip.
+- Left alone: the Pack frames and the Gilt rows (the user's picks), fonts, the Magic menu's keys, extras.rs and the
+  minimap. Places already saved in a character's config are not changed (Settings > Interface > Panel Places > Reset
+  puts the new defaults back).
