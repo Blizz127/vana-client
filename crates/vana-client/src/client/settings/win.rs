@@ -365,7 +365,15 @@ impl SettingsUi {
                 let (stops, at) = self.stops(&r);
                 let d = if key == K::ArrowRight { 1 } else { -1 };
                 // Two options flip either way; more stop at their ends (a slider never wraps).
-                let to = if stops == 2 { 1 - at.min(1) } else { (at as i32 + d).clamp(0, stops as i32 - 1) as usize };
+                // The Preset's Custom is a reading, not a stop: from it Right goes to Original and Left to Ultra.
+                let to = if matches!(r.val, Val::Preset) {
+                    let last = PRESETS.len() as i32 - 1;
+                    if at as u32 == CUSTOM { if d > 0 { 0 } else { last as usize } } else { (at as i32 + d).clamp(0, last) as usize }
+                } else if stops == 2 {
+                    1 - at.min(1)
+                } else {
+                    (at as i32 + d).clamp(0, stops as i32 - 1) as usize
+                };
                 if to != at {
                     self.set_stop(&r, to);
                     self.sounds.push(Se::Cursor);
