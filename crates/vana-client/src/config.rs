@@ -131,7 +131,7 @@ pub struct GraphicsCfg {
 
 impl Default for GraphicsCfg {
     fn default() -> Self {
-        Self { fxaa: false, bloom: false, bloom_intensity: 0.5, bloom_threshold: 0.75, tonemap: false, exposure: 1.0, sharpen: 0.0, saturation: 1.0 }
+        Self { fxaa: false, bloom: false, bloom_intensity: 0.4, bloom_threshold: 0.85, tonemap: false, exposure: 1.0, sharpen: 0.0, saturation: 1.0 }
     }
 }
 

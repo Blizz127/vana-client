@@ -53,6 +53,8 @@ pub struct Settings {
     pub gamepad_camera: u32,
     pub modern_ui: bool,
     pub ui_scale: u32,
+    /// The post-processing pass (config graphics; render/post.rs).
+    pub graphics: crate::config::GraphicsCfg,
     pub modern_scale: u32,
     pub modern_opacity: u32,
     /// The mod packs in priority order (the Mods page; config `mods`).
@@ -102,6 +104,7 @@ impl Settings {
             gamepad_camera: (c.gamepad_camera_speed * 100.0).round().clamp(10.0, 500.0) as u32,
             modern_ui: c.modern_ui,
             ui_scale: c.ui_scale,
+            graphics: c.graphics.clone(),
             modern_scale: c.modern_scale,
             modern_opacity: pct(c.modern_opacity),
             mods: crate::modpack::merged(&c.mods, &crate::modpack::folders()),
@@ -144,6 +147,7 @@ impl Settings {
         c.gamepad_camera_speed = self.gamepad_camera as f32 / 100.0;
         c.modern_ui = self.modern_ui;
         c.ui_scale = self.ui_scale;
+        c.graphics = self.graphics.clone();
         c.modern_scale = self.modern_scale;
         c.modern_opacity = self.modern_opacity as f32 / 100.0;
         c.mods = self.mods.clone();
@@ -210,6 +214,15 @@ enum Val {
     Gpu,
     ModernUi,
     UiScale,
+    /// The post-processing pass's options (config graphics), percents for the numbers.
+    Fxaa,
+    Bloom,
+    BloomIntensity,
+    BloomThreshold,
+    Tonemap,
+    Exposure,
+    Sharpen,
+    Saturation,
     ModernScale,
     ModernOpacity,
     ResetPlaces,
@@ -276,6 +289,11 @@ const UI_SCALES: &[(u32, &str)] = &[(0, "Menu Size"), (1, "Auto"), (100, "100%")
 
 const MODERN_SCALES: &[(u32, &str)] = &[(50, "50%"), (55, "55%"), (60, "60%"), (65, "65%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%"), (100, "100%"), (105, "105%"), (110, "110%"), (115, "115%"), (120, "120%"), (125, "125%"), (130, "130%"), (135, "135%"), (140, "140%"), (145, "145%"), (150, "150%")];
 
+/// A post-processing number as the row's percent.
+fn pct(v: f32) -> u32 {
+    (v * 100.0).round().max(0.0) as u32
+}
+
 const fn row(label: &'static str, help: &'static str, val: Val, choices: &'static [(u32, &'static str)], when: When) -> SRow {
     SRow { label, help, val, choices, when }
 }
@@ -336,7 +354,16 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("3D LCD Mode", "0030: side-by-side stereo for 3D screens.", Tool("0030"), OFF_ON, Now),
     ];
     // Post-processing: one `row(...)` line each when the passes arrive (anti-aliasing, bloom, tone mapping, sharpening).
-    const POST: &[SRow] = &[];
+    const POST: &[SRow] = &[
+        row("Anti-aliasing (FXAA)", "Smooths jagged edges on the 3D scene, cheaply (not retail). Render Resolution 1.5x / 2x is the costlier, sharper way.", Fxaa, OFF_ON, Now),
+        row("Bloom", "A soft glow around the brightest parts of the scene: the sun, lamps, spells (not retail).", Bloom, OFF_ON, Now),
+        row("Bloom Intensity", "How strong the glow is.", BloomIntensity, &[(10, "10%"), (20, "20%"), (30, "30%"), (40, "40%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")], Now),
+        row("Bloom Threshold", "How bright a part must be to glow; higher keeps it to the very brightest.", BloomThreshold, &[(60, "60%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%")], Now),
+        row("Tone Mapping", "A filmic colour curve: richer contrast in highlights and shadows (not retail).", Tonemap, OFF_ON, Now),
+        row("Exposure", "The scene's brightness under Tone Mapping.", Exposure, &[(50, "0.5x"), (75, "0.75x"), (90, "0.9x"), (100, "1.0x"), (110, "1.1x"), (125, "1.25x"), (150, "1.5x"), (200, "2.0x")], Now),
+        row("Sharpening", "Contrast-adaptive sharpening: crisper textures and edges (not retail).", Sharpen, &[(0, "Off"), (10, "10%"), (20, "20%"), (30, "30%"), (40, "40%"), (50, "50%"), (60, "60%"), (80, "80%"), (100, "100%")], Now),
+        row("Saturation", "Colour strength: 100% is as drawn.", Saturation, &[(50, "50%"), (75, "75%"), (90, "90%"), (100, "100%"), (110, "110%"), (125, "125%"), (150, "150%")], Now),
+    ];
     const PLACES_ROW: SRow = row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now);
     const INTERFACE_HEAD: [SRow; 5] = [
         row("Interface", "Classic: the game's own windows. Modern: the new interface's windows where it has them (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
@@ -596,6 +623,14 @@ impl SettingsUi {
             Val::PartyTp => self.s.party_tp as u32,
             Val::ModernUi => self.s.modern_ui as u32,
             Val::UiScale => self.s.ui_scale,
+            Val::Fxaa => self.s.graphics.fxaa as u32,
+            Val::Bloom => self.s.graphics.bloom as u32,
+            Val::BloomIntensity => pct(self.s.graphics.bloom_intensity),
+            Val::BloomThreshold => pct(self.s.graphics.bloom_threshold),
+            Val::Tonemap => self.s.graphics.tonemap as u32,
+            Val::Exposure => pct(self.s.graphics.exposure),
+            Val::Sharpen => pct(self.s.graphics.sharpen),
+            Val::Saturation => pct(self.s.graphics.saturation),
             Val::ModernScale => self.s.modern_scale,
             Val::ModernOpacity => self.s.modern_opacity,
             Val::ResetPlaces => self.s.reset_places as u32,
@@ -639,6 +674,14 @@ impl SettingsUi {
             Val::PartyTp => self.s.party_tp = x != 0,
             Val::ModernUi => self.s.modern_ui = x != 0,
             Val::UiScale => self.s.ui_scale = x,
+            Val::Fxaa => self.s.graphics.fxaa = x != 0,
+            Val::Bloom => self.s.graphics.bloom = x != 0,
+            Val::BloomIntensity => self.s.graphics.bloom_intensity = x as f32 / 100.0,
+            Val::BloomThreshold => self.s.graphics.bloom_threshold = x as f32 / 100.0,
+            Val::Tonemap => self.s.graphics.tonemap = x != 0,
+            Val::Exposure => self.s.graphics.exposure = x as f32 / 100.0,
+            Val::Sharpen => self.s.graphics.sharpen = x as f32 / 100.0,
+            Val::Saturation => self.s.graphics.saturation = x as f32 / 100.0,
             Val::ModernScale => self.s.modern_scale = x,
             Val::ModernOpacity => self.s.modern_opacity = x,
             Val::ResetPlaces => self.s.reset_places = x != 0,
@@ -1733,7 +1776,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();
@@ -1746,11 +1789,11 @@ mod tests {
         let mut want: Vec<String> = old.iter().map(|s| s.to_string()).collect();
         want.sort();
         assert_eq!(seen, want);
-        // The Preset leads Graphics and nothing else; Post-processing is the placeholder.
+        // The Preset leads Graphics and nothing else; Post-processing holds the post pass's options.
         ui.tab = GRAPHICS;
         assert!(matches!(ui.rows()[0].val, Val::Preset) && ui.rows()[1].label == "Render Resolution");
         ui.tab = POST_TAB;
-        assert!(ui.rows().is_empty() && ui.note().is_some_and(|n| n.starts_with("Coming soon")));
+        assert!(ui.rows().len() == 8 && matches!(ui.rows()[0].val, Val::Fxaa) && ui.note().is_none());
         assert_eq!(ui.tabs(), ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Gamepad", "Mods"]);
     }
 
@@ -1769,10 +1812,10 @@ mod tests {
         assert_eq!(ui.preset(), 3);
         assert_eq!(ui.shown(&Row::from(&rows(Kind::Settings, GRAPHICS, true, false)[0])), "Custom");
         ui.set(Val::Preset, 1);
-        assert_eq!((ui.preset(), ui.s.anisotropy, ui.s.draw_distance, ui.s.lamp_lights), (1, 16, 200, true));
+        assert_eq!((ui.preset(), ui.s.anisotropy, ui.s.draw_distance, ui.s.lamp_lights, ui.s.graphics.fxaa), (1, 16, 0, true, true));
         assert_eq!(ui.tool_get("0018"), 2);
         ui.set(Val::Preset, 2);
-        assert_eq!((ui.preset(), ui.s.draw_distance, [ui.tool_get("0003"), ui.tool_get("0004")]), (2, 300, [2880, 1620]));
+        assert_eq!((ui.preset(), ui.s.draw_distance, [ui.tool_get("0003"), ui.tool_get("0004")], ui.s.graphics.tonemap), (2, 0, [2880, 1620], true));
         // Custom is not a preset to choose.
         ui.set(Val::Preset, 3);
         assert_eq!(ui.preset(), 2);
@@ -1809,6 +1852,7 @@ mod tests {
             rest.anisotropy = before.anisotropy;
             rest.draw_distance = before.draw_distance;
             rest.lamp_lights = before.lamp_lights;
+            (rest.graphics.fxaa, rest.graphics.tonemap, rest.graphics.sharpen) = (before.graphics.fxaa, before.graphics.tonemap, before.graphics.sharpen);
             for n in ["0018", "0000", "0017", "0011", "0003", "0004"] {
                 match before.tool.get(n) {
                     Some(v) => rest.tool.insert(n.into(), *v),
