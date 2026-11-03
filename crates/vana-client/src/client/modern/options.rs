@@ -74,12 +74,8 @@ pub fn key(s: &mut SettingsUi, key: egui::Key, shift: bool) -> Done {
 /// Keys from the game: the window of the world's Settings.
 pub fn world_key(w: &mut World, key: egui::Key, shift: bool) {
     let Some(s) = w.settings.as_mut() else { return };
-    key_to(s, key, shift);
+    self::key(s, key, shift);
     w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
-}
-
-fn key_to(s: &mut SettingsUi, k: egui::Key, shift: bool) {
-    key(s, k, shift);
 }
 
 /// Where the keyboard cursor is, as one number (the page follows it when it changes).
@@ -213,7 +209,7 @@ fn row(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, focus: bool, follow
         ui.vertical(|ui| {
             ui.set_width(ctl_w);
             ui.add_space(2.0);
-            control(ui, m, row, r, ctl_w, act);
+            control(ui, m, row, r, act);
         });
     });
     let rect = inner.response.rect.expand2(vec2(8.0, 5.0));
@@ -231,7 +227,7 @@ fn row(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, focus: bool, follow
 }
 
 /// A row's control: a click or drag acts on the row.
-fn control(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, width: f32, act: &mut Vec<Do>) {
+fn control(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, act: &mut Vec<Do>) {
     match &r.ctl {
         WCtl::Toggle(on) => {
             ui.horizontal(|ui| {
@@ -267,7 +263,6 @@ fn control(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, width: f32, act
             });
         }
         WCtl::Slider { n, at, shown } => {
-            let _ = width;
             if let Some(i) = kit::slider(ui, m, *n, *at, shown) {
                 act.push(Do::Set(row, i));
             }

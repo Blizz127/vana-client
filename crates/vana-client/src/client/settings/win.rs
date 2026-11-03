@@ -116,6 +116,7 @@ impl SettingsUi {
         let name = name.to_ascii_lowercase();
         let Some(k) = self.tabs().iter().position(|t| t.to_ascii_lowercase().starts_with(&name)) else { return false };
         self.goto(k, 1);
+        self.m_mods = (1, 0);
         self.zone = if self.row_count() > 0 { Zone::Rows } else { Zone::Cats };
         true
     }
