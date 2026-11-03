@@ -120,6 +120,16 @@ impl SettingsUi {
     }
 
     /// Choosing preset `k` sets the graphics rows (Custom, not a preset, sets nothing).
+    /// A preset from outside the window (the first run's detection).
+    pub fn apply_preset_for(&mut self, k: u32) {
+        self.apply_preset(k);
+    }
+
+    /// The window's values into a config.
+    pub fn store_into(&self, c: &mut Config) {
+        self.s.store(c);
+    }
+
     pub(super) fn apply_preset(&mut self, k: u32) {
         if k as usize >= PRESETS.len() {
             return;

@@ -4717,6 +4717,29 @@ fn party_battle(w: &World) -> bool {
 
 /// FUN_100cd040 with R 0.5 / r 0.2 (the 0x5e-chunk radii of a few large models are not kept): the eye's horizontal
 /// distance h from point `p`; 0 within 0.2, linear to 1 at 0.5; no fade with the eye more than 0.5 above the point.
+/// Ours: the first run's graphics from the GPU and the window: a discrete GPU at up to 1440 lines Ultra, larger High;
+/// an integrated GPU High; a software or unknown one stays Original. The frame limit follows the monitor's rate. Only
+/// while the graphics are still the Original preset and the frame limit its default (a player's choice stays).
+fn detect_graphics(cfg: &Config, kind: wgpu::DeviceType, window: [u32; 2], hz: Option<u32>) -> (Option<u32>, Option<u32>, Config) {
+    let mut ui = settings::SettingsUi::open(cfg, window);
+    let mut c = cfg.clone();
+    let preset = match kind {
+        _ if ui.preset() != 0 => None,
+        wgpu::DeviceType::DiscreteGpu if window[1] <= 1440 => Some(2),
+        wgpu::DeviceType::DiscreteGpu | wgpu::DeviceType::IntegratedGpu => Some(1),
+        _ => None,
+    };
+    if let Some(k) = preset {
+        ui.apply_preset_for(k);
+        ui.store_into(&mut c);
+    }
+    let limit = hz.filter(|_| cfg.frame_limit == Config::default().frame_limit).map(|hz| crate::config::FRAME_LIMITS.iter().copied().filter(|&l| l != 0).min_by_key(|&l| l.abs_diff(hz)).unwrap_or(60));
+    if let Some(l) = limit {
+        c.frame_limit = l;
+    }
+    (preset, limit, c)
+}
+
 /// Ours: the least the near-camera fade leaves of our own character outside first person.
 const OWN_FADE_FLOOR: f32 = 0.35;
 
@@ -14311,6 +14334,19 @@ impl ApplicationHandler for App {
         self.gpus = crate::render::adapter_names(&instance, Some(&surface));
         let gpu = Gpu::with_adapter(instance, Some(&surface), &self.cfg.gpu).expect("opening the GPU");
         let size = window.inner_size();
+        // Ours: the first run picks the graphics from the GPU and the screen (Settings > Graphics' presets), only while
+        // they are still the defaults; never again after.
+        if !self.cfg.graphics_detected {
+            let monitor = window.current_monitor();
+            let hz = monitor.as_ref().and_then(|m| m.refresh_rate_millihertz()).map(|m| (m + 500) / 1000);
+            let detected = detect_graphics(&self.cfg, gpu.adapter.get_info().device_type, [size.width, size.height], hz);
+            log::info!("graphics: first run on {:?} at {}x{} ({hz:?} Hz): preset {:?}, frame limit {:?}", gpu.adapter.get_info().device_type, size.width, size.height, detected.0, detected.1);
+            self.cfg = detected.2;
+            self.cfg.graphics_detected = true;
+            if let Err(e) = self.cfg.save() {
+                log::warn!("saving the config: {e}");
+            }
+        }
         // A software adapter (a VM without a GPU): the first time, the scene draws at half the window's size.
         if gpu.adapter.get_info().device_type == wgpu::DeviceType::Cpu && !self.cfg.software_gpu_seen {
             self.cfg.software_gpu_seen = true;

@@ -90,7 +90,9 @@ pub struct NamedServer {
 /// existed (it has `modern_ui`, written with every other key, but no `controls`) keeps the original keys; a fresh one,
 /// or one only a launcher wrote, gets the default.
 fn legacy_controls(v: &serde_json::Value, parsed: u32) -> u32 {
-    if v.get("controls").is_none() && v.get("modern_ui").is_some() { 0 } else { parsed }
+    // The classic-only client (regular FFXI) starts on the original controls too.
+    let classic = v.get("classic_only").and_then(|b| b.as_bool()).unwrap_or(false);
+    if v.get("controls").is_none() && (classic || v.get("modern_ui").is_some()) { 0 } else { parsed }
 }
 
 /// `ui_scale`'s Auto.
@@ -301,6 +303,13 @@ pub struct Config {
     /// Ours: the classic UI only, the modern one not offered (the regular FFXI launcher entry sets it; FFXI Forever
     /// keeps the modern UI). Read-only for the client: it never writes it back changed.
     pub classic_only: bool,
+    /// Ours: FFXI Forever's one-time move to the modern UI has run (the owner: modern by default, his own install too;
+    /// later choices stay). A config without the key has not.
+    #[serde(default)]
+    pub modern_migrated: bool,
+    /// Ours: the graphics were picked from the GPU and the screen once (the first run; never again after).
+    #[serde(default)]
+    pub graphics_detected: bool,
     /// Ours: the suggestions' and the rotation's thresholds (client/suggest.rs Tuning).
     pub rotation_adaptive: bool,
     pub rotation_cure_pct: u32,
@@ -510,6 +519,8 @@ impl Default for Config {
             modern_minimap: true,
             solo_badge: true,
             classic_only: false,
+            modern_migrated: true,
+            graphics_detected: false,
             rotation_adaptive: true,
             rotation_cure_pct: 75,
             rotation_convert_pct: 25,
@@ -573,7 +584,19 @@ impl Config {
         if c.classic_only {
             c.modern_ui = false;
         }
+        if !c.modern_migrated && !c.classic_only && c.is_forever() {
+            (c.modern_ui, c.modern_migrated) = (true, true);
+            log::info!("config: FFXI Forever's modern UI turned on (once)");
+            if let Err(e) = c.save() {
+                log::warn!("saving the config: {e}");
+            }
+        }
         c
+    }
+
+    /// The server is FFXI Forever: the named server picked is Forever's (its launcher entry names it so).
+    pub fn is_forever(&self) -> bool {
+        self.named_servers.iter().any(|n| same_server(&n.name, &self.server) && n.name.to_ascii_lowercase().contains("forever"))
     }
 
     /// A copy to connect with: when `server` names one of `named_servers`, its address and ports replace the
@@ -766,6 +789,8 @@ mod tests {
         assert_eq!(legacy_controls(&saved, 2), 0);
         assert_eq!(legacy_controls(&launcher, 2), 2);
         assert_eq!(legacy_controls(&chosen, 1), 1);
+        let vana: serde_json::Value = serde_json::json!({"game_dir": "/g", "classic_only": true});
+        assert_eq!(legacy_controls(&vana, 2), 0);
     }
 
     #[test]
