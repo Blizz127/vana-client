@@ -6220,6 +6220,8 @@ struct World {
     extra_skillchain: bool,
     /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
     extra_minimap: bool,
+    /// The minimap shows maps whose key item we lack (config minimap_unowned).
+    minimap_unowned: bool,
     minimap: Option<map::Overlay>,
     minimap_rect: Option<[f32; 4]>,
     minimap_frame: Option<minimap::Frame>,
@@ -6948,7 +6950,8 @@ impl App {
             w.extra_regime = self.cfg.regime;
             w.extra_skillchain = self.cfg.skillchain_helper;
             w.timers_dock = self.cfg.timers_dock;
-            (w.extra_minimap, w.minimap_dock, w.minimap_size) = (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
+            (w.extra_minimap, w.minimap_dock, w.minimap_size) = (if w.modern { self.cfg.modern_minimap } else { self.cfg.minimap }, self.cfg.minimap_dock, self.cfg.minimap_size);
+            w.minimap_unowned = self.cfg.minimap_unowned;
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
         self.window_dirty = true;
@@ -8021,7 +8024,8 @@ impl App {
                             extra_timers: self.cfg.timers,
                             extra_regime: self.cfg.regime,
                             extra_skillchain: self.cfg.skillchain_helper,
-                            extra_minimap: self.cfg.minimap,
+                            extra_minimap: if self.cfg.modern_ui { self.cfg.modern_minimap } else { self.cfg.minimap },
+                            minimap_unowned: self.cfg.minimap_unowned,
                             minimap: None,
                             minimap_rect: None,
                             minimap_frame: None,

@@ -906,15 +906,20 @@ fn arrow_in(painter: &egui::Painter, c: Pos2, facing: f32, size: f32, colour: Co
 /// The minimap on a screen edge (edge_window): the zone and grid over a square map, north up, centred on us,
 /// `span` map pixels across; the radar's dots (the target larger with a red ring), our arrow, N at the top. Open, it
 /// keeps clear of the command menu and the windows at its edge (retail's minimap does); folded, a tab under them.
+/// The radar's scale where there is no map: map pixels a world unit (a map's own runs 0.2..1).
+const RADAR_PX: f32 = 0.5;
+
 /// The wheel zooms.
 fn minimap_panel(p: &mut Panels, w: &mut World) {
     let Some(f) = w.minimap_frame.as_ref() else { return };
     if !w.extra_minimap || hidden(w) {
         return;
     }
-    let Some(img) = w.minimap.as_mut().and_then(|o| o.modern_image()) else { return };
+    // Ours: without a map for where we stand (none for the zone, or its key item missing with the unowned maps off) a
+    // radar of what is near: the same dots and arrow on a plain disc, at RADAR_PX map pixels a world unit.
+    let img = w.minimap.as_mut().and_then(|o| o.modern_image());
     let (m, ctx) = (p.m, p.ctx);
-    let tex = map_texture(m, ctx, &img);
+    let tex = img.as_ref().map(|i| map_texture(m, ctx, i));
     // Its own size once resized (the place's w), else Small / Medium / Large as big on screen as the retail-drawn one:
     // its layout pixels through the UI's scale.
     let mp = p.place("minimap");
@@ -939,12 +944,20 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
         let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ui.available_width()), if picking { Sense::click() } else { Sense::hover() });
         let painter = ui.painter().with_clip_rect(area);
         painter.rect_filled(area, 0.0, m.theme.color("charcoal"));
-        let s = minimap::px_per_unit(&img.region);
+        let s = img.as_ref().map_or(RADAR_PX, |i| minimap::px_per_unit(&i.region));
         let z = area.width() / span;
         let (px, py) = (pos.0 * s, -pos.1 * s);
-        let u0 = pos2((px - span / 2.0 - img.region.ox as f32) / 512.0, (py - span / 2.0 - img.region.oy as f32) / 512.0);
-        painter.image(tex, area, Rect::from_min_size(u0, vec2(span / 512.0, span / 512.0)), Color32::WHITE);
         let c = area.center();
+        if let (Some(i), Some(tex)) = (img.as_ref(), tex) {
+            let u0 = pos2((px - span / 2.0 - i.region.ox as f32) / 512.0, (py - span / 2.0 - i.region.oy as f32) / 512.0);
+            painter.image(tex, area, Rect::from_min_size(u0, vec2(span / 512.0, span / 512.0)), Color32::WHITE);
+        } else {
+            let ring = Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.35));
+            for k in 1..=3 {
+                painter.circle_stroke(c, area.width() / 2.0 * k as f32 / 3.0, ring);
+            }
+            painter.text(area.left_bottom() + vec2(6.0, -6.0), Align2::LEFT_BOTTOM, "No map", FontId::proportional(m.theme.small), m.theme.color("muted"));
+        }
         // The dot nearest the pointer (within 7 points) names itself in a tooltip.
         let hover = resp.hover_pos();
         let mut near: Option<(f32, usize)> = None;

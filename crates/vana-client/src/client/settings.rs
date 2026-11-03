@@ -39,6 +39,8 @@ pub struct Settings {
     pub regime: bool,
     pub skillchain_helper: bool,
     pub minimap: bool,
+    pub modern_minimap: bool,
+    pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub music: u32,
@@ -90,6 +92,8 @@ impl Settings {
             regime: c.regime,
             skillchain_helper: c.skillchain_helper,
             minimap: c.minimap,
+            modern_minimap: c.modern_minimap,
+            minimap_unowned: c.minimap_unowned,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
             // The game's own volumes (Gameplay page, config 10 / 9; the lobby's 0xa8): set by the opener.
@@ -138,6 +142,8 @@ impl Settings {
         c.regime = self.regime;
         c.skillchain_helper = self.skillchain_helper;
         c.minimap = self.minimap;
+        c.modern_minimap = self.modern_minimap;
+        c.minimap_unowned = self.minimap_unowned;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
         c.retail_aspect = self.retail_aspect;
@@ -199,6 +205,9 @@ enum Val {
     Skillchains,
     Regime,
     Minimap,
+    /// The modern UI's minimap and its unowned maps (config modern_minimap, minimap_unowned).
+    ModernMinimap,
+    MinimapUnowned,
     MinimapDock,
     MinimapSize,
     Music,
@@ -374,7 +383,12 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
     // Panel Places (a character's) is for in game only.
-    const INTERFACE: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW];
+    const INTERFACE: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2]];
+    const MINIMAP_ROWS: [SRow; 3] = [
+        row("Minimap", "The modern interface's minimap: the zone around you, north up, with your arrow, your party and what is near; drag it to an edge, the wheel zooms, a corner resizes it (not retail).", ModernMinimap, OFF_ON, Now),
+        row("Minimap Size", "How big the minimap starts (a corner drag sets its own size).", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
+        row("Maps You Don't Own", "On: the minimap shows the zone's map even without its map key item. Off: as retail, only maps you own (a radar of what is near otherwise).", MinimapUnowned, OFF_ON, Now),
+    ];
     const INTERFACE_LOBBY: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PARTY_TP_ROW];
     const SOUND: &[SRow] = &[
         row("Sound", "0007: sound on or off.", Tool("0007"), OFF_ON, Now),
@@ -652,6 +666,8 @@ impl SettingsUi {
             Val::TimersDock => self.s.timers_dock,
             Val::Regime => self.s.regime as u32,
             Val::Minimap => self.s.minimap as u32,
+            Val::ModernMinimap => self.s.modern_minimap as u32,
+            Val::MinimapUnowned => self.s.minimap_unowned as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
             Val::Music => self.s.music,
@@ -702,6 +718,8 @@ impl SettingsUi {
             Val::TimersDock => self.s.timers_dock = x,
             Val::Regime => self.s.regime = x != 0,
             Val::Minimap => self.s.minimap = x != 0,
+            Val::ModernMinimap => self.s.modern_minimap = x != 0,
+            Val::MinimapUnowned => self.s.minimap_unowned = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
             Val::RetailAspect => self.s.retail_aspect = x != 0,
@@ -1776,7 +1794,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();
