@@ -2026,7 +2026,7 @@ const OVERLAY_ZOOM_MAX: f32 = 8.0;
 
 impl Overlay {
     pub fn open(w: &World, regions: &[Region]) -> Self {
-        let region = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
+        let region = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && (w.minimap_unowned || owned(w, r)));
         Self::new(w.pos_zone, region, w.index.clone())
     }
 
@@ -2038,7 +2038,7 @@ impl Overlay {
     /// The player crossed onto another page of the zone (Windurst Waters' north and south): that map, at the same
     /// zoom, the player where they were in the box.
     pub fn follow(&mut self, w: &World, regions: &[Region]) {
-        let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
+        let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && (w.minimap_unowned || owned(w, r)));
         if here == self.region {
             return;
         }

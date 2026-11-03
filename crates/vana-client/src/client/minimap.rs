@@ -57,7 +57,8 @@ pub fn prepare(gu: &GameUi, w: &mut World, sw: f32) {
         }
         _ => w.minimap = Some(Overlay::open(w, regions)),
     }
-    if event::active(w) || w.map.is_some() || w.cnq.is_some() || !w.minimap.as_ref().is_some_and(Overlay::has_map) {
+    // The modern minimap draws a radar of what is near where the zone has no map; the classic one needs the map.
+    if event::active(w) || w.map.is_some() || w.cnq.is_some() || (!w.modern && !w.minimap.as_ref().is_some_and(Overlay::has_map)) {
         return;
     }
     let icons = w.buffs.iter().filter(|&&b| b != 0xffff && b != 0).count();

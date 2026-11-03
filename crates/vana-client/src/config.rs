@@ -264,6 +264,10 @@ pub struct Config {
     /// Extra (the minimap add-ons): the minimap, its place (0 top right, 1 top left), size (0..2) and the map pixels
     /// across (the wheel's zoom).
     pub minimap: bool,
+    /// Ours: the modern UI's minimap (on unless turned off; the classic UI keeps `minimap`, an Extra off by default), and
+    /// whether the minimap shows a zone's map without its key item (the map window keeps retail's rule).
+    pub modern_minimap: bool,
+    pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub minimap_span: f32,
@@ -458,6 +462,8 @@ impl Default for Config {
             rotation_autocast: true,
             regime_out: true,
             minimap: false,
+            modern_minimap: true,
+            minimap_unowned: true,
             minimap_dock: 0,
             minimap_size: 1,
             minimap_span: 160.0,
