@@ -40,6 +40,7 @@ pub struct Settings {
     pub skillchain_helper: bool,
     pub minimap: bool,
     pub modern_minimap: bool,
+    pub solo_badge: bool,
     pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
@@ -93,6 +94,7 @@ impl Settings {
             skillchain_helper: c.skillchain_helper,
             minimap: c.minimap,
             modern_minimap: c.modern_minimap,
+            solo_badge: c.solo_badge,
             minimap_unowned: c.minimap_unowned,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
@@ -143,6 +145,7 @@ impl Settings {
         c.skillchain_helper = self.skillchain_helper;
         c.minimap = self.minimap;
         c.modern_minimap = self.modern_minimap;
+        c.solo_badge = self.solo_badge;
         c.minimap_unowned = self.minimap_unowned;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
@@ -207,6 +210,7 @@ enum Val {
     Minimap,
     /// The modern UI's minimap and its unowned maps (config modern_minimap, minimap_unowned).
     ModernMinimap,
+    SoloBadge,
     MinimapUnowned,
     MinimapDock,
     MinimapSize,
@@ -386,7 +390,8 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
     // Panel Places (a character's) is for in game only.
-    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2]];
+    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2], SOLO_ROW];
+    const SOLO_ROW: SRow = row("Solo Mode Label", "A small Solo label on the solo-mode icon in your effects while Banshee's solo mode is on (!solomode); its tooltip lists the perks.", SoloBadge, OFF_ON, Now);
     const MINIMAP_ROWS: [SRow; 3] = [
         row("Minimap", "The modern interface's minimap: the zone around you, north up, with your arrow, your party and what is near; drag it to an edge, the wheel zooms, a corner resizes it (not retail).", ModernMinimap, OFF_ON, Now),
         row("Minimap Size", "How big the minimap starts (a corner drag sets its own size).", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
@@ -671,6 +676,7 @@ impl SettingsUi {
             Val::Regime => self.s.regime as u32,
             Val::Minimap => self.s.minimap as u32,
             Val::ModernMinimap => self.s.modern_minimap as u32,
+            Val::SoloBadge => self.s.solo_badge as u32,
             Val::MinimapUnowned => self.s.minimap_unowned as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
@@ -724,6 +730,7 @@ impl SettingsUi {
             Val::Regime => self.s.regime = x != 0,
             Val::Minimap => self.s.minimap = x != 0,
             Val::ModernMinimap => self.s.modern_minimap = x != 0,
+            Val::SoloBadge => self.s.solo_badge = x != 0,
             Val::MinimapUnowned => self.s.minimap_unowned = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
@@ -1800,7 +1807,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::SoloBadge | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();

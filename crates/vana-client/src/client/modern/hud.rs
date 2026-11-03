@@ -734,6 +734,10 @@ fn effects(p: Look, w: &World) -> Vec<Effect> {
             let no_timer = p.gu.and_then(|gu| gu.status_entry(small, id)).is_some_and(|e| e.no_timer);
             let timed = timers && end != 0x7fff_ffff && !no_timer;
             let rem = (end.wrapping_sub(now).wrapping_add(59) as i32) / 60;
+            if buffs::is_solo(w, id) {
+                let tip = Some((std::rc::Rc::new((buffs::SOLO_TITLE.to_string(), buffs::SOLO_DESC.to_string())), None));
+                return Effect { icon: Icon::Game(id), label: buffs::solo_label(w, id), ending: false, tip };
+            }
             Effect { icon: Icon::Game(id), label: buffs::label(rem).filter(|_| timed), ending: timed && rem <= 15, tip: effect_tip(p, w, id, timed.then_some(rem)) }
         })
         .collect()

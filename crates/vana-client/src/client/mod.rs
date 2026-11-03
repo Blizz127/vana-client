@@ -6222,6 +6222,8 @@ struct World {
     extra_minimap: bool,
     /// The minimap shows maps whose key item we lack (config minimap_unowned).
     minimap_unowned: bool,
+    /// The "Solo" label on the solo-mode icon (config solo_badge).
+    solo_badge: bool,
     minimap: Option<map::Overlay>,
     minimap_rect: Option<[f32; 4]>,
     minimap_frame: Option<minimap::Frame>,
@@ -6952,6 +6954,7 @@ impl App {
             w.timers_dock = self.cfg.timers_dock;
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (if w.modern { self.cfg.modern_minimap } else { self.cfg.minimap }, self.cfg.minimap_dock, self.cfg.minimap_size);
             w.minimap_unowned = self.cfg.minimap_unowned;
+            w.solo_badge = self.cfg.solo_badge;
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
         self.window_dirty = true;
@@ -8026,6 +8029,7 @@ impl App {
                             extra_skillchain: self.cfg.skillchain_helper,
                             extra_minimap: if self.cfg.modern_ui { self.cfg.modern_minimap } else { self.cfg.minimap },
                             minimap_unowned: self.cfg.minimap_unowned,
+                            solo_badge: self.cfg.solo_badge,
                             minimap: None,
                             minimap_rect: None,
                             minimap_frame: None,

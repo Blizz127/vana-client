@@ -267,6 +267,8 @@ pub struct Config {
     /// Ours: the modern UI's minimap (on unless turned off; the classic UI keeps `minimap`, an Extra off by default), and
     /// whether the minimap shows a zone's map without its key item (the map window keeps retail's rule).
     pub modern_minimap: bool,
+    /// Ours: a "Solo" label on the solo-mode icon (client/buffs.rs).
+    pub solo_badge: bool,
     pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
@@ -463,6 +465,7 @@ impl Default for Config {
             regime_out: true,
             minimap: false,
             modern_minimap: true,
+            solo_badge: true,
             minimap_unowned: true,
             minimap_dock: 0,
             minimap_size: 1,
