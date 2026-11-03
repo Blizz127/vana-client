@@ -39,7 +39,14 @@ pub struct Scan {
     pub origin: (f32, f32),
     /// When c2s 0x0F5 went, until the server confirms (it answers nothing when it refuses: out of range).
     pub asked: Option<std::time::Instant>,
+    /// Ours: when the last list was asked for, and a server that never answered one (Forever before it ports 0x0F4):
+    /// past UNANSWERED the busy strip ends and the panel says Wide Scan is not available.
+    pub sent: Option<std::time::Instant>,
+    pub unanswered: bool,
 }
+
+/// How long a list may take to begin before the server counts as not answering.
+pub const UNANSWERED: std::time::Duration = std::time::Duration::from_secs(8);
 
 impl Scan {
     /// FUN_100f9360: the packet to send. While the server's last list is still open, c2s 0x0F6 (tracking end);
@@ -50,7 +57,15 @@ impl Scan {
             return 0x0F6;
         }
         (self.entries, self.track, self.list_state) = (BTreeMap::new(), Track::default(), 0);
+        (self.sent, self.unanswered) = (Some(std::time::Instant::now()), false);
         0x0F4
+    }
+
+    /// Once a frame: a list asked for that never began (no s2c 0x0F4 / 0x0F6) ends the wait.
+    pub fn check_answer(&mut self) {
+        if self.busy && self.list_state == 0 && self.entries.is_empty() && self.sent.is_some_and(|t| t.elapsed() > UNANSWERED) {
+            (self.busy, self.unanswered, self.sent) = (false, true, None);
+        }
     }
 
     /// FUN_100f93c0 (c2s 0x0F5): the block zeroed with the index set.

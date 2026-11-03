@@ -335,7 +335,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Resolution", "0001 / 0002: the window's size.", Size("0001", "0002", Sizes::Window), &[], Now),
         row("Monitor", "The monitor the game opens on, in every window mode (not retail).", Monitor, &[], Now),
         row("GPU", "The graphics card to draw with; Default is the high-performance one (not retail).", Gpu, &[], Restart),
-        row("Frame Limit", "Frames drawn a second; game time stays at 60 ticks.", FrameLimit, &[], Now),
+        row("Frame Limit", "Frames drawn a second: smoothness only. Movement, animation and game time keep retail's speed at every rate (60 ticks a second).", FrameLimit, &[], Now),
         row("3D Aspect", "Window: the window's shape. Config: retail's ratio from Misc. 2 / the lobby Config.", RetailAspect, &[(0, "Window"), (1, "Config")], Now),
     ];
     // Graphics: the Preset first (it sets the rows below it), then the quality rows.

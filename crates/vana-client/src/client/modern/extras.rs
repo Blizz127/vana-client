@@ -1126,6 +1126,7 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         .collect();
     rows.sort_by(|a, b| (a.0.dx as f32).hypot(a.0.dz as f32).total_cmp(&(b.0.dx as f32).hypot(b.0.dz as f32)));
     // While a list streams in (state 1, or asked and not begun) the last complete one stays.
+    w.scan.check_answer();
     let streaming = w.scan.list_state == 1 || (w.scan.busy && w.scan.list_state != 2);
     if !streaming {
         *m.scan_rows.borrow_mut() = rows;
@@ -1168,7 +1169,7 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         let hresp = flyout_header(ui, m, &count, side);
         ui.add_space(4.0);
         // Scan now (between the 10-s refreshes: camping a notorious monster); greyed while a list comes in.
-        let label = if streaming { "Scanning..." } else { "Scan" };
+        let label = if streaming { "Scanning..." } else if w.scan.unanswered { "Not available" } else { "Scan" };
         ui.horizontal(|ui| {
             let s = kit::Btn { off: streaming, ..Default::default() };
             if kit::clicked(&kit::chip(ui, m, label, s, None), s) {
