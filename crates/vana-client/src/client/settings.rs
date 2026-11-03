@@ -10,6 +10,9 @@ use super::game_ui::GameUi;
 use crate::audio::Ui as Se;
 use crate::config::{Config, FRAME_LIMITS};
 
+mod win;
+pub use win::{WCtl, WRow};
+
 /// What the pages edit (merged back into the config by the app).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
@@ -168,6 +171,8 @@ enum Val {
     /// Width / height names; the choices are sizes.
     Size(&'static str, &'static str, Sizes),
     Gamma,
+    /// Ours: the Graphics page's preset (Original / High / Ultra / Custom), derived from the graphics rows, not kept.
+    Preset,
     FrameLimit,
     Aniso,
     DrawDistance,
@@ -219,6 +224,7 @@ enum Sizes {
     Ui,
 }
 
+#[derive(Clone, Copy)]
 struct SRow {
     label: &'static str,
     help: &'static str,
@@ -274,9 +280,17 @@ const fn row(label: &'static str, help: &'static str, val: Val, choices: &'stati
     SRow { label, help, val, choices, when }
 }
 
-const TABS: [&str; 9] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Gamepad", "Mods"];
+/// Ours (not retail): the Settings pages are player-facing categories, not the Windows Config tool's tabs (General,
+/// Screen, Textures, Effects, Sound, Misc., Client ...). Post-processing is empty until its rows arrive (see POST).
+const TABS: [&str; 9] = ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Gamepad", "Mods"];
+/// The Graphics category (the preset, quality rows): where /graphics opens.
+pub const GRAPHICS: usize = 1;
+/// The Sound page (its volumes are the Gameplay page's in game).
+const SOUND_TAB: usize = 5;
 /// The Gamepad page (client/gamepad.rs).
 const GAMEPAD: usize = 7;
+/// The Post-processing category, empty until it has rows.
+const POST_TAB: usize = 3;
 /// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
 const MODS: usize = 8;
 const EXTRA_TABS: [&str; 3] = ["Maps", "Timers", "Misc."];
@@ -286,33 +300,55 @@ const EXTRA_TABS: [&str; 3] = ["Maps", "Timers", "Misc."];
 fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] {
     use Val::*;
     use When::*;
-    const GENERAL: &[SRow] = &[
+    // Display: the window and what it is shown on.
+    const DISPLAY: &[SRow] = &[
         row("Window Mode", "0034: full screen, a window, or borderless at the window size or the desktop's.", Tool("0034"), &[(0, "Full Screen"), (1, "Windowed"), (2, "Borderless"), (3, "Desktop")], Now),
-        row("MIP Mapping", "0000: lower-resolution textures on distant objects.", Tool("0000"), OFF_ON, NextZone),
-        row("Gamma Base", "0028: base gamma, added to the Gameplay page's R / G / B.", Gamma, &[], Now),
-    ];
-    const SCREEN: &[SRow] = &[
         row("Resolution", "0001 / 0002: the window's size.", Size("0001", "0002", Sizes::Window), &[], Now),
         row("Monitor", "The monitor the game opens on, in every window mode (not retail).", Monitor, &[], Now),
         row("GPU", "The graphics card to draw with; Default is the high-performance one (not retail).", Gpu, &[], Restart),
-        row("Background", "0003 / 0004: the 3D scene's resolution, scaled to the window.", Size("0003", "0004", Sizes::Background), &[], Now),
-        row("UI Scale", "How big the game's windows and text are: Auto grows them with the window past 1080 lines; Menu Size uses the size below, as retail (not retail).", UiScale, UI_SCALES, Now),
-        row("Menu Size", "0037 / 0038: the resolution menus and text are laid out at, then stretched (with UI Scale on Menu Size).", Size("0037", "0038", Sizes::Ui), &[], Now),
+        row("Frame Limit", "Frames drawn a second; game time stays at 60 ticks.", FrameLimit, &[], Now),
         row("3D Aspect", "Window: the window's shape. Config: retail's ratio from Misc. 2 / the lobby Config.", RetailAspect, &[(0, "Window"), (1, "Config")], Now),
-        row("Draw Distance", "How far scenery, characters and effects draw: Retail is the game's distance, the others farther (not retail).", DrawDistance, &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")], Now),
     ];
-    const TEXTURES: &[SRow] = &[
+    // Graphics: the Preset first (it sets the rows below it), then the quality rows.
+    const GRAPHICS_ROWS: &[SRow] = &[
+        row(
+            "Preset",
+            "Sets the quality rows below in one step: Original is this client's defaults; High and Ultra raise filtering, draw distance, textures and lamp lights (Ultra also renders at 1.5x). Custom: set by hand. The Display rows are never changed.",
+            Preset,
+            &[(0, "Original"), (1, "High"), (2, "Ultra"), (3, "Custom")],
+            Now,
+        ),
+        row("Render Resolution", "0003 / 0004: the 3D scene's resolution, scaled to the window. 1.5x and 2x draw the scene larger than the window and scale it down: supersampled anti-aliasing, smoother edges for much more GPU work.", Size("0003", "0004", Sizes::Background), &[], Now),
+        row("Draw Distance", "How far scenery, characters and effects draw: Retail is the game's distance, the others farther (not retail).", DrawDistance, &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")], Now),
         row("Textures", "0018: compressed (BC1 / BC2) or uncompressed textures.", Tool("0018"), &[(0, "High"), (1, "Low"), (2, "Full")], NextZone),
+        row("MIP Mapping", "0000: lower-resolution textures on distant objects.", Tool("0000"), OFF_ON, NextZone),
+        row("Anisotropic Filtering", "Anisotropic texture filtering: sharper textures at a slant (the ground ahead).", Aniso, &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")], NextZone),
         row("2-D Mapping", "0019: map images compressed (DXT3) or at full quality.", Tool("0019"), &[(0, "Compressed"), (1, "Full")], NextZone),
         row("Fonts", "0036: the font texture quality.", Tool("0036"), &[(0, "Compressed"), (1, "Full"), (2, "High")], Restart),
     ];
-    const EFFECTS: &[SRow] = &[
+    // Lighting & Effects.
+    const LIGHTING: &[SRow] = &[
         row("Lamp Lights", "Baked: the lamplight painted onto the walls, as retail. Real: point lights at the lamps (not retail).", LampLights, &[(0, "Baked"), (1, "Real")], Now),
-        row("Environment Animation", "0011: swaying vegetation (Normal 16 steps, Smooth 32).", Tool("0011"), &[(0, "Off"), (1, "Normal"), (2, "Smooth")], Now),
         row("Bump Mapping", "0017: normal-mapped scenery; off lights it with the sun and moon together.", Tool("0017"), OFF_ON, NextZone),
+        row("Environment Animation", "0011: swaying vegetation (Normal 16 steps, Smooth 32).", Tool("0011"), &[(0, "Off"), (1, "Normal"), (2, "Smooth")], Now),
+        row("Gamma", "0028: base gamma, added to the Gameplay page's R / G / B.", Gamma, &[], Now),
         row("Graphics Stabilization", "0040: On interpolates the shine overlay's coordinates plainly (no seam wrap).", Tool("0040"), OFF_ON, Now),
         row("3D LCD Mode", "0030: side-by-side stereo for 3D screens.", Tool("0030"), OFF_ON, Now),
     ];
+    // Post-processing: one `row(...)` line each when the passes arrive (anti-aliasing, bloom, tone mapping, sharpening).
+    const POST: &[SRow] = &[];
+    const PLACES_ROW: SRow = row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now);
+    const INTERFACE_HEAD: [SRow; 5] = [
+        row("Interface", "Classic: the game's own windows. Modern: the new interface's windows where it has them (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
+        row("UI Scale", "How big the game's windows and text are: Auto grows them with the window past 1080 lines; Menu Size uses the size below, as retail (not retail).", UiScale, UI_SCALES, Now),
+        row("Menu Size", "0037 / 0038: the resolution menus and text are laid out at, then stretched (with UI Scale on Menu Size).", Size("0037", "0038", Sizes::Ui), &[], Now),
+        row("Interface Size", "The modern interface's size (not retail).", ModernScale, MODERN_SCALES, Now),
+        row("Panel Opacity", "How opaque the modern interface's window backgrounds are (not retail).", ModernOpacity, &[], Now),
+    ];
+    const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
+    // Panel Places (a character's) is for in game only.
+    const INTERFACE: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW];
+    const INTERFACE_LOBBY: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PARTY_TP_ROW];
     const SOUND: &[SRow] = &[
         row("Sound", "0007: sound on or off.", Tool("0007"), OFF_ON, Now),
         row("Sound Effect Channels", "0029: sound effects playing at once.", Tool("0029"), &[(12, "12"), (13, "13"), (14, "14"), (15, "15"), (16, "16"), (17, "17"), (18, "18"), (19, "19"), (20, "20")], Now),
@@ -327,15 +363,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Opening Movie", "0022: play the opening movie before the title; any key skips it.", Tool("0022"), OFF_ON, Restart),
         row("Simple Character Creation", "0023: character creation with 2-D portraits instead of the 3D models.", Tool("0023"), OFF_ON, Now),
         row("Screenshot Size", "0043: also save each screenshot at the screen size (ffxiuser/screenshots).", Tool("0043"), OFF_ON, Now),
-    ];
-    const CLIENT: &[SRow] = &[
-        row("Frame Limit", "Frames drawn a second; game time stays at 60 ticks.", FrameLimit, &[], Now),
-        row("Anisotropic Filtering", "Anisotropic texture filtering.", Aniso, &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")], NextZone),
-        row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now),
-        row("Interface", "Classic: the game's own windows. Modern: the new interface's windows where it has them (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
-        row("Interface Size", "The modern interface's size (not retail).", ModernScale, MODERN_SCALES, Now),
-        row("Panel Opacity", "How opaque the modern interface's window backgrounds are (not retail).", ModernOpacity, &[], Now),
-        row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now),
     ];
     const GAMEPAD_ROWS: &[SRow] = &[
         row("Gamepad", "A connected gamepad plays the game: the left stick walks, the right one turns the camera, the buttons are the keys' (not retail). Off, a pad does nothing.", Gamepad, OFF_ON, Now),
@@ -374,12 +401,20 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     match kind {
         Kind::Extras if modern => [&MAPS[..3], TIMERS_MODERN, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Extras => [MAPS, TIMERS, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
-        Kind::Settings if in_game && tab == 4 => &SOUND[..3],
+        Kind::Settings if in_game && tab == SOUND_TAB => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
         Kind::Settings if tab == GAMEPAD => GAMEPAD_ROWS,
-        // Panel Places (the last Linux row) is a character's: in game only.
-        Kind::Settings if !in_game && tab == 6 => &CLIENT[..CLIENT.len() - 1],
-        Kind::Settings => [GENERAL, SCREEN, TEXTURES, EFFECTS, SOUND, MISC, CLIENT][tab.min(6)],
+        Kind::Settings => match tab {
+            0 => DISPLAY,
+            GRAPHICS => GRAPHICS_ROWS,
+            2 => LIGHTING,
+            POST_TAB => POST,
+            4 if in_game => INTERFACE,
+            4 => INTERFACE_LOBBY,
+            SOUND_TAB => SOUND,
+            6 => MISC,
+            _ => &[],
+        },
     }
 }
 
@@ -435,7 +470,36 @@ pub struct SettingsUi {
     /// Extras: the Lua mods' pages after our own, and their changes for the app to apply (mod, key, value).
     pub mod_pages: Vec<ModPage>,
     pub mod_changes: Vec<(String, String, serde_json::Value)>,
+    /// Ours: the modern window's (modern/options.rs) state. The values when it opened or last Applied (Cancel goes back to
+    /// them), where the keys are (the category list, the rows, the buttons) and which button, and that it is closing:
+    /// the app drops it once what changed is stored.
+    orig: Settings,
+    pub zone: Zone,
+    pub btn: usize,
+    pub closing: bool,
 }
+
+/// Where the modern window's keys act.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Zone {
+    #[default]
+    Cats,
+    Rows,
+    Buttons,
+}
+
+/// What a window key or button did to the window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Done {
+    Stay,
+    /// OK: the values kept, the window closes.
+    Ok,
+    /// Cancel: the values put back, the window closes.
+    Cancel,
+}
+
+/// The window's bottom buttons.
+pub const WIN_BUTTONS: [&str; 4] = ["Defaults", "Apply", "OK", "Cancel"];
 
 /// What a row's controls are.
 enum Ctl {
@@ -449,7 +513,7 @@ impl SettingsUi {
     }
 
     pub fn open_kind(c: &Config, window: [u32; 2], kind: Kind) -> Self {
-        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new() };
+        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new(), orig: Settings::of(c), zone: Zone::Cats, btn: 2, closing: false };
         s.col = s.marked_col();
         s
     }
@@ -485,14 +549,21 @@ impl SettingsUi {
     fn ctl(r: &Row) -> Ctl {
         match r.val {
             Val::Size(..) | Val::Gamma | Val::FrameLimit | Val::Monitor | Val::Gpu | Val::Music | Val::Effects | Val::MapOpacity | Val::ModernOpacity => Ctl::Slider,
+            // The preset's four names are buttons (widened for their captions, as a long caption's are).
+            Val::Preset => Ctl::Buttons(r.choices.len()),
             _ if r.choices.len() <= 3 => Ctl::Buttons(r.choices.len()),
             _ => Ctl::Slider,
         }
     }
 
+    /// The window's size times `f`, in pixels.
+    fn scaled(&self, f: f32) -> [u32; 2] {
+        [(self.window[0] as f32 * f).round() as u32, (self.window[1] as f32 * f).round() as u32]
+    }
+
     fn sizes(&self, k: Sizes) -> Vec<[u32; 2]> {
-        let [w, h] = self.window;
-        let scaled = |f: f32| [(w as f32 * f).round() as u32, (h as f32 * f).round() as u32];
+        let h = self.window[1];
+        let scaled = |f: f32| self.scaled(f);
         match k {
             Sizes::Window => RESOLUTIONS.to_vec(),
             // 0 = the window's; then scales of it and the tool's squares.
@@ -518,6 +589,7 @@ impl SettingsUi {
         match v {
             Val::Tool(n) => self.tool_get(n),
             Val::Size(..) | Val::Gamma | Val::Monitor | Val::Gpu => 0,
+            Val::Preset => self.preset(),
             Val::FrameLimit => self.s.frame_limit,
             Val::Aniso => self.s.anisotropy as u32,
             Val::DrawDistance => self.s.draw_distance,
@@ -561,6 +633,7 @@ impl SettingsUi {
     fn set(&mut self, v: Val, x: u32) {
         match v {
             Val::Tool(n) => self.tool_set(n, x),
+            Val::Preset => self.apply_preset(x),
             Val::Aniso => self.s.anisotropy = x as u16,
             Val::DrawDistance => self.s.draw_distance = x,
             Val::PartyTp => self.s.party_tp = x != 0,
@@ -808,7 +881,8 @@ impl SettingsUi {
                 }
             }
             egui::Key::Enter => self.enter(),
-            egui::Key::Tab => self.turn(1),
+            egui::Key::Tab | egui::Key::PageDown => self.turn(1),
+            egui::Key::PageUp => self.turn(-1),
             egui::Key::Escape => return true,
             _ => {}
         }
@@ -923,6 +997,23 @@ impl SettingsUi {
         }
         if self.on_mods() {
             self.mods_draw(gu, x, y);
+            return [x, y, W, H];
+        }
+        // A category with no rows yet says what is coming, in lines that fit the page.
+        if let Some(note) = self.note() {
+            let mut line = String::new();
+            let mut ly = y + Self::TOP;
+            for word in note.split(' ') {
+                let next = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+                if !line.is_empty() && gu.label_width(&next) > W - 64.0 {
+                    gu.label(&line, x + 32.0, ly, N, false);
+                    ly += 18.0;
+                    line = word.to_string();
+                } else {
+                    line = next;
+                }
+            }
+            gu.label(&line, x + 32.0, ly, N, false);
             return [x, y, W, H];
         }
         let ctls = self.controls();
@@ -1498,14 +1589,14 @@ mod tests {
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.tool.get("0034"), Some(&2));
-        // Background (under Resolution, Monitor, Graphics Card): Same as window -> 640 x 400.
-        ui.goto(1, 4);
+        // Render Resolution (under the Preset): Same as window -> 640 x 400.
+        ui.goto(1, 2);
         ui.key(egui::Key::Enter);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Escape);
         assert_eq!((ui.s.tool["0003"], ui.s.tool["0004"]), (640, 400));
         // Frame limit 300 -> 360 -> unlimited.
-        ui.goto(6, 1);
+        ui.goto(0, 5);
         ui.key(egui::Key::Enter);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::ArrowRight);
@@ -1573,11 +1664,11 @@ mod tests {
         ui.goto(0, 1);
         ui.key(egui::Key::ArrowLeft);
         assert_eq!(ui.tab, MODS);
-        ui.goto(0, 2);
+        ui.goto(0, 6);
         ui.key(egui::Key::ArrowRight);
         assert_eq!((ui.tab, ui.col), (0, 1));
         ui.key_mod(egui::Key::ArrowRight, true);
-        assert_eq!((ui.tab, ui.row), (1, 2));
+        assert_eq!((ui.tab, ui.row), (1, 6));
         // The page name: opened on it, Up from the first row reaches it, Left / Right there turn the page.
         let mut ui = SettingsUi::open(&c, [1280, 800]);
         assert_eq!(ui.row, 0);
@@ -1620,5 +1711,200 @@ mod tests {
         assert_eq!(ui.row, 0);
         ui.key(egui::Key::ArrowRight);
         assert_eq!(ui.tab, 0);
+    }
+
+    /// The categories hold every row of the old tabs exactly once (Preset is new), in each place's own mode.
+    #[test]
+    fn categories_cover_every_old_row_once() {
+        // Val's Debug of the 39 rows the General .. Gamepad tabs had (Panel Places only in game, the volumes only out of it).
+        let old = [
+            "Tool(\"0034\")", "Tool(\"0000\")", "Gamma", "Size(\"0001\", \"0002\", Window)", "Monitor", "Gpu", "Size(\"0003\", \"0004\", Background)", "UiScale", "Size(\"0037\", \"0038\", Ui)", "RetailAspect", "DrawDistance",
+            "Tool(\"0018\")", "Tool(\"0019\")", "Tool(\"0036\")", "LampLights", "Tool(\"0011\")", "Tool(\"0017\")", "Tool(\"0040\")", "Tool(\"0030\")",
+            "Tool(\"0007\")", "Tool(\"0029\")", "Tool(\"0035\")", "Music", "Effects",
+            "Tool(\"0021\")", "CursorSize", "Tool(\"0022\")", "Tool(\"0023\")", "Tool(\"0043\")",
+            "FrameLimit", "Aniso", "PartyTp", "ModernUi", "ModernScale", "ModernOpacity", "ResetPlaces",
+            "Gamepad", "GamepadDeadzone", "GamepadCamera",
+        ];
+        let c = Config::default();
+        let mut ui = SettingsUi::open(&c, [1280, 800]);
+        let mut seen: Vec<String> = Vec::new();
+        for in_game in [true, false] {
+            ui.in_game = in_game;
+            let mut here = Vec::new();
+            for tab in 0..TABS.len() {
+                ui.tab = tab;
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset)).map(|r| format!("{:?}", r.val)));
+            }
+            let mut dup = here.clone();
+            dup.sort();
+            dup.dedup();
+            assert_eq!(dup.len(), here.len(), "a row is in two categories (in_game {in_game})");
+            seen.extend(here);
+        }
+        seen.sort();
+        seen.dedup();
+        let mut want: Vec<String> = old.iter().map(|s| s.to_string()).collect();
+        want.sort();
+        assert_eq!(seen, want);
+        // The Preset leads Graphics and nothing else; Post-processing is the placeholder.
+        ui.tab = GRAPHICS;
+        assert!(matches!(ui.rows()[0].val, Val::Preset) && ui.rows()[1].label == "Render Resolution");
+        ui.tab = POST_TAB;
+        assert!(ui.rows().is_empty() && ui.note().is_some_and(|n| n.starts_with("Coming soon")));
+        assert_eq!(ui.tabs(), ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Gamepad", "Mods"]);
+    }
+
+    /// The rows a preset sets.
+    fn graphics(s: &Settings) -> (u16, u32, bool, Vec<u32>) {
+        let t = |n: &str| s.tool.get(n).copied().unwrap_or_else(|| crate::config::TOOL_DEFAULTS.iter().find(|d| d.0 == n).map_or(0, |d| d.1));
+        (s.anisotropy, s.draw_distance, s.lamp_lights, ["0018", "0000", "0017", "0011", "0003", "0004"].iter().map(|n| t(n)).collect())
+    }
+
+    /// Original is the defaults, a hand change makes Custom, High and Ultra are found again.
+    #[test]
+    fn presets_are_detected() {
+        let mut ui = SettingsUi::open(&Config::default(), [1920, 1080]);
+        assert_eq!(ui.preset(), 0);
+        ui.s.anisotropy = 4;
+        assert_eq!(ui.preset(), 3);
+        assert_eq!(ui.shown(&Row::from(&rows(Kind::Settings, GRAPHICS, true, false)[0])), "Custom");
+        ui.set(Val::Preset, 1);
+        assert_eq!((ui.preset(), ui.s.anisotropy, ui.s.draw_distance, ui.s.lamp_lights), (1, 16, 200, true));
+        assert_eq!(ui.tool_get("0018"), 2);
+        ui.set(Val::Preset, 2);
+        assert_eq!((ui.preset(), ui.s.draw_distance, [ui.tool_get("0003"), ui.tool_get("0004")]), (2, 300, [2880, 1620]));
+        // Custom is not a preset to choose.
+        ui.set(Val::Preset, 3);
+        assert_eq!(ui.preset(), 2);
+        ui.set(Val::Preset, 0);
+        assert_eq!(ui.preset(), 0);
+        assert_eq!(ui.s, Settings::of(&Config::default()));
+        // A row by hand off High.
+        ui.set(Val::Preset, 1);
+        ui.tool_set("0017", 0);
+        assert_eq!(ui.preset(), 3);
+    }
+
+    /// A preset changes the graphics rows and nothing else, whatever the other settings are.
+    #[test]
+    fn preset_leaves_the_rest_alone() {
+        let mut c = Config::default();
+        c.frame_limit = 144;
+        c.monitor = "DP-1".into();
+        c.gpu = "Some GPU".into();
+        c.modern_scale = 110;
+        c.tool.insert("0034".into(), 2);
+        c.tool.insert("0001".into(), 2560);
+        c.tool.insert("0002".into(), 1440);
+        c.tool.insert("0028".into(), 0.5f32.to_bits());
+        c.tool.insert("0019".into(), 0);
+        c.tool.insert("0036".into(), 2);
+        let mut ui = SettingsUi::open(&c, [2560, 1440]);
+        for k in [1, 2, 0] {
+            let before = ui.s.clone();
+            ui.set(Val::Preset, k);
+            let after = ui.s.clone();
+            // Put the graphics rows back: what is left must be what it was.
+            let mut rest = after.clone();
+            rest.anisotropy = before.anisotropy;
+            rest.draw_distance = before.draw_distance;
+            rest.lamp_lights = before.lamp_lights;
+            for n in ["0018", "0000", "0017", "0011", "0003", "0004"] {
+                match before.tool.get(n) {
+                    Some(v) => rest.tool.insert(n.into(), *v),
+                    None => rest.tool.remove(n),
+                };
+            }
+            assert_eq!(rest, before, "preset {k} touched a row outside the graphics rows");
+        }
+        // Ultra at 1440p: the scene at 1.5x the window.
+        ui.set(Val::Preset, 2);
+        assert_eq!(graphics(&ui.s).3[4..], [3840, 2160]);
+    }
+
+    /// Defaults on a category puts its rows back, on Graphics to Original, and leaves the other categories alone.
+    #[test]
+    fn defaults_reset_the_category() {
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        ui.set(Val::Preset, 2);
+        ui.tool_set("0019", 0);
+        ui.s.frame_limit = 60;
+        ui.tab = GRAPHICS;
+        ui.reset_category();
+        assert_eq!(ui.preset(), 0);
+        assert_eq!(ui.tool_get("0019"), 1);
+        // Frame Limit is on Display: not touched.
+        assert_eq!(ui.s.frame_limit, 60);
+        assert!(ui.dirty);
+    }
+
+    /// The window's keys: categories, rows (Left / Right set at once, live), the buttons; Cancel puts the values back.
+    #[test]
+    fn window_keys_and_cancel() {
+        use egui::Key as K;
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        ui.begin();
+        ui.open_page("graphics");
+        assert_eq!((ui.tab, ui.row, ui.zone), (GRAPHICS, 1, Zone::Rows));
+        // Preset: Right is High, at once; Down to Render Resolution; Up and Up reach the categories.
+        assert_eq!(ui.win_key(K::ArrowRight, false), Done::Stay);
+        assert_eq!(ui.preset(), 1);
+        assert!(ui.dirty);
+        ui.win_key(K::ArrowDown, false);
+        assert_eq!(ui.row, 2);
+        ui.win_key(K::ArrowUp, false);
+        ui.win_key(K::ArrowUp, false);
+        assert_eq!(ui.zone, Zone::Cats);
+        // Down on the list turns the category, Tab and Page Down too; Enter goes into the rows, Down past the last one to the buttons.
+        ui.win_key(K::ArrowDown, false);
+        assert_eq!(ui.tab, 2);
+        ui.win_key(K::PageDown, false);
+        ui.win_key(K::Tab, true);
+        assert_eq!(ui.tab, 2);
+        ui.win_key(K::Enter, false);
+        assert_eq!(ui.zone, Zone::Rows);
+        for _ in 0..6 {
+            ui.win_key(K::ArrowDown, false);
+        }
+        assert_eq!(ui.zone, Zone::Buttons);
+        assert_eq!(ui.btn, 2);
+        // Enter on a toggle steps it: Graphics Stabilization (row 5 of Lighting & Effects).
+        ui.zone = Zone::Rows;
+        ui.row = 5;
+        ui.win_key(K::Enter, false);
+        assert_eq!(ui.tool_get("0040"), 1);
+        // Escape goes back to the categories, a second one cancels: the values are the open ones again.
+        assert_eq!(ui.win_key(K::Escape, false), Done::Stay);
+        assert_eq!(ui.zone, Zone::Cats);
+        assert_eq!(ui.win_key(K::Escape, false), Done::Cancel);
+        assert!(ui.closing && ui.dirty);
+        assert_eq!(ui.s, Settings::of(&Config::default()));
+        // Apply keeps the values as the new ones; Cancel then goes back to them; OK closes keeping them.
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        ui.begin();
+        ui.set(Val::Preset, 1);
+        assert_eq!(ui.win_press(1), Done::Stay);
+        ui.set(Val::Preset, 2);
+        assert_eq!(ui.win_press(3), Done::Cancel);
+        assert_eq!(ui.preset(), 1);
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        ui.begin();
+        ui.set(Val::Preset, 2);
+        assert_eq!(ui.win_press(2), Done::Ok);
+        assert_eq!(ui.preset(), 2);
+    }
+
+    /// The window's rows: a switch for ON / OFF, segments for a few names (Custom shows but is locked), sliders.
+    #[test]
+    fn window_row_controls() {
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        ui.tab = GRAPHICS;
+        let rows = ui.win_rows();
+        assert!(matches!(&rows[0].ctl, WCtl::Segments { labels, at: 0, locked: Some(3) } if labels.len() == 4));
+        assert!(matches!(&rows[1].ctl, WCtl::Slider { .. }));
+        assert!(matches!(&rows[4].ctl, WCtl::Toggle(true)));
+        assert_eq!(rows[3].when, "Applies on next zone");
+        assert_eq!(rows[7].when, "Needs restart");
+        assert!(rows[1].help.starts_with("The 3D scene's resolution"), "{}", rows[1].help);
     }
 }

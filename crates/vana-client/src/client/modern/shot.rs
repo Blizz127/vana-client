@@ -250,6 +250,12 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     if opts.kit {
         kit_sample(&mut p);
     }
+    // The Graphics & Interface window over the HUD, as in game.
+    if let Some(name) = &opts.panel {
+        let px = ctx.content_rect().size() * ctx.pixels_per_point();
+        p.focus = Some(super::options::ID);
+        super::options::sample(&mut p, name, opts.panel_row, [px.x.round() as u32, px.y.round() as u32]);
+    }
     if opts.rows.is_some() || opts.borders.is_some() {
         menu_sample(&mut p);
     }
@@ -261,7 +267,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         timers_sample(m, ctx, screen.center().x - 190.0 - super::extras::WIDTH, super::extras::WIDTH, super::extras::Side::Left);
         timers_sample(m, ctx, screen.center().x - 180.0, 360.0, super::extras::Side::Left);
     }
-    if opts.list || opts.kit || opts.rows.is_some() || opts.borders.is_some() {
+    if opts.list || opts.kit || opts.panel.is_some() || opts.rows.is_some() || opts.borders.is_some() {
         return;
     }
     // Every frame at a few sizes: nine-slice corners, tiled edges, the stretched gradient.
@@ -294,6 +300,10 @@ pub struct Opts {
     pub opacity: f32,
     /// A panel of the kit's controls.
     pub kit: bool,
+    /// The Graphics & Interface window (options.rs) on a category (display, graphics, lighting, post, interface, sound,
+    /// misc, gamepad, mods) with the cursor on a row (0: the category list).
+    pub panel: Option<String>,
+    pub panel_row: usize,
 }
 
 pub fn shot(width: u32, height: u32, scale: u32, backdrop: Option<&Path>, out: &Path, opts: &Opts) -> Result<()> {

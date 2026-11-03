@@ -107,6 +107,19 @@ controls behave alike everywhere. A fix to how a kind of control behaves goes in
 - Retail windows still drawn in the modern UI get the modern frame at the panels' size, standing out past the window
   with a margin.
 
+## Graphics & Interface window (modern/options.rs, client/settings.rs)
+
+Settings (Config > Settings, the title's Config > Settings, `/graphics` or `/options`) is one window of about 900 x 600
+points (clamped to the screen): categories on the left (Display, Graphics, Lighting & Effects, Post-processing,
+Interface, Sound, Misc., Gamepad, Mods), the category's rows on the right (heading, help, "applies on next zone" /
+"needs restart", and a switch, segments or a slider), Defaults / Apply / OK / Cancel below. Changes show and are stored
+at once; Cancel puts back what the window opened with (or was last Applied to). The Graphics category starts with a
+derived Preset row (Original = Config defaults, High, Ultra, else Custom) that sets only the graphics rows. Keys: Up /
+Down, Left / Right (set at once), Enter (next option / press), Tab and the pad's bumpers (Page Up / Down, `Ctx::Pages`)
+turn the category, Escape goes back to the list and, there, cancels. New rows go into a category's table in
+client/settings.rs (Post-processing's `POST` is empty until its passes land). `modern-shot --panel graphics --panel-row 2`
+renders it offscreen. The classic (DAT) pages use the same categories.
+
 ## UI states
 
 | Mode | Emphasis |

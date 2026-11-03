@@ -2169,6 +2169,9 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                 }
                 // Our settings screen, then the Config windows, take the keys while open (in the modern Config ours is
                 // one of its pages, keyed there).
+                // Ours: the modern Graphics & Interface window (modern/options.rs) has its own key model; the classic pages
+                // below stay as they were.
+                _ if world.modern && world.settings.as_ref().is_some_and(|s| s.windowed()) => modern::options_key(world, *key, modifiers.shift),
                 _ if world.settings.is_some() && !(world.modern && world.config.is_some()) => {
                     let mut s = world.settings.take().unwrap();
                     let closes = s.key_mod(*key, modifiers.ctrl || modifiers.alt);
@@ -6282,6 +6285,8 @@ struct World {
     /// Our Settings or Extras page when opened from the Config window, and a request to open one.
     settings: Option<settings::SettingsUi>,
     want_settings: Option<settings::Kind>,
+    /// The category a request to open Settings goes to (/graphics: "Graphics").
+    want_settings_page: Option<&'static str>,
     /// The Lua mods of this session (docs/lua-mods.md).
     lua: lua::Host,
 }
@@ -8057,6 +8062,7 @@ impl App {
                             game_save: false,
                             settings: None,
                             want_settings: None,
+                            want_settings_page: None,
                             lua: Default::default(),
                         }));
                         if let Phase::World(w) = &mut self.phase {
@@ -12087,6 +12093,16 @@ impl App {
                     s.monitors = self.monitors.clone();
                     s.gpus = self.gpus.clone();
                     s.in_game = true;
+                    // Ours: Settings is the Graphics & Interface window in the modern layer, in place of the Config.
+                    if kind == settings::Kind::Settings {
+                        if world.modern {
+                            world.config = None;
+                        }
+                        s.begin();
+                        if let Some(page) = world.want_settings_page.take() {
+                            s.open_page(page);
+                        }
+                    }
                     if kind == settings::Kind::Extras {
                         s.mod_pages = world.lua.settings_pages();
                         if let Some(id) = world.lua.open_page.take() {
@@ -12119,6 +12135,10 @@ impl App {
                             log::warn!("config: {e:#}");
                         }
                     }
+                }
+                // The window's OK or Cancel: closed once what changed (Cancel: the old values back) is stored.
+                if world.settings.as_ref().is_some_and(|s| s.closing && !s.dirty) {
+                    world.settings = None;
                 }
                 if std::mem::take(&mut world.volume_dirty) {
                     apply = true;
@@ -12492,6 +12512,10 @@ impl App {
         use gamepad::Ctx;
         match &self.phase {
             Phase::World(w) if text_field_open(w) => Ctx::Typing,
+            // Ours: our Settings is up (its bumpers turn the categories).
+            Phase::World(w) if w.settings.is_some() && w.map.is_none() => Ctx::Pages,
+            // The same in the lobby: the classic page, or the modern window once opened from the Config's list.
+            Phase::Characters { .. } if self.lobby_settings.is_some() && (!self.cfg.modern_ui || self.lobby_cfg.as_ref().is_some_and(|c| c.m_open && modern::lobby_config_settings(c))) && !self.creating_name() && !self.creating_pass() => Ctx::Pages,
             // The action menu stays up through a fight: walking goes on under it, as the keyboard's movement keys do.
             // With the map window up the right stick zooms it.
             Phase::World(w) if window_over_actions(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some() || event::active(w) || w.prompt.is_some() => {
