@@ -572,7 +572,9 @@ category, spell list, same rows and keys).
   as wide as the room left of the party column (chat.rs `default_room`; it ran under the party window at the larger
   Interface Sizes, its gear and grip over the party's rows: the user's report, "too overlapping"), the main menu, the
   command window, `/check`, the effect icons and the minimap's place start under the top bar's boxes (the menu covered
-  the Network box). A place the player saved stays as saved and is kept on the screen (egui's constrain); the chat
+  the Network box), the cast bar, countdown and objective stand centred under the bar (they sat under the effect
+  icons once these made two rows) and the Timers' place is under four rows of icons; a saved chat height is kept under
+  the top bar too. A place the player saved stays as saved and is kept on the screen (egui's constrain); the chat
   window's width, saved or default, also gives way to the party window while it stands in its way (`chat_width`), and
   the tab row shrinks its tabs before they run under the settings button. Tests: `layout_tests.rs` (the default places
   at 1280x800 .. 3840x2160 and Interface Size 50 / 60 / 100 / 150: on the margin, none over another, none under the

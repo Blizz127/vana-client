@@ -505,12 +505,13 @@ fn default_place(id: &str, screen: Vec2) -> Place {
         // raid1 / raid2's places (y 48 and 150 of the 448 layout).
         "alliance1" => at(0.87, 0.107),
         "alliance2" => at(0.87, 0.335),
-        // The cast bar at retail's (16, 94); the Timers on the left edge, the minimap on the right one.
-        "cast" => at(EDGE / sw, 0.21),
-        // The 0x075 countdown under it, the objective's bars under that.
-        "countdown" => at(EDGE / sw, 0.28),
-        "objective" => at(EDGE / sw, 0.35),
-        "timers" => at(0.0, 0.2187),
+        // The cast bar centred under the top bar (it stood at retail's (16, 94), under the effect icons once there
+        // were two rows of them), the 0x075 countdown under it, the objective's bars under that; the Timers on the
+        // left edge under the most effect icons there are (four rows), the minimap on the right one.
+        "cast" => at((sw - 300.0) / 2.0 / sw, BELOW_BAR / sh),
+        "countdown" => at((sw - 300.0) / 2.0 / sw, (BELOW_BAR + 64.0) / sh),
+        "objective" => at((sw - 300.0) / 2.0 / sw, (BELOW_BAR + 128.0) / sh),
+        "timers" => at(0.0, (BELOW_BAR + 4.0 * 54.0 + GAP) / sh),
         // The training regime lower on the same edge.
         "regime" => at(0.0, 0.6),
         // The skillchain helper on the right edge, under the minimap.
@@ -797,7 +798,12 @@ impl<'a> Panels<'a> {
     /// and clear of the party window (chat_width).
     fn room(&self, id: &str, size: Vec2) -> Vec2 {
         let p = self.place(id);
-        let (w, h) = (if p.w > 0.0 { p.w } else { size.x }, if p.h > 0.0 { p.h } else { size.y });
+        let (w, mut h) = (if p.w > 0.0 { p.w } else { size.x }, if p.h > 0.0 { p.h } else { size.y });
+        if id == "chat" {
+            // Not taller than the room under the top bar (a height saved on a bigger window).
+            let most = self.ctx.content_rect().height() * p.b - theme::BELOW_BAR - chat::chrome();
+            h = h.min(most.max(60.0));
+        }
         vec2(if id == "chat" { self.chat_width(w, h, &p) } else { w }, h)
     }
 

@@ -192,6 +192,10 @@ fn timers_sample(m: &Modern, ctx: &egui::Context, x: f32, width: f32, side: supe
     });
 }
 
+/// How many effects the shot's status panel shows at least (the layout tests set it).
+#[cfg(test)]
+thread_local!(pub(super) static EFFECTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+
 pub(super) fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts, backdrop: bool) {
     let top = crate::client::hudtop::TopView {
         title: "Status".into(),
@@ -233,7 +237,12 @@ pub(super) fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts:
     let named = |l: &str, mode: u16| mode == 13 && chat::mentions(l, "Lenon");
     chat::draw(&mut p, &ChatView { lines: lines.iter().enumerate().map(|(k, (a, b, c, d))| (a.clone(), *b, *c, *d, named(b, *d), k)).collect(), input: Some(InputView { channel: "Party", sel: Some((0, 7)), pieces: vec![("Pulling now ".into(), false), ("Thank you.".into(), true)], caret: 22, fep: None }), waiting: false, unread }, shown, true);
     let fx = |icon, label: Option<&str>, ending| Effect { icon: Icon::Pack(icon), label: label.map(str::to_string), ending, tip: None };
-    let mine = vec![fx("icons/protect", Some("25m"), false), fx("icons/haste", Some("2m"), false), fx("icons/refresh", Some("12"), true), fx("icons/poison", None, false)];
+    let mut mine = vec![fx("icons/protect", Some("25m"), false), fx("icons/haste", Some("2m"), false), fx("icons/refresh", Some("12"), true), fx("icons/poison", None, false)];
+    // The tests' crowded party play: up to 32 effects (four rows of icons).
+    #[cfg(test)]
+    while mine.len() < EFFECTS.with(|n| n.get()) {
+        mine.push(fx("icons/haste", Some("1m"), false));
+    }
     hud::status_panel(&mut p, &StatusView { effects: mine, cursor: None }, false);
     let dot = |x, y, c: u32| (x, y, super::chat::colour(c.to_le_bytes()));
     let compass = hud::CompassView { heading: 0.6, dots: vec![dot(4.0, -9.0, 0x8030_60e0), dot(-11.0, 3.0, 0x8000_b040), dot(14.0, 13.0, 0x5000_b040)], range: 28.8, arrow: Some((0.6, -0.8, "focus")) };
