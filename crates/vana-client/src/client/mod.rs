@@ -4,6 +4,7 @@ pub mod ground;
 pub mod combat;
 mod actmotion;
 mod chair;
+mod controls;
 mod battlemod;
 pub mod opening;
 mod flyover;
@@ -315,7 +316,13 @@ fn world_window_open(w: &World) -> bool {
 /// A window has the keys (keys_spec "window" state): arrows go to it, not to the camera. The log counts only while
 /// focused: Escape or another window unfocuses it and leaves the 0x78 state at 1.
 fn keys_in_window(w: &World) -> bool {
-    world_window_open(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some()
+    w.action_menu.is_some() || menu_has_keys(w)
+}
+
+/// Ours: a window other than the action menu (which stays up while engaged) has the keys: the Modern WASD does not walk
+/// under a menu, a list or a prompt.
+fn menu_has_keys(w: &World) -> bool {
+    window_over_actions(w) || w.palette.0 != 0 || w.log_active || w.log_focus == 2 || event::choice(w).is_some() || event::input(w).is_some()
 }
 
 /// The open windows but the action menu (playermo), which stays up while engaged: macros run while it is the only one
@@ -6529,21 +6536,14 @@ pub struct App {
     tasks_tx: Sender<Task>,
     tasks: Receiver<Task>,
     keys: HashSet<KeyCode>,
-    dragging: bool,
-    left_down: bool,
-    middle_down: bool,
-    /// Where the right button went down (the camera arrow's reference).
-    drag_from: Option<(f64, f64)>,
+    /// The mouse buttons (left, right = a look drag, middle) and their presses (controls.rs).
+    ptr: controls::Pointer,
     /// FUN_10157fa0's +0x57: this movement push already sent its stand-up command.
     stand_sent: bool,
     /// Wheel notches since the last frame (FOV zoom), and those a focused list takes.
     wheel: f32,
     list_wheel: f32,
     mods: winit::keyboard::ModifiersState,
-    press_at: Option<(f64, f64)>,
-    /// When the left button went down, and the right one (where and when): the drag rule (FUN_10125040).
-    press_time: Option<Instant>,
-    right_press: Option<((f64, f64), Instant)>,
     /// Ours (modern MMOs): a look drag holds the pointer, hidden, where it began. Some(true) locked (raw motion turns
     /// the camera), Some(false) only confined (X11: warped back after each move).
     look_grab: Option<bool>,
@@ -6799,18 +6799,12 @@ impl App {
             tasks_tx,
             tasks,
             keys: HashSet::new(),
-            dragging: false,
-            left_down: false,
-            middle_down: false,
-            drag_from: None,
+            ptr: Default::default(),
             stand_sent: false,
             mouse: Default::default(),
             wheel: 0.0,
             list_wheel: 0.0,
             mods: Default::default(),
-            press_at: None,
-            press_time: None,
-            right_press: None,
             look_grab: None,
             grab_at: None,
             swallow_click: false,
@@ -10116,8 +10110,24 @@ impl App {
         let ticks = dt * 60.0;
         // Movement axes 4 / 5 (FUN_1011fe30): numpad 6 / 4 and 8 / 2 or the compact stick (W / A / S / D).
         let (mut ax, mut ay) = (self.input.axis(4), self.input.axis(5));
+        // Ours (not retail): the Modern scheme's WASD, Q / E and the buttons (controls.rs); the larger of it and the
+        // numpad / pad axes counts, as between the numpad and the compact stick. Its turn replaces type 2's Q / E.
+        let scheme = controls::Scheme::from_config(self.cfg.controls);
+        let modern = scheme == controls::Scheme::Modern;
+        let kb = scheme.keyboard_type(world.game.get(0x42));
+        let mut modern_turn = 0.0;
+        if modern {
+            let m = controls::intent(self.cfg.controls_ad_turn, self.input.modern_keys(), self.ptr.left, self.ptr.right);
+            if m.ax.abs() > ax.abs() {
+                ax = m.ax;
+            }
+            if m.ay.abs() > ay.abs() {
+                ay = m.ay;
+            }
+            modern_turn = m.turn;
+        }
         // Test drives hold W; both mouse buttons run forward, as in most modern MMOs.
-        if self.keys.contains(&KeyCode::KeyW) || (self.left_down && self.dragging) {
+        if self.keys.contains(&KeyCode::KeyW) || (self.ptr.left && self.ptr.right) {
             ay = -1.0;
         }
         // FUN_10157fa0 (config 0x46, on by default): a push past 0.5 on a movement axis stands a resting character
@@ -10146,10 +10156,12 @@ impl App {
         let (cx, cy) = (self.input.axis(6), self.input.axis(7));
         // Keyboard type 2, free camera: Shift held faces the camera (0x9c, player +0xfb; camera keys and Q / E off),
         // and Q / E turn the player (0xaa / 0xa9, FUN_10253a60 / FUN_102539f0) while the camera axes are idle.
-        let type2 = world.game.get(0x42) == 2 && !world.locked;
+        let type2 = kb == 2 && !world.locked;
         let face_cam = type2 && self.input.test(0x9c, input::mode::HELD);
         let turn = if type2 && !face_cam && cx == 0.0 && cy == 0.0 && ax == 0.0 {
             self.input.test(0xaa, input::mode::HELD) as i32 as f32 - self.input.test(0xa9, input::mode::HELD) as i32 as f32
+        } else if modern && !world.locked {
+            modern_turn
         } else {
             0.0
         };
@@ -10157,7 +10169,8 @@ impl App {
         if !in_event && self.input.test(0x45, input::mode::PRESS) {
             world.walk = !world.walk;
         }
-        if !in_event && self.input.test(0x1c, input::mode::PRESS) {
+        // Modern: autorun also on its compact key (R unless Key Assignment moved it).
+        if !in_event && (self.input.test(0x1c, input::mode::PRESS) || (modern && self.input.modern_autorun())) {
             world.autorun = !world.autorun;
             world.autorun_dir = Vec3::ZERO;
         }
@@ -10428,7 +10441,10 @@ impl App {
     fn key_functions(&mut self, dt: f32) {
         let mut f = input::Frame { ticks: dt * 60.0, ..Default::default() };
         if let Phase::World(w) = &self.phase {
-            self.input.assign(&w.game);
+            // Ours: the Controls scheme sets the keyboard type the key functions run under (controls.rs).
+            let scheme = controls::Scheme::from_config(self.cfg.controls);
+            let kb = scheme.keyboard_type(w.game.get(0x42));
+            self.input.assign(&w.game, kb);
             self.input.context = if w.map.is_some() || w.cnq.is_some() {
                 0x26
             } else if w.layout.is_some() {
@@ -10439,7 +10455,8 @@ impl App {
                 0xffff
             };
             f.typing = text_field_open(w);
-            f.keyboard = w.game.get(0x42);
+            f.keyboard = kb;
+            f.modern = scheme == controls::Scheme::Modern && !menu_has_keys(w);
             // A window has the keys: arrows go to it, not to the camera (keys_spec "window" state). The log counts only
             // while focused: Escape or another window unfocuses it and leaves the 0x78 state at 1.
             f.window = keys_in_window(w);
@@ -10457,7 +10474,7 @@ impl App {
         // The map window's keys and animations (FUN_101ef0a0); it goes once its fade-out ends, reopening the main menu
         // it came from (LAB_101faff0).
         let k = self.ui_k;
-        let drag = self.press_at.zip(self.last_cursor).filter(|_| self.left_down).map(|(a, b)| ((b.0 - a.0) as f32 * k.0, (b.1 - a.1) as f32 * k.1));
+        let drag = self.ptr.press_at.zip(self.last_cursor).filter(|_| self.ptr.left).map(|(a, b)| ((b.0 - a.0) as f32 * k.0, (b.1 - a.1) as f32 * k.1));
         if world.cnq.is_some() && !region::update(world, &mut self.input, dt * 60.0) {
             world.cnq = None;
         }
@@ -10676,15 +10693,15 @@ impl App {
             self.mouse.visible = false;
         }
         let at = self.last_cursor;
-        let moved = self.left_down && self.press_at.zip(at).is_some_and(|(a, b)| (a.0 - b.0).abs() + (a.1 - b.1).abs() >= 5.0);
+        let moved = self.ptr.left && self.ptr.press_at.zip(at).is_some_and(|(a, b)| (a.0 - b.0).abs() + (a.1 - b.1).abs() >= 5.0);
         self.mouse.kind = mousecur::NORMAL;
-        if self.left_down && self.dragging {
+        if self.ptr.left && self.ptr.right {
             self.mouse.kind = mousecur::MOVE_DRAG;
             self.mouse.angle = -std::f32::consts::PI;
             return;
         }
-        if self.dragging || moved {
-            if let (Some(from), Some(to)) = (self.press_at.or(self.drag_from), at) {
+        if self.ptr.right || moved {
+            if let (Some(from), Some(to)) = (self.ptr.press_at.or(self.ptr.drag_from), at) {
                 self.mouse.camera_drag((from.0 as f32, from.1 as f32), (to.0 as f32, to.1 as f32));
             }
             return;
@@ -10715,7 +10732,10 @@ impl App {
     /// inverts its axes); with the right button the character faces where it looks (modern MMOs); in first person it
     /// turns the look itself.
     fn look(&mut self, dx: f64, dy: f64) {
-        let right = self.dragging;
+        let right = self.ptr.right;
+        if right {
+            self.ptr.right_moved += dx.abs() + dy.abs();
+        }
         let Phase::World(world) = &mut self.phase else { return };
         let inv = |w: &World, id: u16| if w.game.get(id) == 1 { -1.0 } else { 1.0 };
         match () {
@@ -10775,7 +10795,7 @@ impl App {
     fn mouse_button(&mut self, button: MouseButton, pressed: bool, consumed: bool) {
         self.mouse.visible = true;
         if pressed && button == MouseButton::Right {
-            self.drag_from = self.last_cursor;
+            self.ptr.drag_from = self.last_cursor;
         }
         let release = |from: Option<((f64, f64), Instant)>, at: Option<(f64, f64)>, k: (f32, f32)| -> Option<((f64, f64), bool)> {
             let ((a, t), b) = (from?, at?);
@@ -10785,6 +10805,8 @@ impl App {
         let size = self.window_size;
         let (k, retail_aspect) = (self.ui_k, self.cfg.retail_aspect);
         let hud = &self.hud_blockers;
+        // Ours: Modern (`interact`): a right click on an actor targets it and does what Enter on the target does.
+        let interact = controls::Scheme::from_config(self.cfg.controls) == controls::Scheme::Modern;
         let world_click = |phase: &mut Phase, b: (f64, f64), left: bool, drag: bool| -> bool {
             let on_hud = hud.iter().any(|r| inside(r, (b.0 as f32 * k.0, b.1 as f32 * k.1)));
             let Phase::World(world) = phase else { return false };
@@ -10796,44 +10818,72 @@ impl App {
             if !drag {
                 fishing::click(world);
             }
+            if !left && interact {
+                // A look drag's release is not a click: it leaves the target as it is (retail's clears it).
+                if drag {
+                    return false;
+                }
+                let picked = Self::under_pointer(world, b, size, aspect).0;
+                return target::interact(world, picked);
+            }
             let picked = if left { Self::under_pointer(world, b, size, aspect).0 } else { None };
             target::click(world, picked, left, drag)
         };
         match button {
             MouseButton::Left => {
                 if pressed {
-                    self.press_at = self.last_cursor;
-                    self.press_time = Some(Instant::now());
-                } else if let Some((b, drag)) = release(self.press_at.take().zip(self.press_time.take()), self.last_cursor, self.ui_k) {
+                    self.ptr.press_at = self.last_cursor;
+                    self.ptr.press_time = Some(Instant::now());
+                } else if let Some((b, drag)) = release(self.ptr.press_at.take().zip(self.ptr.press_time.take()), self.last_cursor, self.ui_k) {
                     self.swallow_click |= world_click(&mut self.phase, b, true, drag);
                 }
-                self.left_down = pressed;
+                self.ptr.left = pressed;
             }
             MouseButton::Right => {
                 if pressed {
-                    self.right_press = self.last_cursor.map(|c| (c, Instant::now()));
-                } else if let Some((b, drag)) = release(self.right_press.take(), self.last_cursor, self.ui_k) {
-                    self.swallow_click |= world_click(&mut self.phase, b, false, drag);
+                    self.ptr.right_press = self.last_cursor.map(|c| (c, Instant::now()));
+                    self.ptr.right_moved = 0.0;
+                } else {
+                    let held = self.ptr.right_press.map(|(_, t)| t.elapsed());
+                    if let Some((b, drag)) = release(self.ptr.right_press.take(), self.last_cursor, self.ui_k) {
+                        // Modern: a click is short and still, by the look motion too (a locked pointer's position
+                        // does not move).
+                        let drag = if interact { !controls::is_click(self.ptr.right_moved, held) } else { drag };
+                        self.swallow_click |= world_click(&mut self.phase, b, false, drag);
+                    }
                 }
-                self.dragging = pressed;
+                self.ptr.right = pressed;
             }
             MouseButton::Middle => {
                 // WM_MBUTTONDOWN turns an RoE description's page (FUN_102326b0).
                 if pressed && let Phase::World(w) = &mut self.phase {
                     roe::flip_page(w);
                 }
-                self.middle_down = pressed;
+                self.ptr.middle = pressed;
             }
             _ => {}
         }
-        if !self.dragging
+        if !self.ptr.right
             && let Phase::World(w) = &mut self.phase
         {
             w.mouse_look = false;
         }
-        if !self.left_down && !self.dragging && !self.middle_down {
+        if !self.ptr.any_down() {
             self.release_pointer();
         }
+    }
+
+    /// Ours: the window lost or gained focus. The buttons, a drag and the mouselook state are dropped as the keys are
+    /// (no release comes while another window has the pointer; a stale left + right ran the character on its own), and
+    /// the pointer is given back.
+    fn lose_focus(&mut self) {
+        self.input.clear();
+        let mut look = false;
+        controls::lose_focus(&mut self.ptr, &mut look);
+        if let Phase::World(w) = &mut self.phase {
+            w.mouse_look = look;
+        }
+        self.release_pointer();
     }
 
     fn camera(world: &World) -> Camera {
@@ -12590,7 +12640,7 @@ impl App {
         self.input.set_pad_zoom(out.zoom);
         if out.pressed {
             // Other key presses hide the cursor.
-            if !self.dragging && !self.left_down {
+            if !self.ptr.right && !self.ptr.left {
                 self.mouse.visible = false;
             }
             // The opening movie ends on any key; the press is not passed on.
@@ -14341,7 +14391,7 @@ impl ApplicationHandler for App {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     // Other key functions hide the cursor (FUN_10125f70(0)), except during a drag.
                     let modifier = matches!(code, KeyCode::ShiftLeft | KeyCode::ShiftRight | KeyCode::ControlLeft | KeyCode::ControlRight | KeyCode::AltLeft | KeyCode::AltRight | KeyCode::SuperLeft | KeyCode::SuperRight);
-                    if event.state == ElementState::Pressed && !modifier && !self.dragging && !self.left_down {
+                    if event.state == ElementState::Pressed && !modifier && !self.ptr.right && !self.ptr.left {
                         self.mouse.visible = false;
                     }
                     if code == KeyCode::F12 && event.state == ElementState::Pressed && !event.repeat {
@@ -14370,7 +14420,7 @@ impl ApplicationHandler for App {
                 self.focused = f;
                 // Keys and buttons held across a focus change (Alt-Tab, an overlay, the Steam keyboard) may never send
                 // their release: nothing is held on either side of it (ours: retail clears on the loss only).
-                self.input.clear();
+                self.lose_focus();
                 let (m, e) = self.volume_factors();
                 if self.cfg.tool("0035") == 0
                     && let Some(a) = self.audio.as_mut()
@@ -14394,7 +14444,7 @@ impl ApplicationHandler for App {
                 // A left-drag that starts on the map overlay pans it instead of turning the camera.
                 let k = self.ui_k;
                 let on_overlay = |w: &World, p: (f64, f64)| w.overlay.as_ref().is_some_and(|o| o.has_map() && inside(&o.rect, (p.0 as f32 * k.0, p.1 as f32 * k.1)));
-                if let (true, Some(a), Some((x, y)), Phase::World(world)) = (self.left_down, self.press_at, self.last_cursor, &mut self.phase)
+                if let (true, Some(a), Some((x, y)), Phase::World(world)) = (self.ptr.left, self.ptr.press_at, self.last_cursor, &mut self.phase)
                     && on_overlay(world, a)
                 {
                     if let Some(o) = world.overlay.as_mut() {
@@ -14403,7 +14453,7 @@ impl ApplicationHandler for App {
                     self.last_cursor = Some((position.x, position.y));
                     return;
                 }
-                let looking = self.dragging || self.middle_down || (self.left_down && self.press_at.is_some_and(|a| (a.0 - position.x).abs() + (a.1 - position.y).abs() >= 5.0));
+                let looking = self.ptr.right || self.ptr.middle || (self.ptr.left && self.ptr.press_at.is_some_and(|a| (a.0 - position.x).abs() + (a.1 - position.y).abs() >= 5.0));
                 if let (true, Some((x, y))) = (looking, self.last_cursor) {
                     if self.look_grab.is_none() {
                         self.grab_pointer();

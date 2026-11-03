@@ -92,11 +92,28 @@ Published releases are built with `release/build-linux.sh` (in the Steam Runtime
 
 `release/build-linux-sandbox.sh` is the same Linux build with no network: an image from the sniper SDK plus the pinned Rust toolchain (`release/sniper.Dockerfile`, built once), then the build runs in it with `--network none` from a populated cargo registry and checks the binary's glibc requirement, `ldd` and `--help` inside the SDK image. `release/steam-deck.md` covers adding the client as a non-Steam game in Game Mode.
 
+## Keyboard and mouse
+
+Settings > Controls > Keyboard & Mouse picks one of three schemes (`controls` in config.json: 2 Modern, the default; 1
+FFXI WASD; 0 Original), whichever interface style is on.
+
+| | Modern | FFXI WASD | Original |
+|---|---|---|---|
+| Keys | W / S walk, A / D strafe, Q / E turn (the "A / D Keys" row swaps the pairs, `controls_ad_turn`), R autorun | retail's keyboard type 2: W A S D, Q / E turn, Shift faces the camera | retail's keys as the game Config's Keyboard type sets them |
+| Right button held | mouselook: the character faces where the camera looks, A / D / Q / E strafe | as in the others | as in the others |
+| Both buttons | run forward | run forward | run forward |
+| Right click | on someone: target them and talk (an NPC) or open the action menu | clears the target | clears the target |
+
+The left button turns the camera, a left click targets, the wheel zooms, in all three. FFXI has no jumping; Space opens
+the chat line. Autorun ends when you move back. The keys never move you while the chat line or a menu has them; they
+follow the retail Key Assignment (the left stick's four keys, the Turn Right / Left keys), and losing the window's focus
+drops every held key and button.
+
 ## Gamepad
 
 A connected gamepad works with no setup (Linux evdev; Windows Gaming Input, so Xbox, PlayStation and most other
 pads). The layout follows retail's PC gamepad as far as the client's key functions allow; the pad presses the same
-keys as the keyboard. Config > Settings > Gamepad turns it off and sets the sticks' deadzone and the camera speed
+keys as the keyboard. Config > Settings > Controls turns it off and sets the sticks' deadzone and the camera speed
 (`gamepad`, `gamepad_deadzone`, `gamepad_camera_speed` in config.json).
 
 | Button | Walking about | In a window or menu | In a text field |

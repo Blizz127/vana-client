@@ -81,12 +81,12 @@ impl SettingsUi {
         }
     }
 
-    /// The Experience row's value: Modern (the new interface, no opening movie), Original (the classic windows, the
-    /// Original graphics preset, the movie), else Custom.
+    /// The Experience row's value: Modern (the new interface, the Modern controls, no opening movie), Original (the
+    /// classic windows, the Original controls and graphics preset, the movie), else Custom.
     pub fn experience(&self) -> u32 {
-        match (self.s.modern_ui, self.tool_get("0022"), self.preset()) {
-            (true, 0, _) => 0,
-            (false, 1, 0) => 1,
+        match (self.s.modern_ui, self.s.controls, self.tool_get("0022"), self.preset()) {
+            (true, 2, 0, _) => 0,
+            (false, 0, 1, 0) => 1,
             _ => EXPERIENCES as u32,
         }
     }
@@ -95,10 +95,12 @@ impl SettingsUi {
         match k {
             0 => {
                 self.s.modern_ui = true;
+                self.s.controls = 2;
                 self.tool_set("0022", 0);
             }
             1 => {
                 self.s.modern_ui = false;
+                self.s.controls = 0;
                 self.apply_preset(0);
                 self.tool_set("0022", 1);
             }

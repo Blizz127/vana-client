@@ -74,6 +74,8 @@ pub struct Frame {
     pub window: bool,
     /// Key Assignment (k1assign / k2assign) is open: the compact keys are off and flag 0x10 fails.
     pub assigning: bool,
+    /// Ours: the Modern scheme is on and no menu, list or prompt has the keys (controls.rs).
+    pub modern: bool,
 }
 
 #[derive(Default)]
@@ -109,6 +111,10 @@ pub struct Input {
     typing: bool,
     assigning: bool,
     window: bool,
+    /// Ours: the Modern scheme's keys count this frame, and the keys Key Assignment gave Q / E (the type 2 turn
+    /// ids 0x67 / 0x66).
+    modern: bool,
+    turn_keys: [u8; 2],
     /// DAT_104cf22c: a handler took Enter / Esc this frame (FUN_101202a0); only mode 4 tests still pass.
     consumed: bool,
     /// NumLock, from the last numpad digit's logical key (winit reports no toggle state).
@@ -144,6 +150,8 @@ impl Default for Input {
             typing: false,
             assigning: false,
             window: false,
+            modern: false,
+            turn_keys: [0x10, 0x12],
             consumed: false,
             numlock: true,
             pad_down: [false; 256],
@@ -187,8 +195,9 @@ impl Input {
 
     /// Key Assignment (k1 config 0x4a.., k2 0x6a..) rewrites slot 0 of the k2 ids with Ctrl / Alt + key, the
     /// compact records' keys, and with keyboard type 2 the turn ids 0xaa / 0xa9 (no Ctrl / Alt).
-    pub fn assign(&mut self, game: &crate::gamecfg::Values) {
-        let now: Vec<u32> = std::iter::once(game.get(0x42)).chain((0x4a..0x8a).map(|id| game.get(id))).collect();
+    /// `kb` is the keyboard type in force (the Controls scheme's, controls.rs: the Config's 0x42 under Original).
+    pub fn assign(&mut self, game: &crate::gamecfg::Values, kb: u32) {
+        let now: Vec<u32> = std::iter::once(kb).chain((0x4a..0x8a).map(|id| game.get(id))).collect();
         if self.assigned.as_ref() == Some(&now) {
             return;
         }
@@ -211,7 +220,9 @@ impl Input {
                 }
             }
         }
-        if game.get(0x42) == 2 {
+        // Ours: the Modern scheme's Q / E are the type 2 turn keys (0x67 left, 0x66 right), at any keyboard type.
+        self.turn_keys = [game.get(0x67) as u8, game.get(0x66) as u8];
+        if kb == 2 {
             slot0(&mut self.bindings, 0xaa, 0x80, game.get(0x66));
             slot0(&mut self.bindings, 0xa9, 0x80, game.get(0x67));
         }
@@ -289,6 +300,7 @@ impl Input {
         self.typing = f.typing;
         self.assigning = f.assigning;
         self.window = f.window;
+        self.modern = f.modern;
         self.clock += f.ticks;
         let frames = (self.clock / FRAME_TICKS).floor();
         self.clock -= frames * FRAME_TICKS;
@@ -418,6 +430,42 @@ impl Input {
         };
         let pad = if analog.abs() > pad.abs() && !(self.typing && matches!(id, 4 | 5)) { analog } else { pad };
         if keys.abs() >= pad.abs() { keys } else { pad }
+    }
+
+    /// Ours (not retail): the key of the compact record that sets pad bit `bit` (a stick direction, the autorun key),
+    /// as Key Assignment left it; `default` before the tables are read. 0 is a key taken off.
+    fn compact_key(&self, bit: u64, default: u8) -> u8 {
+        self.compact.iter().find(|c| c.bits == bit).map_or(default, |c| c.key)
+    }
+
+    /// Whether the Modern keys count now: the scheme is on, no text field, menu or Key Assignment has the keys, the
+    /// input context is the field's, and Ctrl / Alt (the menu shortcuts' letters) are up.
+    fn modern_live(&self) -> bool {
+        self.modern && !self.typing && !self.assigning && self.masks[4] & self.context != 0 && !self.ctrl() && !self.alt()
+    }
+
+    /// Ours (not retail): the Modern scheme's keys held now. W / S / A / D are the compact stick's keys and Q / E the
+    /// type 2 turn keys, so Key Assignment (k1 rows, Turn Right / Left) moves them. Nothing while a text field, a
+    /// menu or Key Assignment has the keys.
+    pub fn modern_keys(&self) -> super::controls::Keys {
+        if !self.modern_live() {
+            return Default::default();
+        }
+        let down = |k: u8| k != 0 && self.held(k);
+        super::controls::Keys {
+            fwd: down(self.compact_key(0x80_0000, 0x11)),
+            back: down(self.compact_key(0x100_0000, 0x1f)),
+            left: down(self.compact_key(0x40_0000, 0x1e)),
+            right: down(self.compact_key(0x20_0000, 0x20)),
+            q: down(self.turn_keys[0]),
+            e: down(self.turn_keys[1]),
+        }
+    }
+
+    /// Ours: the Modern scheme's autorun key went down this frame (the compact autorun key, R unless moved).
+    pub fn modern_autorun(&self) -> bool {
+        let k = self.compact_key(0x100, 0x13);
+        self.modern_live() && k != 0 && self.pressed(k)
     }
 
     fn held(&self, k: u8) -> bool {
@@ -869,6 +917,75 @@ mod tests {
         assert!(!i.test(0x44, mode::PRESS));
     }
 
+    /// Modern's keys come from the compact records of FFXiMain: one record per stick direction (W / S / A / D) and the
+    /// autorun record (R), and the type 2 turn keys' defaults are Q / E. Skipped without the game's DLL.
+    #[test]
+    fn modern_keys_from_the_real_tables() {
+        let Some(i) = real() else { return };
+        assert_eq!(
+            [0x80_0000, 0x100_0000, 0x40_0000, 0x20_0000, 0x100].map(|b| i.compact.iter().filter(|c| c.bits == b).map(|c| c.key).collect::<Vec<_>>()),
+            [vec![0x11], vec![0x1f], vec![0x1e], vec![0x20], vec![0x13]]
+        );
+        assert_eq!(i.turn_keys, [0x10, 0x12]);
+    }
+
+    /// The Modern scheme's keys (controls.rs): W / S / A / D and Q / E held, only while the scheme is on and nothing
+    /// else has the keys; Key Assignment's keys replace them.
+    #[test]
+    fn modern_keys() {
+        use super::super::controls::Keys;
+        let mut i = Input::default();
+        i.masks = vec![0xffff; IDS];
+        let k = winit::keyboard::Key::Character("x".into());
+        let modern = || Frame { modern: true, keyboard: 0, ..frame() };
+        for c in [KeyCode::KeyW, KeyCode::KeyA, KeyCode::KeyE] {
+            i.key(c, true, &k);
+        }
+        // Off while the scheme is: nothing (the other schemes' keys go through the key functions).
+        i.begin_frame(Frame { modern: false, ..modern() });
+        assert_eq!(i.modern_keys(), Keys::default());
+        i.begin_frame(modern());
+        assert_eq!(i.modern_keys(), Keys { fwd: true, left: true, e: true, ..Default::default() });
+        // A text field, Key Assignment, the wrong input context and Ctrl / Alt (a menu shortcut) silence it.
+        i.begin_frame(Frame { typing: true, ..modern() });
+        assert_eq!(i.modern_keys(), Keys::default());
+        i.begin_frame(Frame { assigning: true, ..modern() });
+        assert_eq!(i.modern_keys(), Keys::default());
+        i.context = 0x26;
+        i.masks[4] = 0x0001;
+        i.begin_frame(modern());
+        assert_eq!(i.modern_keys(), Keys::default());
+        i.context = 0xffff;
+        i.masks[4] = 0xffff;
+        i.key(KeyCode::AltLeft, true, &k);
+        i.begin_frame(modern());
+        assert_eq!(i.modern_keys(), Keys::default());
+        i.key(KeyCode::AltLeft, false, &k);
+        // Key Assignment: the stick's up key moved to I (0x17), Turn Right to G (0x22), the autorun key to T (0x14).
+        i.base_compact = vec![
+            Compact { key: 0x17, rule: 0, states: 6, bits: 0x80_0000 },
+            Compact { key: 0x14, rule: 0, states: 6, bits: 0x100 },
+        ];
+        let mut v = crate::gamecfg::Values::default();
+        v.set(0x66, 0x22);
+        i.assign(&v, 0);
+        i.begin_frame(modern());
+        // W no longer walks; I does, and G turns right (E no longer does).
+        assert_eq!(i.modern_keys(), Keys { left: true, ..Default::default() });
+        i.key(KeyCode::KeyI, true, &k);
+        i.key(KeyCode::KeyG, true, &k);
+        i.key(KeyCode::KeyT, true, &k);
+        i.begin_frame(modern());
+        assert_eq!(i.modern_keys(), Keys { fwd: true, left: true, e: true, ..Default::default() });
+        assert!(i.modern_autorun());
+        i.begin_frame(modern());
+        assert!(!i.modern_autorun());
+        // Losing the focus drops them all.
+        i.clear();
+        i.begin_frame(modern());
+        assert_eq!(i.modern_keys(), Keys::default());
+    }
+
     /// Key Assignment: k2 row 0 (Attack, 0x3b) to G; k1 row 6 (Menu Cursor & Camera Left) to U; turns on type 2.
     #[test]
     fn key_assignment() {
@@ -876,12 +993,12 @@ mod tests {
         let mut v = crate::gamecfg::Values::default();
         v.set(0x6a, 0x22);
         v.set(0x50, 0x16);
-        i.assign(&v);
+        i.assign(&v, v.get(0x42));
         assert_eq!(i.bindings[0x3b][0], 0x1022);
         assert!([13usize, 17, 21, 25].iter().all(|&r| i.compact[r].key == 0x16));
         assert_eq!((i.bindings[0xaa][0], i.bindings[0xa9][0]), (0x8012, 0x8010));
         v.set(0x42, 0);
-        i.assign(&v);
+        i.assign(&v, v.get(0x42));
         assert_eq!(i.bindings[0xaa][0], i.base_bindings[0xaa][0]);
     }
 }

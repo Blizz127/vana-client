@@ -278,6 +278,12 @@ pub struct Config {
     pub gamepad: bool,
     pub gamepad_deadzone: f32,
     pub gamepad_camera_speed: f32,
+    /// Not retail (client/controls.rs): the keyboard and mouse scheme. 0 Original (retail's keyboard as the game
+    /// Config's Keyboard type sets it), 1 FFXI WASD (retail's keyboard type 2), 2 Modern (WASD and the mouse as in
+    /// WoW, the default). `controls_ad_turn`: under Modern, A / D turn the character and Q / E strafe (default: A / D
+    /// strafe and Q / E turn).
+    pub controls: u32,
+    pub controls_ad_turn: bool,
     /// Ours: resting's ticks as timed on the first rest seen, [first heal, interval, the server's look period] in
     /// seconds (client/resttick.rs).
     pub rest_tick: Option<[f32; 3]>,
@@ -473,6 +479,8 @@ impl Default for Config {
             gamepad: true,
             gamepad_deadzone: crate::client::gamepad::DEFAULT_DEADZONE,
             gamepad_camera_speed: crate::client::gamepad::DEFAULT_CAMERA_SPEED,
+            controls: 2,
+            controls_ad_turn: false,
             rest_tick: None,
             cursor_size: 0,
             auto_sort: 0,
@@ -515,6 +523,7 @@ impl Config {
         }
         c.gamepad_deadzone = c.gamepad_deadzone.clamp(0.0, crate::client::gamepad::MAX_DEADZONE);
         c.gamepad_camera_speed = c.gamepad_camera_speed.clamp(0.1, 5.0);
+        c.controls = c.controls.min(2);
         c
     }
 
