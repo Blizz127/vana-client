@@ -14,6 +14,7 @@ pub mod screens;
 pub mod invwin;
 pub mod screenfx;
 pub mod post;
+pub mod postdepth;
 pub mod movie;
 pub mod scale;
 pub mod gputime;
@@ -2786,6 +2787,13 @@ pub fn depth_view(device: &wgpu::Device, width: u32, height: u32) -> wgpu::Textu
         .create_view(&Default::default())
 }
 
+/// Ours: the post pass's depth effects over an offscreen shot (render/postdepth.rs): the fog in the zone lighting's colour (the
+/// renderer's own without), densest at the height the camera looks at.
+fn depth_in<'a>(depth: &'a wgpu::TextureView, camera: &Camera, aspect: f32, lighting: Option<&crate::dat::weather::Lighting>, fallback: [f32; 3]) -> postdepth::DepthIn<'a> {
+    let fog = lighting.map_or(fallback, |l| l.fog.to_array());
+    postdepth::DepthIn { depth, cam: postdepth::PostCam::new(camera, aspect, camera.target.y, fog) }
+}
+
 /// Renders one frame offscreen and writes it as a PNG.
 pub fn render_png(scene: &ZoneScene, camera: &Camera, width: u32, height: u32, path: &std::path::Path) -> Result<usize> {
     render_pngs(scene, &[(camera, path)], width, height)
@@ -2871,7 +2879,7 @@ pub fn render_pngs_post(
                 }
                 renderer.render(&gpu, &mut encoder, &view, &depth, camera, width as f32 / height as f32, &actor_refs);
                 if let Some(fx) = post::ensure(&mut post_fx, &gpu, format, &graphics) {
-                    fx.in_place(&gpu, &mut encoder, &target, &graphics);
+                    fx.in_place(&gpu, &mut encoder, &target, &graphics, Some(depth_in(&depth, camera, width as f32 / height as f32, lighting.as_ref(), renderer.fog_color)));
                 }
                 if let Some(q) = q {
                     encoder.write_timestamp(q, f * 2 + 1);
@@ -2916,7 +2924,7 @@ pub fn render_pngs_post(
         renderer.render_refraction(&gpu, &mut encoder, &view, Some(&target), &depth, camera, width as f32 / height as f32, &actor_refs);
         post(&gpu, &mut encoder, (&view, &target), &depth, camera, lighting.as_ref(), &mut renderer);
         if let Some(fx) = post::ensure(&mut post_fx, &gpu, format, &graphics) {
-            fx.in_place(&gpu, &mut encoder, &target, &graphics);
+            fx.in_place(&gpu, &mut encoder, &target, &graphics, Some(depth_in(&depth, camera, width as f32 / height as f32, lighting.as_ref(), renderer.fog_color)));
         }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },

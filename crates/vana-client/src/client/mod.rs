@@ -13128,7 +13128,9 @@ impl App {
         // The world always draws offscreen: through the plain view, in gamma space.
         let world_phase = matches!(self.phase, Phase::World(_));
         // Ours: the post-processing reads the scene texture, so any option on draws it offscreen too.
-        let post = self.cfg.graphics.active();
+        // The AO and fog need the world's camera: off in the lobby scenes (and so no pass for them there).
+        let fxcfg = if world_phase { self.cfg.graphics.clone() } else { crate::config::GraphicsCfg { ao: false, fog: false, ..self.cfg.graphics.clone() } };
+        let post = fxcfg.active();
         let scaled = bg != size || gamma.iter().any(|g| (g - 1.0).abs() > 1e-3) || world_phase || lcd || post;
         let (scene_view, scene_depth, scene_tex) = if scaled {
             self.scene_scale.get_or_insert_with(|| crate::render::scale::SceneScale::new(&gfx.gpu, gfx.config.format)).target(&gfx.gpu, bg)
@@ -13142,6 +13144,7 @@ impl App {
         let mut counts = perf::Counts::default();
 
         let mut drew_world = false;
+        let mut post_cam: Option<crate::render::postdepth::PostCam> = None;
         if let Phase::World(world) = &mut self.phase {
             let w: &mut World = world;
             // A zone change holds the last frame drawn, still in the scene texture.
@@ -13979,6 +13982,13 @@ impl App {
                     fx.draw_all(&gfx.gpu, &mut encoder, &scene_raw, Some(&scene_tex), bg, cross, flash, blur, m);
                 }
                 mark!("screen fx");
+                // Ours: the post pass's AO and height fog read this scene's depth from this camera. Not over a zone change's held frame,
+                // a crossfade or a flash (their picture is not this depth's), and the fog colour goes down with the fades so black stays
+                // black. The fog is densest at the player's feet.
+                if (cross.is_none() && flash.is_none() && !w.zone_hold.is_some_and(|h| h.captured)) && fxcfg.depth_on() {
+                    let fog = r.lighting.as_ref().map_or(r.fog_color, |l| l.fog.to_array());
+                    post_cam = Some(crate::render::postdepth::PostCam::new(&camera, aspect, w.pos.y, std::array::from_fn(|i| fog[i] * m[i].clamp(0.0, 1.0))));
+                }
                 w.last_camera = Some(camera);
                 drew_world = true;
             }
@@ -14057,7 +14067,7 @@ impl App {
         {
             // The post-processed picture is in a texture of its own: the scene texture stays as drawn (the zone change's
             // held frame is copied from it next frame).
-            let posted = crate::render::post::ensure(&mut self.post_fx, &gfx.gpu, gfx.config.format, &self.cfg.graphics).map(|p| p.run(&gfx.gpu, &mut encoder, &scene_tex, &self.cfg.graphics).create_view(&Default::default()));
+            let posted = crate::render::post::ensure(&mut self.post_fx, &gfx.gpu, gfx.config.format, &fxcfg).map(|p| p.run(&gfx.gpu, &mut encoder, &scene_tex, &fxcfg, post_cam.map(|cam| crate::render::postdepth::DepthIn { depth: &scene_depth, cam })).create_view(&Default::default()));
             if posted.is_some() {
                 mark!("post fx");
             }
