@@ -917,6 +917,18 @@ mod tests {
         assert!(!i.test(0x44, mode::PRESS));
     }
 
+    /// Modern's keys come from the compact records of FFXiMain: one record per stick direction (W / S / A / D) and the
+    /// autorun record (R), and the type 2 turn keys' defaults are Q / E. Skipped without the game's DLL.
+    #[test]
+    fn modern_keys_from_the_real_tables() {
+        let Some(i) = real() else { return };
+        assert_eq!(
+            [0x80_0000, 0x100_0000, 0x40_0000, 0x20_0000, 0x100].map(|b| i.compact.iter().filter(|c| c.bits == b).map(|c| c.key).collect::<Vec<_>>()),
+            [vec![0x11], vec![0x1f], vec![0x1e], vec![0x20], vec![0x13]]
+        );
+        assert_eq!(i.turn_keys, [0x10, 0x12]);
+    }
+
     /// The Modern scheme's keys (controls.rs): W / S / A / D and Q / E held, only while the scheme is on and nothing
     /// else has the keys; Key Assignment's keys replace them.
     #[test]
