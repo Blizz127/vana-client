@@ -585,6 +585,12 @@ enum Cmd {
         /// A panel of the widget kit's controls (long and short values, a long label) in place of the frames.
         #[arg(long)]
         kit: bool,
+        /// The Graphics & Interface window on a category: display, graphics, lighting, post, interface, sound, misc, gamepad, mods.
+        #[arg(long)]
+        panel: Option<String>,
+        /// With --panel: the row the cursor is on (0: the category list).
+        #[arg(long, default_value_t = 1)]
+        panel_row: usize,
     },
     /// Disassemble a zone's event scripts (event DAT), with dialogue text inlined.
     EventDump {
@@ -1239,9 +1245,9 @@ fn main() -> Result<()> {
             println!("bounds {} .. {}; wrote {}", mesh.min, mesh.max, out.display());
             Ok(())
         }
-        Cmd::ModernShot { width, height, scale, backdrop, out, chat_font, font, font_strong, rows, borders, opacity, kit } => {
+        Cmd::ModernShot { width, height, scale, backdrop, out, chat_font, font, font_strong, rows, borders, opacity, kit, panel, panel_row } => {
             let list = font.is_some();
-            client::modern_shot(width, height, scale, backdrop.as_deref(), &out, &client::ModernShotOpts { chat_font, font: font.zip(font_strong), list, rows, borders, opacity, kit })
+            client::modern_shot(width, height, scale, backdrop.as_deref(), &out, &client::ModernShotOpts { chat_font, font: font.zip(font_strong), list, rows, borders, opacity, kit, panel, panel_row })
         }
         Cmd::CreatorShot { screen: true, race, face, hair, frame, view, width, height, step, size, job, nation, name, world, help_time, bench, out, .. } => {
             client::creator_screen_shot(&client::CreatorScreenShot { race, face, hair, size, job, nation, step, name, world, frame, view, help_time, width, height, bench }, &out)

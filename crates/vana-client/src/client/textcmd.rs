@@ -615,6 +615,13 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
     // A line without a command goes to the chat mode (/chatmode).
     let line = if line.starts_with('/') { line.to_string() } else { format!("{}{line}", w.chat_prefix) };
     let first = line.split([' ', '\t']).next().unwrap_or("");
+    // Ours (not retail): /graphics (or /options) opens Settings on its Graphics category: the Graphics & Interface window
+    // in the modern UI, the Settings page in the classic one (client/settings.rs).
+    if first.eq_ignore_ascii_case("/graphics") || first.eq_ignore_ascii_case("/options") {
+        w.want_settings = Some(super::settings::Kind::Settings);
+        w.want_settings_page = Some("Graphics");
+        return;
+    }
     // Ours (Extras, not retail): /timers [in | out] slides the timers window's drawer; alone it toggles.
     if first.eq_ignore_ascii_case("/timers") && w.extra_timers {
         match line.split_whitespace().nth(1).map(str::to_ascii_lowercase).as_deref() {

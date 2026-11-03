@@ -114,6 +114,9 @@ pub enum Ctx {
     Name,
     /// The map window is up: a window (Menu's buttons) whose right stick zooms and whose R3 closes it.
     Map,
+    /// Ours: our Settings window (modern/options.rs, or the classic pages) is up: a window (Menu's buttons) whose bumpers
+    /// turn its categories, as Page Up / Page Down.
+    Pages,
     /// Our own on-screen keyboard (client/osk.rs) is up over a text field and takes the pad whole: every button is
     /// one of its keys (see `osk_binding`), nothing reaches the game, no DIK is held and the sticks do not walk.
     Osk,
@@ -198,7 +201,16 @@ pub fn binding(b: Btn, ctx: Ctx) -> Option<Binding> {
             _ => None,
         };
     }
-    let ctx = if matches!(ctx, Ctx::Action | Ctx::Map) { Ctx::Menu } else { ctx };
+    // Ours: our Settings window is up: the bumpers turn its categories (Page Up / Down), every other button is the
+    // Menu's.
+    if ctx == Ctx::Pages {
+        match b {
+            LeftBumper => return bind(Some(Key::PageUp), &[]),
+            RightBumper => return bind(Some(Key::PageDown), &[]),
+            _ => {}
+        }
+    }
+    let ctx = if matches!(ctx, Ctx::Action | Ctx::Map | Ctx::Pages) { Ctx::Menu } else { ctx };
     let typing = matches!(ctx, Ctx::Typing | Ctx::Name);
     match (b, ctx) {
         (South, _) => bind(Some(Key::Enter), &[DIK_ENTER]),
@@ -592,6 +604,9 @@ mod tests {
         assert_eq!(f(Start, Ctx::Menu), Some((Some(Key::Minus), vec![0x0c], false)));
         assert_eq!((f(LeftBumper, Ctx::Field), f(RightBumper, Ctx::Menu)), (Some((None, vec![0x4e], false)), Some((None, vec![0x4a], false))));
         assert_eq!(f(LeftBumper, Ctx::Typing), None);
+        // Our Settings window: the bumpers are Page Up / Down (no DIK), the rest the Menu's.
+        assert_eq!((f(LeftBumper, Ctx::Pages), f(RightBumper, Ctx::Pages)), (Some((Some(Key::PageUp), vec![], false)), Some((Some(Key::PageDown), vec![], false))));
+        assert_eq!(f(South, Ctx::Pages), f(South, Ctx::Menu));
         assert_eq!(f(North, Ctx::Field), Some((None, vec![0x37], false)));
         assert_eq!(f(LeftThumb, Ctx::Field), Some((None, vec![0xb5], false)));
         assert_eq!(f(LeftThumb, Ctx::Menu), None);

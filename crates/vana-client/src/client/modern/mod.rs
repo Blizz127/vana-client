@@ -31,6 +31,7 @@ mod lists;
 mod loot;
 mod macros;
 mod modwin;
+mod options;
 pub use modwin::Click as ModClick;
 mod minor;
 mod paint;
@@ -53,6 +54,7 @@ use egui::{Color32, Context, FontFamily, FontId, Id, LayerId, Order, Pos2, Rect,
 pub use command::{BarFocus, CmdMenu, bar_focus, key as command_key};
 pub use config::{extras_entry, key as config_key, lobby_key as lobby_config_key, lobby_settings as lobby_config_settings};
 pub use journal::key as journal_key;
+pub use options::world_key as options_key;
 pub use lists::key as magic_key;
 pub use macros::key as macro_key;
 pub use status::key as status_key;
@@ -429,6 +431,7 @@ fn focus_panel(w: &World) -> Option<&'static str> {
         _ if w.polmail.list.is_some() => "msglist",
         _ if w.friendui.as_ref().is_some_and(|u| u.list.is_some() && u.stat.is_none()) => "friendlist",
         _ if w.friendui.is_some() => "window",
+        _ if w.modern && w.settings.as_ref().is_some_and(|s| s.windowed()) => options::ID,
         _ if w.settings.is_some() || w.config.is_some() || w.bluset.is_some() || w.pupset.is_some() => "window",
         _ if w.magic.is_some() || w.ability.is_some() => "list",
         _ if w.cats.is_some() => "cats",

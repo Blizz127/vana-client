@@ -391,7 +391,7 @@ fn ours_act(s: &mut SettingsUi, v: &settings::View, act: kit::Act, at: At) -> bo
 }
 
 /// Our page's keys (Settings, Extras, Mods); true when the page is left.
-fn ours_key(s: &mut SettingsUi, key: egui::Key, shift: bool) -> bool {
+pub(super) fn ours_key(s: &mut SettingsUi, key: egui::Key, shift: bool) -> bool {
     s.sounds.clear();
     if s.m_remove.is_some() {
         remove_key(s, key);
@@ -470,21 +470,22 @@ pub fn extras_entry() -> usize {
     ENTRIES.iter().position(|e| matches!(e.1, Entry::Extras)).unwrap_or(0)
 }
 
+/// The kind of our page the list's entry hosts in the Config window: Extras only. Settings opens as a window of its own
+/// (options.rs), in place of the Config.
 fn settings_kind(k: usize) -> Option<settings::Kind> {
     match ENTRIES.get(k)?.1 {
         Entry::Extras => Some(settings::Kind::Extras),
-        Entry::Settings => Some(settings::Kind::Settings),
         _ => None,
     }
 }
 
-/// Our Settings / Extras state follows the list's entry: asked for (the app makes it) while one is chosen, dropped
-/// once another is and nothing is left to store.
+/// Our Extras state follows the list's entry: asked for (the app makes it) while it is chosen, dropped once another is
+/// and nothing is left to store.
 fn settings_follow(w: &mut World, entry: usize) {
     match settings_kind(entry) {
         Some(kind) if w.settings.as_ref().map(|s| s.kind) != Some(kind) => w.want_settings = Some(kind),
         Some(_) => {}
-        None if w.settings.as_ref().is_some_and(|s| s.in_game && !s.dirty) => w.settings = None,
+        None if w.settings.as_ref().is_some_and(|s| s.in_game && !s.dirty && !s.windowed()) => w.settings = None,
         None => {}
     }
 }
@@ -733,8 +734,7 @@ fn settings_do(s: &mut SettingsUi, act: Vec<Do>) {
 }
 
 /// What the mouse did on the Mods page.
-enum ModDo {
-    Tab(usize),
+pub(super) enum ModDo {
     Press(usize, usize),
     Browse(usize),
     Remove(bool),
@@ -742,12 +742,8 @@ enum ModDo {
 
 /// The Mods page: Install from File at the top (or the file picker), each pack with its toggle, chevrons and
 /// Uninstall, the archives found with Install; the removal prompt in place while asked.
-fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow: bool, act: &mut Vec<ModDo>) {
-    let v = s.view();
+pub(super) fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow: bool, act: &mut Vec<ModDo>) {
     let at = if open { Some(s.m_mods) } else { None };
-    if let Some(k) = kit::tab_strip(ui, m, "settings tabs", &v.tabs.iter().map(String::as_str).collect::<Vec<_>>(), v.tab, at.is_some_and(|a| a.0 == 0)) {
-        act.push(ModDo::Tab(k));
-    }
     let state = s.mods_state();
     if let Some(b) = state.and_then(|m| m.browse.as_ref()) {
         ui.label(egui::RichText::new(b.dir.display().to_string()).size(m.theme.small).color(m.theme.color("gold")));
@@ -835,13 +831,9 @@ fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow:
     }
 }
 
-fn mods_do(s: &mut SettingsUi, act: Vec<ModDo>) {
+pub(super) fn mods_do(s: &mut SettingsUi, act: Vec<ModDo>) {
     for a in act {
         match a {
-            ModDo::Tab(k) => {
-                s.m_tab(k);
-                s.m_mods = (0, 0);
-            }
             ModDo::Press(st, b) => {
                 s.m_mods = (st, b);
                 mods_act(s, kit::Act::Press(st, b), At::new(st, b));
@@ -890,24 +882,36 @@ pub fn lobby_settings(c: &ConfigUi) -> bool {
     c.m_entry == 1
 }
 
-/// The help for our page's cursor.
-fn ours_help(s: &SettingsUi) -> String {
-    if s.on_mods_page() { s.help() } else { s.view().help }
-}
+/// What the list's Settings entry says before it is opened.
+const OPTIONS_LINE: &str = "Graphics & Interface: the display, graphics, lighting, interface, sound and gamepad options in a window of their own. Press Enter or Right to open it.";
 
-/// The title's Config (lobycwin) in the modern style: the list, then retail's page or our Settings (`s`). Its step
-/// comes back: the sounds, the changed ids.
+/// The title's Config (lobycwin) in the modern style: the list, then retail's page or, opened, our Settings (`s`) as the
+/// Graphics & Interface window (options.rs) in the Config's place. Its step comes back: the sounds, the changed ids.
 pub fn lobby(p: &mut Panels, c: &mut ConfigUi, v: &mut Values, mut s: Option<&mut SettingsUi>, sw: f32) -> configui::Out {
     let mut out = configui::Out::default();
     let Some(gu) = p.gu else { return out };
     let m = p.m;
     let entry = c.m_entry.min(LOBBY.len() - 1);
     let (open, row) = (c.m_open, c.m_row);
+    if open && lobby_settings(c) && let Some(sm) = s.as_deref_mut().filter(|s| s.windowed()) {
+        p.focus = Some(super::options::ID);
+        let follow = super::options::follow(p, sm);
+        let mut acts = Vec::new();
+        super::options::window(p, sm, follow, &mut acts);
+        if !acts.is_empty() {
+            let done = super::options::apply(sm, acts);
+            out.sounds.append(&mut sm.sounds);
+            if done != settings::Done::Stay {
+                c.m_open = false;
+                sm.closing = false;
+            }
+        }
+        return out;
+    }
     let shapes = lobby_shapes();
     let t = texts(gu, c, v, &shapes);
-    let ours = s.as_deref().filter(|_| lobby_settings(c));
-    let follow = m.moved("lobby config", entry * 1_000_000 + ours.map_or(row, |o| o.view().row * 100 + o.view().tab + o.m_mods.0 * 10_000));
-    let (mut sact, mut mact, mut click, mut hover) = (Vec::new(), Vec::new(), None, None);
+    let follow = m.moved("lobby config", entry * 1_000_000 + row);
+    let (mut click, mut hover) = (None, None);
     // Centred, by last frame's size.
     let screen = p.ctx.content_rect();
     let size = m.rects.borrow().get("lobby config").map_or(vec2(640.0, 360.0), |r| r.size());
@@ -920,31 +924,26 @@ pub fn lobby(p: &mut Panels, c: &mut ConfigUi, v: &mut Values, mut s: Option<&mu
             egui::ScrollArea::vertical().id_salt("lobby config page").max_height(tall).min_scrolled_height(tall).auto_shrink([false, true]).show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.set_width(PAGE_W);
-                    match ours {
-                        Some(s) if s.on_mods_page() => mods_page(ui, m, s, open, follow, &mut mact),
-                        Some(s) => settings_page(ui, m, &s.view(), open, follow, &mut sact),
-                        None if lobby_settings(c) => {}
-                        None => hover = native_rows(ui, m, gu, c, v, &shapes, &t, open.then_some(row), follow, sw, &mut click),
+                    if lobby_settings(c) {
+                        ui.label(egui::RichText::new(OPTIONS_LINE).size(m.theme.small).color(m.theme.color("muted")));
+                    } else {
+                        hover = native_rows(ui, m, gu, c, v, &shapes, &t, open.then_some(row), follow, sw, &mut click);
                     }
                 })
             });
         });
-        match ours {
-            Some(s) => help_line(ui, m, &ours_help(s)),
-            None => help_line(ui, m, hover.or(open.then_some(row)).and_then(|i| t.helps.get(i)).map_or("", |h| h.as_str())),
+        if !lobby_settings(c) {
+            help_line(ui, m, hover.or(open.then_some(row)).and_then(|i| t.helps.get(i)).map_or("", |h| h.as_str()));
         }
     });
-    if let Some(s) = s.as_deref_mut().filter(|_| !sact.is_empty() || !mact.is_empty()) {
-        s.sounds.clear();
-        settings_do(s, sact);
-        mods_do(s, mact);
-        out.sounds.append(&mut s.sounds);
-        c.m_open = true;
-    }
     match click {
         Some(Click::Entry(k)) => {
             (c.m_entry, c.m_open, c.m_row) = (k, true, 0);
             out.sounds.push(Se::Select);
+            // Our Settings opens as its window: what it holds now is what Cancel goes back to.
+            if let Some(sm) = s.as_deref_mut().filter(|_| lobby_settings(c)) {
+                sm.begin();
+            }
         }
         Some(Click::Opt(i, x)) => {
             (c.m_open, c.m_row) = (true, i);
@@ -994,6 +993,10 @@ pub fn lobby_key(c: &mut ConfigUi, v: &mut Values, s: Option<&mut SettingsUi>, k
             (kit::Act::Press(..), _) => {
                 (c.m_open, c.m_row) = (true, 0);
                 out.sounds.push(Se::Select);
+                // Our Settings opens as its window: what it holds now is what Cancel goes back to.
+                if let Some(s) = s.filter(|_| lobby_settings(c)) {
+                    s.begin();
+                }
             }
             (a, _) => out.sounds.extend(a.sound()),
         }
@@ -1001,9 +1004,9 @@ pub fn lobby_key(c: &mut ConfigUi, v: &mut Values, s: Option<&mut SettingsUi>, k
     }
     if lobby_settings(c) {
         if let Some(s) = s {
-            if ours_key(s, key, shift) {
+            if super::options::key(s, key, shift) != settings::Done::Stay {
                 c.m_open = false;
-                out.sounds.push(Se::Cancel);
+                s.closing = false;
             }
             out.sounds.append(&mut s.sounds);
         }
@@ -1030,10 +1033,11 @@ fn native_key(c: &mut ConfigUi, v: &mut Values, all: &[Shape], key: egui::Key, s
 }
 
 pub fn draw(p: &mut Panels, w: &mut World) {
-    // Ours goes with the Config window, once the app has stored what changed.
-    if w.modern && w.config.is_none() && w.settings.as_ref().is_some_and(|s| s.in_game && !s.dirty) {
+    // Extras goes with the Config window, once the app has stored what changed (Settings is a window of its own).
+    if w.modern && w.config.is_none() && w.settings.as_ref().is_some_and(|s| s.in_game && !s.dirty && !s.windowed()) {
         w.settings = None;
     }
+    super::options::draw(p, w);
     let Some(gu) = p.gu else { return };
     if !w.modern || !shown(w) {
         return;
@@ -1046,7 +1050,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let (open, row) = (c.m_open, c.m_row);
     // Our Settings / Extras page, when that entry is chosen and its state is up.
     let ours = w.settings.as_ref().filter(|s| settings_kind(entry) == Some(s.kind));
-    let (mut sact, mut mact) = (Vec::new(), Vec::new());
+    let mut sact = Vec::new();
     let shapes = match ENTRIES[entry].1 {
         Entry::Native(menus) => shapes(menus),
         _ => Vec::new(),
@@ -1061,7 +1065,6 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     };
     // The cursor kept in view as it moves (only then, so the wheel stays free).
     let at = match ours {
-        Some(s) if s.on_mods_page() => s.mods_state().and_then(|m| m.browse.as_ref()).map_or(s.m_mods.0 * 1000 + s.m_mods.1, |b| 900_000 + b.cursor),
         Some(s) => s.view().row * 100 + s.view().tab,
         None => c.m_keys.map_or(row, |_| 500_000 + c.m_key_row),
     };
@@ -1123,10 +1126,6 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                     _ => {}
                 }
                 match ours {
-                    Some(s) if s.on_mods_page() => {
-                        mods_page(ui, m, s, open, follow, &mut mact);
-                        help = s.help();
-                    }
                     Some(s) => {
                         settings_page(ui, m, &s.view(), open, follow, &mut sact);
                         help = s.view().help;
@@ -1134,7 +1133,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                     None if shapes.is_empty() => {
                         let what = match ENTRIES[entry].1 {
                             Entry::Extras => "The gameplay additions (not retail): the map overlay, the synthesis amount, timestamps, timers, the minimap.",
-                            _ => "Window, resolution, frame limit and the other settings of the Windows Config tool.",
+                            _ => OPTIONS_LINE,
                         };
                         ui.label(egui::RichText::new(what).size(m.theme.small).color(m.theme.color("muted")));
                     }
@@ -1148,11 +1147,10 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         help_line(ui, m, &help);
     });
     // A click on our page gives it the keys.
-    if !sact.is_empty() || !mact.is_empty() {
+    if !sact.is_empty() {
         if let Some(s) = w.settings.as_mut() {
             s.sounds.clear();
             settings_do(s, sact);
-            mods_do(s, mact);
             w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
         }
         if let Some(c) = w.config.as_mut() {
@@ -1256,8 +1254,16 @@ fn fallback(ctl: Ctl) -> String {
     }
 }
 
-/// The list's entry `k` taken: its page gets the keys (Extras / Settings ours: their state takes them from here).
+/// The list's entry `k` taken: its page gets the keys (Extras ours: its state takes them from here). Settings closes
+/// the Config and opens as its own window (options.rs).
 fn choose(w: &mut World, k: usize) {
+    if matches!(ENTRIES.get(k).map(|e| e.1), Some(Entry::Settings)) {
+        w.config = None;
+        w.game_save = true;
+        w.want_settings = Some(settings::Kind::Settings);
+        w.sounds.push(Se::Select as u32);
+        return;
+    }
     let Some(c) = w.config.as_mut() else { return };
     (c.m_entry, c.m_open, c.m_row, c.m_keys) = (k, true, 0, None);
     let out = configui::Out { sounds: vec![Se::Select], ..Default::default() };
@@ -1347,6 +1353,7 @@ pub fn key(w: &mut World, key: egui::Key, shift: bool) -> bool {
             }
         }
         Entry::Extras | Entry::Settings => {
+            // (Settings is not hosted here; its entry opens its window, so only Extras' state is ever up.)
             if let Some(s) = w.settings.as_mut().filter(|s| settings_kind(entry) == Some(s.kind)) {
                 if ours_key(s, key, shift) {
                     c.m_open = false;
