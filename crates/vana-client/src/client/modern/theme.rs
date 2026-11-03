@@ -32,6 +32,27 @@ const FONTS: [(&str, &[u8]); 5] = [
 const FRAMES: [&str; 5] = ["window_normal", "window_focused", "window_inactive", "window_alert", "window_tooltip"];
 const FRAME_MASK: &str = "frames/window_normal_border";
 
+/// Ours (not retail): the layout's one source of truth, in points before egui's zoom (the zoom is the window's height
+/// against 1080 times Interface Size, so a point is a different number of pixels at every size but every panel keeps
+/// these distances in its own points). A panel's frame stands `SCREEN_GAP` from the screen's edge and `PANEL_GAP` from the next
+/// frame; the top bar's boxes are `BAR_H` high; the party and target windows (the right column) are `COLUMN_W` wide
+/// and the chat window takes the room left of them; `TEXT_PAD` is how far the slim boxes' text stands from their
+/// frame (the panels' own margins are mod.rs's MARGIN).
+pub const SCREEN_GAP: f32 = 12.0;
+pub const PANEL_GAP: f32 = 6.0;
+pub const BAR_H: f32 = 46.0;
+pub const COLUMN_W: f32 = 340.0;
+pub const TEXT_PAD: f32 = 18.0;
+/// The top of the first panel under the top bar.
+pub const BELOW_BAR: f32 = SCREEN_GAP + BAR_H + PANEL_GAP;
+/// The least zoom: body text at 16 points stays over 10 pixels (Interface Size 50 % on a 1280 x 800 window gave
+/// seven-pixel text).
+pub const MIN_ZOOM: f32 = 0.66;
+/// The type scale in points: titles and the bars' labels, body text, small print (captions, buttons, numbers).
+pub const TITLE: f32 = 18.0;
+pub const BODY: f32 = 16.0;
+pub const SMALL: f32 = 14.5;
+
 /// Emphasis beside egui's Proportional (Fira Sans) and Monospace (JetBrains Mono): titles and names; the bars' labels.
 pub const STRONG: &str = "strong";
 pub const LABEL: &str = "label";
@@ -70,10 +91,12 @@ impl Theme {
             ThemeFile::default()
         });
         let mut colors: HashMap<String, Color32> = f.palette.iter().filter_map(|(k, v)| Some((k.clone(), hex(v)?))).collect();
-        // The pack's previews: parchment white text, a slate grey for the quiet parts.
+        // The pack's previews: parchment white text, a slate grey for the quiet parts (muted: captions, help, numbers,
+        // lighter than the pack's, which read dim over a bright backdrop; dim: what is switched off).
         colors.entry("text".into()).or_insert(Color32::from_rgb(0xe6, 0xe1, 0xd6));
-        colors.entry("muted".into()).or_insert(Color32::from_rgb(0x8f, 0x9d, 0xa6));
-        Self { colors, ui: 16.0, title: 18.0, small: 14.5 }
+        colors.entry("muted".into()).or_insert(Color32::from_rgb(0xa8, 0xb5, 0xbe));
+        colors.entry("dim".into()).or_insert(Color32::from_rgb(0x7b, 0x88, 0x92));
+        Self { colors, ui: BODY, title: TITLE, small: SMALL }
     }
 
     /// A palette colour (theme.json "palette").
@@ -81,10 +104,10 @@ impl Theme {
         self.colors.get(name).copied().unwrap_or(Color32::MAGENTA)
     }
 
-    /// egui's zoom: the window height in pixels against 1080 times the size setting (percent), clamped to 0.4 .. 3.
+    /// egui's zoom: the window height in pixels against 1080 times the size setting (percent), clamped to MIN_ZOOM .. 3.
     /// egui multiplies in the monitor's scale, so a 200% panel draws the interface twice as large.
     pub fn zoom(&self, height_px: f32, scale: u32) -> f32 {
-        (height_px / 1080.0 * scale as f32 / 100.0).clamp(0.4, 3.0)
+        (height_px / 1080.0 * scale as f32 / 100.0).clamp(MIN_ZOOM, 3.0)
     }
 }
 
@@ -332,7 +355,7 @@ mod tests {
     #[test]
     fn theme_and_manifest_parse() {
         let t = Theme::load();
-        for c in ["charcoal", "surface", "bronze", "gold", "focus", "hp", "mp", "tp", "text", "muted"] {
+        for c in ["charcoal", "surface", "bronze", "gold", "focus", "hp", "mp", "tp", "text", "muted", "dim"] {
             assert_ne!(t.color(c), Color32::MAGENTA, "{c}");
         }
         let m: ManifestFile = serde_json::from_str(MANIFEST).unwrap();

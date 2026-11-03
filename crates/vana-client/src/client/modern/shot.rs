@@ -192,7 +192,7 @@ fn timers_sample(m: &Modern, ctx: &egui::Context, x: f32, width: f32, side: supe
     });
 }
 
-fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts, backdrop: bool) {
+pub(super) fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts, backdrop: bool) {
     let top = crate::client::hudtop::TopView {
         title: "Status".into(),
         help: "View status.".into(),

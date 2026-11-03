@@ -5,14 +5,10 @@ use super::super::hudtop::TopView;
 use super::{Modern, STRONG, paint};
 use egui::{Align2, Color32, Context, FontFamily, FontId, Id, LayerId, Order, Painter, Rect, pos2, vec2};
 
-/// Edge margin, bar height, the side boxes' width and the gaps, in points (retail: 16, 30, 112, 2 px).
-const PAD: f32 = 16.0;
-const H: f32 = 46.0;
+/// Edge margin, bar height and the gaps are the theme's (retail: 16, 30 and 2 px), the side boxes' width ours.
+use super::theme::{BAR_H as H, PANEL_GAP as GAP, SCREEN_GAP as PAD, SMALL, TEXT_PAD};
 const SIDE: f32 = 200.0;
 const NET: f32 = 168.0;
-const GAP: f32 = 4.0;
-/// The legends' and the network numbers' size: small, but readable at any Interface Size.
-const SMALL: f32 = 14.0;
 
 /// The help line's marquee (FUN_10217640): the text, ticks left before it moves, its offset, the last frame's time.
 #[derive(Default)]
@@ -40,7 +36,7 @@ pub fn draw(m: &Modern, ctx: &Context, v: &TopView) {
         let r = Rect::from_min_size(pos2(screen.min.x + PAD, screen.min.y + PAD), vec2(SIDE, H));
         frame(r);
         let font = FontId::new(m.theme.ui, FontFamily::Name(STRONG.into()));
-        p.with_clip_rect(r.shrink2(vec2(10.0, 0.0))).text(pos2(r.min.x + 12.0, r.center().y), Align2::LEFT_CENTER, &v.title, font, m.theme.color("gold"));
+        p.with_clip_rect(r.shrink2(vec2(10.0, 0.0))).text(pos2(r.min.x + TEXT_PAD, r.center().y), Align2::LEFT_CENTER, &v.title, font, m.theme.color("gold"));
     }
     // helpwind between the two, its "Help" legend only while fully shown.
     let r = Rect::from_min_max(pos2(screen.min.x + PAD + SIDE + GAP, screen.min.y + PAD), pos2(screen.max.x - PAD - NET - GAP, screen.min.y + PAD + H));
@@ -96,7 +92,7 @@ fn help(m: &Modern, ctx: &Context, p: &Painter, r: Rect, v: &TopView) {
     if q.text.is_empty() {
         return;
     }
-    let bx = r.shrink2(vec2(12.0, 0.0));
+    let bx = r.shrink2(vec2(TEXT_PAD, 0.0));
     let font = FontId::proportional(m.theme.ui);
     let col = m.theme.color("text");
     let clip = p.with_clip_rect(bx);

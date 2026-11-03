@@ -39,10 +39,12 @@ fn shows(tab: u8, mode: u16, battle_in_all: bool) -> bool {
 }
 /// Lines kept in the window's scroll.
 const KEEP: usize = 300;
-/// The default room: the width and the lines' height in points.
-/// The default room: most of the screen's width (the user's arrangement), eight or nine lines.
+/// The default room: the width left of the party column, eight or nine lines.
 fn default_room(ctx: &egui::Context) -> Vec2 {
-    vec2(ctx.content_rect().width() * 0.8715, 174.0)
+    use super::theme::{COLUMN_W, PANEL_GAP, SCREEN_GAP};
+    // Ours: the room between the screen's left edge and the party column (target and party), not a share of the width
+    // (a share ran under the party window at the larger Interface Sizes, 2026-11-03).
+    vec2((ctx.content_rect().width() - 2.0 * SCREEN_GAP - COLUMN_W - PANEL_GAP).max(360.0), 174.0)
 }
 /// The font sizes the settings offer.
 const FONT_SIZES: std::ops::RangeInclusive<f32> = 10.0..=32.0;
@@ -413,7 +415,7 @@ pub struct Shown {
 }
 
 /// The window's height without lines: its margins, the tab row and the gap under it.
-fn chrome() -> f32 {
+pub(super) fn chrome() -> f32 {
     super::ROOM_MARGIN.sum().y + TAB_H + GAP
 }
 
