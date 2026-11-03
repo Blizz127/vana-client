@@ -665,6 +665,24 @@ pub fn click(w: &mut World, picked: Option<u32>, left: bool, drag: bool) -> bool
     true
 }
 
+/// Ours (not retail; the Modern controls): a right click. The actor under the pointer becomes the target (or the
+/// prompt's pick) and the confirm of Enter on the target follows at once: an NPC is talked to, anything else opens the
+/// action menu. A click on nothing is retail's right click (cancels the prompt, clears the target, stops autorun). A
+/// locked target stays the target: only the confirm runs. True when it confirmed.
+pub fn interact(w: &mut World, picked: Option<u32>) -> bool {
+    let Some(p) = picked else { return click(w, None, false, false) };
+    log::debug!("world interact picked {p:#x} target {:?}", w.target);
+    if picks_allowed(w) {
+        set(w, Some(p));
+    }
+    if sub_up(w) {
+        confirm_sub(w);
+    } else {
+        confirm_target(w);
+    }
+    true
+}
+
 /// FUN_10083620 / FUN_10083f20: the nearest candidate in front of the character (its own frame, local forward
 /// >= 0) within 50 units (distance^2 < 2500), optionally of some kinds.
 fn nearest(w: &World, keep: impl Fn(u32, &super::Entity) -> bool) -> Option<u32> {

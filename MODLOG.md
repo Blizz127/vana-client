@@ -20586,3 +20586,21 @@ Lessons from other games' mod layers (BG3 Script Extender, WoW, Skyrim, Factorio
 - The scene is 8-bit gamma-space (as D3D8): FXAA 3.11 / CAS / saturation work on those values, bloom and the tone curve through
   linear (x^2.2). The tone curve is the ACES fit with mid grey and white held, so at exposure 1 it is a gentle S, not HDR.
 - Offscreen shots (`render_pngs_post`) apply it too, read from the same config (FFXI_CONFIG).
+
+## Controls: the Modern keyboard and mouse scheme (ours, not retail; 2026-11-03)
+- Config `controls` (0 Original, 1 FFXI WASD, 2 Modern, the default) and `controls_ad_turn`; Settings > Controls (the old
+  Gamepad page, its rows kept) and the Experience row (Modern = modern UI + Modern controls + movie skipped; Original =
+  classic UI + Original controls + Original preset + movie). client/controls.rs holds the pure rules (the scheme, the
+  keyboard type it runs under, the movement from keys and buttons, what a right click is, the focus-loss clear).
+- Original runs the key functions under the Config's 0x42; FFXI WASD under type 2 whatever it says; Modern under type 0
+  (the compact keyboard off, so its letters are free) and reads W / S / A / D itself: the compact stick records' keys
+  (Key Assignment moves them), Q / E the type 2 turn keys 0x67 / 0x66, autorun on the compact autorun record's key (R).
+  Off under a menu (not the action menu), the chat line and other text fields, Key Assignment, a non-field input
+  context, and with Ctrl / Alt held. A / D strafe and Q / E turn (or the other way); with the right button held all
+  four strafe, the character already facing the camera (mouse_look, as before).
+- A right click (under 6 px of look motion and 0.35 s) in Modern: the actor under the pointer is the target and Enter's
+  confirm follows (talk to an NPC, else the action menu; a sub-target prompt takes it as its pick); on nothing it is
+  retail's right click. A right look drag no longer clears the target in Modern. Retail's right click is unchanged
+  in the other schemes.
+- Focus change: App::lose_focus drops held keys, buttons, drag state and mouse_look and gives the pointer back
+  (the stuck-run bug). Space is the chat line, as before; FFXI has no jump.

@@ -53,6 +53,9 @@ pub struct Settings {
     pub gamepad: bool,
     pub gamepad_deadzone: u32,
     pub gamepad_camera: u32,
+    /// The Controls page's scheme (config controls: 0 Original, 1 FFXI WASD, 2 Modern) and Modern's A / D choice.
+    pub controls: u32,
+    pub controls_ad_turn: bool,
     pub modern_ui: bool,
     pub ui_scale: u32,
     /// The post-processing pass (config graphics; render/post.rs).
@@ -106,6 +109,8 @@ impl Settings {
             gamepad: c.gamepad,
             gamepad_deadzone: pct(c.gamepad_deadzone),
             gamepad_camera: (c.gamepad_camera_speed * 100.0).round().clamp(10.0, 500.0) as u32,
+            controls: c.controls.min(2),
+            controls_ad_turn: c.controls_ad_turn,
             modern_ui: c.modern_ui,
             ui_scale: c.ui_scale,
             graphics: c.graphics.clone(),
@@ -151,6 +156,8 @@ impl Settings {
         c.gamepad = self.gamepad;
         c.gamepad_deadzone = self.gamepad_deadzone as f32 / 100.0;
         c.gamepad_camera_speed = self.gamepad_camera as f32 / 100.0;
+        c.controls = self.controls;
+        c.controls_ad_turn = self.controls_ad_turn;
         c.modern_ui = self.modern_ui;
         c.ui_scale = self.ui_scale;
         c.graphics = self.graphics.clone();
@@ -217,6 +224,9 @@ enum Val {
     Gamepad,
     GamepadDeadzone,
     GamepadCamera,
+    /// Ours: the keyboard and mouse scheme (config controls) and Modern's A / D keys (controls_ad_turn).
+    Controls,
+    ControlsAd,
     /// The monitor for full screen, from the list the app passes in.
     Monitor,
     /// The graphics adapter ("Default" then the app's list).
@@ -311,13 +321,13 @@ const fn row(label: &'static str, help: &'static str, val: Val, choices: &'stati
 
 /// Ours (not retail): the Settings pages are player-facing categories, not the Windows Config tool's tabs (General,
 /// Screen, Textures, Effects, Sound, Misc., Client ...). Post-processing is empty until its rows arrive (see POST).
-const TABS: [&str; 9] = ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Gamepad", "Mods"];
+const TABS: [&str; 9] = ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Controls", "Mods"];
 /// The Graphics category (the preset, quality rows): where /graphics opens.
 pub const GRAPHICS: usize = 1;
 /// The Sound page (its volumes are the Gameplay page's in game).
 const SOUND_TAB: usize = 5;
-/// The Gamepad page (client/gamepad.rs).
-const GAMEPAD: usize = 7;
+/// The Controls page: the keyboard and mouse scheme (client/controls.rs) and the gamepad (client/gamepad.rs).
+const CONTROLS: usize = 7;
 /// The Post-processing category, empty until it has rows.
 const POST_TAB: usize = 3;
 /// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
@@ -376,7 +386,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Saturation", "Colour strength: 100% is as drawn.", Saturation, &[(50, "50%"), (75, "75%"), (90, "90%"), (100, "100%"), (110, "110%"), (125, "125%"), (150, "150%")], Now),
     ];
     const PLACES_ROW: SRow = row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now);
-    const EXPERIENCE_ROW: SRow = row("Experience", "Modern: the new interface, the opening movie skipped. Original: the game as retail had it, its own windows, the Original graphics preset and the opening movie. Each setting below can still be changed on its own (not retail).", Experience, &[(0, "Modern"), (1, "Original"), (2, "Custom")], Now);
+    const EXPERIENCE_ROW: SRow = row("Experience", "Modern: the new interface, WASD and mouse controls, the opening movie skipped. Original: the game as retail had it, its own windows, retail's keyboard, the Original graphics preset and the opening movie. Each setting below can still be changed on its own (not retail).", Experience, &[(0, "Modern"), (1, "Original"), (2, "Custom")], Now);
     const INTERFACE_HEAD: [SRow; 5] = [
         row("Interface", "Classic: the game's own windows. Modern: the new interface's windows where it has them (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
         row("UI Scale", "How big the game's windows and text are: Auto grows them with the window past 1080 lines; Menu Size uses the size below, as retail (not retail).", UiScale, UI_SCALES, Now),
@@ -408,7 +418,9 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Simple Character Creation", "0023: character creation with 2-D portraits instead of the 3D models.", Tool("0023"), OFF_ON, Now),
         row("Screenshot Size", "0043: also save each screenshot at the screen size (ffxiuser/screenshots).", Tool("0043"), OFF_ON, Now),
     ];
-    const GAMEPAD_ROWS: &[SRow] = &[
+    const CONTROLS_ROWS: &[SRow] = &[
+        row("Keyboard & Mouse", "Modern: WASD and the mouse as in WoW. W / S walk, A / D strafe, Q / E turn; hold the right button to look (the character faces where the camera looks), both buttons run, the left button turns the camera, a left click targets, a right click on someone talks to them or opens the action menu, R is autorun. FFXI has no jumping; Space opens the chat line. FFXI WASD: retail's keyboard type 2 (Q / E turn, Shift faces the camera). Original: retail's keyboard as the game Config's Keyboard type sets it. The keys follow Key Assignment (not retail).", Controls, &[(2, "Modern"), (1, "FFXI WASD"), (0, "Original")], Now),
+        row("A / D Keys", "Modern: A / D strafe (Q / E turn), or turn (Q / E strafe). While the right button is held all four strafe.", ControlsAd, &[(0, "Strafe"), (1, "Turn")], Now),
         row("Gamepad", "A connected gamepad plays the game: the left stick walks, the right one turns the camera, the buttons are the keys' (not retail). Off, a pad does nothing.", Gamepad, OFF_ON, Now),
         row("Stick Deadzone", "How far a stick must be pushed before it counts; raise it if the character or camera drifts on its own.", GamepadDeadzone, DEADZONES, Now),
         row("Camera Speed", "How fast the right stick turns the camera, against the keys' speed.", GamepadCamera, CAMERA_SPEEDS, Now),
@@ -447,7 +459,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         Kind::Extras => [MAPS, TIMERS, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == SOUND_TAB => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
-        Kind::Settings if tab == GAMEPAD => GAMEPAD_ROWS,
+        Kind::Settings if tab == CONTROLS => CONTROLS_ROWS,
         Kind::Settings => match tab {
             0 => DISPLAY,
             GRAPHICS => GRAPHICS_ROWS,
@@ -679,6 +691,8 @@ impl SettingsUi {
             Val::RetailAspect => self.s.retail_aspect as u32,
             Val::CursorSize => self.s.cursor_size,
             Val::Gamepad => self.s.gamepad as u32,
+            Val::Controls => self.s.controls,
+            Val::ControlsAd => self.s.controls_ad_turn as u32,
             Val::GamepadDeadzone => self.s.gamepad_deadzone,
             Val::GamepadCamera => self.s.gamepad_camera,
             Val::Mod(i) => self.mod_page().and_then(|p| p.rows.get(i)).map_or(0, |r| r.at as u32),
@@ -730,6 +744,8 @@ impl SettingsUi {
             Val::RetailAspect => self.s.retail_aspect = x != 0,
             Val::CursorSize => self.s.cursor_size = x,
             Val::Gamepad => self.s.gamepad = x != 0,
+            Val::Controls => self.s.controls = x.min(2),
+            Val::ControlsAd => self.s.controls_ad_turn = x != 0,
             Val::GamepadDeadzone => self.s.gamepad_deadzone = x,
             Val::GamepadCamera => self.s.gamepad_camera = x,
             Val::Mod(i) => {
@@ -1800,7 +1816,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();
@@ -1818,7 +1834,52 @@ mod tests {
         assert!(matches!(ui.rows()[0].val, Val::Preset) && ui.rows()[1].label == "Render Resolution");
         ui.tab = POST_TAB;
         assert!(ui.rows().len() == 8 && matches!(ui.rows()[0].val, Val::Fxaa) && ui.note().is_none());
-        assert_eq!(ui.tabs(), ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Gamepad", "Mods"]);
+        assert_eq!(ui.tabs(), ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Controls", "Mods"]);
+        // The Controls page: the keyboard and mouse scheme first (Modern the default), then A / D, then the gamepad rows.
+        ui.tab = CONTROLS;
+        let vals: Vec<String> = ui.rows().iter().map(|r| format!("{:?}", r.val)).collect();
+        assert_eq!(vals, ["Controls", "ControlsAd", "Gamepad", "GamepadDeadzone", "GamepadCamera"]);
+        assert_eq!(ui.get(Val::Controls), 2);
+        assert!(ui.rows()[0].help.contains("no jumping"));
+    }
+
+    /// The Controls row's choices set `controls`; the A / D row `controls_ad_turn`; both reach the config.
+    #[test]
+    fn controls_rows_set_the_config() {
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        assert_eq!((ui.s.controls, ui.s.controls_ad_turn), (2, false));
+        ui.tab = CONTROLS;
+        let first = ui.rows()[0].clone();
+        assert_eq!(ui.stops(&first), (3, 0));
+        for (stop, want) in [(1, 1), (2, 0), (0, 2)] {
+            ui.set_stop(&first, stop);
+            assert_eq!(ui.s.controls, want);
+        }
+        ui.set(Val::ControlsAd, 1);
+        let mut c = Config::default();
+        ui.s.store(&mut c);
+        assert_eq!((c.controls, c.controls_ad_turn), (2, true));
+        // Defaults on this page brings the scheme back.
+        ui.set(Val::Controls, 0);
+        ui.reset_category();
+        assert_eq!((ui.s.controls, ui.s.controls_ad_turn), (2, false));
+    }
+
+    /// The Experience row carries the controls: Modern is the Modern scheme, Original the Original one; a hand change
+    /// is Custom.
+    #[test]
+    fn experience_sets_the_controls() {
+        let mut ui = SettingsUi::open(&Config::default(), [1280, 800]);
+        assert_eq!(ui.experience(), 0);
+        ui.apply_experience(1);
+        assert_eq!((ui.s.controls, ui.experience()), (0, 1));
+        ui.set(Val::Controls, 1);
+        assert_eq!(ui.experience(), win::EXPERIENCES as u32);
+        ui.apply_experience(0);
+        assert_eq!((ui.s.controls, ui.experience()), (2, 0));
+        // The Original controls alone with the Modern interface are neither.
+        ui.set(Val::Controls, 0);
+        assert_eq!(ui.experience(), win::EXPERIENCES as u32);
     }
 
     /// The rows a preset sets.
