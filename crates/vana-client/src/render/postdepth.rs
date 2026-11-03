@@ -506,6 +506,27 @@ mod tests {
         assert!(!fx.has_depth_fx(), "fxaa alone makes no depth effect");
         let fx = super::super::post::ensure(&mut slot, &gpu, FMT, &ao_cfg()).unwrap();
         assert!(!fx.has_depth_fx(), "made on the first run, not by ensure");
+        // A run with the depth makes it; a frame without one (a flash, a held frame) keeps it; ensure drops it with the option.
+        let scene = gpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            size: wgpu::Extent3d { width: N, height: N, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: FMT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let d = depth(&gpu, 0, 6.0);
+        let mut enc = gpu.device.create_command_encoder(&Default::default());
+        fx.run(&gpu, &mut enc, &scene, &ao_cfg(), Some(DepthIn { depth: &d, cam: cam(0.0, 0.0, [1.0; 3]) }));
+        assert!(fx.has_depth_fx());
+        let fx = super::super::post::ensure(&mut slot, &gpu, FMT, &ao_cfg()).unwrap();
+        fx.run(&gpu, &mut enc, &scene, &ao_cfg(), None);
+        assert!(fx.has_depth_fx(), "a frame without the depth does not rebuild it next frame");
+        gpu.queue.submit([enc.finish()]);
+        let fx = super::super::post::ensure(&mut slot, &gpu, FMT, &GraphicsCfg { fxaa: true, ..Default::default() }).unwrap();
+        assert!(!fx.has_depth_fx(), "dropped with the option");
         assert!(super::super::post::ensure(&mut slot, &gpu, FMT, &GraphicsCfg::default()).is_none() && slot.is_none());
     }
 

@@ -416,10 +416,8 @@ impl PostFx {
         // AO and height fog first, over the scene as drawn; every pass after reads their result in its place.
         let sv = match depth.filter(|_| cfg.depth_on()) {
             Some(d) => self.depthfx.get_or_insert_with(|| DepthFx::new(gpu, plain)).run(gpu, enc, &sv, [size.width, size.height], d, cfg),
-            None => {
-                self.depthfx = None;
-                sv
-            }
+            // No depth this frame (a flash, a held frame): skipped, and kept for the next; `ensure` drops it with the option.
+            None => sv,
         };
         let comp = cfg.composite_on();
         let half = [(size.width / 2).max(1), (size.height / 2).max(1)];
