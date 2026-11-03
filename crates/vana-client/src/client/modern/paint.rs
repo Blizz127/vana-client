@@ -39,6 +39,18 @@ pub fn outlined(p: &Painter, at: Pos2, align: Align2, text: &str, font: FontId, 
     r
 }
 
+/// A one-point line along `y` from `x0` to `x1`, `c` at the left end fading out to the right (a panel title's rule).
+pub fn fade_rule(p: &Painter, x0: f32, x1: f32, y: f32, c: Color32) {
+    let mut m = Mesh::default();
+    for (x, col) in [(x0, c), (x1, Color32::TRANSPARENT)] {
+        m.colored_vertex(pos2(x, y), col);
+        m.colored_vertex(pos2(x, y + 1.0), col);
+    }
+    m.add_triangle(0, 1, 2);
+    m.add_triangle(1, 3, 2);
+    p.add(Shape::mesh(m));
+}
+
 fn quad(m: &mut Mesh, r: Rect, uv: Rect) {
     if r.width() > 0.0 && r.height() > 0.0 {
         m.add_rect_with_uv(r, uv, Color32::WHITE);

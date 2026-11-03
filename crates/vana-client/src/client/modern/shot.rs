@@ -192,7 +192,11 @@ fn timers_sample(m: &Modern, ctx: &egui::Context, x: f32, width: f32, side: supe
     });
 }
 
-fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
+/// How many effects the shot's status panel shows at least (the layout tests set it).
+#[cfg(test)]
+thread_local!(pub(super) static EFFECTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+
+pub(super) fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts, backdrop: bool) {
     let top = crate::client::hudtop::TopView {
         title: "Status".into(),
         help: "View status.".into(),
@@ -233,7 +237,12 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     let named = |l: &str, mode: u16| mode == 13 && chat::mentions(l, "Lenon");
     chat::draw(&mut p, &ChatView { lines: lines.iter().enumerate().map(|(k, (a, b, c, d))| (a.clone(), *b, *c, *d, named(b, *d), k)).collect(), input: Some(InputView { channel: "Party", sel: Some((0, 7)), pieces: vec![("Pulling now ".into(), false), ("Thank you.".into(), true)], caret: 22, fep: None }), waiting: false, unread }, shown, true);
     let fx = |icon, label: Option<&str>, ending| Effect { icon: Icon::Pack(icon), label: label.map(str::to_string), ending, tip: None };
-    let mine = vec![fx("icons/protect", Some("25m"), false), fx("icons/haste", Some("2m"), false), fx("icons/refresh", Some("12"), true), fx("icons/poison", None, false)];
+    let mut mine = vec![fx("icons/protect", Some("25m"), false), fx("icons/haste", Some("2m"), false), fx("icons/refresh", Some("12"), true), fx("icons/poison", None, false)];
+    // The tests' crowded party play: up to 32 effects (four rows of icons).
+    #[cfg(test)]
+    while mine.len() < EFFECTS.with(|n| n.get()) {
+        mine.push(fx("icons/haste", Some("1m"), false));
+    }
     hud::status_panel(&mut p, &StatusView { effects: mine, cursor: None }, false);
     let dot = |x, y, c: u32| (x, y, super::chat::colour(c.to_le_bytes()));
     let compass = hud::CompassView { heading: 0.6, dots: vec![dot(4.0, -9.0, 0x8030_60e0), dot(-11.0, 3.0, 0x8000_b040), dot(14.0, 13.0, 0x5000_b040)], range: 28.8, arrow: Some((0.6, -0.8, "focus")) };
@@ -242,7 +251,10 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     let vit = |hp: u32, mp: u32, f: f32| hud::RowVitals { hp, hp_max: Some(1000), mp, tp: Some(if f > 0.9 { 1250 } else { 300 }), hpf: f, mpf: Some(f * 0.8), hp_colour: if f < 0.75 { egui::Color32::from_rgb(0xff, 0xd0, 0x40) } else { egui::Color32::WHITE } };
     let row = |slot, name: &str, job, here: bool, hp: f32, marked, effects: Vec<Effect>| PartyRow { slot, name: name.into(), icon: hud::job_icon(job), sub_icon: hud::job_icon(if job == 3 { 5 } else { 0 }), here: here.then(|| vit((hp * 1000.0) as u32, 420, hp)), zone: "Port Jeuno".into(), marked, hand: marked.then_some(0x8080_8080), marks: (slot == 0) as u8, effects, jobs: String::new() };
     hud::party_panel(&mut p, "party", "Party", &[row(0, "Lenon", 5, true, 0.98, false, vec![]), row(1, "Raven", 1, true, 0.88, false, theirs.clone()), row(2, "Koru", 3, true, 0.62, true, vec![]), row(3, "Shantotto", 4, true, 0.95, false, vec![]), row(4, "Prishe", 2, false, 1.0, false, vec![])], false, Some(super::super::resttick::Shown::Next(0.6, 4.0)));
-    hud::cast_panel(&mut p, "cast", "Casting", 0.6, "60%");
+    // (Not over the magic list: nothing casts while it is open.)
+    if !matches!(opts.panel.as_deref(), Some("magic" | "cats")) {
+        hud::cast_panel(&mut p, "cast", "Casting", 0.6, "60%");
+    }
     hud::target_panel(&mut p, &TargetView { name: "Robber Crab".into(), ring: "indicators/target_hostile", locked: true, hp: Some((72, 0.72)), colour: Some(egui::Color32::from_rgb(255, 80, 80)), cast: Some(("Firaga".into(), Some(0.4))), distance: Some(12.4) });
     if opts.list {
         list_sample(&mut p);
@@ -251,10 +263,15 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         kit_sample(&mut p);
     }
     // The Graphics & Interface window over the HUD, as in game.
-    if let Some(name) = &opts.panel {
+    if let Some(name) = opts.panel.as_deref().filter(|n| !matches!(*n, "magic" | "cats")) {
         let px = ctx.content_rect().size() * ctx.pixels_per_point();
         p.focus = Some(super::options::ID);
         super::options::sample(&mut p, name, opts.panel_row, [px.x.round() as u32, px.y.round() as u32]);
+    }
+    // The magic list (or its categories) over the HUD, on the combat window's place as in game.
+    if let Some(name @ ("magic" | "cats")) = opts.panel.as_deref() {
+        p.focus = Some("list");
+        super::lists::sample(&mut p, name == "cats");
     }
     if opts.rows.is_some() || opts.borders.is_some() {
         menu_sample(&mut p);
@@ -270,7 +287,11 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     if opts.list || opts.kit || opts.panel.is_some() || opts.rows.is_some() || opts.borders.is_some() {
         return;
     }
-    // Every frame at a few sizes: nine-slice corners, tiled edges, the stretched gradient.
+    // Every frame at a few sizes: nine-slice corners, tiled edges, the stretched gradient (not over a backdrop: that is
+    // the HUD as it stands over the game).
+    if backdrop {
+        return;
+    }
     let painter = ctx.layer_painter(LayerId::new(Order::Foreground, Id::unique("frames")));
     let screen = ctx.content_rect();
     let names = ["window_normal", "window_focused", "window_inactive", "window_alert", "window_tooltip"];
@@ -301,7 +322,8 @@ pub struct Opts {
     /// A panel of the kit's controls.
     pub kit: bool,
     /// The Graphics & Interface window (options.rs) on a category (display, graphics, lighting, post, interface, sound,
-    /// misc, gamepad, mods) with the cursor on a row (0: the category list).
+    /// misc, gamepad, mods) with the cursor on a row (0: the category list); "magic" or "cats": the magic list or its
+    /// category window (lists.rs).
     pub panel: Option<String>,
     pub panel_row: usize,
 }
@@ -349,7 +371,7 @@ pub fn shot(width: u32, height: u32, scale: u32, backdrop: Option<&Path>, out: &
             if let Some(t) = &bg {
                 ctx.layer_painter(LayerId::background()).image(t.id(), ctx.content_rect(), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
             }
-            sample(&m, ctx, &mut layout, opts);
+            sample(&m, ctx, &mut layout, opts, bg.is_some());
         });
         // Taken as they come (a TexturesDelta dropped unapplied is an error in debug builds).
         deltas.extend(output.textures_delta.set.drain());

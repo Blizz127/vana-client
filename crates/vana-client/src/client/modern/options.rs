@@ -11,18 +11,19 @@ use super::super::settings::{Done, SettingsUi, WCtl, WIN_BUTTONS, WRow, Zone};
 use super::config::{self, ModDo};
 use super::kit::{self, Btn};
 use super::{Panels, Title};
-use egui::{Align, Align2, Color32, FontFamily, FontId, Layout, RichText, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{Align, Align2, Color32, FontFamily, FontId, Layout, Rect, RichText, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
 
 /// The panel's id (and what the key dispatch's focus names).
 pub const ID: &str = "options";
 /// The window's size at Interface Size 100%, and how far from the screen's edges it keeps.
 const WIDTH: f32 = 900.0;
 const HEIGHT: f32 = 600.0;
-const EDGE: f32 = 12.0;
-/// The category list's width, the gap, and the controls' column.
+const EDGE: f32 = super::theme::SCREEN_GAP;
+/// The category list's width, the gap, and the controls' column (the heading and its help get the rest: they are the
+/// long part).
 const CATS_W: f32 = 184.0;
-const GAP: f32 = 14.0;
-const CTL_W: f32 = 320.0;
+const GAP: f32 = 16.0;
+const CTL_W: f32 = 280.0;
 
 /// What the pointer did in the window.
 pub enum Do {
@@ -150,7 +151,12 @@ fn categories(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, body: f32, act: &m
             };
             super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
             let c = if here { m.theme.color("gold") } else { m.theme.color("text") };
-            ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.ui), c);
+            // Ours: the category chosen keeps an accent bar and the strong face while the keys are on its rows.
+            let font = if here { FontId::new(m.theme.ui, FontFamily::Name(super::STRONG.into())) } else { FontId::proportional(m.theme.ui) };
+            if here {
+                ui.painter().rect_filled(Rect::from_min_max(pos2(r.min.x + 8.0, r.min.y + 6.0), pos2(r.min.x + 11.0, r.max.y - 6.0)), 1.5, m.theme.color("gold"));
+            }
+            ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, name, font, c);
             if resp.clicked() {
                 act.push(Do::Cat(k));
             }
@@ -162,9 +168,12 @@ fn categories(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, body: f32, act: &m
 /// The chosen category: its name, then its rows (or the Mods page, or what is coming).
 fn page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, body: f32, right: f32, follow: bool, act: &mut Vec<Do>) {
     let name = s.categories().get(s.category()).cloned().unwrap_or_default();
-    ui.label(RichText::new(name).size(m.theme.title).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
-    ui.add_space(4.0);
-    let room = body - 32.0;
+    // Ours: the category's name under the window's title, in the body size with a rule (not a second title).
+    let (hr, _) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::hover());
+    ui.painter().text(pos2(hr.min.x, hr.center().y), Align2::LEFT_CENTER, name, FontId::new(m.theme.ui, FontFamily::Name(super::STRONG.into())), m.theme.color("text"));
+    super::paint::fade_rule(ui.painter(), hr.min.x, hr.max.x, hr.max.y, m.theme.color("bronze").gamma_multiply(0.6));
+    ui.add_space(6.0);
+    let room = body - 36.0;
     let scroll = egui::ScrollArea::vertical().id_salt(("options page", s.category())).min_scrolled_height(room).max_height(room).auto_shrink([false, false]);
     if s.on_mods_page() {
         let mut mact = Vec::new();
@@ -182,6 +191,8 @@ fn page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, body: f32, right: f32, f
     let rows = s.win_rows();
     scroll.show(ui, |ui| {
         ui.set_width(right - 14.0);
+        // Room for the first row's ring above it.
+        ui.add_space(6.0);
         for (k, r) in rows.iter().enumerate() {
             let here = s.zone == Zone::Rows && s.view_row() == k + 1;
             row(ui, m, k + 1, r, here, follow, right - 14.0, act);
@@ -192,20 +203,21 @@ fn page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, body: f32, right: f32, f
 /// One row: heading, help and note on the left, its control on the right; ringed while the cursor is on it.
 #[allow(clippy::too_many_arguments)]
 fn row(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, focus: bool, follow: bool, width: f32, act: &mut Vec<Do>) {
-    let ctl_w = CTL_W.min(width * 0.55);
-    let label_w = (width - ctl_w - 20.0).max(120.0);
+    let ctl_w = CTL_W.min(width * 0.45);
+    let label_w = (width - ctl_w - 24.0).max(140.0);
     let bg = ui.painter().add(Shape::Noop);
     let inner = ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(label_w);
+            ui.spacing_mut().item_spacing.y = 3.0;
             let c = if focus { m.theme.color("gold") } else { m.theme.color("text") };
             ui.label(RichText::new(&r.label).size(m.theme.ui).family(FontFamily::Name(super::STRONG.into())).color(c));
-            ui.add(egui::Label::new(RichText::new(&r.help).size(m.theme.small - 1.0).color(m.theme.color("muted"))).wrap());
+            ui.add(egui::Label::new(RichText::new(&r.help).size(m.theme.small).color(m.theme.color("muted"))).wrap());
             if !r.when.is_empty() {
-                ui.label(RichText::new(r.when).size(m.theme.small - 1.0).italics().color(m.theme.color("bronze")));
+                ui.label(RichText::new(r.when).size(m.theme.small).italics().color(m.theme.color("bronze")));
             }
         });
-        ui.add_space(20.0);
+        ui.add_space(24.0);
         ui.vertical(|ui| {
             ui.set_width(ctl_w);
             ui.add_space(2.0);
@@ -220,10 +232,10 @@ fn row(ui: &mut Ui, m: &super::Modern, row: usize, r: &WRow, focus: bool, follow
             ui.scroll_to_rect(rect, None);
         }
     }
-    ui.add_space(8.0);
-    let y = ui.cursor().min.y - 4.0;
+    ui.add_space(10.0);
+    let y = ui.cursor().min.y - 5.0;
     ui.painter().hline(rect.x_range(), y, Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.25)));
-    ui.add_space(6.0);
+    ui.add_space(8.0);
 }
 
 /// A row's control: a click or drag acts on the row.

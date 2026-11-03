@@ -185,7 +185,7 @@ fn bar(ui: &Ui, m: &Modern, kind: &str, r: Rect, f: f32) {
 
 /// A bar `BAR` high under the row's text; the labels over bars at `LABEL_SIZE`.
 pub(super) const BAR: f32 = 14.0;
-const LABEL_SIZE: f32 = 18.0;
+const LABEL_SIZE: f32 = super::theme::TITLE;
 
 /// A bar with its label and value over its top edge, the label a little in from the bar's start.
 pub(super) fn labelled_bar(ui: &Ui, m: &Modern, kind: &str, r: Rect, f: f32, label: (&str, Color32), value: (&str, Color32)) {
@@ -286,12 +286,12 @@ fn rest_strip(ui: &mut Ui, m: &Modern, rest: Shown) {
     let painter = ui.painter();
     match rest {
         Shown::Timing(t) => {
-            painter.text(pos2(r.min.x + 4.0, y), Align2::LEFT_CENTER, "Timing rest ticks...", font.clone(), m.theme.color("muted"));
-            painter.text(pos2(r.max.x - 4.0, y), Align2::RIGHT_CENTER, format!("{t:.0} s"), font, m.theme.color("muted"));
+            painter.text(pos2(r.min.x, y), Align2::LEFT_CENTER, "Timing rest ticks...", font.clone(), m.theme.color("muted"));
+            painter.text(pos2(r.max.x, y), Align2::RIGHT_CENTER, format!("{t:.0} s"), font, m.theme.color("muted"));
         }
         Shown::Next(f, left) => {
-            let label = painter.text(pos2(r.min.x + 4.0, y), Align2::LEFT_CENTER, "Next tick", font.clone(), m.theme.color("text"));
-            let secs = painter.text(pos2(r.max.x - 4.0, y), Align2::RIGHT_CENTER, format!("{:.0} s", left.ceil()), font, m.theme.color("text"));
+            let label = painter.text(pos2(r.min.x, y), Align2::LEFT_CENTER, "Next tick", font.clone(), m.theme.color("text"));
+            let secs = painter.text(pos2(r.max.x, y), Align2::RIGHT_CENTER, format!("{:.0} s", left.ceil()), font, m.theme.color("text"));
             bar(ui, m, "recast", Rect::from_min_max(pos2(label.max.x + 10.0, y - 3.5), pos2(secs.min.x - 10.0, y + 3.5)), f);
         }
     }
@@ -381,7 +381,7 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], sma
             let hp_r = Rect::from_min_max(pos2(x, r.min.y + 26.0), pos2(right, r.min.y + 38.0));
             let hp = v.hp_max.map_or(v.hp.to_string(), |max| format!("{} / {max}", v.hp));
             labelled_bar(ui, m, "hp", hp_r, v.hpf, (&row.name, m.theme.color("text")), (&hp, v.hp_colour));
-            let small_font = FontId::new(14.0, FontFamily::Name(super::LABEL.into()));
+            let small_font = FontId::new(m.theme.small, FontFamily::Name(super::LABEL.into()));
             if let Some(mpf) = v.mpf {
                 // The MP bar under it, its number at its right; TP (config 0xae bit 0) before it, blue from 1000.
                 let my = hp_r.max.y + 9.0;

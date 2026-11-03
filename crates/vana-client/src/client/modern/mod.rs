@@ -25,6 +25,8 @@ mod hud;
 mod inspect;
 mod items;
 mod journal;
+#[cfg(test)]
+mod layout_tests;
 mod kit;
 mod lobby;
 mod lists;
@@ -472,48 +474,58 @@ impl Dock {
     }
 }
 
-/// Where each panel starts (the user's own arrangement, 2026-10-26): the chat and party windows on the screen's
-/// bottom, the location panel on the chat window and the combat window on it (retail's compass and action menu ride
-/// the log), the target on the party window (retail's targetwi, flag 0x2000), the status icons, the command window and
-/// the Timers at the left under the top bar, the main menu and the minimap at the right.
-fn default_place(id: &str) -> Place {
+/// Where each panel starts (the user's own arrangement, 2026-10-26; laid out in points from the screen's edges,
+/// 2026-11-03, so no two overlap at any window size or Interface Size): the chat and party windows on the screen's
+/// bottom, the chat window as wide as the room left of the party column (chat.rs default_room), the location panel on
+/// the chat window and the combat window on it (retail's compass and action menu ride the log), the target on the
+/// party window (retail's targetwi, flag 0x2000), the status icons, the command window and the Timers at the left under
+/// the top bar, the main menu and the minimap at the right under it. `screen` is the screen's size in points.
+fn default_place(id: &str, screen: Vec2) -> Place {
+    use theme::{BELOW_BAR, COLUMN_W, PANEL_GAP as GAP, SCREEN_GAP as EDGE, TEXT_PAD};
+    let (margin_left, margin_top) = (MARGIN.left as f32, MARGIN.top as f32);
+    let (sw, sh) = (screen.x.max(1.0), screen.y.max(1.0));
     let at = |x, y| Place { x, y, ..Default::default() };
-    let on = |to: &str| Place { dock: Some(Dock { to: to.into(), gap: 4.0, dx: 0.0, right: false }), ..Default::default() };
+    // From the left edge, from the top bar's bottom, and (a fraction below zero) from the right edge.
+    let left = |dx: f32, y: f32| at((EDGE + dx) / sw, y / sh);
+    let right = |y: f32| at(-EDGE / sw, y / sh);
+    let on = |to: &str| Place { dock: Some(Dock { to: to.into(), gap: GAP, dx: 0.0, right: false }), ..Default::default() };
     match id {
-        "chat" => Place { x: 0.0121, b: 0.9998, ..Default::default() },
-        "party" => Place { x: 0.8836, b: 0.9992, ..Default::default() },
+        "chat" => Place { x: EDGE / sw, b: 1.0 - EDGE / sh, ..Default::default() },
+        "party" => Place { x: (sw - EDGE - COLUMN_W) / sw, b: 1.0 - EDGE / sh, ..Default::default() },
         "where" => Place { dock: Some(Dock { to: "chat".into(), gap: -0.5, dx: 1.25, right: false }), ..Default::default() },
         "combat" => on("where"),
         "target" => on("party"),
         // The magic and ability windows ride on the combat window (retail's sit on the log), the list on its categories.
         "cats" => on("combat"),
         "list" => on("cats"),
-        // Below zero x is from the right edge.
-        "status" => at(0.0637, 0.0313),
-        "command" => at(-0.0047, 0.034),
+        // The effect icons under the top bar's title box, their first icon in line with its text (the panel's margin
+        // is clear of the frame it does not draw).
+        "status" => at((EDGE + TEXT_PAD - margin_left) / sw, (BELOW_BAR - margin_top) / sh),
+        "command" => right(BELOW_BAR),
         // raid1 / raid2's places (y 48 and 150 of the 448 layout).
         "alliance1" => at(0.87, 0.107),
         "alliance2" => at(0.87, 0.335),
-        // The cast bar at retail's (16, 94); the Timers on the left edge, the minimap on the right one.
-        "cast" => at(0.02, 0.21),
-        // The 0x075 countdown under it, the objective's bars under that.
-        "countdown" => at(0.02, 0.28),
-        "objective" => at(0.02, 0.35),
-        "timers" => at(0.0, 0.2187),
+        // The cast bar centred under the top bar (it stood at retail's (16, 94), under the effect icons once there
+        // were two rows of them), the 0x075 countdown under it, the objective's bars under that; the Timers on the
+        // left edge under the most effect icons there are (four rows), the minimap on the right one.
+        "cast" => at((sw - 300.0) / 2.0 / sw, BELOW_BAR / sh),
+        "countdown" => at((sw - 300.0) / 2.0 / sw, (BELOW_BAR + 64.0) / sh),
+        "objective" => at((sw - 300.0) / 2.0 / sw, (BELOW_BAR + 128.0) / sh),
+        "timers" => at(0.0, (BELOW_BAR + 4.0 * 54.0 + GAP) / sh),
         // The training regime lower on the same edge.
         "regime" => at(0.0, 0.6),
         // The skillchain helper on the right edge, under the minimap.
         "skillchains" => at(-0.001, 0.25),
-        "minimap" => at(-0.001, 0.0353),
+        // Under the top bar's network box, not over it.
+        "minimap" => at(-0.001, BELOW_BAR / sh),
         // The command window: every window the command menu opens shows here. The item info rides the log as retail's
         // (mode 0, flag 0x1000).
-        "window" | "expansions" => at(0.0047, 0.0347),
+        "window" | "expansions" => left(0.0, BELOW_BAR),
         "iteminfo" => on("combat"),
         // The treasure pool rides the action menu it is opened from, over the item info of its cursor's row.
         "loot" => on("iteminfo"),
         // /check beside the command window's place.
-        "check" => at(0.2, 0.0347),
-        "blklist" => at(0.2, 0.0347),
+        "check" | "blklist" => at(0.2, BELOW_BAR / sh),
         // The chat mode window rides the action menu it is opened from.
         "chatctrl" => on("combat"),
         // The comment editor sits on the log as retail's (flag 0x1000).
@@ -771,21 +783,48 @@ impl<'a> Panels<'a> {
     /// A panel's place: the saved one, else its default (a bottom-placed panel saved before it had one keeps the
     /// default bottom).
     fn place(&self, id: &str) -> Place {
-        let mut p = self.layout.get(id).cloned().or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id));
+        let mut p = self.layout.get(id).cloned().or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id, self.ctx.content_rect().size()));
         // A dock on an edge window (saved before they refused them) gives way to the place itself.
         if p.dock.as_ref().is_some_and(|d| EDGE.contains(&d.to.as_str())) {
             p.dock = None;
         }
         if BOTTOM.contains(&id) && p.b <= 0.0 {
-            p.b = default_place(id).b;
+            p.b = default_place(id, self.ctx.content_rect().size()).b;
         }
         p
     }
 
-    /// The resizable panel's room: its saved width and height, else `size`.
+    /// The resizable panel's room: its saved width and height, else `size`. The chat window's width stays on the screen
+    /// and clear of the party window (chat_width).
     fn room(&self, id: &str, size: Vec2) -> Vec2 {
         let p = self.place(id);
-        vec2(if p.w > 0.0 { p.w } else { size.x }, if p.h > 0.0 { p.h } else { size.y })
+        let (w, mut h) = (if p.w > 0.0 { p.w } else { size.x }, if p.h > 0.0 { p.h } else { size.y });
+        if id == "chat" {
+            // Not taller than the room under the top bar (a height saved on a bigger window).
+            let most = self.ctx.content_rect().height() * p.b - theme::BELOW_BAR - chat::chrome();
+            h = h.min(most.max(60.0));
+        }
+        vec2(if id == "chat" { self.chat_width(w, h, &p) } else { w }, h)
+    }
+
+    /// The chat window's width: `w` (saved, or the default's) cut to the screen's room right of its left edge, and to
+    /// the room left of the party window where that stands in the window's way (its lines, tab row and gear were
+    /// drawn under the party's rows). Ours: the party window may be anywhere, and what a player saved is theirs
+    /// otherwise; the width saved stays as it was, it only gives way while something stands there.
+    fn chat_width(&self, w: f32, lines_h: f32, place: &Place) -> f32 {
+        use theme::{PANEL_GAP, SCREEN_GAP};
+        const LEAST: f32 = 240.0;
+        let s = self.ctx.content_rect();
+        let rects = self.m.rects.borrow();
+        let left = rects.get("chat").map_or(s.width() * place.x.max(0.0), |r| r.min.x);
+        let mut room = (s.max.x - SCREEN_GAP - left).max(LEAST);
+        // The window's most height: its lines' room and its chrome, as the log rule leaves it at most.
+        let bottom = s.height() * place.b;
+        let top = bottom - lines_h - chat::chrome();
+        if let Some(party) = rects.get("party").filter(|r| r.min.x > left + LEAST && r.max.y > top && r.min.y < bottom) {
+            room = room.min(party.min.x - PANEL_GAP - left);
+        }
+        w.min(room).max(LEAST)
     }
 
     /// A panel's top left for its height `h`: on the panel it is docked on, else from its place.
@@ -1177,6 +1216,8 @@ fn title_row_in(ui: &mut Ui, m: &Modern, t: &Title, colour: egui::Color32) {
     if let Some(n) = t.note {
         p.text(pos2(r.max.x, r.center().y), egui::Align2::RIGHT_CENTER, n, FontId::proportional(m.theme.small), m.theme.color("muted"));
     }
+    // Ours: a rule under every title, fading out to the right (the panels' one chrome).
+    paint::fade_rule(p, r.min.x, r.max.x, r.max.y + 2.0, m.theme.color("bronze").gamma_multiply(0.6));
 }
 
 /// `text` on one line of at most `width`, cut with an ellipsis.

@@ -273,59 +273,41 @@ fn list(p: &mut Panels, w: &mut World) {
     let mut ask_click: Option<bool> = None;
     let mut wheel = 0.0f32;
     let rect = p.panel("list", Some(Title { icon: None, text: title, note: Some(&note) }), 360.0, |ui| {
-        // The sort strip: its window's rows as the kit's buttons, the cursor's ringed while it has the keys.
-        if let Some(menu) = win.sort {
-            let labels = sort_labels(menu);
-            let cursor = win.sort_focus.filter(|_| win.ask.is_none()).map(|c| c as usize - 1);
-            if let Some(k) = kit::buttons(ui, m, labels, cursor, cursor.map_or(0, |c| 1 << c), 0) {
-                sort_click = Some(k as u16 + 1);
-            }
-            if let Some(yes) = win.ask {
-                ui.add_space(4.0);
-                ask_click = kit::yes_no(ui, m, "Sort them now?", ["Yes", "No"], yes, m.theme.small);
-            }
-            ui.add_space(6.0);
+        let sort = win.sort.map(|menu| Strip { labels: sort_labels(menu), cursor: win.sort_focus.filter(|_| win.ask.is_none()).map(|c| c as usize - 1), ask: win.ask });
+        // The search's hits take the rows' place (the sort strip stays over them).
+        if let Some(sort) = &sort {
+            let out = strip(ui, m, sort);
+            (sort_click, ask_click) = (out.0, out.1);
         }
         if let Some((text, sel, hits, icons)) = &search {
             found = search_rows(ui, m, w, icons, text, *sel, hits);
             return;
         }
-        let top = ui.cursor().min;
-        if win.rows.is_empty() {
-            let empty = match (win.kind, win.list_mode) {
-                (Kind::Mount, _) => "No mounts.",
-                (Kind::Magic, true) => "No spells learned.",
-                (Kind::Magic, false) => "No spells available.",
-                _ => "Nothing available.",
-            };
-            ui.label(egui::RichText::new(empty).size(m.theme.ui).color(m.theme.color("muted")));
-        }
-        for (k, &id) in win.rows.iter().skip(win.scroll).take(VISIBLE).enumerate() {
-            let (name, right, off) = row_view(w, win.kind, id);
-            let picked = win.manual == 2 && win.scroll + k == win.picked;
-            let look = if k == win.cursor && win.sort_focus.is_none() { Look::Cursor } else if picked { Look::Picked } else { Look::Normal };
-            let resp = row(ui, m, icons.get(k).copied().flatten(), None, &name, &right, look, off);
-            mouse.take(k, &resp);
-        }
-        // The bar: the rows shown out of all, at the right edge.
-        let track = Rect::from_min_max(pos2(ui.max_rect().max.x + 6.0, top.y), pos2(ui.max_rect().max.x + 14.0, ui.cursor().min.y));
-        kit::bar(ui.painter(), m, track, win.rows.len(), VISIBLE, win.scroll);
-        // The cost box for the cursor's row, and Manual Sort's hint.
-        let lines = cost_lines(w, &win);
-        if !lines.is_empty() || win.manual > 0 {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 18.0;
-                for (label, value) in &lines {
-                    ui.label(egui::RichText::new(*label).size(m.theme.small).color(m.theme.color("muted")));
-                    ui.label(egui::RichText::new(value).size(m.theme.ui).color(m.theme.color("text")));
-                }
-            });
-            if win.manual > 0 {
-                let hint = if win.manual == 1 { "Manual Sort: pick a row to move." } else { "Manual Sort: pick its new place." };
-                ui.label(egui::RichText::new(hint).size(m.theme.small).color(m.theme.color("gold")));
-            }
-        }
+        let empty = match (win.kind, win.list_mode) {
+            (Kind::Mount, _) => "No mounts.",
+            (Kind::Magic, true) => "No spells learned.",
+            (Kind::Magic, false) => "No spells available.",
+            _ => "Nothing available.",
+        };
+        let rows: Vec<RowView> = win
+            .rows
+            .iter()
+            .skip(win.scroll)
+            .take(VISIBLE)
+            .enumerate()
+            .map(|(k, &id)| {
+                let (name, right, off) = row_view(w, win.kind, id);
+                let picked = win.manual == 2 && win.scroll + k == win.picked;
+                let look = if k == win.cursor && win.sort_focus.is_none() { Look::Cursor } else if picked { Look::Picked } else { Look::Normal };
+                RowView { icon: icons.get(k).copied().flatten(), name, right, off, look }
+            })
+            .collect();
+        let manual_hint = match win.manual {
+            0 => None,
+            1 => Some("Manual Sort: pick a row to move."),
+            _ => Some("Manual Sort: pick its new place."),
+        };
+        mouse = rows_and_cost(ui, m, &rows, empty, (win.rows.len(), win.scroll), &cost_lines(w, &win), manual_hint);
         if ui.rect_contains_pointer(ui.max_rect()) {
             // The wheel's own events (line notches; pixel deltas as 50 points a notch), not egui's smoothed scroll.
             wheel = ui.input(|i| {
@@ -373,6 +355,90 @@ fn list(p: &mut Panels, w: &mut World) {
             magic::bar(w, msg);
         }
     }
+}
+
+/// The sort strip over a list: its buttons, the keyboard cursor's (ringed), the question under them.
+struct Strip {
+    labels: &'static [&'static str],
+    cursor: Option<usize>,
+    ask: Option<bool>,
+}
+
+/// The strip's buttons and its question: the button clicked (1-based, as the window's rows) and the answer clicked.
+fn strip(ui: &mut Ui, m: &super::Modern, s: &Strip) -> (Option<u16>, Option<bool>) {
+    let click = kit::buttons(ui, m, s.labels, s.cursor, s.cursor.map_or(0, |c| 1 << c), 0).map(|k| k as u16 + 1);
+    let mut ask = None;
+    if let Some(yes) = s.ask {
+        ui.add_space(4.0);
+        ask = kit::yes_no(ui, m, "Sort them now?", ["Yes", "No"], yes, m.theme.small);
+    }
+    ui.add_space(6.0);
+    (click, ask)
+}
+
+/// One list row as `rows_and_cost` draws it.
+struct RowView {
+    icon: Option<egui::TextureId>,
+    name: String,
+    right: String,
+    off: bool,
+    look: Look,
+}
+
+/// A list's rows (or why there are none), the bar at the right edge for `(total, scroll)`, then the cost box and Manual
+/// Sort's hint; the row clicked.
+fn rows_and_cost(ui: &mut Ui, m: &super::Modern, rows: &[RowView], empty_text: &str, (total, scroll): (usize, usize), lines: &[(&'static str, String)], hint: Option<&str>) -> Mouse {
+    let mut mouse = Mouse::default();
+    let top = ui.cursor().min;
+    if rows.is_empty() {
+        ui.label(egui::RichText::new(empty_text).size(m.theme.ui).color(m.theme.color("muted")));
+    }
+    for (k, r) in rows.iter().enumerate() {
+        let resp = row(ui, m, r.icon, None, &r.name, &r.right, r.look, r.off);
+        mouse.take(k, &resp);
+    }
+    // The bar: the rows shown out of all, at the right edge.
+    let track = Rect::from_min_max(pos2(ui.max_rect().max.x + 6.0, top.y), pos2(ui.max_rect().max.x + 14.0, ui.cursor().min.y));
+    kit::bar(ui.painter(), m, track, total, VISIBLE, scroll);
+    if !lines.is_empty() || hint.is_some() {
+        // A rule over the cost box, as every panel's title has one under it.
+        ui.add_space(8.0);
+        let y = ui.cursor().min.y - 4.0;
+        super::paint::fade_rule(ui.painter(), ui.max_rect().min.x, ui.max_rect().max.x, y, m.theme.color("bronze").gamma_multiply(0.6));
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 18.0;
+            for (label, value) in lines {
+                ui.label(egui::RichText::new(*label).size(m.theme.small).color(m.theme.color("muted")));
+                ui.label(egui::RichText::new(value).size(m.theme.ui).color(m.theme.color("text")));
+            }
+        });
+        if let Some(hint) = hint {
+            ui.label(egui::RichText::new(hint).size(m.theme.small).color(m.theme.color("gold")));
+        }
+    }
+    mouse
+}
+
+/// The shot's magic list (`modern-shot --panel magic`): White Magic with its sort strip, the cursor on the first
+/// row, one spell greyed, the cost box; `cats` the category window instead. Drawn by the helpers the game's lists use.
+pub(super) fn sample(p: &mut Panels, cats: bool) {
+    let m = p.m;
+    if cats {
+        p.panel("cats", Some(Title { icon: None, text: "Magic", note: None }), 260.0, |ui| {
+            for (k, (label, icon)) in [("White Magic", "icons/healing"), ("Black Magic", "icons/elemental"), ("Summoning", "icons/summoning"), ("Ninjutsu", "icons/ninjutsu"), ("Songs", "icons/songs"), ("Blue Magic", "icons/magic")].into_iter().enumerate() {
+                let look = if k == 0 { Look::Cursor } else { Look::Normal };
+                row(ui, m, None, Some(icon), label, "", look, k == 4);
+            }
+        });
+        return;
+    }
+    let spells = [("Cure", "8 MP", false), ("Cure II", "24 MP", false), ("Cure III", "46 MP", false), ("Cure IV", "88 MP", false), ("Curaga", "60 MP", false), ("Raise", "150 MP", true), ("Poisona", "8 MP", false), ("Paralyna", "12 MP", false), ("Blindna", "16 MP", false), ("Silena", "24 MP", false), ("Cursna", "30 MP", false), ("Dia", "0:12   7 MP", false)];
+    let rows: Vec<RowView> = spells.iter().enumerate().map(|(k, (n, mp, off))| RowView { icon: None, name: n.to_string(), right: mp.to_string(), off: *off, look: if k == 0 { Look::Cursor } else { Look::Normal } }).collect();
+    let lines = [("MP Cost", "8".to_string()), ("Next", "0:00".to_string())];
+    p.panel("list", Some(Title { icon: None, text: "White Magic", note: Some("69") }), 360.0, |ui| {
+        strip(ui, m, &Strip { labels: sort_labels("menu    mgcsortw"), cursor: None, ask: None });
+        rows_and_cost(ui, m, &rows, "", (69, 0), &lines, None);
+    });
 }
 
 /// The sort strip's buttons for a sort window.
