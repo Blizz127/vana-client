@@ -21,6 +21,22 @@ pub(super) fn icons(w: &World) -> Vec<(u16, u32)> {
         .collect()
 }
 
+/// Ours: Banshee's solo mode (LSB and Forever, effect 789) arrives as Dedication's icon with the server's no-timer mark
+/// in its 0x063 list; a ring's Dedication is always timed.
+pub const SOLO_ICON: u16 = 249;
+pub const SOLO_TITLE: &str = "Solo Mode";
+pub const SOLO_DESC: &str = "Solo mode is on: auto-Reraise, Regen and Refresh, more EXP and skill-ups, accuracy, and 12% faster movement. !solomode off turns it off.";
+
+/// Icon `i` of the list is solo mode: Dedication's icon, untimed in the server's own timer list.
+pub fn is_solo(w: &World, id: u16) -> bool {
+    id == SOLO_ICON && w.buff_timers.as_ref().is_some_and(|t| (0..32).any(|i| t.0[i] == SOLO_ICON && t.1[i] == 0x7fff_ffff))
+}
+
+/// The solo-mode badge's label under the icon (config solo_badge).
+pub fn solo_label(w: &World, id: u16) -> Option<String> {
+    (w.solo_badge && is_solo(w, id)).then(|| "Solo".to_string())
+}
+
 /// The modern status panel's icons a row (modern/hud.rs).
 pub const MODERN_ROW: usize = 10;
 
@@ -80,6 +96,10 @@ pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
     }
     let list = icons(w);
     let Some(&(id, _)) = list.get(w.buff_cursor.min(list.len().saturating_sub(1))) else { return };
+    if is_solo(w, id) {
+        (bars.title[2], bars.help[2]) = (SOLO_TITLE.to_string(), SOLO_DESC.to_string());
+        return;
+    }
     if let Some(bt) = &w.battle {
         bars.title[2] = bt.status_title(id);
     }
@@ -118,7 +138,7 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) {
         let rem = (end.wrapping_sub(now).wrapping_add(59) as i32) / 60;
         let c = if timed && rem <= 15 { (0x40 + (64.0 * phase) as u32) as f32 / 128.0 } else { 1.0 };
         gu.image_rect(&tex, cx + 1.0, cy + 1.0, 24.0, 24.0, [c, c, c, 1.0]);
-        if let Some(s) = label(rem).filter(|_| timed) {
+        if let Some(s) = label(rem).filter(|_| timed).or_else(|| solo_label(w, id)) {
             gu.shape_scaled_centred(s.as_bytes(), cx + 14.0, cy + 20.0, 0.85, 0x8080_8080);
         }
         // FUN_10227970: the window's cursor (its kind-6 ref, the anc_equi box) scaled 0.74 over the icon. Placed on the
