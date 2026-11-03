@@ -45,6 +45,13 @@ pub struct Scan {
     pub unanswered: bool,
 }
 
+/// Ours: whether we have Wide Scan. Under the era lock (the base game, Forever) a Ranger or Beastmaster has it, main or
+/// support, as Forever's server answers (the owner: era-accurate); with the expansions on, LSB gives it to every job
+/// (ALL_JOBS_WIDESCAN).
+pub fn available(w: &super::World) -> bool {
+    !super::era::locked(w) || w.stats.as_ref().is_some_and(|s| [s.main.0, s.sub.0].iter().any(|j| matches!(j, 9 | 11)))
+}
+
 /// How long a list may take to begin before the server counts as not answering.
 pub const UNANSWERED: std::time::Duration = std::time::Duration::from_secs(8);
 

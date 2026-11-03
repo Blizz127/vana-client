@@ -253,6 +253,7 @@ pub fn ride(w: &mut World, dy: f32) {
 /// Toggles first person (key function 0x10, FUN_100a4580 -> FUN_100a7350): SE 0014 *(caller)*, focal 280 in it.
 pub fn toggle_first(w: &mut World) {
     w.camst.first = !w.camst.first;
+    log::info!("camera: first person {}", if w.camst.first { "on" } else { "off" });
     w.camst.fp = (0.0, 0.0);
     w.camst.face = None;
     w.camst.fp_mouse = None;

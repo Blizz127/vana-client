@@ -100,6 +100,25 @@ pub struct Facts {
     pub sub: (u8, u8),
     pub mp: u32,
     pub mp_max: u32,
+    /// The player's thresholds (Settings > Interface; config rotation_*).
+    pub tuning: Tuning,
+}
+
+/// Ours: when the suggestions react (Settings > Interface): cure at or under `cure_pct` of HP, Convert under
+/// `convert_pct` of MP, renew an effect under `renew_secs` left; `adaptive` off leaves only the fight's own rules
+/// (debuffs, weapon skills, damage) with no healing, ailments, Convert or renewing.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Tuning {
+    pub adaptive: bool,
+    pub cure_pct: u32,
+    pub convert_pct: u32,
+    pub renew_secs: u32,
+}
+
+impl Default for Tuning {
+    fn default() -> Self {
+        Self { adaptive: true, cure_pct: 75, convert_pct: 25, renew_secs: 30 }
+    }
 }
 
 impl Facts {
@@ -191,8 +210,6 @@ fn nuke_floor(main: u8) -> u32 {
     if main == 4 { 0 } else { 50 }
 }
 
-/// Seconds left under which an effect is worth renewing.
-const SOON: f32 = 30.0;
 
 /// Debuffs to keep on what we fight, in order: the status and the spells that give it (strongest first). Dia / Bio,
 /// Slow, Paralyze, Blind, Gravity, and the ninjutsu Hojo / Jubaku / Kurayami / Dokumori, the songs Elegy / Requiem.
@@ -276,7 +293,8 @@ pub fn all(f: &Facts) -> Vec<Suggestion> {
     let me = f.party.first();
 
     // Raise the fallen.
-    if let Some(m) = f.party.iter().find(|m| !m.me && m.here && m.hp_max > 0 && m.hp == 0)
+    let adaptive = f.tuning.adaptive;
+    if let Some(m) = f.party.iter().find(|m| adaptive && !m.me && m.here && m.hp_max > 0 && m.hp == 0)
         && let Some(&id) = RAISES.iter().find(|&&s| f.can(s))
     {
         push(&mut out, Suggestion { action: Action::Spell(id), target: who(m), reason: format!("{} KO'd.", named(m)) });
@@ -290,14 +308,15 @@ pub fn all(f: &Facts) -> Vec<Suggestion> {
     }
     // Ailments.
     for &(effect, spell, word) in &AILMENTS {
-        if let Some(m) = f.party.iter().find(|m| m.here && m.effects.contains(&effect))
+        if let Some(m) = f.party.iter().find(|m| adaptive && m.here && m.effects.contains(&effect))
             && f.can(spell)
         {
             push(&mut out, Suggestion { action: Action::Spell(spell), target: who(m), reason: format!("{} {word}.", named(m)) });
         }
     }
     // Healing: several low, Curaga; else the lowest; a waltz when no cure is known.
-    let low: Vec<&Member> = f.party.iter().filter(|m| m.here && m.hp_max > 0 && m.hp > 0 && m.hp * 4 <= m.hp_max * 3).collect();
+    let t = f.tuning;
+    let low: Vec<&Member> = f.party.iter().filter(|m| t.adaptive && m.here && m.hp_max > 0 && m.hp > 0 && m.hp * 100 <= m.hp_max * t.cure_pct).collect();
     if low.len() >= 3
         && let Some(id) = tier(&CURAGAS, low.iter().map(|m| m.hp_max - m.hp).sum::<u32>() / low.len() as u32, |s| f.can(s))
     {
@@ -316,7 +335,8 @@ pub fn all(f: &Facts) -> Vec<Suggestion> {
     // Convert (RDM): MP low and HP high swaps them; the cures above then mend the HP.
     if f.fighting()
         && f.mp_max > 0
-        && f.mp_pct() < 25
+        && t.adaptive
+        && f.mp_pct() < t.convert_pct
         && f.hp_pct() > 75
         && let Some(a) = f.ability("Convert")
     {
@@ -385,7 +405,7 @@ pub fn all(f: &Facts) -> Vec<Suggestion> {
         }
     }
     // Refresh, Haste and Phalanx back on as soon as they are missing in a fight.
-    if f.fighting() {
+    if adaptive && f.fighting() {
         for &(effect, spells, name) in &KEEP {
             if !f.has(effect)
                 && let Some(&id) = spells.iter().find(|&&s| f.can(s))
@@ -454,13 +474,14 @@ pub fn all(f: &Facts) -> Vec<Suggestion> {
     // Renew what wears off soon; between fights, put back what is missing.
     for &(effect, spells, name) in &RENEW {
         if let Some(&(_, Some(left))) = f.own.iter().find(|(e, _)| *e == effect)
-            && left < SOON
+            && t.adaptive
+            && left < t.renew_secs as f32
             && let Some(&id) = spells.iter().find(|&&s| f.can(s))
         {
             push(&mut out, Suggestion { action: Action::Spell(id), target: None, reason: format!("{name} wears off in {}s.", left.ceil() as u32) });
         }
     }
-    if !f.fighting() {
+    if adaptive && !f.fighting() {
         for &(effect, spells, name) in &BETWEEN {
             if !f.has(effect)
                 && let Some(&id) = spells.iter().find(|&&s| f.can(s))
@@ -551,7 +572,7 @@ pub fn facts(w: &World) -> Facts {
     let partners = super::skillchain::members(w).into_iter().filter(|m| !m.me).map(|m| Partner { name: m.name.clone(), tp: m.tp, skills: m.skills.iter().map(|&s| (super::skillchain::name(w, s), d.props(s))).collect() }).collect();
     let (main, sub) = w.stats.as_ref().map_or(((0, 0), (0, 0)), |s| (s.main, s.sub));
     let (mp, mp_max) = (w.vitals.map_or(0, |v| v.1), w.stats.as_ref().map_or(0, |s| s.mp_max));
-    Facts { party, own, tp: w.vitals.map_or(0, |v| v.2), engaged: w.my_motion.status == 1, spells, abilities, weapon_skills, target, resonance, partners, main, sub, mp, mp_max }
+    Facts { party, own, tp: w.vitals.map_or(0, |v| v.2), engaged: w.my_motion.status == 1, spells, abilities, weapon_skills, target, resonance, partners, main, sub, mp, mp_max, tuning: w.suggest_tuning }
 }
 
 #[cfg(test)]

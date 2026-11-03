@@ -219,9 +219,11 @@ fn ld(pos: vec2<i32>, dim: vec2<i32>, o: vec2<i32>) -> vec3<f32> {
         if (tone) {
             // Narkowicz's ACES fit, with the input scaled 0.47 and the result divided by its value there so mid grey and
             // white stay put at exposure 1: a gentle S (deeper shadows, a firmer shoulder) rather than a darkening.
+            // Ours (the owner: "a little too strong / dark on the bee"): 30% of the plain exposure under the curve, so
+            // dark characters and monsters keep their detail; mid grey and white still stay put.
             let x = l * (0.47 * p.exposure);
             let y = (x * (2.51 * x + vec3<f32>(0.03))) / (x * (2.43 * x + vec3<f32>(0.59)) + vec3<f32>(0.14));
-            l = y / 0.5963;
+            l = mix(y / 0.5963, l * p.exposure, 0.3);
         }
         c = to_gam(clamp(l, vec3<f32>(0.0), vec3<f32>(1.0)));
     }

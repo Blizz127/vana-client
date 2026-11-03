@@ -41,6 +41,11 @@ pub struct Settings {
     pub minimap: bool,
     pub modern_minimap: bool,
     pub solo_badge: bool,
+    pub classic_only: bool,
+    pub rotation_adaptive: bool,
+    pub rotation_cure_pct: u32,
+    pub rotation_convert_pct: u32,
+    pub rotation_renew_secs: u32,
     pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
@@ -98,6 +103,11 @@ impl Settings {
             minimap: c.minimap,
             modern_minimap: c.modern_minimap,
             solo_badge: c.solo_badge,
+            classic_only: c.classic_only,
+            rotation_adaptive: c.rotation_adaptive,
+            rotation_cure_pct: c.rotation_cure_pct,
+            rotation_convert_pct: c.rotation_convert_pct,
+            rotation_renew_secs: c.rotation_renew_secs,
             minimap_unowned: c.minimap_unowned,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
@@ -151,6 +161,10 @@ impl Settings {
         c.minimap = self.minimap;
         c.modern_minimap = self.modern_minimap;
         c.solo_badge = self.solo_badge;
+        c.rotation_adaptive = self.rotation_adaptive;
+        c.rotation_cure_pct = self.rotation_cure_pct;
+        c.rotation_convert_pct = self.rotation_convert_pct;
+        c.rotation_renew_secs = self.rotation_renew_secs;
         c.minimap_unowned = self.minimap_unowned;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
@@ -218,6 +232,11 @@ enum Val {
     /// The modern UI's minimap and its unowned maps (config modern_minimap, minimap_unowned).
     ModernMinimap,
     SoloBadge,
+    /// The suggestions' thresholds (config rotation_*).
+    RotAdaptive,
+    RotCure,
+    RotConvert,
+    RotRenew,
     MinimapUnowned,
     MinimapDock,
     MinimapSize,
@@ -412,7 +431,13 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
     // Panel Places (a character's) is for in game only.
-    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2], SOLO_ROW];
+    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2], SOLO_ROW, ROT_ROWS[0], ROT_ROWS[1], ROT_ROWS[2], ROT_ROWS[3]];
+    const ROT_ROWS: [SRow; 4] = [
+        row("Adaptive Suggestions", "The battle menu's Suggested rows and the one-button rotation (/rot) react to the fight: cure who is low, lift ailments, put back what wears off, Convert when MP runs low. Off: only the fight's own actions (debuffs, weapon skills, damage).", RotAdaptive, OFF_ON, Now),
+        row("Cure Below", "Suggest a cure when you or a party member is at or under this much HP.", RotCure, &[(40, "40%"), (50, "50%"), (60, "60%"), (70, "70%"), (75, "75%"), (80, "80%"), (90, "90%")], Now),
+        row("Convert Below", "Suggest Convert (Red Mage) when your MP is under this much (and your HP is high).", RotConvert, &[(10, "10%"), (15, "15%"), (20, "20%"), (25, "25%"), (30, "30%"), (40, "40%")], Now),
+        row("Renew Buffs", "Suggest putting an effect back when it has this little time left.", RotRenew, &[(10, "10 s"), (20, "20 s"), (30, "30 s"), (45, "45 s"), (60, "60 s"), (90, "90 s")], Now),
+    ];
     const SOLO_ROW: SRow = row("Solo Mode Label", "A small Solo label on the solo-mode icon in your effects while Banshee's solo mode is on (!solomode); its tooltip lists the perks.", SoloBadge, OFF_ON, Now);
     const MINIMAP_ROWS: [SRow; 3] = [
         row("Minimap", "The modern interface's minimap: the zone around you, north up, with your arrow, your party and what is near; drag it to an edge, the wheel zooms, a corner resizes it (not retail).", ModernMinimap, OFF_ON, Now),
@@ -616,7 +641,9 @@ impl SettingsUi {
                 .map(|(i, r)| Row { label: r.label.clone(), help: r.help.clone(), val: Val::Mod(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now })
                 .collect();
         }
-        rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect()
+        // Ours: a classic-only client (config classic_only: the regular FFXI entry) offers no modern UI.
+        let hidden = |v: &Val| self.s.classic_only && matches!(v, Val::ModernUi | Val::Experience | Val::ModernScale | Val::ModernOpacity | Val::ResetPlaces | Val::ModernMinimap | Val::MinimapSize | Val::MinimapUnowned);
+        rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().filter(|r| !hidden(&r.val)).map(Row::from).collect()
     }
 
     fn ctl(r: &Row) -> Ctl {
@@ -707,6 +734,10 @@ impl SettingsUi {
             Val::Minimap => self.s.minimap as u32,
             Val::ModernMinimap => self.s.modern_minimap as u32,
             Val::SoloBadge => self.s.solo_badge as u32,
+            Val::RotAdaptive => self.s.rotation_adaptive as u32,
+            Val::RotCure => self.s.rotation_cure_pct,
+            Val::RotConvert => self.s.rotation_convert_pct,
+            Val::RotRenew => self.s.rotation_renew_secs,
             Val::MinimapUnowned => self.s.minimap_unowned as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
@@ -769,6 +800,10 @@ impl SettingsUi {
             Val::Minimap => self.s.minimap = x != 0,
             Val::ModernMinimap => self.s.modern_minimap = x != 0,
             Val::SoloBadge => self.s.solo_badge = x != 0,
+            Val::RotAdaptive => self.s.rotation_adaptive = x != 0,
+            Val::RotCure => self.s.rotation_cure_pct = x,
+            Val::RotConvert => self.s.rotation_convert_pct = x,
+            Val::RotRenew => self.s.rotation_renew_secs = x,
             Val::MinimapUnowned => self.s.minimap_unowned = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
@@ -1847,7 +1882,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::Ao | Val::AoStrength | Val::AoRadius | Val::Fog | Val::FogDensity | Val::FogHeight | Val::ModernMinimap | Val::SoloBadge | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::Ao | Val::AoStrength | Val::AoRadius | Val::Fog | Val::FogDensity | Val::FogHeight | Val::ModernMinimap | Val::SoloBadge | Val::RotAdaptive | Val::RotCure | Val::RotConvert | Val::RotRenew | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();

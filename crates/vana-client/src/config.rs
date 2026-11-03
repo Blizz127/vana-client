@@ -298,6 +298,14 @@ pub struct Config {
     pub modern_minimap: bool,
     /// Ours: a "Solo" label on the solo-mode icon (client/buffs.rs).
     pub solo_badge: bool,
+    /// Ours: the classic UI only, the modern one not offered (the regular FFXI launcher entry sets it; FFXI Forever
+    /// keeps the modern UI). Read-only for the client: it never writes it back changed.
+    pub classic_only: bool,
+    /// Ours: the suggestions' and the rotation's thresholds (client/suggest.rs Tuning).
+    pub rotation_adaptive: bool,
+    pub rotation_cure_pct: u32,
+    pub rotation_convert_pct: u32,
+    pub rotation_renew_secs: u32,
     pub minimap_unowned: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
@@ -501,6 +509,11 @@ impl Default for Config {
             minimap: false,
             modern_minimap: true,
             solo_badge: true,
+            classic_only: false,
+            rotation_adaptive: true,
+            rotation_cure_pct: 75,
+            rotation_convert_pct: 25,
+            rotation_renew_secs: 30,
             minimap_unowned: true,
             minimap_dock: 0,
             minimap_size: 1,
@@ -557,6 +570,9 @@ impl Config {
         c.gamepad_deadzone = c.gamepad_deadzone.clamp(0.0, crate::client::gamepad::MAX_DEADZONE);
         c.gamepad_camera_speed = c.gamepad_camera_speed.clamp(0.1, 5.0);
         c.controls = c.controls.min(2);
+        if c.classic_only {
+            c.modern_ui = false;
+        }
         c
     }
 
@@ -576,6 +592,16 @@ impl Config {
             }
         }
         c
+    }
+
+    /// The suggestions' thresholds, clamped to the settings' ranges.
+    pub fn suggest_tuning(&self) -> crate::client::suggest::Tuning {
+        crate::client::suggest::Tuning {
+            adaptive: self.rotation_adaptive,
+            cure_pct: self.rotation_cure_pct.clamp(20, 95),
+            convert_pct: self.rotation_convert_pct.clamp(5, 60),
+            renew_secs: self.rotation_renew_secs.clamp(5, 120),
+        }
     }
 
     /// The loader version to report: `loader_version` as "major.minor.patch", or None for the client's own.

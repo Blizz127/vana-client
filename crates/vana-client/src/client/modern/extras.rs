@@ -1107,7 +1107,8 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         (w.scan.track, w.scan.asked) = (Default::default(), None);
         w.sounds.push(crate::audio::Ui::Error as u32);
     }
-    if !folded && w.scan.track.index == 0 && w.scan.list_state != 1 && m.scan_at.get().is_none_or(|t| now.duration_since(t).as_secs_f32() >= 10.0) {
+    let can_scan = super::super::widescan::available(w);
+    if can_scan && !folded && w.scan.track.index == 0 && w.scan.list_state != 1 && m.scan_at.get().is_none_or(|t| now.duration_since(t).as_secs_f32() >= 10.0) {
         m.scan_at.set(Some(now));
         super::super::scan_request(w);
     }
@@ -1169,7 +1170,7 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         let hresp = flyout_header(ui, m, &count, side);
         ui.add_space(4.0);
         // Scan now (between the 10-s refreshes: camping a notorious monster); greyed while a list comes in.
-        let label = if streaming { "Scanning..." } else if w.scan.unanswered { "Not available" } else { "Scan" };
+        let label = if !can_scan { "Not available for your job" } else if streaming { "Scanning..." } else if w.scan.unanswered { "Not available" } else { "Scan" };
         ui.horizontal(|ui| {
             let s = kit::Btn { off: streaming, ..Default::default() };
             if kit::clicked(&kit::chip(ui, m, label, s, None), s) {
@@ -1281,7 +1282,7 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         *p.changed = true;
         w.sounds.push(crate::audio::Ui::Cursor as u32);
     }
-    if scan && w.scan.list_state != 1 {
+    if scan && can_scan && w.scan.list_state != 1 {
         m.scan_at.set(Some(now));
         super::super::scan_request(w);
         w.sounds.push(crate::audio::Ui::Select as u32);

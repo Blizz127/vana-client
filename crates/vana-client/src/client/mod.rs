@@ -35,7 +35,7 @@ mod buffs;
 mod game_ui;
 mod hudtop;
 mod listsearch;
-mod suggest;
+pub(crate) mod suggest;
 mod rotation;
 mod augment;
 mod iteminfo;
@@ -4717,6 +4717,9 @@ fn party_battle(w: &World) -> bool {
 
 /// FUN_100cd040 with R 0.5 / r 0.2 (the 0x5e-chunk radii of a few large models are not kept): the eye's horizontal
 /// distance h from point `p`; 0 within 0.2, linear to 1 at 0.5; no fade with the eye more than 0.5 above the point.
+/// Ours: the least the near-camera fade leaves of our own character outside first person.
+const OWN_FADE_FLOOR: f32 = 0.35;
+
 fn near_camera_fade(p: Vec3, eye: Vec3) -> f32 {
     let dy = if p.y < eye.y { 0.0 } else { p.y - eye.y };
     let h = Vec3::new(p.x - eye.x, 0.0, p.z - eye.z).length();
@@ -6231,6 +6234,10 @@ struct World {
     minimap_unowned: bool,
     /// The "Solo" label on the solo-mode icon (config solo_badge).
     solo_badge: bool,
+    /// The suggestions' thresholds (config rotation_*).
+    suggest_tuning: suggest::Tuning,
+    /// Our model is being faded by the near camera (logged once per start).
+    own_faded: bool,
     minimap: Option<map::Overlay>,
     minimap_rect: Option<[f32; 4]>,
     minimap_frame: Option<minimap::Frame>,
@@ -6931,7 +6938,7 @@ impl App {
         }
         if let Phase::World(w) = &mut self.phase {
             w.party_tp = self.cfg.party_tp;
-            w.modern = self.cfg.modern_ui;
+            w.modern = self.cfg.modern_ui && !self.cfg.classic_only;
             w.condense = self.cfg.modern_condense;
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.map_opacity = self.cfg.map_overlay_opacity;
@@ -6949,6 +6956,7 @@ impl App {
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (if w.modern { self.cfg.modern_minimap } else { self.cfg.minimap }, self.cfg.minimap_dock, self.cfg.minimap_size);
             w.minimap_unowned = self.cfg.minimap_unowned;
             w.solo_badge = self.cfg.solo_badge;
+            w.suggest_tuning = self.cfg.suggest_tuning();
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
         self.window_dirty = true;
@@ -8024,6 +8032,8 @@ impl App {
                             extra_minimap: if self.cfg.modern_ui { self.cfg.modern_minimap } else { self.cfg.minimap },
                             minimap_unowned: self.cfg.minimap_unowned,
                             solo_badge: self.cfg.solo_badge,
+                            suggest_tuning: self.cfg.suggest_tuning(),
+                            own_faded: false,
                             minimap: None,
                             minimap_rect: None,
                             minimap_frame: None,
@@ -9339,6 +9349,10 @@ impl App {
                     indi::apply(world, me, indi);
                     world.my_plate = plate;
                     world.my_fellow = fellow;
+                    // Ours (diagnostics: the owner's vanishing character): our flags as the server changes them.
+                    if flags != world.self_flags {
+                        log::info!("self: 0x037 flags {:#010x} -> {:#010x} (status {status})", world.self_flags, flags);
+                    }
                     world.self_flags = flags;
                     world.buffs = icons;
                     world.my_team = team;
@@ -13716,6 +13730,21 @@ impl App {
                         } else {
                             near_camera_fade(at(&a.bones), eye)
                         }
+                    };
+                    // Ours (the owner: "my character just wasn't visible" mid-fight): the near-camera fade never takes
+                    // our own character below OWN_FADE_FLOOR outside first person (a camera pushed into us by the
+                    // terrain left nothing to see); it says so in the log once each time it starts.
+                    let cam_fade = if *id == w.my_id && !w.camst.first {
+                        let fading = cam_fade < 0.5;
+                        if fading != w.own_faded {
+                            w.own_faded = fading;
+                            if fading {
+                                log::info!("camera: our model fades near the eye ({cam_fade:.2}; eye {eye:?})");
+                            }
+                        }
+                        cam_fade.max(OWN_FADE_FLOOR)
+                    } else {
+                        cam_fade
                     };
                     // FUN_100d5b10: an event's look, else the target / face target; eased and weighted in world space.
                     let point = |k: usize| ch.skeleton.points.get(k).copied().unwrap_or((0, Vec3::ZERO));
