@@ -13,6 +13,7 @@ pub mod mtext;
 pub mod screens;
 pub mod invwin;
 pub mod screenfx;
+pub mod post;
 pub mod movie;
 pub mod scale;
 pub mod gputime;
@@ -2850,6 +2851,9 @@ pub fn render_pngs_post(
     let view = target.create_view(&Default::default());
     let depth = depth_view(&gpu.device, width, height);
     let row = (width * 4).div_ceil(256) * 256;
+    // Ours: the post-processing of Config `graphics` (off by default), over each finished frame as in the client.
+    let graphics = crate::config::Config::load().graphics;
+    let mut post_fx = None;
     // FFXI_BENCH=N: the first view N more times after a warm-up, its time a frame printed (GPU-bound offscreen).
     if let (Some(n), Some((camera, _, lighting))) = (std::env::var("FFXI_BENCH").ok().and_then(|v| v.parse::<u32>().ok()), frames.first()) {
         renderer.lighting = *lighting;
@@ -2857,7 +2861,7 @@ pub fn render_pngs_post(
         let ts = gpu.device.features().contains(wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS);
         let n = n.min(2048);
         let qs = ts.then(|| gpu.device.create_query_set(&wgpu::QuerySetDescriptor { label: Some("bench"), ty: wgpu::QueryType::Timestamp, count: n * 2 }));
-        let run = |k: u32, timed: bool| -> Result<(f32, Option<f32>)> {
+        let mut run = |k: u32, timed: bool| -> Result<(f32, Option<f32>)> {
             let t = std::time::Instant::now();
             for f in 0..k {
                 let mut encoder = gpu.device.create_command_encoder(&Default::default());
@@ -2866,6 +2870,9 @@ pub fn render_pngs_post(
                     encoder.write_timestamp(q, f * 2);
                 }
                 renderer.render(&gpu, &mut encoder, &view, &depth, camera, width as f32 / height as f32, &actor_refs);
+                if let Some(fx) = post::ensure(&mut post_fx, &gpu, format, &graphics) {
+                    fx.in_place(&gpu, &mut encoder, &target, &graphics);
+                }
                 if let Some(q) = q {
                     encoder.write_timestamp(q, f * 2 + 1);
                 }
@@ -2908,6 +2915,9 @@ pub fn render_pngs_post(
         renderer.render(&gpu, &mut encoder, &view, &depth, camera, width as f32 / height as f32, &actor_refs);
         renderer.render_refraction(&gpu, &mut encoder, &view, Some(&target), &depth, camera, width as f32 / height as f32, &actor_refs);
         post(&gpu, &mut encoder, (&view, &target), &depth, camera, lighting.as_ref(), &mut renderer);
+        if let Some(fx) = post::ensure(&mut post_fx, &gpu, format, &graphics) {
+            fx.in_place(&gpu, &mut encoder, &target, &graphics);
+        }
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
             wgpu::TexelCopyBufferInfo { buffer: &readback, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(height) } },

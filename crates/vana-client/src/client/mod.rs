@@ -6679,6 +6679,8 @@ pub struct App {
     ui_k: (f32, f32),
     /// The offscreen scene target and its scaling pass (background resolution other than the window's).
     scene_scale: Option<crate::render::scale::SceneScale>,
+    /// Ours (Config graphics): the post-processing over the scene; None while every option is off (render/post.rs).
+    post_fx: Option<crate::render::post::PostFx>,
     /// The top-left debug lines (position, zone, frame timing), toggled with F12.
     debug_overlay: bool,
     perf: perf::Perf,
@@ -6879,6 +6881,7 @@ impl App {
             exit_requested: false,
             close_asked: false,
             scene_scale: None,
+            post_fx: None,
             cursor_in: false,
             login_error: None,
             twofa: None,
@@ -13062,7 +13065,9 @@ impl App {
         };
         // The world always draws offscreen: through the plain view, in gamma space.
         let world_phase = matches!(self.phase, Phase::World(_));
-        let scaled = bg != size || gamma.iter().any(|g| (g - 1.0).abs() > 1e-3) || world_phase || lcd;
+        // Ours: the post-processing reads the scene texture, so any option on draws it offscreen too.
+        let post = self.cfg.graphics.active();
+        let scaled = bg != size || gamma.iter().any(|g| (g - 1.0).abs() > 1e-3) || world_phase || lcd || post;
         let (scene_view, scene_depth, scene_tex) = if scaled {
             self.scene_scale.get_or_insert_with(|| crate::render::scale::SceneScale::new(&gfx.gpu, gfx.config.format)).target(&gfx.gpu, bg)
         } else {
@@ -13988,7 +13993,15 @@ impl App {
             && scaled
             && let Some(sc) = &self.scene_scale
         {
-            sc.blit(&gfx.gpu, &mut encoder, &view, size, gamma, lcd.then_some((LCD_SHIFT, self.lcd_frame % 2 == 1)));
+            // The post-processed picture is in a texture of its own: the scene texture stays as drawn (the zone change's
+            // held frame is copied from it next frame).
+            let posted = crate::render::post::ensure(&mut self.post_fx, &gfx.gpu, gfx.config.format, &self.cfg.graphics).map(|p| p.run(&gfx.gpu, &mut encoder, &scene_tex, &self.cfg.graphics).create_view(&Default::default()));
+            if posted.is_some() {
+                mark!("post fx");
+            }
+            sc.blit_from(&gfx.gpu, &mut encoder, posted.as_ref(), &view, size, gamma, lcd.then_some((LCD_SHIFT, self.lcd_frame % 2 == 1)));
+        } else if !post {
+            self.post_fx = None;
         }
         self.window_size = size;
         self.mouse_kind(size);

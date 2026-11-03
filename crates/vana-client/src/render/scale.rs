@@ -184,7 +184,24 @@ impl SceneScale {
     /// Scales the offscreen scene onto `dst` (window size) with a gamma per channel, replacing what is there. `lcd`:
     /// 3D LCD Mode's side-by-side eyes (the scene `extra` wider) and whether this frame carries the strip.
     pub fn blit(&self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder, dst: &wgpu::TextureView, dst_size: [u32; 2], gamma: [f32; 3], lcd: Option<(f32, bool)>) {
+        self.blit_from(gpu, encoder, None, dst, dst_size, gamma, lcd);
+    }
+
+    /// As `blit`, from `src` (a picture the size of the scene, e.g. render/post.rs's result) in place of the scene itself.
+    #[allow(clippy::too_many_arguments)]
+    pub fn blit_from(&self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder, src: Option<&wgpu::TextureView>, dst: &wgpu::TextureView, dst_size: [u32; 2], gamma: [f32; 3], lcd: Option<(f32, bool)>) {
         let Some(t) = &self.target else { return };
+        let other = src.map(|v| {
+            gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("scene scale"),
+                layout: &self.layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.uniform.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(v) },
+                    wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                ],
+            })
+        });
         let (on, strip, extra) = lcd.map_or((0.0, 0.0, 0.0), |(e, s)| (1.0, s as u32 as f32, e));
         let u = [t.size[0] as f32, t.size[1] as f32, dst_size[0].max(1) as f32, dst_size[1].max(1) as f32, gamma[0], gamma[1], gamma[2], 1.0, on, strip, extra, 0.0];
         gpu.queue.put(&self.uniform, 0, bytemuck::cast_slice(&u));
@@ -197,7 +214,7 @@ impl SceneScale {
             multiview_mask: None,
         });
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &t.group, &[]);
+        pass.set_bind_group(0, other.as_ref().unwrap_or(&t.group), &[]);
         pass.draw(0..3, 0..1);
     }
 }
