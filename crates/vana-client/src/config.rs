@@ -90,6 +90,55 @@ fn era_lock_on() -> bool {
     true
 }
 
+/// Ours (not retail): the optional post-processing over the drawn 3D scene, before the 2D layer (render/post.rs). All off by
+/// default; with every option off no pass, pipeline or texture exists. A `graphics` object of its own, so the launcher's
+/// merge of config.json keeps it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GraphicsCfg {
+    /// FXAA 3.11 (luma edge search) on the scene.
+    pub fxaa: bool,
+    /// Bloom: bright parts of the scene above `bloom_threshold` (0..1, in the picture's brightness) blurred and added back at
+    /// `bloom_intensity` (0..2).
+    pub bloom: bool,
+    pub bloom_intensity: f32,
+    pub bloom_threshold: f32,
+    /// A filmic (ACES-fitted) curve on the scene with an `exposure` multiplier (0.25..4, 1 = as drawn); the scene is 8-bit, so
+    /// this is a grade, not HDR.
+    pub tonemap: bool,
+    pub exposure: f32,
+    /// Contrast-adaptive sharpening (AMD CAS style), strength 0..1; 0 = off.
+    pub sharpen: f32,
+    /// Saturation, 1 = as drawn, 0 = grey, up to 2.
+    pub saturation: f32,
+}
+
+impl Default for GraphicsCfg {
+    fn default() -> Self {
+        Self { fxaa: false, bloom: false, bloom_intensity: 0.5, bloom_threshold: 0.75, tonemap: false, exposure: 1.0, sharpen: 0.0, saturation: 1.0 }
+    }
+}
+
+impl GraphicsCfg {
+    pub fn bloom_on(&self) -> bool {
+        self.bloom && self.bloom_intensity > 0.001
+    }
+    pub fn sharpen_on(&self) -> bool {
+        self.sharpen > 0.005
+    }
+    pub fn saturation_on(&self) -> bool {
+        (self.saturation - 1.0).abs() > 0.005
+    }
+    /// Anything the composite pass does (everything but FXAA).
+    pub fn composite_on(&self) -> bool {
+        self.bloom_on() || self.tonemap || self.sharpen_on() || self.saturation_on()
+    }
+    /// Whether the post pass runs at all; false = the render path is exactly the one without it.
+    pub fn active(&self) -> bool {
+        self.fxaa || self.composite_on()
+    }
+}
+
 /// Server names compare without case or outer spaces ("PlayOnline", "playonline").
 fn same_server(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
@@ -225,6 +274,8 @@ pub struct Config {
     pub gpu: String,
     /// Set once a software adapter (WARP, llvmpipe) was first seen and the background was halved for it. Not retail.
     pub software_gpu_seen: bool,
+    /// Ours (not retail): optional post-processing over the 3D scene, all off by default (render/post.rs).
+    pub graphics: GraphicsCfg,
     /// FFXiMain's own options by config id (the in-game and lobby Config menus).
     pub game: crate::gamecfg::GameConfig,
     /// DAT overlays (not retail; dat::overlay): folders under mods_dir(), highest priority first.
@@ -411,6 +462,7 @@ impl Default for Config {
             monitor: String::new(),
             gpu: String::new(),
             software_gpu_seen: false,
+            graphics: Default::default(),
             game: Default::default(),
         }
     }
@@ -580,6 +632,22 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A config from before `graphics`, and one naming only fxaa, keep every other option off / neutral.
+    #[test]
+    fn graphics_defaults_are_off() {
+        let d = Config::default().graphics;
+        assert!(!d.active() && !d.fxaa && !d.bloom && !d.tonemap && d.sharpen == 0.0 && d.saturation == 1.0 && d.exposure == 1.0);
+        let c: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(c.graphics, GraphicsCfg::default());
+        let c: Config = serde_json::from_str(r#"{"graphics":{"fxaa":true}}"#).unwrap();
+        assert!(c.graphics.fxaa && c.graphics.active() && !c.graphics.composite_on());
+        assert_eq!(GraphicsCfg { fxaa: false, ..c.graphics }, GraphicsCfg::default());
+        // Bloom at zero intensity, sharpen 0 and saturation 1 do nothing.
+        assert!(!GraphicsCfg { bloom: true, bloom_intensity: 0.0, ..Default::default() }.active());
+        assert!(GraphicsCfg { sharpen: 0.5, ..Default::default() }.composite_on());
+        assert!(GraphicsCfg { saturation: 0.0, ..Default::default() }.composite_on());
+    }
 
     #[test]
     fn named_server_resolves_address_and_ports() {

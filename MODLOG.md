@@ -20575,3 +20575,14 @@ Ashita, beyond the above:
 - Controller input (tCrossBar, cBind) waits on gamepad support.
 
 Lessons from other games' mod layers (BG3 Script Extender, WoW, Skyrim, Factorio) are in docs/lua-mods.md 2.
+
+## Post-processing over the 3D scene (ours, not retail; 2026-11-03)
+- Config `graphics` (own object, all off by default): `fxaa`, `bloom` (+ `bloom_intensity`, `bloom_threshold`), `tonemap` (+
+  `exposure`), `sharpen` 0..1 (CAS style), `saturation` (1 = as drawn). render/post.rs; the client runs it between the
+  finished scene (after the screen fx and lobby fades) and the scaling pass, so the 2D layer stays crisp.
+- With every option off there is no pass, pipeline or texture, and the frame is the one without it (`post::ensure` drops
+  the PostFx when the last option goes off). The scene texture is never written (a zone change's held frame is copied from
+  it); the result goes to a texture of the pass's own that the scaling pass reads.
+- The scene is 8-bit gamma-space (as D3D8): FXAA 3.11 / CAS / saturation work on those values, bloom and the tone curve through
+  linear (x^2.2). The tone curve is the ACES fit with mid grey and white held, so at exposure 1 it is a gentle S, not HDR.
+- Offscreen shots (`render_pngs_post`) apply it too, read from the same config (FFXI_CONFIG).
