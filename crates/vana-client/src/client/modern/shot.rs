@@ -192,7 +192,7 @@ fn timers_sample(m: &Modern, ctx: &egui::Context, x: f32, width: f32, side: supe
     });
 }
 
-fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
+fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts, backdrop: bool) {
     let top = crate::client::hudtop::TopView {
         title: "Status".into(),
         help: "View status.".into(),
@@ -251,10 +251,15 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         kit_sample(&mut p);
     }
     // The Graphics & Interface window over the HUD, as in game.
-    if let Some(name) = &opts.panel {
+    if let Some(name) = opts.panel.as_deref().filter(|n| !matches!(*n, "magic" | "cats")) {
         let px = ctx.content_rect().size() * ctx.pixels_per_point();
         p.focus = Some(super::options::ID);
         super::options::sample(&mut p, name, opts.panel_row, [px.x.round() as u32, px.y.round() as u32]);
+    }
+    // The magic list (or its categories) over the HUD, on the combat window's place as in game.
+    if let Some(name @ ("magic" | "cats")) = opts.panel.as_deref() {
+        p.focus = Some("list");
+        super::lists::sample(&mut p, name == "cats");
     }
     if opts.rows.is_some() || opts.borders.is_some() {
         menu_sample(&mut p);
@@ -270,7 +275,11 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     if opts.list || opts.kit || opts.panel.is_some() || opts.rows.is_some() || opts.borders.is_some() {
         return;
     }
-    // Every frame at a few sizes: nine-slice corners, tiled edges, the stretched gradient.
+    // Every frame at a few sizes: nine-slice corners, tiled edges, the stretched gradient (not over a backdrop: that is
+    // the HUD as it stands over the game).
+    if backdrop {
+        return;
+    }
     let painter = ctx.layer_painter(LayerId::new(Order::Foreground, Id::unique("frames")));
     let screen = ctx.content_rect();
     let names = ["window_normal", "window_focused", "window_inactive", "window_alert", "window_tooltip"];
@@ -301,7 +310,8 @@ pub struct Opts {
     /// A panel of the kit's controls.
     pub kit: bool,
     /// The Graphics & Interface window (options.rs) on a category (display, graphics, lighting, post, interface, sound,
-    /// misc, gamepad, mods) with the cursor on a row (0: the category list).
+    /// misc, gamepad, mods) with the cursor on a row (0: the category list); "magic" or "cats": the magic list or its
+    /// category window (lists.rs).
     pub panel: Option<String>,
     pub panel_row: usize,
 }
@@ -349,7 +359,7 @@ pub fn shot(width: u32, height: u32, scale: u32, backdrop: Option<&Path>, out: &
             if let Some(t) = &bg {
                 ctx.layer_painter(LayerId::background()).image(t.id(), ctx.content_rect(), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
             }
-            sample(&m, ctx, &mut layout, opts);
+            sample(&m, ctx, &mut layout, opts, bg.is_some());
         });
         // Taken as they come (a TexturesDelta dropped unapplied is an error in debug builds).
         deltas.extend(output.textures_delta.set.drain());
