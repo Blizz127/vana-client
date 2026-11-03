@@ -28,6 +28,17 @@ struct Look {
 pub const PRESETS: [&str; 3] = ["Original", "High", "Ultra"];
 /// The Preset row's value while the rows match none of them.
 const CUSTOM: u32 = 3;
+/// The Experience row's (Modern, Original, then Custom: a reading, not a choice).
+pub(super) const EXPERIENCES: usize = 2;
+
+/// A row whose last choice is a reading (Custom), not a stop: its choices to pick from.
+fn picks(v: Val) -> Option<usize> {
+    match v {
+        Val::Preset => Some(PRESETS.len()),
+        Val::Experience => Some(EXPERIENCES),
+        _ => None,
+    }
+}
 
 /// What the Post-processing category says until it has rows (POST).
 pub const POST_NOTE: &str = "Coming soon: anti-aliasing, bloom, tone mapping, sharpening.";
@@ -67,6 +78,31 @@ impl SettingsUi {
             fxaa: self.s.graphics.fxaa,
             tonemap: self.s.graphics.tonemap,
             sharpen: (self.s.graphics.sharpen * 100.0).round() as u32,
+        }
+    }
+
+    /// The Experience row's value: Modern (the new interface, no opening movie), Original (the classic windows, the
+    /// Original graphics preset, the movie), else Custom.
+    pub fn experience(&self) -> u32 {
+        match (self.s.modern_ui, self.tool_get("0022"), self.preset()) {
+            (true, 0, _) => 0,
+            (false, 1, 0) => 1,
+            _ => EXPERIENCES as u32,
+        }
+    }
+
+    pub(super) fn apply_experience(&mut self, k: u32) {
+        match k {
+            0 => {
+                self.s.modern_ui = true;
+                self.tool_set("0022", 0);
+            }
+            1 => {
+                self.s.modern_ui = false;
+                self.apply_preset(0);
+                self.tool_set("0022", 1);
+            }
+            _ => {}
         }
     }
 
@@ -201,7 +237,7 @@ impl SettingsUi {
                         WCtl::Slider { n, at, shown: self.shown(r) }
                     }
                     _ if r.choices.len() == 2 && r.choices[0].1 == "ON" && r.choices[1].1 == "OFF" => WCtl::Toggle(self.get(r.val) == r.choices[0].0),
-                    _ => WCtl::Segments { labels: r.choices.iter().map(|c| c.1.clone()).collect(), at: self.stops(r).1, locked: matches!(r.val, Val::Preset).then_some(CUSTOM as usize) },
+                    _ => WCtl::Segments { labels: r.choices.iter().map(|c| c.1.clone()).collect(), at: self.stops(r).1, locked: picks(r.val) },
                 };
                 let when = match r.when {
                     When::Now => "",
@@ -366,9 +402,9 @@ impl SettingsUi {
                 let d = if key == K::ArrowRight { 1 } else { -1 };
                 // Two options flip either way; more stop at their ends (a slider never wraps).
                 // The Preset's Custom is a reading, not a stop: from it Right goes to Original and Left to Ultra.
-                let to = if matches!(r.val, Val::Preset) {
-                    let last = PRESETS.len() as i32 - 1;
-                    if at as u32 == CUSTOM { if d > 0 { 0 } else { last as usize } } else { (at as i32 + d).clamp(0, last) as usize }
+                let to = if let Some(n) = picks(r.val) {
+                    let last = n as i32 - 1;
+                    if at >= n { if d > 0 { 0 } else { last as usize } } else { (at as i32 + d).clamp(0, last) as usize }
                 } else if stops == 2 {
                     1 - at.min(1)
                 } else {
@@ -386,7 +422,7 @@ impl SettingsUi {
                     return;
                 }
                 let (stops, at) = self.stops(&r);
-                let list = if matches!(r.val, Val::Preset) { PRESETS.len() } else { stops };
+                let list = picks(r.val).unwrap_or(stops);
                 if list < 2 {
                     return;
                 }

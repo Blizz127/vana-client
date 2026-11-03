@@ -223,6 +223,8 @@ enum Val {
     Gpu,
     ModernUi,
     UiScale,
+    /// One click for the whole look (derived, not stored): Modern, Original (retail's), else Custom.
+    Experience,
     /// The post-processing pass's options (config graphics), percents for the numbers.
     Fxaa,
     Bloom,
@@ -374,6 +376,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Saturation", "Colour strength: 100% is as drawn.", Saturation, &[(50, "50%"), (75, "75%"), (90, "90%"), (100, "100%"), (110, "110%"), (125, "125%"), (150, "150%")], Now),
     ];
     const PLACES_ROW: SRow = row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now);
+    const EXPERIENCE_ROW: SRow = row("Experience", "Modern: the new interface, the opening movie skipped. Original: the game as retail had it, its own windows, the Original graphics preset and the opening movie. Each setting below can still be changed on its own (not retail).", Experience, &[(0, "Modern"), (1, "Original"), (2, "Custom")], Now);
     const INTERFACE_HEAD: [SRow; 5] = [
         row("Interface", "Classic: the game's own windows. Modern: the new interface's windows where it has them (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
         row("UI Scale", "How big the game's windows and text are: Auto grows them with the window past 1080 lines; Menu Size uses the size below, as retail (not retail).", UiScale, UI_SCALES, Now),
@@ -383,7 +386,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
     // Panel Places (a character's) is for in game only.
-    const INTERFACE: &[SRow] = &[INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2]];
+    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2]];
     const MINIMAP_ROWS: [SRow; 3] = [
         row("Minimap", "The modern interface's minimap: the zone around you, north up, with your arrow, your party and what is near; drag it to an edge, the wheel zooms, a corner resizes it (not retail).", ModernMinimap, OFF_ON, Now),
         row("Minimap Size", "How big the minimap starts (a corner drag sets its own size).", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
@@ -637,6 +640,7 @@ impl SettingsUi {
             Val::PartyTp => self.s.party_tp as u32,
             Val::ModernUi => self.s.modern_ui as u32,
             Val::UiScale => self.s.ui_scale,
+            Val::Experience => self.experience(),
             Val::Fxaa => self.s.graphics.fxaa as u32,
             Val::Bloom => self.s.graphics.bloom as u32,
             Val::BloomIntensity => pct(self.s.graphics.bloom_intensity),
@@ -690,6 +694,7 @@ impl SettingsUi {
             Val::PartyTp => self.s.party_tp = x != 0,
             Val::ModernUi => self.s.modern_ui = x != 0,
             Val::UiScale => self.s.ui_scale = x,
+            Val::Experience => self.apply_experience(x),
             Val::Fxaa => self.s.graphics.fxaa = x != 0,
             Val::Bloom => self.s.graphics.bloom = x != 0,
             Val::BloomIntensity => self.s.graphics.bloom_intensity = x as f32 / 100.0,
@@ -1674,7 +1679,8 @@ mod tests {
     /// Enter; Up from the page name wraps to the last row.
     #[test]
     fn extras_buttons() {
-        let c = Config::default();
+        // The classic pages (the modern UI, the default, leaves out the minimap's place and size).
+        let c = Config { modern_ui: false, ..Default::default() };
         let mut ui = SettingsUi::open_kind(&c, [1280, 800], Kind::Extras);
         assert_eq!((ui.tab, ui.row), (0, 0));
         ui.key(egui::Key::ArrowLeft);
@@ -1794,7 +1800,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();

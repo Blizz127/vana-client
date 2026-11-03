@@ -394,7 +394,7 @@ pub const TOOL_DEFAULTS: &[(&str, u32)] = &[
     ("0018", 1),    // texture compression
     ("0019", 1),    // map compression
     ("0021", 0),    // hardware mouse
-    ("0022", 1),    // opening movie
+    ("0022", 0),    // opening movie (ours: skipped unless asked for; retail 1)
     ("0023", 0),    // simplified character creation
     ("0028", 0),    // gamma base 0.0
     ("0029", 12),   // sound effect channels
@@ -474,7 +474,7 @@ impl Default for Config {
             cursor_size: 0,
             auto_sort: 0,
             mods: Vec::new(),
-            modern_ui: false,
+            modern_ui: true,
             modern_scale: 60,
             modern_opacity: 0.85,
             modern_places: Default::default(),
