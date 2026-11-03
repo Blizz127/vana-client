@@ -86,6 +86,22 @@ pub struct NamedServer {
     pub loader_version: Option<String>,
 }
 
+/// `ui_scale`'s Auto.
+pub const UI_SCALE_AUTO: u32 = 1;
+
+fn ui_scale_auto() -> u32 {
+    UI_SCALE_AUTO
+}
+
+/// The classic UI's stretch for `ui_scale` at this window size; None leaves it to the Menu Size.
+pub fn ui_scale_factor(ui_scale: u32, window: [u32; 2]) -> Option<f32> {
+    match ui_scale {
+        0 => None,
+        UI_SCALE_AUTO => Some((window[1] as f32 / 1080.0).max(1.0)),
+        p => Some((p as f32 / 100.0).clamp(0.5, 4.0)),
+    }
+}
+
 fn era_lock_on() -> bool {
     true
 }
@@ -161,6 +177,10 @@ pub struct Config {
     /// file: what a character sees follows only what its server reports (a server unlocks by sending the bits).
     #[serde(skip, default = "era_lock_on")]
     pub era_lock: bool,
+    /// Ours (not retail): the classic UI's scale. 0 = the Menu Size (0037 / 0038) as retail, 1 = Auto (100% up to
+    /// 1080 lines, then the window's height over 1080), else a percent. It keeps the window's shape.
+    #[serde(default = "ui_scale_auto")]
+    pub ui_scale: u32,
     /// Ours: the map (and search) server address to use instead of the one the lobby (and each zone change) names, its ports
     /// kept; for a server reached through a proxy or a NAT that hands out an address the client cannot reach.
     pub map_host: Option<std::net::Ipv4Addr>,
@@ -369,6 +389,7 @@ impl Default for Config {
             target_hpp: false,
             earth_clock: false,
             era_lock: true,
+            ui_scale: UI_SCALE_AUTO,
             map_host: None,
             expansions_seen: Default::default(),
             lamp_lights: true,
@@ -560,6 +581,10 @@ impl Config {
 
     /// The UI layout size (0037 / 0038, 0 = the window's): laid out there and stretched to the window.
     pub fn ui_size(&self, window: [u32; 2]) -> [u32; 2] {
+        // Ours: UI Scale lays the UI out at the window's size over the scale, so it keeps the window's shape.
+        if let Some(k) = ui_scale_factor(self.ui_scale, window) {
+            return [((window[0] as f32 / k).round() as u32).max(320), ((window[1] as f32 / k).round() as u32).max(240)];
+        }
         match [self.tool("0037"), self.tool("0038")] {
             [w, h] if w >= 320 && h >= 240 => [w.min(window[0].max(320) * 4), h.min(window[1].max(240) * 4)],
             _ => window,
@@ -580,6 +605,21 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ui_scale_keeps_the_window_shape_and_auto_is_retail_up_to_1080() {
+        let mut c = Config::default();
+        assert_eq!(c.ui_scale, UI_SCALE_AUTO);
+        assert_eq!(c.ui_size([1920, 1080]), [1920, 1080]);
+        assert_eq!(c.ui_size([1280, 800]), [1280, 800]);
+        assert_eq!(c.ui_size([3840, 2160]), [1920, 1080]);
+        assert_eq!(c.ui_size([2560, 1440]), [1920, 1080]);
+        c.ui_scale = 150;
+        assert_eq!(c.ui_size([1920, 1080]), [1280, 720]);
+        // Menu Size: retail's 0037 / 0038 (0: the window).
+        c.ui_scale = 0;
+        assert_eq!(c.ui_size([3840, 2160]), [3840, 2160]);
+    }
 
     #[test]
     fn named_server_resolves_address_and_ports() {

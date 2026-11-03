@@ -49,6 +49,7 @@ pub struct Settings {
     pub gamepad_deadzone: u32,
     pub gamepad_camera: u32,
     pub modern_ui: bool,
+    pub ui_scale: u32,
     pub modern_scale: u32,
     pub modern_opacity: u32,
     /// The mod packs in priority order (the Mods page; config `mods`).
@@ -97,6 +98,7 @@ impl Settings {
             gamepad_deadzone: pct(c.gamepad_deadzone),
             gamepad_camera: (c.gamepad_camera_speed * 100.0).round().clamp(10.0, 500.0) as u32,
             modern_ui: c.modern_ui,
+            ui_scale: c.ui_scale,
             modern_scale: c.modern_scale,
             modern_opacity: pct(c.modern_opacity),
             mods: crate::modpack::merged(&c.mods, &crate::modpack::folders()),
@@ -138,6 +140,7 @@ impl Settings {
         c.gamepad_deadzone = self.gamepad_deadzone as f32 / 100.0;
         c.gamepad_camera_speed = self.gamepad_camera as f32 / 100.0;
         c.modern_ui = self.modern_ui;
+        c.ui_scale = self.ui_scale;
         c.modern_scale = self.modern_scale;
         c.modern_opacity = self.modern_opacity as f32 / 100.0;
         c.mods = self.mods.clone();
@@ -201,6 +204,7 @@ enum Val {
     /// The graphics adapter ("Default" then the app's list).
     Gpu,
     ModernUi,
+    UiScale,
     ModernScale,
     ModernOpacity,
     ResetPlaces,
@@ -261,6 +265,9 @@ pub struct ModRow {
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
 const DEADZONES: &[(u32, &str)] = &[(5, "5%"), (10, "10%"), (15, "15%"), (20, "20%"), (25, "25%"), (30, "30%"), (35, "35%"), (40, "40%"), (50, "50%"), (60, "60%")];
 const CAMERA_SPEEDS: &[(u32, &str)] = &[(25, "0.25x"), (50, "0.5x"), (75, "0.75x"), (100, "1x"), (125, "1.25x"), (150, "1.5x"), (200, "2x"), (250, "2.5x"), (300, "3x"), (400, "4x")];
+/// The classic UI's scale (config ui_scale): 0 the Menu Size, 1 Auto, else a percent.
+const UI_SCALES: &[(u32, &str)] = &[(0, "Menu Size"), (1, "Auto"), (100, "100%"), (125, "125%"), (150, "150%"), (175, "175%"), (200, "200%"), (250, "250%"), (300, "300%")];
+
 const MODERN_SCALES: &[(u32, &str)] = &[(50, "50%"), (55, "55%"), (60, "60%"), (65, "65%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%"), (100, "100%"), (105, "105%"), (110, "110%"), (115, "115%"), (120, "120%"), (125, "125%"), (130, "130%"), (135, "135%"), (140, "140%"), (145, "145%"), (150, "150%")];
 
 const fn row(label: &'static str, help: &'static str, val: Val, choices: &'static [(u32, &'static str)], when: When) -> SRow {
@@ -289,7 +296,8 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Monitor", "The monitor the game opens on, in every window mode (not retail).", Monitor, &[], Now),
         row("GPU", "The graphics card to draw with; Default is the high-performance one (not retail).", Gpu, &[], Restart),
         row("Background", "0003 / 0004: the 3D scene's resolution, scaled to the window.", Size("0003", "0004", Sizes::Background), &[], Now),
-        row("Menu Size", "0037 / 0038: the resolution menus and text are laid out at, then stretched.", Size("0037", "0038", Sizes::Ui), &[], Now),
+        row("UI Scale", "How big the game's windows and text are: Auto grows them with the window past 1080 lines; Menu Size uses the size below, as retail (not retail).", UiScale, UI_SCALES, Now),
+        row("Menu Size", "0037 / 0038: the resolution menus and text are laid out at, then stretched (with UI Scale on Menu Size).", Size("0037", "0038", Sizes::Ui), &[], Now),
         row("3D Aspect", "Window: the window's shape. Config: retail's ratio from Misc. 2 / the lobby Config.", RetailAspect, &[(0, "Window"), (1, "Config")], Now),
         row("Draw Distance", "How far scenery, characters and effects draw: Retail is the game's distance, the others farther (not retail).", DrawDistance, &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")], Now),
     ];
@@ -515,6 +523,7 @@ impl SettingsUi {
             Val::DrawDistance => self.s.draw_distance,
             Val::PartyTp => self.s.party_tp as u32,
             Val::ModernUi => self.s.modern_ui as u32,
+            Val::UiScale => self.s.ui_scale,
             Val::ModernScale => self.s.modern_scale,
             Val::ModernOpacity => self.s.modern_opacity,
             Val::ResetPlaces => self.s.reset_places as u32,
@@ -556,6 +565,7 @@ impl SettingsUi {
             Val::DrawDistance => self.s.draw_distance = x,
             Val::PartyTp => self.s.party_tp = x != 0,
             Val::ModernUi => self.s.modern_ui = x != 0,
+            Val::UiScale => self.s.ui_scale = x,
             Val::ModernScale => self.s.modern_scale = x,
             Val::ModernOpacity => self.s.modern_opacity = x,
             Val::ResetPlaces => self.s.reset_places = x != 0,
