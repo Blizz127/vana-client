@@ -95,6 +95,10 @@ fn legacy_controls(v: &serde_json::Value, parsed: u32) -> u32 {
     if v.get("controls").is_none() && (classic || v.get("modern_ui").is_some()) { 0 } else { parsed }
 }
 
+/// Ours: the containers kept sorted by default: the inventory, the Mog Safe and Storage, the Locker, the satchel, sack
+/// and case, Mog Safe 2 (container ids 0, 1, 2, 4, 5, 6, 7, 9).
+pub const AUTO_SORT_BAGS: u32 = 1 | 1 << 1 | 1 << 2 | 1 << 4 | 1 << 5 | 1 << 6 | 1 << 7 | 1 << 9;
+
 /// `ui_scale`'s Auto.
 pub const UI_SCALE_AUTO: u32 = 1;
 
@@ -339,6 +343,9 @@ pub struct Config {
     /// Ours (user, 2026-10-25): containers whose sort window's Auto stays on, bit = container: a new item there sorts
     /// it again. Retail's Auto sorts once; Manual turns ours off.
     pub auto_sort: u32,
+    /// Ours: a new item merges into the container's partial stacks (c2s 0x03A, the server's own merge) without
+    /// re-sorting it.
+    pub auto_combine: bool,
     /// The "FINAL FANTASY XI Config" tool's values by registry name (HKLM\...\FinalFantasyXI\0000..0043,
     /// read at start-up by FUN_10016c30); missing ones take TOOL_DEFAULTS.
     pub tool: std::collections::BTreeMap<String, u32>,
@@ -536,7 +543,8 @@ impl Default for Config {
             controls_ad_turn: false,
             rest_tick: None,
             cursor_size: 0,
-            auto_sort: 0,
+            auto_sort: AUTO_SORT_BAGS,
+            auto_combine: true,
             mods: Vec::new(),
             modern_ui: true,
             modern_scale: 60,
@@ -584,8 +592,14 @@ impl Config {
         if c.classic_only {
             c.modern_ui = false;
         }
+        // The regular FFXI client keeps retail's manual sorting unless chosen.
+        if c.classic_only && bytes.as_ref().and_then(|b| serde_json::from_slice::<serde_json::Value>(b).ok()).is_some_and(|v| v.get("auto_combine").is_none()) {
+            (c.auto_sort, c.auto_combine) = (0, false);
+        }
         if !c.modern_migrated && !c.classic_only && c.is_forever() {
             (c.modern_ui, c.modern_migrated) = (true, true);
+            // The owner: sorting and combining on by default too.
+            (c.auto_sort, c.auto_combine) = (AUTO_SORT_BAGS, true);
             log::info!("config: FFXI Forever's modern UI turned on (once)");
             if let Err(e) = c.save() {
                 log::warn!("saving the config: {e}");

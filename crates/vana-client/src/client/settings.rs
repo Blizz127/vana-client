@@ -42,6 +42,9 @@ pub struct Settings {
     pub modern_minimap: bool,
     pub solo_badge: bool,
     pub classic_only: bool,
+    /// The containers kept sorted (config auto_sort; the rows set them all or none) and combining.
+    pub auto_sort: u32,
+    pub auto_combine: bool,
     pub rotation_adaptive: bool,
     pub rotation_cure_pct: u32,
     pub rotation_convert_pct: u32,
@@ -104,6 +107,8 @@ impl Settings {
             modern_minimap: c.modern_minimap,
             solo_badge: c.solo_badge,
             classic_only: c.classic_only,
+            auto_sort: c.auto_sort,
+            auto_combine: c.auto_combine,
             rotation_adaptive: c.rotation_adaptive,
             rotation_cure_pct: c.rotation_cure_pct,
             rotation_convert_pct: c.rotation_convert_pct,
@@ -162,6 +167,8 @@ impl Settings {
         c.modern_minimap = self.modern_minimap;
         c.solo_badge = self.solo_badge;
         c.rotation_adaptive = self.rotation_adaptive;
+        c.auto_sort = self.auto_sort;
+        c.auto_combine = self.auto_combine;
         c.rotation_cure_pct = self.rotation_cure_pct;
         c.rotation_convert_pct = self.rotation_convert_pct;
         c.rotation_renew_secs = self.rotation_renew_secs;
@@ -234,6 +241,9 @@ enum Val {
     SoloBadge,
     /// The suggestions' thresholds (config rotation_*).
     RotAdaptive,
+    /// Inventory: keep every bag sorted, combine stacks.
+    KeepSorted,
+    Combine,
     RotCure,
     RotConvert,
     RotRenew,
@@ -431,7 +441,11 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const PARTY_TP_ROW: SRow = row("Party TP", "Show TP in the party window (retail config 0xae, off there).", PartyTp, OFF_ON, Now);
     // Panel Places (a character's) is for in game only.
-    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2], SOLO_ROW, ROT_ROWS[0], ROT_ROWS[1], ROT_ROWS[2], ROT_ROWS[3]];
+    const INTERFACE: &[SRow] = &[EXPERIENCE_ROW, INTERFACE_HEAD[0], INTERFACE_HEAD[1], INTERFACE_HEAD[2], INTERFACE_HEAD[3], INTERFACE_HEAD[4], PLACES_ROW, PARTY_TP_ROW, MINIMAP_ROWS[0], MINIMAP_ROWS[1], MINIMAP_ROWS[2], SOLO_ROW, INV_ROWS[0], INV_ROWS[1], ROT_ROWS[0], ROT_ROWS[1], ROT_ROWS[2], ROT_ROWS[3]];
+    const INV_ROWS: [SRow; 2] = [
+        row("Keep Bags Sorted", "Your inventory, satchel, sack, case and Mog House storage sort themselves again when an item comes in (each bag's sort window's Auto / Manual sets one bag).", KeepSorted, OFF_ON, Now),
+        row("Combine Stacks", "A new item joins the partial stacks of the same item in its bag (the server's own merge), even where the bag is not kept sorted.", Combine, OFF_ON, Now),
+    ];
     const ROT_ROWS: [SRow; 4] = [
         row("Adaptive Suggestions", "The battle menu's Suggested rows and the one-button rotation (/rot) react to the fight: cure who is low, lift ailments, put back what wears off, Convert when MP runs low. Off: only the fight's own actions (debuffs, weapon skills, damage).", RotAdaptive, OFF_ON, Now),
         row("Cure Below", "Suggest a cure when you or a party member is at or under this much HP.", RotCure, &[(40, "40%"), (50, "50%"), (60, "60%"), (70, "70%"), (75, "75%"), (80, "80%"), (90, "90%")], Now),
@@ -735,6 +749,8 @@ impl SettingsUi {
             Val::ModernMinimap => self.s.modern_minimap as u32,
             Val::SoloBadge => self.s.solo_badge as u32,
             Val::RotAdaptive => self.s.rotation_adaptive as u32,
+            Val::KeepSorted => (self.s.auto_sort != 0) as u32,
+            Val::Combine => self.s.auto_combine as u32,
             Val::RotCure => self.s.rotation_cure_pct,
             Val::RotConvert => self.s.rotation_convert_pct,
             Val::RotRenew => self.s.rotation_renew_secs,
@@ -801,6 +817,9 @@ impl SettingsUi {
             Val::ModernMinimap => self.s.modern_minimap = x != 0,
             Val::SoloBadge => self.s.solo_badge = x != 0,
             Val::RotAdaptive => self.s.rotation_adaptive = x != 0,
+            Val::KeepSorted if (x != 0) != (self.s.auto_sort != 0) => self.s.auto_sort = if x != 0 { crate::config::AUTO_SORT_BAGS } else { 0 },
+            Val::KeepSorted => {}
+            Val::Combine => self.s.auto_combine = x != 0,
             Val::RotCure => self.s.rotation_cure_pct = x,
             Val::RotConvert => self.s.rotation_convert_pct = x,
             Val::RotRenew => self.s.rotation_renew_secs = x,
@@ -1882,7 +1901,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::Ao | Val::AoStrength | Val::AoRadius | Val::Fog | Val::FogDensity | Val::FogHeight | Val::ModernMinimap | Val::SoloBadge | Val::RotAdaptive | Val::RotCure | Val::RotConvert | Val::RotRenew | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::Ao | Val::AoStrength | Val::AoRadius | Val::Fog | Val::FogDensity | Val::FogHeight | Val::ModernMinimap | Val::SoloBadge | Val::RotAdaptive | Val::KeepSorted | Val::Combine | Val::RotCure | Val::RotConvert | Val::RotRenew | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();

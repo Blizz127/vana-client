@@ -857,6 +857,22 @@ pub(super) fn auto_sort_tick(w: &mut World, dt: f32) {
     }
 }
 
+/// Ours: containers with a new item merge into their partial stacks (c2s 0x03A, the server's merge) once the burst
+/// is over, without re-sorting the view.
+pub(super) fn auto_combine_tick(w: &mut World, dt: f32) {
+    if w.combine_due.0 == 0 {
+        return;
+    }
+    w.combine_due.1 -= dt;
+    if w.combine_due.1 > 0.0 {
+        return;
+    }
+    let due = std::mem::take(&mut w.combine_due.0);
+    for c in (0..32u8).filter(|c| due >> c & 1 != 0) {
+        let _ = w.net.commands.send(NetCommand::Packet { id: 0x03A, body: (c as u32).to_le_bytes().to_vec() });
+    }
+}
+
 /// Auto keeps the container sorted (ours), Manual stops it.
 fn keep_sorted(w: &mut World, c: u8, on: bool) {
     let v = if on { w.auto_sort | 1 << c } else { w.auto_sort & !(1 << c) };

@@ -6275,6 +6275,9 @@ struct World {
     auto_sort: u32,
     auto_sort_dirty: bool,
     sort_due: (u32, f32),
+    /// Config auto_combine, and the containers to merge once their new items are in.
+    auto_combine: bool,
+    combine_due: (u32, f32),
     timers_dock: u32,
     timers: timers::Timers,
     regime: regime::Tracker,
@@ -6979,6 +6982,7 @@ impl App {
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (if w.modern { self.cfg.modern_minimap } else { self.cfg.minimap }, self.cfg.minimap_dock, self.cfg.minimap_size);
             w.minimap_unowned = self.cfg.minimap_unowned;
             w.solo_badge = self.cfg.solo_badge;
+            (w.auto_combine, w.auto_sort) = (self.cfg.auto_combine, self.cfg.auto_sort);
             w.suggest_tuning = self.cfg.suggest_tuning();
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
@@ -8068,6 +8072,8 @@ impl App {
                             auto_sort: self.cfg.auto_sort,
                             auto_sort_dirty: false,
                             sort_due: (0, 0.0),
+                            auto_combine: self.cfg.auto_combine,
+                            combine_due: (0, 0.0),
                             timers_dock: self.cfg.timers_dock,
                             timers: timers::Timers::new(self.cfg.timers_out, self.cfg.timers_folded),
                             regime: regime::Tracker::new(self.cfg.regime_out),
@@ -9253,6 +9259,9 @@ impl App {
                     world.inv.set(container, index, id, count);
                     if fresh && container < 32 && world.auto_sort >> container & 1 != 0 {
                         world.sort_due = (world.sort_due.0 | 1 << container, items::SORT_DELAY);
+                    } else if fresh && container < 32 && world.auto_combine && matches!(container, 0..=2 | 4..=7 | 9) {
+                        // Ours: combine only (the server's merge, the view left as it is).
+                        world.combine_due = (world.combine_due.0 | 1 << container, items::SORT_DELAY);
                     }
                     if id != 0 {
                         world.inv.locks.insert((container, index), lock);
@@ -9978,6 +9987,7 @@ impl App {
         partymenu::update(world);
         status::update(world);
         items::auto_sort_tick(world, dt);
+        items::auto_combine_tick(world, dt);
         items::follow_held(world);
         equipwin::tick(world);
         auction::update(world, dt);
