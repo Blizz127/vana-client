@@ -428,7 +428,16 @@ pub struct Pads {
     used: bool,
 }
 
+/// The pad in use becomes `id` (input came from it).
+fn switch(active: &mut Option<gilrs::GamepadId>, id: gilrs::GamepadId) {
+    if *active != Some(id) {
+        log::info!("gamepad: input from another pad, using it");
+        *active = Some(id);
+    }
+}
+
 impl Pads {
+
     /// Whether the pad was the last device used: text fields raise the on-screen keyboard only then.
     pub fn in_use(&self) -> bool {
         self.used
@@ -474,7 +483,9 @@ impl Pads {
             }
         }
         let Some(g) = self.gilrs.as_mut() else { return Snapshot::default() };
-        // Events keep gilrs's state current; the first pad found and the last one a button went down on is the one in use.
+        // Events keep gilrs's state current. The pad in use is the first found, then whichever last had a button go
+        // down or a stick pushed past half (ours: with Steam Input there are two, the physical pad and Steam's virtual
+        // one, and Steam can take the physical one over so its events stop with the stick still read as pushed).
         while let Some(ev) = g.next_event() {
             match ev.event {
                 EventType::Connected => {
@@ -487,7 +498,8 @@ impl Pads {
                         self.active = None;
                     }
                 }
-                EventType::ButtonPressed(..) => self.active = Some(ev.id),
+                EventType::ButtonPressed(..) => switch(&mut self.active, ev.id),
+                EventType::AxisChanged(_, v, _) if v.abs() > 0.5 => switch(&mut self.active, ev.id),
                 _ => {}
             }
         }

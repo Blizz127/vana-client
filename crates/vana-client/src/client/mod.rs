@@ -10153,6 +10153,10 @@ impl App {
             world.autorun = !world.autorun;
             world.autorun_dir = Vec3::ZERO;
         }
+        // Ours: moving back ends autorun (as other MMOs; a toggled autorun read as a stuck key, the owner's report).
+        if world.autorun && ay > 0.5 {
+            world.autorun = false;
+        }
         // Turning while autorunning steers it: the move goes forward and the turn counts as X input.
         if world.autorun && turn != 0.0 {
             (ax, ay) = (turn, -1.0);
@@ -14356,9 +14360,9 @@ impl ApplicationHandler for App {
             // Config-tool 0035 = 0: no sound while the window is not focused (no DSBCAPS_GLOBALFOCUS).
             WindowEvent::Focused(f) => {
                 self.focused = f;
-                if !f {
-                    self.input.clear();
-                }
+                // Keys and buttons held across a focus change (Alt-Tab, an overlay, the Steam keyboard) may never send
+                // their release: nothing is held on either side of it (ours: retail clears on the loss only).
+                self.input.clear();
                 let (m, e) = self.volume_factors();
                 if self.cfg.tool("0035") == 0
                     && let Some(a) = self.audio.as_mut()
