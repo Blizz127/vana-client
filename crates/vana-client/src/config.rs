@@ -86,6 +86,13 @@ pub struct NamedServer {
     pub loader_version: Option<String>,
 }
 
+/// Ours: the Modern controls are the default for new players only. A config the client saved before the controls
+/// existed (it has `modern_ui`, written with every other key, but no `controls`) keeps the original keys; a fresh one,
+/// or one only a launcher wrote, gets the default.
+fn legacy_controls(v: &serde_json::Value, parsed: u32) -> u32 {
+    if v.get("controls").is_none() && v.get("modern_ui").is_some() { 0 } else { parsed }
+}
+
 /// `ui_scale`'s Auto.
 pub const UI_SCALE_AUTO: u32 = 1;
 
@@ -538,7 +545,11 @@ impl Config {
     }
 
     pub fn load() -> Self {
-        let mut c: Self = std::fs::read(config_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+        let bytes = std::fs::read(config_path()).ok();
+        let mut c: Self = bytes.as_ref().and_then(|b| serde_json::from_slice(b).ok()).unwrap_or_default();
+        if let Some(v) = bytes.as_ref().and_then(|b| serde_json::from_slice::<serde_json::Value>(b).ok()) {
+            c.controls = legacy_controls(&v, c.controls);
+        }
         // A config from before the lists: its one login starts them.
         if c.logins.is_empty() && !c.server.trim().is_empty() && !c.username.trim().is_empty() {
             c.remember_login();
@@ -719,6 +730,16 @@ mod tests {
         assert!(!GraphicsCfg { fog: true, fog_density: 0.0, ..Default::default() }.active());
         let c: Config = serde_json::from_str(r#"{"graphics":{"ao":true}}"#).unwrap();
         assert!(c.graphics.ao && c.graphics.ao_strength == 1.0 && !c.graphics.fog);
+    }
+
+    #[test]
+    fn modern_controls_only_for_new_configs() {
+        let saved: serde_json::Value = serde_json::json!({"modern_ui": false, "server": "x"});
+        let launcher: serde_json::Value = serde_json::json!({"game_dir": "/g", "server": "x"});
+        let chosen: serde_json::Value = serde_json::json!({"modern_ui": true, "controls": 1});
+        assert_eq!(legacy_controls(&saved, 2), 0);
+        assert_eq!(legacy_controls(&launcher, 2), 2);
+        assert_eq!(legacy_controls(&chosen, 1), 1);
     }
 
     #[test]

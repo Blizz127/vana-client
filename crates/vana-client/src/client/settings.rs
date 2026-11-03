@@ -248,6 +248,12 @@ enum Val {
     Exposure,
     Sharpen,
     Saturation,
+    Ao,
+    AoStrength,
+    AoRadius,
+    Fog,
+    FogDensity,
+    FogHeight,
     ModernScale,
     ModernOpacity,
     ResetPlaces,
@@ -388,6 +394,12 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Exposure", "The scene's brightness under Tone Mapping.", Exposure, &[(50, "0.5x"), (75, "0.75x"), (90, "0.9x"), (100, "1.0x"), (110, "1.1x"), (125, "1.25x"), (150, "1.5x"), (200, "2.0x")], Now),
         row("Sharpening", "Contrast-adaptive sharpening: crisper textures and edges (not retail).", Sharpen, &[(0, "Off"), (10, "10%"), (20, "20%"), (30, "30%"), (40, "40%"), (50, "50%"), (60, "60%"), (80, "80%"), (100, "100%")], Now),
         row("Saturation", "Colour strength: 100% is as drawn.", Saturation, &[(50, "50%"), (75, "75%"), (90, "90%"), (100, "100%"), (110, "110%"), (125, "125%"), (150, "150%")], Now),
+        row("Ambient Occlusion", "Soft contact shadows where surfaces meet: under trees, at walls and ledges (SSAO; not retail).", Ao, OFF_ON, Now),
+        row("AO Strength", "How dark the contact shadows are.", AoStrength, &[(50, "50%"), (75, "75%"), (100, "100%"), (130, "130%"), (160, "160%"), (200, "200%")], Now),
+        row("AO Radius", "How far the shadows reach from a corner.", AoRadius, &[(50, "Small"), (80, "0.8"), (120, "Medium"), (150, "1.5"), (200, "Large"), (300, "3")], Now),
+        row("Height Fog", "Low-lying mist that thickens near the ground and with distance, in the zone's own fog colour (not retail).", Fog, OFF_ON, Now),
+        row("Fog Density", "How thick the mist is.", FogDensity, &[(30, "30%"), (50, "50%"), (80, "80%"), (100, "100%"), (130, "130%"), (160, "160%"), (200, "200%")], Now),
+        row("Fog Height", "How high the mist reaches above your feet.", FogHeight, &[(5, "Low"), (10, "10"), (20, "Medium"), (40, "40"), (80, "High"), (150, "Very High")], Now),
     ];
     const PLACES_ROW: SRow = row("Panel Places", "Reset puts this character's modern windows back where they start (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now);
     const EXPERIENCE_ROW: SRow = row("Experience", "Modern: the new interface, WASD and mouse controls, the opening movie skipped. Original: the game as retail had it, its own windows, retail's keyboard, the Original graphics preset and the opening movie. Each setting below can still be changed on its own (not retail).", Experience, &[(0, "Modern"), (1, "Original"), (2, "Custom")], Now);
@@ -666,6 +678,12 @@ impl SettingsUi {
             Val::Exposure => pct(self.s.graphics.exposure),
             Val::Sharpen => pct(self.s.graphics.sharpen),
             Val::Saturation => pct(self.s.graphics.saturation),
+            Val::Ao => self.s.graphics.ao as u32,
+            Val::AoStrength => pct(self.s.graphics.ao_strength),
+            Val::AoRadius => pct(self.s.graphics.ao_radius),
+            Val::Fog => self.s.graphics.fog as u32,
+            Val::FogDensity => pct(self.s.graphics.fog_density),
+            Val::FogHeight => self.s.graphics.fog_height.round() as u32,
             Val::ModernScale => self.s.modern_scale,
             Val::ModernOpacity => self.s.modern_opacity,
             Val::ResetPlaces => self.s.reset_places as u32,
@@ -723,6 +741,12 @@ impl SettingsUi {
             Val::Exposure => self.s.graphics.exposure = x as f32 / 100.0,
             Val::Sharpen => self.s.graphics.sharpen = x as f32 / 100.0,
             Val::Saturation => self.s.graphics.saturation = x as f32 / 100.0,
+            Val::Ao => self.s.graphics.ao = x != 0,
+            Val::AoStrength => self.s.graphics.ao_strength = x as f32 / 100.0,
+            Val::AoRadius => self.s.graphics.ao_radius = x as f32 / 100.0,
+            Val::Fog => self.s.graphics.fog = x != 0,
+            Val::FogDensity => self.s.graphics.fog_density = x as f32 / 100.0,
+            Val::FogHeight => self.s.graphics.fog_height = x as f32,
             Val::ModernScale => self.s.modern_scale = x,
             Val::ModernOpacity => self.s.modern_opacity = x,
             Val::ResetPlaces => self.s.reset_places = x != 0,
@@ -1823,7 +1847,7 @@ mod tests {
             let mut here = Vec::new();
             for tab in 0..TABS.len() {
                 ui.tab = tab;
-                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::ModernMinimap | Val::SoloBadge | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
+                here.extend(ui.rows().iter().filter(|r| !matches!(r.val, Val::Preset | Val::Experience | Val::Controls | Val::ControlsAd | Val::Fxaa | Val::Bloom | Val::BloomIntensity | Val::BloomThreshold | Val::Tonemap | Val::Exposure | Val::Sharpen | Val::Saturation | Val::Ao | Val::AoStrength | Val::AoRadius | Val::Fog | Val::FogDensity | Val::FogHeight | Val::ModernMinimap | Val::SoloBadge | Val::MinimapUnowned | Val::MinimapSize)).map(|r| format!("{:?}", r.val)));
             }
             let mut dup = here.clone();
             dup.sort();
@@ -1840,7 +1864,7 @@ mod tests {
         ui.tab = GRAPHICS;
         assert!(matches!(ui.rows()[0].val, Val::Preset) && ui.rows()[1].label == "Render Resolution");
         ui.tab = POST_TAB;
-        assert!(ui.rows().len() == 8 && matches!(ui.rows()[0].val, Val::Fxaa) && ui.note().is_none());
+        assert!(ui.rows().len() == 14 && matches!(ui.rows()[0].val, Val::Fxaa) && ui.note().is_none());
         assert_eq!(ui.tabs(), ["Display", "Graphics", "Lighting & Effects", "Post-processing", "Interface", "Sound", "Misc.", "Controls", "Mods"]);
         // The Controls page: the keyboard and mouse scheme first (Modern the default), then A / D, then the gamepad rows.
         ui.tab = CONTROLS;
@@ -1945,6 +1969,7 @@ mod tests {
             rest.draw_distance = before.draw_distance;
             rest.lamp_lights = before.lamp_lights;
             (rest.graphics.fxaa, rest.graphics.tonemap, rest.graphics.sharpen) = (before.graphics.fxaa, before.graphics.tonemap, before.graphics.sharpen);
+            (rest.graphics.ao, rest.graphics.fog) = (before.graphics.ao, before.graphics.fog);
             for n in ["0018", "0000", "0017", "0011", "0003", "0004"] {
                 match before.tool.get(n) {
                     Some(v) => rest.tool.insert(n.into(), *v),

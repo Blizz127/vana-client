@@ -22,6 +22,9 @@ struct Look {
     fxaa: bool,
     tonemap: bool,
     sharpen: u32,
+    /// SSAO and the height fog.
+    ao: bool,
+    fog: bool,
 }
 
 /// The presets' names, in the Preset row's order (then Custom).
@@ -54,13 +57,13 @@ impl SettingsUi {
     /// and scaled down (supersampling).
     fn preset_look(&self, k: u32) -> Look {
         let c = Config::default();
-        let original = Look { aniso: c.anisotropy, draw: c.draw_distance, textures: tool_default("0018"), mip: tool_default("0000"), bump: tool_default("0017"), lamps: c.lamp_lights, env: tool_default("0011"), render: [tool_default("0003"), tool_default("0004")], fxaa: c.graphics.fxaa, tonemap: c.graphics.tonemap, sharpen: (c.graphics.sharpen * 100.0).round() as u32 };
+        let original = Look { aniso: c.anisotropy, draw: c.draw_distance, textures: tool_default("0018"), mip: tool_default("0000"), bump: tool_default("0017"), lamps: c.lamp_lights, env: tool_default("0011"), render: [tool_default("0003"), tool_default("0004")], fxaa: c.graphics.fxaa, tonemap: c.graphics.tonemap, sharpen: (c.graphics.sharpen * 100.0).round() as u32, ao: c.graphics.ao, fog: c.graphics.fog };
         // The draw distance stays the default's (Unlimited): a preset never shortens the view.
-        let high = Look { aniso: 16, textures: 2, mip: 1, bump: 1, lamps: true, env: 2, fxaa: true, ..original };
+        let high = Look { aniso: 16, textures: 2, mip: 1, bump: 1, lamps: true, env: 2, fxaa: true, ao: true, ..original };
         match k {
             0 => original,
             1 => high,
-            _ => Look { render: self.scaled(1.5), tonemap: true, sharpen: 30, ..high },
+            _ => Look { render: self.scaled(1.5), tonemap: true, sharpen: 30, fog: true, ..high },
         }
     }
 
@@ -78,6 +81,8 @@ impl SettingsUi {
             fxaa: self.s.graphics.fxaa,
             tonemap: self.s.graphics.tonemap,
             sharpen: (self.s.graphics.sharpen * 100.0).round() as u32,
+            ao: self.s.graphics.ao,
+            fog: self.s.graphics.fog,
         }
     }
 
@@ -126,6 +131,7 @@ impl SettingsUi {
         self.s.graphics.fxaa = l.fxaa;
         self.s.graphics.tonemap = l.tonemap;
         self.s.graphics.sharpen = l.sharpen as f32 / 100.0;
+        (self.s.graphics.ao, self.s.graphics.fog) = (l.ao, l.fog);
         for (n, v) in [("0018", l.textures), ("0000", l.mip), ("0017", l.bump), ("0011", l.env), ("0003", l.render[0]), ("0004", l.render[1])] {
             self.tool_set(n, v);
         }
@@ -223,6 +229,7 @@ impl SettingsUi {
         // The presets also set these post-processing rows: Graphics' Defaults is Original whole.
         if self.tab == super::GRAPHICS {
             (self.s.graphics.fxaa, self.s.graphics.tonemap, self.s.graphics.sharpen) = (d.s.graphics.fxaa, d.s.graphics.tonemap, d.s.graphics.sharpen);
+            (self.s.graphics.ao, self.s.graphics.fog) = (d.s.graphics.ao, d.s.graphics.fog);
         }
         self.dirty |= self.s != before;
         self.sounds.push(Se::Select);
