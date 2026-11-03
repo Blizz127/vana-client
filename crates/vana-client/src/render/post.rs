@@ -6,9 +6,13 @@
 //! and saturation work on the gamma values as stored, bloom and the tone curve go through linear (x^2.2). Order: FXAA, then
 //! (CAS, bloom added, tone curve, saturation) in one composite pass. The result goes to a texture of its own and the scene
 //! texture is left as drawn (a zone change's held frame is copied from it and must not be processed twice).
+//!
+//! Ambient occlusion and height fog (render/postdepth.rs) read the scene's depth and run first, over the scene as drawn;
+//! FXAA and the composite then take their result. They are made only while one is on and the depth is given.
 
 use super::Gpu;
 use super::Put;
+use super::postdepth::{DepthFx, DepthIn};
 use crate::config::GraphicsCfg;
 
 const SHADER: &str = r#"
@@ -228,7 +232,7 @@ fn ld(pos: vec2<i32>, dim: vec2<i32>, o: vec2<i32>) -> vec3<f32> {
 }
 "#;
 
-fn pipeline(device: &wgpu::Device, shader: &wgpu::ShaderModule, pl: &wgpu::PipelineLayout, entry: &str, format: wgpu::TextureFormat, blend: Option<wgpu::BlendState>) -> wgpu::RenderPipeline {
+pub(super) fn pipeline(device: &wgpu::Device, shader: &wgpu::ShaderModule, pl: &wgpu::PipelineLayout, entry: &str, format: wgpu::TextureFormat, blend: Option<wgpu::BlendState>) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("post fx"),
         layout: Some(pl),
@@ -293,6 +297,9 @@ pub struct PostFx {
     /// `run`'s result texture and `in_place`'s copy of the scene.
     out: Option<Scratch>,
     copy: Option<Scratch>,
+    /// Ambient occlusion and height fog (render/postdepth.rs): made when one is first on and the depth is given, dropped when
+    /// both go off; they run first, and the rest reads their result.
+    depthfx: Option<DepthFx>,
 }
 
 /// The PostFx for `cfg`: made on first need, dropped (with its textures) when every option is off, so an unused pass costs
@@ -309,6 +316,9 @@ pub fn ensure<'a>(slot: &'a mut Option<PostFx>, gpu: &Gpu, format: wgpu::Texture
     let fx = slot.get_or_insert_with(|| PostFx::new(gpu, format));
     if !cfg.bloom_on() {
         fx.bloom = None;
+    }
+    if !cfg.depth_on() {
+        fx.depthfx = None;
     }
     Some(fx)
 }
@@ -348,7 +358,7 @@ impl PostFx {
         let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("post fx"), size: 32, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let fxaa = pipeline(device, &shader, &pl, "fxaa_fs", format, None);
         let composite = pipeline(device, &shader, &pl, "composite_fs", format, None);
-        Self { shader, layout, pl, sampler, uniform, format, fxaa, composite, bloom: None, mid: None, out: None, copy: None }
+        Self { shader, layout, pl, sampler, uniform, format, fxaa, composite, bloom: None, mid: None, out: None, copy: None, depthfx: None }
     }
 
     fn scratch(gpu: &Gpu, slot: &mut Option<Scratch>, label: &str, size: wgpu::Extent3d, format: wgpu::TextureFormat, usage: wgpu::TextureUsages) {
@@ -371,31 +381,46 @@ impl PostFx {
 
     /// The scene texture `scene` (a render target and sampled, as the scaling pass's) processed into a texture of this
     /// struct's own, at the same size and format; the scene texture is not touched. Read it through its default view.
-    pub fn run(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, scene: &wgpu::Texture, cfg: &GraphicsCfg) -> wgpu::Texture {
+    /// `depth`: the scene's depth and camera for the AO and fog; without it those two are skipped (the lobby has no camera).
+    pub fn run(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, scene: &wgpu::Texture, cfg: &GraphicsCfg, depth: Option<DepthIn>) -> wgpu::Texture {
         let usage = wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC;
         Self::scratch(gpu, &mut self.out, "post fx output", scene.size(), scene.format(), usage);
         let out = self.out.as_ref().unwrap();
         let (tex, view) = (out.tex.clone(), out.view.clone());
-        self.apply(gpu, enc, scene, &view, cfg);
+        self.apply(gpu, enc, scene, &view, cfg, depth);
         tex
     }
 
     /// As `run`, writing back over `tex` (which needs COPY_SRC and RENDER_ATTACHMENT), through a copy of it: for the offscreen
     /// shot tools.
-    pub fn in_place(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, tex: &wgpu::Texture, cfg: &GraphicsCfg) {
+    pub fn in_place(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, tex: &wgpu::Texture, cfg: &GraphicsCfg, depth: Option<DepthIn>) {
         Self::scratch(gpu, &mut self.copy, "post fx input", tex.size(), tex.format(), wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
         let copy = self.copy.as_ref().unwrap().tex.clone();
         enc.copy_texture_to_texture(tex.as_image_copy(), copy.as_image_copy(), tex.size());
         let view = tex.create_view(&wgpu::TextureViewDescriptor { format: Some(tex.format().remove_srgb_suffix()), ..Default::default() });
-        self.apply(gpu, enc, &copy, &view, cfg);
+        self.apply(gpu, enc, &copy, &view, cfg, depth);
+    }
+
+    /// Whether the depth effects' pipelines and textures exist (tests).
+    #[cfg(test)]
+    pub fn has_depth_fx(&self) -> bool {
+        self.depthfx.is_some()
     }
 
     /// The passes: `src` through its plain view into `dst` (a plain view of the same size).
-    fn apply(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, src: &wgpu::Texture, dst: &wgpu::TextureView, cfg: &GraphicsCfg) {
+    fn apply(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, src: &wgpu::Texture, dst: &wgpu::TextureView, cfg: &GraphicsCfg, depth: Option<DepthIn>) {
         let device = &gpu.device;
         let size = src.size();
         let plain = src.format().remove_srgb_suffix();
         let sv = src.create_view(&wgpu::TextureViewDescriptor { format: Some(plain), ..Default::default() });
+        // AO and height fog first, over the scene as drawn; every pass after reads their result in its place.
+        let sv = match depth.filter(|_| cfg.depth_on()) {
+            Some(d) => self.depthfx.get_or_insert_with(|| DepthFx::new(gpu, plain)).run(gpu, enc, &sv, [size.width, size.height], d, cfg),
+            None => {
+                self.depthfx = None;
+                sv
+            }
+        };
         let comp = cfg.composite_on();
         let half = [(size.width / 2).max(1), (size.height / 2).max(1)];
         let bloom = cfg.bloom_on();
@@ -544,7 +569,7 @@ mod tests {
         let mut slot = None;
         let fx = ensure(&mut slot, gpu, FMT, cfg).expect("an option is on");
         let mut enc = gpu.device.create_command_encoder(&Default::default());
-        let out = fx.run(gpu, &mut enc, src, cfg);
+        let out = fx.run(gpu, &mut enc, src, cfg, None);
         gpu.queue.submit([enc.finish()]);
         read(gpu, &out)
     }

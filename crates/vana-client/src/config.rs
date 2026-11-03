@@ -127,11 +127,23 @@ pub struct GraphicsCfg {
     pub sharpen: f32,
     /// Saturation, 1 = as drawn, 0 = grey, up to 2.
     pub saturation: f32,
+    /// Screen-space ambient occlusion from the scene's depth (render/postdepth.rs): creases and contact shadows darkened by
+    /// `ao_strength` (0..2, 1 = as tuned; the scenery already has baked vertex lighting, so that is moderate), over
+    /// `ao_radius` world units (0.25..4); it fades out with distance.
+    pub ao: bool,
+    pub ao_strength: f32,
+    pub ao_radius: f32,
+    /// Height fog: an exponential haze that is densest at the camera's look-at height and below it and thins above, tinted by
+    /// the zone's own fog colour. `fog_density` 0..2 (1 = 0.004 a unit), `fog_height` the world units it takes to thin to 1/e
+    /// (2..200). It adds to the retail distance fog (which is kept), not on top of it twice.
+    pub fog: bool,
+    pub fog_density: f32,
+    pub fog_height: f32,
 }
 
 impl Default for GraphicsCfg {
     fn default() -> Self {
-        Self { fxaa: false, bloom: false, bloom_intensity: 0.4, bloom_threshold: 0.85, tonemap: false, exposure: 1.0, sharpen: 0.0, saturation: 1.0 }
+        Self { fxaa: false, bloom: false, bloom_intensity: 0.4, bloom_threshold: 0.85, tonemap: false, exposure: 1.0, sharpen: 0.0, saturation: 1.0, ao: false, ao_strength: 1.0, ao_radius: 1.2, fog: false, fog_density: 0.8, fog_height: 20.0 }
     }
 }
 
@@ -145,13 +157,23 @@ impl GraphicsCfg {
     pub fn saturation_on(&self) -> bool {
         (self.saturation - 1.0).abs() > 0.005
     }
-    /// Anything the composite pass does (everything but FXAA).
+    pub fn ao_on(&self) -> bool {
+        self.ao && self.ao_strength > 0.005
+    }
+    pub fn fog_on(&self) -> bool {
+        self.fog && self.fog_density > 0.0005
+    }
+    /// Either effect that reads the scene's depth (and so needs the camera).
+    pub fn depth_on(&self) -> bool {
+        self.ao_on() || self.fog_on()
+    }
+    /// Anything the composite pass does (everything but FXAA and the depth effects).
     pub fn composite_on(&self) -> bool {
         self.bloom_on() || self.tonemap || self.sharpen_on() || self.saturation_on()
     }
     /// Whether the post pass runs at all; false = the render path is exactly the one without it.
     pub fn active(&self) -> bool {
-        self.fxaa || self.composite_on()
+        self.fxaa || self.composite_on() || self.depth_on()
     }
 }
 
@@ -678,6 +700,13 @@ mod tests {
         assert!(!GraphicsCfg { bloom: true, bloom_intensity: 0.0, ..Default::default() }.active());
         assert!(GraphicsCfg { sharpen: 0.5, ..Default::default() }.composite_on());
         assert!(GraphicsCfg { saturation: 0.0, ..Default::default() }.composite_on());
+        // The depth effects are off by default, count as the post pass being on, and do nothing at zero strength / density.
+        assert!(!d.ao && !d.fog && !d.depth_on());
+        assert!(GraphicsCfg { ao: true, ..Default::default() }.active() && GraphicsCfg { fog: true, ..Default::default() }.depth_on());
+        assert!(!GraphicsCfg { ao: true, ao_strength: 0.0, ..Default::default() }.active());
+        assert!(!GraphicsCfg { fog: true, fog_density: 0.0, ..Default::default() }.active());
+        let c: Config = serde_json::from_str(r#"{"graphics":{"ao":true}}"#).unwrap();
+        assert!(c.graphics.ao && c.graphics.ao_strength == 1.0 && !c.graphics.fog);
     }
 
     #[test]
