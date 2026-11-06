@@ -192,7 +192,8 @@ pub struct Config {
     /// Extra (the clock add-ons): Earth time, the moon and the next day beside the Vana'diel clock (client/clock.rs).
     pub earth_clock: bool,
     /// The Game Master window (ours, client/gm.rs): its request (c2s 0x1F0) goes out at a zone-in only while this is
-    /// on and only to a private server; off sends nothing for it.
+    /// on and only to a private server. No Settings row: only a server with its GM extension can use it, so it is set
+    /// in config.json by hand.
     pub gm_window: bool,
     /// Extra (the trust chatter filters): trusts' party lines (battle message 711) are not printed.
     pub hide_trust_speech: bool,
