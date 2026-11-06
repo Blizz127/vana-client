@@ -569,8 +569,8 @@ Milestone 1:
 - Mouse Camera Speed (ours, not retail): Settings' Mouse row (Input > Mouse, Camera & Keys, and the classic Settings
   Controls page) scales every mouse look drag, 25% to 200%, 100% the old speed. The controller's camera is not touched,
   so it stays retail's.
-- Ours: a Game Master window (Command Menu > Game Master), with Settings' GM Window on (off by default) and a
-  private server whose GM tools answer the 0x1F0 request with a GM level above 0. Groups, a search by name, 9
+- Ours: a Game Master window (Command Menu > Game Master), with config `gm_window` set in config.json by hand (off;
+  no Settings row) and a private server whose GM tools answer the 0x1F0 request with a GM level above 0. Groups, a search by name, 9
   commands a page (Up / Down, Left / Right), a form per command, runs over 0x1F1 with the server's printed reply in
   the window. Its fields and search are typing, so they trigger no game hotkeys. Not retail (retail has no GM menu).
 - Pickers: while a field is being typed in, up to 6 matches show under it (id or name, names starting with the text

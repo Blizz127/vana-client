@@ -808,7 +808,7 @@ pub struct NetStats {
     pub send_ms: std::sync::atomic::AtomicU32,
     /// Settings' Send Rate in ms, used on a private server when no mod sets one (0 before the first frame sets it).
     pub rate_ms: std::sync::atomic::AtomicU32,
-    /// Settings' GM Window: the zone-in asks a private server for the GM list (c2s 0x1F0).
+    /// Config `gm_window`: the zone-in asks a private server for the GM list (c2s 0x1F0).
     pub gm_window: std::sync::atomic::AtomicBool,
     /// The last sub-packet of each id each way (packets.last), kept while HOOK_LAST is set.
     pub last_in: Mutex<std::collections::HashMap<u16, Vec<u8>>>,

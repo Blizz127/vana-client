@@ -22511,10 +22511,10 @@ Character Shadows (config `actor_shadows`: 0 Retail, 1 Real), Shadow Quality (`s
 
 ## Game Master window (ours) (2026-11-06)
 
-Ours, not retail: the retail client has no GM menu. Needs Settings' GM Window (config `gm_window`, off by default) and
+Ours, not retail: the retail client has no GM menu. Needs config `gm_window` (off by default; no Settings row, only by hand) and
 a private server whose GM tools speak these packets; without them nothing is sent and the window never shows.
 
-- At each zone-in, on a private server (never a PlayOnline session) with GM Window on, the client sends c2s 0x1F0
+- At each zone-in, on a private server (never a PlayOnline session) with `gm_window` on, the client sends c2s 0x1F0
   {u8 Version = 1, padding}; a server without the extension logs it as an unknown packet, hence the setting. The server answers with s2c 0x1F0 pages:
   u8 Version @4, GmLevel @5 (the real `m_GMlevel`, not the 0x037 badge, which reads 0 while hidden and the same
   for levels 4 and 5), u16 Total @6, First @8, u8 Count @0xA, Flags @0xB (bit 0 last page), then entries of
