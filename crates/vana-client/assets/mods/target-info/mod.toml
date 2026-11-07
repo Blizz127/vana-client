@@ -1,0 +1,22 @@
+name = "Target Info"
+version = "1.0.0"
+description = "Your target's distance and HP percent in the target window (the distance and target-info add-ons)."
+permissions = ["ui.native"]
+
+[settings.distance]
+type = "bool"
+default = false
+label = "Target Distance"
+help = "Shows how far away your target is in the target window."
+tab = "Battle"
+place = 0
+from = "target_distance"
+
+[settings.hpp]
+type = "bool"
+default = false
+label = "Target HP %"
+help = "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it."
+tab = "Battle"
+place = 1
+from = "target_hpp"

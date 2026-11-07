@@ -259,14 +259,14 @@ fn palette_scored(w: &World, query: &str) -> Vec<Hit> {
     }
     for &(_, cat) in magic::cat_rows("menu    magselec") {
         if let Cat::Magic(ty, list) = cat {
-            for id in magic::magic_rows(w, ty, list, 0) {
+            for id in magic::shown(w, Kind::Magic, magic::magic_rows(w, ty, list, 0)) {
                 push(Kind::Magic, id, name(w, Kind::Magic, id), None, magic::type_label(ty).into(), None);
             }
         }
     }
     for &(_, cat) in magic::cat_rows("menu    abiselec") {
         if let Cat::Ability(ty) = cat {
-            for id in magic::ability_rows(w, ty) {
+            for id in magic::shown(w, Kind::Ability, magic::ability_rows(w, ty)) {
                 push(Kind::Ability, id, name(w, Kind::Ability, id), None, magic::ability_label(ty).into(), None);
             }
         }
@@ -654,11 +654,15 @@ fn matches(w: &World, query: &str) -> Vec<Hit> {
     } else if let Some(c) = w.cats {
         for (k, &(_, cat)) in magic::cat_rows(c.menu).iter().enumerate() {
             match cat {
-                Cat::Magic(ty, list) => {
-                    add(Kind::Magic, Some(k), magic::magic_rows(w, ty, list && !super::monstrosity::active(w), 0))
+                Cat::Magic(ty, list) => add(
+                    Kind::Magic,
+                    Some(k),
+                    magic::shown(w, Kind::Magic, magic::magic_rows(w, ty, list && !super::monstrosity::active(w), 0)),
+                ),
+                Cat::Ability(ty) => {
+                    add(Kind::Ability, Some(k), magic::shown(w, Kind::Ability, magic::ability_rows(w, ty)))
                 }
-                Cat::Ability(ty) => add(Kind::Ability, Some(k), magic::ability_rows(w, ty)),
-                Cat::Mount => add(Kind::Mount, Some(k), magic::mount_rows(w)),
+                Cat::Mount => add(Kind::Mount, Some(k), magic::shown(w, Kind::Mount, magic::mount_rows(w))),
                 _ => {}
             }
         }

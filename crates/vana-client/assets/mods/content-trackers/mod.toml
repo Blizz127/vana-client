@@ -1,0 +1,10 @@
+name = "Content Trackers"
+version = "1.1.0"
+description = "A window for the content you are in: Dynamis, Abyssea, Salvage, Nyzul Isle, Omen, Delve, Odyssey, Sortie or a reive, with the time left and what the content's messages tell; pop lists for the Empyrean and Zeni NMs (the content tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Content Trackers"
+help = "A window with the time left and the content's progress: Dynamis currency and granules, Abyssea lights and cruor, Salvage restrictions and cells, Nyzul Isle and Omen floors and objectives, Delve plasm, Odyssey segments, Sortie gallimaufry and coffers, reive bayld and momentum. //pops shows an NM's pops, //znm the Zeni NMs."

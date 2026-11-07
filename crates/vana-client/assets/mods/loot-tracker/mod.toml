@@ -1,0 +1,10 @@
+name = "Loot Tracker"
+version = "1.0.0"
+description = "Treasure Hunter on your target, what each kind of monster has dropped this session, and the treasure pool's time left (the loot tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Loot Tracker"
+help = "Shows, in a window on a screen edge, your target's Treasure Hunter level, the pool's items with their time left, and this session's kills and drops by monster. //lootlog reset starts over."

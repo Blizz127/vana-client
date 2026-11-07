@@ -31,6 +31,7 @@ commands.register("hello", function() ui.open("hello") end)
 | [`ui.show(id)`](#uishow) | Shows a window without giving it the keys. |
 | [`ui.close(id)`](#uiclose) | Hides a window. |
 | [`ui.is_open(id)`](#uiis_open) | Whether a window is showing. |
+| [`ui.opacity(id, opacity)`](#uiopacity) | Sets a window's opacity. |
 | [`ui.on(id, handler)`](#uion) | Sets the function that gets a window's events. |
 | [`ui.prompt(text, buttons?, handler)`](#uiprompt) | Asks the player a question with buttons (Yes / No by default). |
 | [`ui.menu(items, handler)`](#uimenu) | Opens a small pop-up list at the pointer, like a right-click menu. |
@@ -131,6 +132,21 @@ A bar filled from 0 to 1, with a label and a text. It is not a cursor stop.
 | `value` | `number` | `0` | How full it is, 0 to 1. |
 | `text` | `string` | `""` | A text shown with the bar, for example `"75%"`. |
 | `kind` | `string` | `"hp"` | The bar's colour: `"hp"`, `"mp"`, `"tp"`, `"cast"`, `"experience"` or `"recast"`. |
+| `style` | `string` | none | `"row"`: a list row, as the training regime window's: the label at the left, the text at the right, a thin bar under them (a `value` of 0 or less: no bar fill, the bar dim). |
+| `dim` | `boolean` | `false` | A `row` drawn dim, as a finished one is. |
+
+### timers
+
+A section of the client's timers, drawn as the Timers draw it: recasts as rows with their bars, effects as icon cells
+by who bears them. It shows in an edge window standing in for that section's panel (`panel = "timers_recasts"` and so
+on); in the classic UI the three panels make the one Timers window with three sections. It is not a cursor stop, and
+an edge window whose sections are empty is not drawn.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | `""` | Optional. |
+| `section` | `string` | `"recasts"` | `"recasts"`, `"buffs"` or `"debuffs"`. |
+| `builtin` | `boolean` | `true` | The client's own rows too (our recasts and effects, the effects we put on others); the mods' [`timers.add`](timers.md) rows show either way. |
 
 ### separator
 
@@ -225,6 +241,32 @@ fields, all numbers defaulting to `0` unless shown:
 | `"tri"` | `x1`, `y1`, `x2`, `y2`, `x3`, `y3` | A filled triangle. |
 | `"text"` | `x`, `y`, `text` (default `""`) | Text with its top left at (x, y), in the UI's text font. |
 | `"icon"` | `x`, `y`, `size` (default `16`), `kind`, `id` | A square icon with its top left at (x, y): `kind` is `"item"` (or none), `"status"`, `"spell"` or `"ability"`, as for [`hud.icon`](hud.md#hudicon). `id` is required. |
+
+### chip
+
+A status line drawn as the modern pending-action chip: a dot, the text, a note at the right and a detail line under
+it, in the tone's colour (`waiting`: the note muted and the dot in the focus colour; `refused`: red; `quiet`: muted).
+It is not a cursor stop, and the classic UI does not draw it. `ui.update` changes any field.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | `""` | The element's id, for `ui.update`. |
+| `text` | `string` | `""` | The line (`"Cure III → Raven"`). |
+| `note` | `string` | `""` | The note at the right (`"waiting..."`, `"refused"`). |
+| `tone` | `string` | `"waiting"` | `"waiting"`, `"refused"` or `"quiet"`. |
+| `detail` | `string` | `""` | A line under it; none when empty. |
+
+### targets
+
+Rows that each name an entity, drawn as the modern focus panel's rows were: a short label, the entity's name in its
+name colour, and its HP bar (a party member's HP, else the entity's when it shows an HP gauge); the row of our current
+target is lit. A click on a row targets that entity, as a click in the target list does. Rows whose entity is
+neither in sight nor in the party are left out. It is not a cursor stop, and the classic UI does not draw it.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | `""` | The element's id, for `ui.update`. |
+| `rows` | `table` | `{}` | The rows, each `{entity, label, tag}`: `entity` the server id (required), `label` the text before the name (`"Last"`), `tag` the text command tag that names it, for the tooltip (`"<lt>"`). |
 
 ### Pages (tabs)
 
@@ -370,6 +412,11 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `x`, `y` | `number` | none | The window's top left corner in the classic UI, in its own units. Give both, or neither. Without them, windows are placed one below and right of the other from the top left. The modern UI places its windows itself and does not use these. |
 | `modal` | `boolean` | `false` | While a modal window is open it keeps the keys and is the only mod window the pointer reaches; other mod windows cannot take the keys from it. It is centred on the screen (in the classic UI, at `x`, `y` when given). A click outside it does not close it. |
 | `popup` | `boolean` | `false` | A pop-up: a modal window placed with its top left at the pointer, which a click outside it closes (sending `close`). It opens where the pointer is when `ui.open` opens it. |
+| `opacity` | `number` | `1` | The whole window's opacity, 0 to 1: its frame and everything in it (per-window opacity). `ui.opacity` changes it later. A value the player sets for the window wins. |
+| `edge` | `boolean` | `false` | An edge window, drawn as the Timers and the training regime windows are: on a screen edge (in the modern UI the player drags it along the edges), folding to a tab that shows `title`, with `heading` as a line over the elements; a click on that line folds it. It is a HUD window: it never takes the keys. |
+| `heading` | `string` | the title | An edge window's line over its elements. |
+| `resize` | `boolean` | `false` | An edge window the player can make wider (modern UI). |
+| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"`, `"timers_debuffs"`, `"skillchains"` (the client's skillchain helper view, drawn whatever the window's elements are) or `"minimap"` (the client's minimap, with Wide Scan under it in the modern UI): the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows; in the modern UI one takes a place the first time it shows (the left edge under the edge windows there if it fits above the location panel, else the right edge under the minimap) and keeps it until the player moves it. An ordinary (not edge) window takes `"focus"` (the modern focus panel, on the target panel; not drawn while an event takes the target window down) or `"pending"` (the pending-action chip's panel, over the cast bar): it stands in for that panel, with its place, `ui.native.hide` and `/uimodes`; neither is drawn in the classic UI. |
 
 **Returns** nothing.
 
@@ -583,6 +630,34 @@ ui.on("fruit", function(win, e)
   if e.kind == "press" and e.id == "act" and e.index == 2 then
     ui.close(win)
   end
+end)
+```
+
+## `ui.opacity`
+
+```lua
+ui.opacity(id, opacity)
+```
+
+Sets the opacity of one of your windows, its frame and everything in it, as the client draws every window: each
+window, built in or a mod's, carries its own opacity. The player's own setting for the window, when there is one,
+wins over yours.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The window's id. |
+| `opacity` | `number` | no | 0 (unseen) to 1 (opaque); `nil` gives the window back its opacity (opaque). |
+
+**Returns** nothing.
+
+**Example**
+
+```lua
+-- Fade the window while engaged.
+events.on("status_change", function(status)
+  ui.opacity("tracker", status == 1 and 0.4 or nil)
 end)
 ```
 

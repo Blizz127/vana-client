@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 const THEME: &str = include_str!("../../../assets/modern/theme.json");
 const MANIFEST: &str = include_str!("../../../assets/modern/manifest.json");
-const ATLASES: [(&str, &[u8]); 9] = [
+const ATLASES: [(&str, &[u8]); 13] = [
     ("atlases/frames_0@2x.png", include_bytes!("../../../assets/modern/atlases/frames_0@2x.png")),
     ("atlases/controls_0@2x.png", include_bytes!("../../../assets/modern/atlases/controls_0@2x.png")),
     ("atlases/gauges_0@2x.png", include_bytes!("../../../assets/modern/atlases/gauges_0@2x.png")),
@@ -22,6 +22,10 @@ const ATLASES: [(&str, &[u8]); 9] = [
     ("atlases/status_0@2x.png", include_bytes!("../../../assets/modern/atlases/status_0@2x.png")),
     ("atlases/weather_0@2x.png", include_bytes!("../../../assets/modern/atlases/weather_0@2x.png")),
     ("atlases/markers_0@2x.png", include_bytes!("../../../assets/modern/atlases/markers_0@2x.png")),
+    ("atlases/actions_0@2x.png", include_bytes!("../../../assets/modern/atlases/actions_0@2x.png")),
+    ("atlases/actions_1@2x.png", include_bytes!("../../../assets/modern/atlases/actions_1@2x.png")),
+    ("atlases/actions_2@2x.png", include_bytes!("../../../assets/modern/atlases/actions_2@2x.png")),
+    ("atlases/actions_3@2x.png", include_bytes!("../../../assets/modern/atlases/actions_3@2x.png")),
 ];
 const FONTS: [(&str, &[u8]); 5] = [
     ("FiraSans-Regular", include_bytes!("../../../assets/fonts/FiraSans-Regular.ttf")),
@@ -213,6 +217,33 @@ pub fn frame_image(name: &str) -> Option<FrameImage> {
     }
     let corner_uv = it.nine_slice.map_or(24.0, |n| n[0]) / it.size[0];
     Some(FrameImage { size: [w, h], rgba, corner_uv, top: ct, bottom: cb, inset: top as f32 / w as f32 })
+}
+
+/// A sprite's pixels (its atlas cell, 2x) by manifest id, without egui: for the game UI's pass (mods' HUD icons).
+/// Each atlas is decoded once, on first use.
+pub fn sprite_pixels(id: &str) -> Option<(u32, u32, Vec<u8>)> {
+    type Decoded = std::sync::Mutex<HashMap<String, Arc<([usize; 2], Vec<u8>)>>>;
+    static MANIFEST_ITEMS: std::sync::OnceLock<HashMap<String, AtlasRef>> = std::sync::OnceLock::new();
+    static DECODED: std::sync::OnceLock<Decoded> = std::sync::OnceLock::new();
+    let items = MANIFEST_ITEMS.get_or_init(|| {
+        serde_json::from_str::<ManifestFile>(MANIFEST)
+            .map(|m| m.items.into_iter().map(|it| (it.id, it.atlas)).collect())
+            .unwrap_or_default()
+    });
+    let a = items.get(id)?;
+    let img = {
+        let mut decoded = DECODED.get_or_init(Default::default).lock().ok()?;
+        match decoded.get(&a.file) {
+            Some(img) => img.clone(),
+            None => {
+                let bytes = ATLASES.iter().find(|(n, _)| *n == a.file).map(|(_, b)| *b)?;
+                let img = Arc::new(decode(bytes)?);
+                decoded.insert(a.file.clone(), img.clone());
+                img
+            }
+        }
+    };
+    Some((a.rect[2], a.rect[3], crop(&img, a.rect)))
 }
 
 impl Art {
@@ -498,7 +529,7 @@ mod tests {
             assert_ne!(t.color(c), Color32::MAGENTA, "{c}");
         }
         let m: ManifestFile = serde_json::from_str(MANIFEST).unwrap();
-        assert_eq!(m.items.len(), 518);
+        assert_eq!(m.items.len(), 1217);
         assert!(m.items.iter().all(|it| ATLASES.iter().any(|(n, _)| *n == it.atlas.file)));
         for (_, bytes) in ATLASES {
             assert!(decode(bytes).is_some());
@@ -506,5 +537,14 @@ mod tests {
         for f in FRAMES.iter().map(|f| format!("frames/{f}")).chain([FRAME_MASK.to_string()]) {
             assert!(m.items.iter().any(|it| it.id == f && it.nine_slice == Some([24.0; 4])), "{f}");
         }
+    }
+
+    /// The game UI's copy of a sprite is its 2x atlas cell.
+    #[test]
+    fn sprite_pixels_cut_the_cell() {
+        let (w, h, rgba) = sprite_pixels("status/s2").unwrap();
+        assert_eq!((w, h, rgba.len()), (128, 128, 128 * 128 * 4));
+        assert!(rgba.chunks(4).any(|p| p[3] > 0));
+        assert!(sprite_pixels("status/none").is_none());
     }
 }

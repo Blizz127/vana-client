@@ -1,0 +1,23 @@
+name = "Warp Helper"
+version = "1.0.0"
+description = "Answers the Home Point, Survival Guide and Waypoint menus by name, and warps home with the Warp spell or a warp item (the warp add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Warp Helper"
+help = "Near a Home Point, Survival Guide or Waypoint: //warp <zone> [number or place]. //warp home casts Warp or uses a Warp Ring, Warp Cudgel or Instant Warp; //warp dim <holla | dem | mea> uses a Dimensional Ring."
+
+[settings.fare]
+type = "enum"
+default = "Gil"
+options = ["Gil", "Tabs"]
+label = "Survival Guide fare"
+help = "What a Survival Guide trip is paid with when the guide asks."
+
+[settings.gear_back]
+type = "bool"
+default = true
+label = "Wear the old gear again"
+help = "After a warp ring or cudgel takes you away, put back what that slot held."

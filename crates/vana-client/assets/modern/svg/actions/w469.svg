@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ebcf1"/>
+      <stop offset="0.45" stop-color="#4f86e6"/>
+      <stop offset="1" stop-color="#284373"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#284373"/>
+      <stop offset="1" stop-color="#284373"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="30.48" y1="20.36" x2="30.48" y2="47.64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ebcf1"/>
+      <stop offset="0.45" stop-color="#4f86e6"/>
+      <stop offset="1" stop-color="#284373"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="33.58" y1="28.352" x2="33.58" y2="30.968" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="26.14" y1="21.6" x2="26.14" y2="26.56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="47.527" y1="12.82" x2="47.527" y2="26.986" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+  </defs>
+  <title>w469</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="wyvern_1" d="M16.84 42.68 C16.84 35.24 20.56 29.04 26.76 26.56 L25.52 20.36 L30.48 25.32 C34.2 24.7 37.92 25.94 40.4 29.04 L44.12 30.9 L40.4 32.76 C39.16 34.62 36.68 35.86 33.58 36.48 L36.68 38.96 L31.72 38.96 C29.24 41.44 26.76 43.92 24.9 47.64 L18.08 47.64 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="wyvern_2" d="M35.137 29.243 C35.297 29.838 34.729 30.508 33.869 30.738 C33.009 30.968 32.183 30.672 32.023 30.077 C31.863 29.482 32.431 28.812 33.291 28.582 C34.151 28.352 34.977 28.648 35.137 29.243 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <polygon id="wyvern_3" points="26.76,26.56 23.04,21.6 29.24,24.7" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-linejoin="round"/>
+      <path id="gusts" d="M49.411 19.054 L40.65 19.054 C40.166 19.054 39.773 18.661 39.773 18.178 C39.773 17.694 40.166 17.302 40.65 17.302 L49.411 17.302 C51.139 17.302 52.231 16.322 51.49 15.013 C51.14 14.442 50.154 14.332 50.02 15.216 C49.947 15.695 49.501 16.024 49.022 15.952 C48.544 15.879 48.215 15.432 48.287 14.954 C48.668 12.442 51.802 12.126 52.997 14.119 C53.001 14.124 53.004 14.129 53.007 14.135 C54.348 16.483 52.728 19.054 49.411 19.054 Z M39.876 20.909 L52.504 20.909 C55.82 20.909 57 23.831 55.244 25.947 C53.694 27.874 50.597 26.992 50.597 24.363 C50.597 23.879 50.989 23.486 51.473 23.486 C51.957 23.486 52.349 23.879 52.349 24.363 C52.349 25.338 53.368 25.488 53.881 24.846 C53.885 24.841 53.889 24.837 53.892 24.832 C54.729 23.827 54.291 22.661 52.504 22.661 L39.876 22.661 C39.393 22.661 39 22.269 39 21.785 C39 21.301 39.393 20.909 39.876 20.909 Z M41.68 24.517 L47.092 24.517 C47.576 24.517 47.968 24.909 47.968 25.393 C47.968 25.877 47.576 26.269 47.092 26.269 L41.68 26.269 C41.196 26.269 40.804 25.877 40.804 25.393 C40.804 24.909 41.196 24.517 41.68 24.517 Z" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

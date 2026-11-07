@@ -311,6 +311,8 @@ pub struct GameUi {
     renderer: Option<UiRenderer>,
     /// The scene depth name plates are tested against this frame (taken by render).
     pub scene_depth: Option<wgpu::TextureView>,
+    /// Offscreen targets to show as images (client/portrait.rs), bound at the next render.
+    views: Vec<(String, wgpu::TextureView)>,
     /// What this frame draws, rebuilt by the UI code each frame.
     batch: UiBatch,
     /// The modern frame for the retail windows (made on first use; None inside when the pack has none).
@@ -449,6 +451,7 @@ impl GameUi {
             data,
             renderer: None,
             scene_depth: None,
+            views: Vec::new(),
             batch: UiBatch::default(),
             modern_frame: None,
             skin_on: false,
@@ -1798,6 +1801,11 @@ impl GameUi {
         }
     }
 
+    /// Shows an offscreen target's view as the image `name` from the next render on.
+    pub fn view(&mut self, name: &str, view: wgpu::TextureView) {
+        self.views.push((name.to_string(), view));
+    }
+
     pub fn has_image(&self, name: &str) -> bool {
         self.images.contains(name)
     }
@@ -1855,6 +1863,11 @@ impl GameUi {
     /// Clips what is pushed next to (x, y, w, h); None ends it.
     pub fn clip(&mut self, clip: Option<[f32; 4]>) {
         self.batch.set_clip(clip);
+    }
+
+    /// What is drawn from now on is drawn at this opacity (its window's: per-window opacity); None = as given.
+    pub fn opacity(&mut self, opacity: Option<f32>) {
+        self.batch.set_opacity(opacity);
     }
 
     /// Quads drawn from now on are depth-tested against the scene at NDC z `depth` (name plates); None = not.
@@ -2213,60 +2226,12 @@ impl GameUi {
         Some(name)
     }
 
-    /// A status icon's pixels (the modern layer's copy).
-    /// A menu sprite as straight RGBA over its cells' bounds (each cell's texture area stretched to its corners, its
-    /// first corner colour applied, 0x80 = 1.0), for the modern layer's textures.
+    /// A menu sprite as straight RGBA, for the modern layer's textures.
     pub fn sprite_rgba(&self, lib: &str, index: usize) -> Option<(u32, u32, Vec<u8>)> {
-        let ui = &self.data.lobby;
-        let s = ui.lib(lib)?.sprites.get(index)?;
-        let xs = s.cells.iter().flat_map(|c| c.corners.iter().map(|p| p[0] as i32));
-        let ys = s.cells.iter().flat_map(|c| c.corners.iter().map(|p| p[1] as i32));
-        let (x0, x1, y0, y1) = (xs.clone().min()?, xs.max()?, ys.clone().min()?, ys.max()?);
-        let (w, h) = ((x1 - x0).max(1) as usize, (y1 - y0).max(1) as usize);
-        let mut out = vec![0u8; w * h * 4];
-        for c in &s.cells {
-            let Some(img) = ui.images.get(&c.texture) else { continue };
-            let (l, t) = (c.corners[0][0] as i32 - x0, c.corners[0][1] as i32 - y0);
-            let (cw, ch) =
-                ((c.corners[3][0] - c.corners[0][0]).max(1) as i32, (c.corners[3][1] - c.corners[0][1]).max(1) as i32);
-            let k = c.colors[0].map(|v| v as f32 / 128.0);
-            for py in 0..ch {
-                for px in 0..cw {
-                    let (mut u, mut v) = (px * c.size[0] as i32 / cw, py * c.size[1] as i32 / ch);
-                    if c.flip & 1 != 0 {
-                        u = c.size[0] as i32 - 1 - u;
-                    }
-                    if c.flip & 2 != 0 {
-                        v = c.size[1] as i32 - 1 - v;
-                    }
-                    let (u, v) = (c.uv[0] as i32 + u, c.uv[1] as i32 + v);
-                    let (ox, oy) = (l + px, t + py);
-                    if u < 0
-                        || v < 0
-                        || u >= img.width as i32
-                        || v >= img.height as i32
-                        || ox < 0
-                        || oy < 0
-                        || ox >= w as i32
-                        || oy >= h as i32
-                    {
-                        continue;
-                    }
-                    let si = (v as usize * img.width as usize + u as usize) * 4;
-                    let src: [f32; 4] = std::array::from_fn(|i| (img.rgba[si + i] as f32 * k[i]).min(255.0));
-                    let di = (oy as usize * w + ox as usize) * 4;
-                    // Over what is there.
-                    let a = src[3] / 255.0;
-                    for i in 0..3 {
-                        out[di + i] = (src[i] * a + out[di + i] as f32 * (1.0 - a)) as u8;
-                    }
-                    out[di + 3] = (src[3] + out[di + 3] as f32 * (1.0 - a)).min(255.0) as u8;
-                }
-            }
-        }
-        Some((w as u32, h as u32, out))
+        self.data.lobby.sprite_rgba(lib, index)
     }
 
+    /// A status icon's pixels (the modern layer's copy).
     pub fn status_rgba(&self, small: bool, id: u16) -> Option<(u32, u32, Vec<u8>)> {
         crate::dat::statusinfo::icon(self.data.status[small as usize].as_deref()?, id)
     }
@@ -2539,6 +2504,9 @@ impl GameUi {
         }
         for (name, w, h, rgba) in self.replaced.drain(..) {
             r.replace_image(gpu, &name, w, h, &rgba);
+        }
+        for (name, view) in self.views.drain(..) {
+            r.insert_view(gpu, &name, &view);
         }
         // The modern text's glyph atlas when it grew, and the screen scale its next glyphs are made for.
         if let Some((side, rgba)) = mtext::take_dirty() {

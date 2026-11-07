@@ -1,0 +1,10 @@
+name = "Gearshift"
+version = "0.1.0"
+description = "Swaps gear around your actions from GearSwap job files and LuAshitacast and Ashitacast XML profiles, unchanged (the gear-swap add-ons)."
+permissions = ["packets.read", "packets.write", "automation"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Gear Swapping"
+help = "Runs your GearSwap job file, LuAshitacast profile or Ashitacast XML profile for the job you play (in this mod's data folder: gearswap/ or ashitacast/)."

@@ -81,6 +81,9 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             Ok(())
         })?,
     )?;
+    // The zone's music slots as the server set them: 1 day, 2 night, 3 solo battle, 4 party battle, 5 mount, 6 death,
+    // 7 and 8 from events (0 unset).
+    t.set("music_slots", lua.create_function(|lua, ()| Ok(super::api::world(lua)?.music.slots.to_vec()))?)?;
     g.set("audio", t)?;
     Ok(())
 }

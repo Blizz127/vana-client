@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfae63"/>
+      <stop offset="0.7" stop-color="#cfae63"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6e5427"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="30" y1="16" x2="30" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b6d1f7"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="27.273" y1="24.029" x2="27.273" y2="32.833" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8db6f2"/>
+      <stop offset="0.42" stop-color="#2f7be8"/>
+      <stop offset="1" stop-color="#183e74"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="34.34" y1="41.415" x2="36.812" y2="55.432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="43.187" y1="32.568" x2="45.659" y2="46.585" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w660</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#fff6dc" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="drop" d="M30 16 C33.117 21.455 38.182 25.741 38.182 31.586 C38.182 36.261 34.518 40 30 40 C25.482 40 21.818 36.261 21.818 31.586 C21.818 25.741 26.883 21.455 30 16 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.889" stroke-linejoin="round"/>
+      <path id="glint" d="M28.239 24.266 C28.582 23.939 29.124 23.952 29.451 24.294 C29.778 24.637 29.765 25.18 29.423 25.507 C27.801 27.054 26.571 29.092 26.571 31.975 C26.571 32.449 26.187 32.833 25.714 32.833 C25.24 32.833 24.857 32.449 24.857 31.975 C24.857 28.624 26.279 26.137 28.239 24.266 Z" fill="url(#linear-gradient-2)"/>
+      <path id="link_1" d="M34.172 43.577 C35.89 41.848 38.693 41.847 40.423 43.577 C42.153 45.307 42.152 48.11 40.42 49.831 L36.981 53.27 C35.263 54.999 32.459 55 30.73 53.27 C29 51.541 29.001 48.739 30.731 47.018 Z M35.735 45.141 L32.291 48.585 C31.428 49.443 31.429 50.842 32.293 51.706 C33.158 52.571 34.557 52.572 35.417 51.706 L38.862 48.262 C39.725 47.404 39.723 46.005 38.859 45.141 C37.995 44.276 36.595 44.275 35.735 45.141 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+      <path id="link_2" d="M43.019 34.73 C44.737 33.001 47.54 33 49.27 34.73 C51 36.46 50.999 39.263 49.267 40.984 L45.828 44.423 C44.11 46.152 41.306 46.153 39.577 44.423 C37.847 42.694 37.848 39.892 39.578 38.171 Z M44.582 36.294 L41.138 39.738 C40.275 40.596 40.276 41.995 41.14 42.859 C42.005 43.724 43.404 43.725 44.264 42.859 L47.709 39.415 C48.572 38.557 48.57 37.158 47.706 36.294 C46.842 35.429 45.442 35.428 44.582 36.294 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

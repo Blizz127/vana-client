@@ -5863,12 +5863,20 @@ Full spec: scratchpad iuse/SPEC.md of that session (sort windows, manual sort, t
   1 filled in so Enter goes on as before. Up / Down 1, Right 1, Left the most (complete sets of the crystal and every
   material at its count in unlocked stacks, 1..99), digits type the number, Backspace drops a digit, Escape back to
   tskill1. Bars: itemctrl's (0xd 0x3e, 0xe 0x10c).
-- The repeats (synth::repeat_frame): each next one goes when the last is over (its 0x06F in and the retail 2 s
+- The repeats (since 2026-11-06 the bundled Synthesis Amount mod: the count step is the client option
+  synth_amount, the count goes to the mods' synth_amount event, the mod sends the rest with actions.synth while
+  game.synth().busy is false): each next one goes when the last is over (its 0x06F in and the retail 2 s
   request lock gone, our animation done, out of status 0x2c, no synthesis window), from fresh stacks as /lastsynth
   finds them; LSB's own rule is 15 s from the last start (0x096_combine_ask.cpp), and a synthesis takes about 16 s.
   Failures go on; any other answer (interrupted, a cancel, wait longer), missing materials (group 9 0xe) or a zone
   change stop them. Sends actions by itself: the user asked for it as a standing feature (not an Extras toggle).
 - Live: History -> Synthesize -> 3 typed -> three in a row, about 5 s apart (two failures, one success).
+- LSB since its synthesis transactions (2026-10-19, items/transactions/synth.cpp): claimAndLock sends the crystal stack
+  with LockFlg 15, consumeCrystal takes one and releases the claim with no item packet, and unlockAll at the commit no
+  longer includes it, so the rest of the stack stays locked on the client until a zone change. Our find_units (as
+  retail's /lastsynth) skips locked stacks: a second synthesis from that stack is refused with group 9 0xe "Synthesis
+  canceled." Seen 2026-11-06 with the built-in repeats (master) and the mod's alike: one synthesis, then the refusal
+  2 s after its result. A server bug; the client keeps what the server sent.
 
 ## Effect element life: GPU and CPU in step (Bastok smoke flashes, 2026-10-23)
 
@@ -13640,6 +13648,14 @@ From the research notes:
 - Not retail: the user's Ashita "Timers" add-on built in (Extras rows Timers and Timers Position; /timers [in | out]).
   client/timers.rs (rows, the window, the drawer, the tracking), client/durations.rs (LSB's lengths), tables
   data/timers/*.tsv made from LSB's scripts and data (ids and numbers only).
+- Since 2026-11-06 the windows are the bundled Timers mod's (assets/mods/timers): three edge windows, panels
+  timers_recasts / timers_buffs / timers_debuffs, each with a `timers` element for its section (the user, 2026-11-06:
+  three windows so /uimodes shows and hides each). The tracking stays the client's (timers.rs, durations.rs); an
+  element's `builtin` (the mod's setting, config `timers` carried over) adds the client's own rows, the mods'
+  timers.add rows show either way. The modern UI draws one edge window per section (its heading with the count folds
+  it; the drawer in folds all three; config timers_out / timers_folded keep the folds), the recasts' window in the one
+  window's saved place, modes and pins that named "timers" naming the three; the classic UI keeps the one window with
+  three sections, drawn from the panels that are open.
 - Retail's charge abilities (/recast's "[%s] %s (%d)", now done too): FUN_10222c90 maps an ability (or the sub-list
   row opening it, record +0xe 9 / 0xf / 0x12, via FUN_10222c10) by its kind (+2): 9 Quick Draw (COR main or sub;
   2 charges from level 0x28; full 0x78 s), 0xf Stratagems (SCH main or sub; (level - 10) / 0x14 + 1; full 0xf0 s),
@@ -17692,8 +17708,16 @@ Supersedes "Not done: the idle variants +0x1a8 / +0x1ac" under "Motion name base
 
 ## Training regime window (an Extra, 2026-10-28)
 
-Not retail (retail has no tracker and no regime packet; the user's wish). client/regime.rs, Extras > Timers > Training
-Regime (config `regime`, its drawer `regime_out`). The state comes from packets alone; nothing is sent for it:
+Not retail (retail has no tracker and no regime packet; the user's wish). Since 2026-11-06 the bundled Training Regime
+mod (assets/mods/regime) tracks it and fills the edge window `panel = "regime"`; client/regime.rs keeps the panel
+(its drawer `regime_out`, slide, place in the Timers' dock, the classic drawing). The mod's setting carries over
+config `regime`; the client's kept state (regime/<server>/<name>.json) goes into its storage.character once. The
+packets: the event start (0x032..0x034) and the page answer (0x05C) through packets.on_in, our option (c2s 0x05B:
+option @8, mode @0xe, 1 an update) through packets.on_out, the confirmation through the zone_text event (the installed
+id after MsgShift), the battle messages through battle_message; the labels through res.zone_text / zone_text_find.
+Seen live 2026-11-06 (East Ronfaure's Field Manual, page 1 "6 members of the pugil family"): accepted, Review and
+cancel each logged by the mod, the window as master drew it in both UIs. The state comes from packets alone; nothing
+is sent for it:
 - the book's event (an NPC named "Field Manual" / "Grounds Tome"): the start's num[7] is the server's regime id
   (0 or a hunt's 147..559: none); our update option 2 | page << 4 gets s2c 0x05C num[0..3] needed, num[7] the id; our
   end with that option (bit 31 repeat) and then s2c 0x02A with MesNum bit 15 about us is the accept, its installed id
@@ -22807,6 +22831,12 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
 - The modern focus panel (hud.rs others_panel, place "focus" on the target panel): a row for the focus target
   (retail's /focustarget, a member of our six) and one for the last target, each with its HP; a click targets it.
   Hidden when neither is set.
+- 2026-11-07: the panel is the bundled mod Focus and Last Target (assets/mods/focus-target, the user: a mod, not a
+  built-in): a window with `panel = "focus"` (stands in for the panel: its place on the target panel, /uimodes,
+  hiding; skipped while an event takes the target window down, and in the classic UI) holding a `targets` element,
+  whose rows the client draws as others_panel drew them (hud.rs other_rows / other_views) and whose click is
+  target::pick. `<lt>` and `<ft>` stay the client's; `game.player()` has focus_target and last_target. Compared
+  with master live (Last: Aurelie): the same panel.
 
 ## netstat: the Help Desk reply mark (2026-11-02)
 
@@ -22872,6 +22902,12 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
   our id as actor before that and within 2 s of the ask is taken as the refusal (but experience, limit and capacity
   points, defeats: 6, 8, 105, 253, 371, 372, 718, 735). *inf:* the heuristic leans on LSB answering a refused action
   at once with a 0x029 and an accepted one with a 0x028 first.
+- 2026-11-07: the chip is the bundled mod Pending Actions (assets/mods/pending-actions; the user: a mod, not a
+  built-in): the asks from c2s 0x01A (categories 3 / 7 / 9) and 0x037 seen by packets.on_out, the confirmation by the
+  `action` event, the refusal by `battle_message` with its line from res.message (the game's own text whatever other
+  mods filter); a window with `panel = "pending"` holding a `chip` element the client draws as the chip was
+  (modern/pending.rs chip). pending.rs and World.asked are gone. Compared with master live (Provoke on Fulchia:
+  refused, "You cannot attack that target.", gone after 4 s): the same chip.
 
 ## itemctrl / moneyctr: the mouse (2026-11-02)
 
@@ -22980,3 +23016,90 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
   blocks and tables. Classic: the game's frame and title strip, the game font with in-line colours (bold `1e 01`,
   code `1e 02`), the list scroll bar, OK. Modern: the pack's frame, Fira Sans with the strong face and mono, a thin
   bar. Up / Down, Page Up / Page Down (Space), Home / End and the wheel scroll; Enter or Escape closes, as does OK.
+
+## Spell and ability list icons: the standard and HD sets (2026-11-07)
+
+From `action-icon-dump` (30261006_0; every named spell and ability record, its icons as "Magic list" above picks them):
+- The standard icon (spell +0x40, ability +3, "menu    magiconw") is school x 8 + element (fire, ice, wind, earth,
+  lightning, water, light, dark): 0..7 plain orbs (white magic, support, Geomancy), 8..15 orbs with an eye (black
+  magic), 16..23 crystal shards (summoning, Blood Pacts; light also every Trust), 24..31 scrolls (ninjutsu), 32..39
+  notes (songs), 40..47 "Abi" tiles (weapon skills, job abilities, pet commands, Monstrosity; light is most of them),
+  48..55 cards (Quick Draw), 56..63 monster faces (blue magic); 64 (physical blue magic, element 15) is an empty image,
+  65 the gold die (Phantom Roll). 30 and 31 hold the same picture. 65 distinct images in all.
+- The HD icon (+0x42 / +4, the default set) is a picture per spell or ability: 688 distinct for the 2383 named
+  records (the tier numeral and the area star are drawn into it, but some tiers share one: Curing Waltz I..V; weapon
+  skills by weapon and element, Trusts by weapon). 55 of them are standard images (songs, ninjutsu, blue magic,
+  Geomancy, the generic ability tiles: 1206 records).
+- Ours (modern UI): one icon per distinct picture, keyed by the record's HD value (+0x42 / +4; the standard icon when
+  0xffff): assets/modern/action_map.tsv, magiconw N as N, magico2w N as 1000 + N; the standard images keep one icon
+  per school and element. Drawn whichever set config 0x99 picks; the classic UI keeps the game's.
+
+## A changed look without the blink (2026-11-07)
+
+client/mod.rs (Actor::next). Ours, not retail, by the user's choice: retail rebuilds an actor whose look changes
+(FUN_10092900), and while it is rebuilt the character is not there: it blinks, and anyone targeting it loses the
+target, which ends a spell cast on it (the reason DressUp's blinking option and BlinkMeNot hold looks still). Ours blinked
+too: the new model's GPU copy goes up a part a frame under the copy budget (render `skinned_actor`), and the actor was
+not drawn, its name plate not shown and it was out of World::visible (target cycling, the sub-target cursor, the mouse)
+until it was up.
+- Now an actor already drawn keeps its old model (character and GPU copy) while the new one loads and goes up
+  (Actor::next); the swap is one frame. A newer look before that replaces the pending one.
+- Our main target never dropped for it anyway (held by server id; the drop rule, FUN_10152c70, reads the hidden bit,
+  status and distance). Live: Nine (the user) healed Lnxcsfix while she swapped her hat every 2 s; a swap 1.2 s into
+  the cast, the heal landed. Per-frame shots of two hat swaps: no frame without her (before: two).
+
+## HUD portraits and speech bubbles (2026-11-07)
+
+Ours, not retail (retail has neither). client/portrait.rs, render/portrait.rs, ZoneRenderer::render_portrait,
+lua/hud.rs (Kind::Portrait, Kind::Bubble, bubble_tris).
+- `hud.portrait`: an actor posed this frame drawn again, alone, after the scene pass: the skinned pipeline with separate
+  uniforms (frame_uniforms: this frame's lighting, fog and areas from the portrait camera) and globals bind group per
+  slot, into a target twice the shown size (steps of 16; bilinear down to the shown size smooths it), cleared to the
+  element's backing (premultiplied). Then render/portrait.rs cuts it to the inscribed oval (blend ZERO / SRCALPHA) and
+  draws the frame ring (premultiplied over, a first-order distance to the ellipse, lit from above). The target is the
+  scene's format (gamma-encoded), so the game UI binds it as an image (UiRenderer::insert_view) and egui as a native
+  texture without conversion. At most 4 slots; a slot keeps its actor while wanted; only actors drawn this frame
+  (drawn_map) are posed, so none is shown otherwise.
+- Its camera: level, from straight in front (Place.forward), centred between the model's top (pos.y + a.top) and
+  attach point 3. Point 3 (the point others look at, the head bone's) sits at about the neck, not the face: the span
+  top..point 3 is about the head and neck. Square: half height 0.66 span; oval 0.72 span, centre 0.55 span below the
+  top. Seen right on an Elvaan (Fulchia), and on a Mithra, Tarutaru and Galka (render.look race).
+- `hud.bubble`: one outline (rounded rect, corner arcs, the tail let into the side facing its point: base clamped clear
+  of the corners, tip at most tail_len out, leaning at most 60 degrees off the side's normal), filled by a fan from the
+  centre plus the tail triangle, a mitred outline strip centred on it and a pixel of feathering outside; the same
+  triangles go to the game UI (GameUi::quad) and to an egui mesh.
+- Entities in Lua have `height` (-a.top, the rest pose's top, scaled).
+
+## Content trackers: Omen, Delve, Odyssey, Sortie, reives, pop lists (2026-11-07)
+
+Ours (a bundled Lua mod, assets/mods/content-trackers). The lines are matched as printed (numbers filled, plurals and
+[a/b] picks made, colour codes stripped). LandSandBoat has no Omen, Delve, Odyssey or Sortie and sends no reive lines;
+those are tested with fed lines only. Facts from the zone dialogue DATs of our install:
+- Omen (zone 292): floor objectives 7339..7346 ("Vanquish ...", "Open N treasure portents."), 7343 the free floor, 7347
+  "A spectral light flares up." (cleared), 7348 "... N omens from your foes!", 7350 / 7351 "You have N seconds
+  remaining." (the bonus timer), 7333 "Your stay has been extended by N minutes." (a new floor), 7331 the KO countdown.
+  Bonus objectives 7354..7371 start "N: " (slot 1..10) and pick their verb by num3: new, "You have <done> ..." (progress
+  or done), "You have failed to ..."; the count is the first number, for 7371 (cures) the second; damage objectives
+  (7363..7370) have a threshold, and their "You have" form is the success (inferred).
+- Delve: "You receive N corpuscle[s] of mweya plasm." and "..., making for a total of M." (ids per zone: 261 8036, 262
+  7932, 263 8769, 264 / 271 7501, 265 7825, 266 8149, 267 8048, 274 7934, 276 7902); after them six "Your ears ..."
+  stages, "A dreadful energy emanates ..." / "The oppressive energy passes." (inferred: the fracture's progress and its
+  boss); the Delve I time lines 7332..7337 of 264 / 271. Kills are estimated as plasmon does (a gain that is a multiple
+  of 50 but not of 500, 750 or 10000 is gain / 50 kills, else one).
+- Odyssey and Sortie lines are not in their zones' dialogue files but in files numbered as zones 2019..2026 (Sheol
+  A, B, C, Gaol) and 2030..2032 (Sortie); 298 / 279 and 275 / 133 / 189 hold only the common block. Inferred, not
+  traced: our zone_text always loads the zone's file, so retail's ids there would print the wrong entries.
+  Sheol: 7239 izzat, 7248 Moogle Mastery, 7249 "You receive N moogle segments for a total of M.", 7252 translocators,
+  7230 extensions; Gaol 7253 RP. Rabao 12109 "Entering Sheol B: Difficult." names the area and difficulty; 298 / 279
+  also host Selbina's fights, so a run counts only from Rabao. The moglophone is key item 3212 (3234..3236 the II);
+  the 20 hours to another is the helpers' figure, not the game's.
+- Sortie (2030): 7238 "<player> received N gallimaufry for a total of M.", 7239..7242 / 7248..7251 "#A..#H treasure
+  coffer status report: n/m #?: n/m." (inferred: the sector's objective and a hidden one), 7236 / 7237 temporary items,
+  7244 the plate's seconds (key items 3300 / 3301), 7230 extensions (its "Sorite" typo is the file's).
+- Reives (the same ids in every reive zone, 7175..7219): joined, victorious, "<player> obtained N bayld!" ("You have
+  obtained N bayld!" 7012 is a quest's), momentum scores and bonuses, the lockout; the Reive Mark is status 511.
+- Base time limits of Omen, Sortie, Odyssey and Delve II are in no line: they come as the s2c 0x075 countdown
+  (inferred), now given to mods as game.countdown().
+- Pop lists: the Empyrean (and other) NMs' pop trees as EmpyPopTracker has them (28 NMs: ids, droppers, how they
+  appear); the ZNMs by path with pop items, the seals Sanraku takes, trophies and the seals they give, salts 1016..1018
+  and each ???'s place.

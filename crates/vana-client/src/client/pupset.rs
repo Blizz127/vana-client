@@ -262,6 +262,9 @@ pub(super) fn set_slot(w: &mut World, i: usize, item: u16) -> Result<(), &'stati
     } else {
         item.checked_sub(base).filter(|&x| x > 0 && x < 0x100).ok_or("not an item for that slot")? as u8
     };
+    if w.ext_job_sent.is_some_and(|t| t.elapsed() < super::bluset::THROTTLE) {
+        return Err("one change a second: wait and call again");
+    }
     send(w, side, i, v);
     Ok(())
 }

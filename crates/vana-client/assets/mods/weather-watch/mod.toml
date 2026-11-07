@@ -1,0 +1,22 @@
+name = "Weather Watch"
+version = "1.0.0"
+description = "Tells you when the weather you are waiting for starts or ends, and can tell your party (the weather add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Weather Watch"
+help = "Says when one of the weathers below starts or ends in your zone, with a call sound. //weather says the weather now."
+
+[settings.weathers]
+type = "string"
+default = "Rain, Squall, Snow, Blizzards, Wind, Gales, Sand Storm, Dust Storm, Thunder, Thunderstorms, Auroras, Stellar Glare, Gloom, Darkness"
+label = "Weathers"
+help = "The weathers to watch, separated by commas."
+
+[settings.party]
+type = "bool"
+default = false
+label = "Tell the Party"
+help = "Also says it in party chat."

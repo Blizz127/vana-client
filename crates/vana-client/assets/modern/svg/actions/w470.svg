@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ebcf1"/>
+      <stop offset="0.45" stop-color="#4f86e6"/>
+      <stop offset="1" stop-color="#284373"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#284373"/>
+      <stop offset="1" stop-color="#284373"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="24.7" y1="27.84" x2="24.7" y2="42.28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d9a874"/>
+      <stop offset="0.5" stop-color="#9a6a3c"/>
+      <stop offset="1" stop-color="#57381c"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="40.6" y1="21.53" x2="40.6" y2="30.616" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="34.377" y1="24.558" x2="34.377" y2="34.058" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="47" y1="39.5" x2="47" y2="54.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8a59c"/>
+      <stop offset="0.45" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </linearGradient>
+  </defs>
+  <title>w470</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="lance_1" d="M35.753 28.364 L36.025 28.836 C36.25 29.226 36.117 29.725 35.726 29.95 L14.762 42.054 C14.371 42.28 13.872 42.146 13.647 41.756 L13.375 41.284 C13.149 40.894 13.283 40.395 13.674 40.17 L34.638 28.066 C35.029 27.84 35.528 27.974 35.753 28.364 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="lance_2" d="M47.078 22.14 C45.075 26.83 41.881 29.459 37.838 30.616 L34.122 29.62 L35.118 25.904 C38.141 22.981 42.015 21.53 47.078 22.14 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <polygon id="lance_3" points="45.311,23.16 42.118,25.789 37.271,28.273 36.863,27.567 41.438,24.611" fill="#ffffff" opacity="0.5"/>
+      <path id="lance_4" d="M33.056 25.053 L37.544 32.827 C37.807 33.282 37.6 33.721 37.081 33.807 L36.094 33.972 C35.575 34.058 34.941 33.759 34.678 33.303 L31.21 27.297 C30.948 26.841 31.005 26.143 31.339 25.737 L31.975 24.964 C32.309 24.558 32.793 24.598 33.056 25.053 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="badge_down" cx="47" cy="47" r="7.5" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="badge_down_mark" d="M47.277 51.911 L51.323 47.689 C51.476 47.529 51.421 47.4 51.2 47.4 L49.2 47.4 C48.979 47.4 48.8 47.221 48.8 47 L48.8 42.8 C48.8 42.579 48.621 42.4 48.4 42.4 L45.6 42.4 C45.379 42.4 45.2 42.579 45.2 42.8 L45.2 47 C45.2 47.221 45.021 47.4 44.8 47.4 L42.8 47.4 C42.579 47.4 42.524 47.529 42.677 47.689 L46.723 51.911 C46.876 52.071 47.124 52.071 47.277 51.911 Z" fill="#ffffff" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

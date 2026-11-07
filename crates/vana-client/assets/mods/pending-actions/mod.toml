@@ -1,0 +1,10 @@
+name = "Pending Actions"
+version = "1.0.0"
+description = "The modern UI's chip over the cast bar: the spell, weapon skill, ability or item asked for while the server has not answered, its refusal in the server's words, or that no answer came."
+permissions = ["packets.read"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Pending Actions"
+help = "Over the cast bar (modern UI): what you asked for while the server has not answered, the server's refusal, or that no answer came."

@@ -5,7 +5,7 @@
 
 use super::super::World;
 use super::super::favs::{self, Fav};
-use super::super::magic::{self, Kind};
+use super::super::magic::Kind;
 use super::{Panels, Title, paint};
 use egui::{Align2, Color32, FontId, Rect, Sense, Ui, pos2, vec2};
 
@@ -40,16 +40,14 @@ pub fn star(ui: &Ui, m: &super::Modern, r: Rect, on: bool, row_hovered: bool) ->
 pub(super) struct Chip {
     pub fav: Fav,
     pub name: String,
-    pub icon: Option<egui::TextureId>,
+    pub icon: Option<(egui::TextureId, Rect)>,
     pub off: bool,
     pub count: Option<u32>,
 }
 
 fn chips(p: &Panels, w: &World) -> Vec<Chip> {
     let m = p.m;
-    let game_icon = |kind: Kind, id: u16| {
-        p.gu.and_then(|gu| magic::row_icon(w, kind, id).and_then(|(lib, k)| m.sprite_icon(p.ctx, gu, lib, k)))
-    };
+    let game_icon = |kind: Kind, id: u16| p.gu.and_then(|gu| m.row_icon(p.ctx, gu, w, kind, id));
     favs::all(w)
         .into_iter()
         .map(|fav| match fav {
@@ -69,7 +67,8 @@ fn chips(p: &Panels, w: &World) -> Vec<Chip> {
             },
             Fav::Item(id) => {
                 let (name, n) = favs::item(w, id);
-                let icon = w.item_info.as_ref().and_then(|info| m.item_icon(p.ctx, info, id));
+                let icon =
+                    w.item_info.as_ref().and_then(|info| m.item_icon(p.ctx, info, id)).map(|t| (t, super::FULL_UV));
                 Chip { fav, name, icon, off: n == 0, count: Some(n) }
             }
         })
@@ -117,8 +116,8 @@ pub(super) fn strip(p: &mut Panels, chips: &[Chip]) -> Option<Fav> {
                         let tint = if c.off { Color32::from_gray(100) } else { Color32::WHITE };
                         let icon = Rect::from_center_size(r.center(), vec2(28.0, 28.0));
                         match c.icon {
-                            Some(t) => {
-                                ui.painter().image(t, icon, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), tint);
+                            Some((t, uv)) => {
+                                ui.painter().image(t, icon, uv, tint);
                             }
                             // No art: the name's first letters.
                             None => {

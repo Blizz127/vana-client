@@ -2,3 +2,9 @@ name = "DPS"
 version = "1.0.0"
 authors = ["vana-client"]
 description = "/dps: the damage your party dealt since the first hit after a reset; /dps reset starts again."
+
+[settings.window]
+type = "bool"
+default = false
+label = "Damage Meter"
+help = "Shows the party's damage, each member's share and damage a second, in a window on a screen edge while you fight (the damage meter add-ons). /dps reset starts again."

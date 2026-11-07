@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ebcf1"/>
+      <stop offset="0.45" stop-color="#4f86e6"/>
+      <stop offset="1" stop-color="#284373"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#284373"/>
+      <stop offset="1" stop-color="#284373"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="35.28" y1="13.96" x2="35.28" y2="50.04" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ebcf1"/>
+      <stop offset="0.45" stop-color="#4f86e6"/>
+      <stop offset="1" stop-color="#284373"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="39.38" y1="24.53" x2="39.38" y2="27.99" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="29.54" y1="15.6" x2="29.54" y2="22.16" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w464</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="wyvern_1" d="M17.24 43.48 C17.24 33.64 22.16 25.44 30.36 22.16 L28.72 13.96 L35.28 20.52 C40.2 19.7 45.12 21.34 48.4 25.44 L53.32 27.9 L48.4 30.36 C46.76 32.82 43.48 34.46 39.38 35.28 L43.48 38.56 L36.92 38.56 C33.64 41.84 30.36 45.12 27.9 50.04 L18.88 50.04 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="wyvern_2" d="M41.439 25.708 C41.651 26.495 40.899 27.381 39.762 27.686 C38.625 27.99 37.532 27.599 37.321 26.812 C37.109 26.025 37.861 25.139 38.998 24.834 C40.135 24.53 41.228 24.921 41.439 25.708 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <polygon id="wyvern_3" points="30.36,22.16 25.44,15.6 33.64,19.7" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

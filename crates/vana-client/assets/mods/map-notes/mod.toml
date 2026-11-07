@@ -1,0 +1,16 @@
+name = "Map Notes"
+version = "1.0.0"
+description = "Notes pinned to places on a zone's map, your party and the monsters you track, marked on the Map Overlay (the map marker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Map Notes"
+help = "On the Map Overlay (Ctrl or Alt + O): your notes (//mapnote add <text> where you stand; list, del <n>), party members, and what //mapnote track <name> follows."
+
+[settings.party]
+type = "bool"
+default = true
+label = "Party on the Map"
+help = "Party and alliance members in sight marked on the Map Overlay."

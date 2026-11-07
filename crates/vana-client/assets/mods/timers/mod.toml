@@ -1,0 +1,13 @@
+name = "Timers"
+version = "1.0.0"
+description = "Recasts, your effects and the ones you put on others and on monsters, in windows that slide in and out (the timers add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Timers"
+help = "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers)."
+tab = "Timers"
+place = 0
+from = "timers"

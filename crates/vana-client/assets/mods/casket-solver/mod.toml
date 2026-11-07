@@ -1,0 +1,10 @@
+name = "Casket Solver"
+version = "1.0.0"
+description = "Works out a treasure casket's two-digit combination from its hints and tells you what is left and what to try (the casket solver add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Casket Solver"
+help = "After each casket hint or wrong guess, says how many combinations are left, which (when few), and the best number to try next."

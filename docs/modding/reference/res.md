@@ -24,6 +24,8 @@ end)
 | [`res.ability(id)`](#resability) | A job ability, weapon skill or pet command's record. |
 | [`res.status(id)`](#resstatus) | A status effect's name. |
 | [`res.zone(id)`](#reszone) | A zone's name. |
+| [`res.zone_text(zone, id)`](#reszone_text) | A zone dialogue entry's bytes, as the game file holds them. |
+| [`res.zone_text_find(zone, prefix)`](#reszone_text_find) | The first zone dialogue entry starting with some bytes. |
 | [`res.title(id)`](#restitle) | A title's name. |
 | [`res.key_item(id)`](#reskey_item) | A key item's name and description. |
 | [`res.augments(item, extdata)`](#resaugments) | An item's augments, decoded from its extdata. |
@@ -66,6 +68,7 @@ loaded yet. A field the record's kind does not have is `0`.
 | --- | --- | --- |
 | `id` | `integer` | The item id. |
 | `name` | `string` | The item's name. |
+| `log_name` | `string` | The long name the chat log uses ("Hachiman Domaru +1" for "Hachi. Domaru +1"). |
 | `description` | `string` | Its description text (may be empty). |
 | `kind` | `string` | Which layout the record has, set by the id range: `"general"` (0x0000-0x0FFF, 0x2200-0x27FF, 0x7800-0x7BFF), `"usable"` (0x1000-0x1FFF), `"automaton"` (0x2000-0x21FF, automaton heads, frames and attachments), `"armor"` (0x2800-0x3FFF, 0x5A00-0x6FFF), `"weapon"` (0x4000-0x59FF), `"maze"` (0x7000-0x73FF, Maze Monger tabulae, vouchers and runes), `"instinct"` (0x7400-0x77FF, Monstrosity instincts), `"objective"` (0xE000-0xEFF7, Records of Eminence objectives), `"instinct_catalogue"` (0xEFF8-0xEFFF), `"monster"` (0xF000-0xF1FF, Monstrosity species), `"roe_category"` (0xF200-0xF5FF, Records of Eminence categories), `"teleport_point"` (0xF600-0xF613), `"primer_category"` (0xF620-0xF62F) and `"primer_topic"` (0xF630-0xF71F) for the Adventuring Primer, `"currency"` (0xFFFF, gil). |
 | `flags` | `integer` | Flag bits: 0x8000 Rare, 0x4000 Ex. |
@@ -252,6 +255,58 @@ events.on("zone_change", function(zone, previous)
 end)
 ```
 
+## `res.zone_text`
+
+```lua
+res.zone_text(zone, id) -> string?
+```
+
+A zone's dialogue entry (the lines NPCs and events print there), by its id in the installed game files, as the file
+holds it: Shift-JIS bytes with the game's codes in them (`0x07` a new line, `0x0a n` a value, `0x7f ...` the other
+codes). [`text.from_shift_jis`](text.md#textfrom_shift_jis) turns the plain parts into text.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `zone` | `integer` | yes | The zone id. |
+| `id` | `integer` | yes | The entry's id, as the [`zone_text`](events.md#zone_text) event gives it. |
+
+**Returns** `string`, or `nil` when the zone has no such entry.
+
+**Example**
+
+```lua
+events.on("zone_text", function(id)
+  local raw = res.zone_text(game.player().zone, id)
+  if raw then log.info(text.from_shift_jis((raw:gsub("[\0-\31\127]", "")))) end
+end)
+```
+
+## `res.zone_text_find`
+
+```lua
+res.zone_text_find(zone, prefix) -> integer?
+```
+
+The id of the first entry of a zone's dialogue that starts with `prefix` (compared as bytes).
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `zone` | `integer` | yes | The zone id. |
+| `prefix` | `string` | yes | The bytes the entry starts with (Shift-JIS; plain English text is the same bytes). |
+
+**Returns** `integer`, or `nil` when no entry starts with it.
+
+**Example**
+
+```lua
+-- The training regime block of this zone's dialogue.
+local r = res.zone_text_find(game.player().zone, "New training regime registered!")
+```
+
 ## `res.title`
 
 ```lua
@@ -379,7 +434,7 @@ log would print, with the names and numbers you pass filled in.
 | --- | --- | --- | --- |
 | `actor` | `integer` or `string` | none | Who acts: a server id (our own id gives our name; another id must be an entity the client knows, or no name is filled in), or a name, used as a player's name. |
 | `target` | `integer` or `string` | none | Who it is done to, as `actor`. |
-| `values` | `integer[]` | none | The numbers the message fills in, in order (at most 5 are used). |
+| `values` | `integer[]` | none | The numbers the message fills in, in order (at most 5 are used). For a `battle_message`, its `param1`, `param2`. For an action's result, as the game fills it: the action's `param`, the result's `value`, its `proc.value`, its `react.value`, its `bit` (a move's or spell's name comes from these). |
 
 **Returns** `table?`: `nil` when the id has no text or the battle text has not loaded yet.
 

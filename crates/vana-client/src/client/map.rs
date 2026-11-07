@@ -2470,9 +2470,20 @@ pub fn grid_text(w: &World, regions: &[Region]) -> String {
     }
 }
 
-/// The map shown for where we stand (one the client would show: a map it needs and we own), for Lua mods.
-pub(super) fn current(w: &World, regions: &[Region]) -> Option<Region> {
-    Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r))
+/// The map record for where we stand and how the map window shows it (FUN_101f8360); none where no map exists
+/// ("There is no map for this area.").
+pub(super) fn record(w: &World, regions: &[Region]) -> Option<(Region, Show)> {
+    let r = Region::here(regions, w)?;
+    Some((
+        r,
+        if r.need() == Need::Nothing {
+            Show::NoMapNeeded
+        } else if owned(w, &r) {
+            Show::Map
+        } else {
+            Show::NotOwned
+        },
+    ))
 }
 
 fn owned(w: &World, region: &Region) -> bool {
@@ -2488,55 +2499,79 @@ fn owned(w: &World, region: &Region) -> bool {
 pub struct Overlay {
     pub zone: u16,
     region: Option<Region>,
+    /// What it shows of the record (HUD maps; the minimap shows only an owned map): the map, retail's NO MAP image
+    /// over the map's place while we don't own it, or a record needing no map's image (no marker).
+    show: Show,
+    hud: bool,
     texture: Option<String>,
     shade: Option<Shade>,
     rx: Option<Receiver<ShadedLoaded>>,
-    /// Screen pixels per map pixel, and the map pixel at the box's top-left (None until the first draw).
-    zoom: f32,
-    view: Option<(f32, f32)>,
-    /// The box as last drawn (x, y, w, h).
-    pub rect: [f32; 4],
     /// The decoded image (size, pixels), kept for the modern layer's own texture.
     image: Option<([usize; 2], Arc<Vec<u8>>)>,
 }
 
-/// What the modern layer draws a map from: the image's name, size and pixels and the map's region.
+/// What the modern layer draws a map from: the image's name, size and pixels, the map's region, and whether our
+/// marker goes on it.
 pub struct MapImage {
     pub name: String,
     pub size: [usize; 2],
     pub rgba: Arc<Vec<u8>>,
     pub region: Region,
+    pub marker: bool,
 }
 
-/// The box's side as a share of the screen's shorter side, and the zoom range over fitting the whole map.
-const OVERLAY_SIZE: f32 = 0.7;
-const OVERLAY_ZOOM_MAX: f32 = 8.0;
+/// A record's showing, as the map window shows it (FUN_101f8360): the map; NO MAP while not owned, the markers where
+/// they would be on the map; or a record needing no map (0x180): its image, no marker.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Show {
+    Map,
+    NotOwned,
+    NoMapNeeded,
+}
 
 impl Overlay {
+    /// The minimap's: an owned map only.
     pub fn open(w: &World, regions: &[Region]) -> Self {
         let region = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
         Self::new(w.pos_zone, region, w.index.clone())
     }
 
-    pub fn new(zone: u16, region: Option<Region>, index: Option<Arc<DatIndex>>) -> Self {
-        let rx = region.zip(index).map(|(r, index)| load_shaded(index, r.file_id()));
-        Self { zone, region, texture: None, shade: None, rx, zoom: 1.0, view: None, rect: [0.0; 4], image: None }
+    /// A HUD map's: whatever the map window shows for where we stand (`record`).
+    pub fn open_hud(w: &World, regions: &[Region]) -> Self {
+        let rec = record(w, regions);
+        let file = rec.map(|(r, show)| if show == Show::NotOwned { NO_MAP } else { r.file_id() });
+        let rx = file.zip(w.index.clone()).map(|(f, index)| load_shaded(index, f));
+        Self {
+            zone: w.pos_zone,
+            region: rec.map(|r| r.0),
+            show: rec.map_or(Show::Map, |r| r.1),
+            hud: true,
+            texture: None,
+            shade: None,
+            rx,
+            image: None,
+        }
     }
 
-    /// The player crossed onto another page of the zone (Windurst Waters' north and south): that map, at the same
-    /// zoom, the player where they were in the box.
+    pub fn new(zone: u16, region: Option<Region>, index: Option<Arc<DatIndex>>) -> Self {
+        let rx = region.zip(index).map(|(r, index)| load_shaded(index, r.file_id()));
+        Self { zone, region, show: Show::Map, hud: false, texture: None, shade: None, rx, image: None }
+    }
+
+    /// The player crossed onto another page of the zone (Windurst Waters' north and south), or now owns the map (its
+    /// key item came in): that map.
     pub fn follow(&mut self, w: &World, regions: &[Region]) {
-        let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
-        if here == self.region {
+        if self.hud {
+            let rec = record(w, regions);
+            if rec.map(|r| r.0) != self.region || rec.map(|r| r.1) != Some(self.show).filter(|_| self.region.is_some())
+            {
+                *self = Self::open_hud(w, regions);
+            }
             return;
         }
-        let old = std::mem::replace(self, Self::new(w.pos_zone, here, w.index.clone()));
-        if let (Some(from), Some(v), Some(to)) = (old.region, old.view, here) {
-            let (ox, oy) = from.px(w.pos.x, w.pos.z);
-            let (nx, ny) = to.px(w.pos.x, w.pos.z);
-            (self.rect, self.zoom) = (old.rect, old.zoom);
-            self.view = Some((nx as f32 - (ox as f32 - v.0), ny as f32 - (oy as f32 - v.1)));
-            self.clamp();
+        let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
+        if here != self.region {
+            *self = Self::new(w.pos_zone, here, w.index.clone());
         }
     }
 
@@ -2578,51 +2613,13 @@ impl Overlay {
         let (Some(name), Some((size, rgba)), Some(region)) = (&self.texture, &self.image, self.region) else {
             return None;
         };
-        Some(MapImage { name: name.clone(), size: *size, rgba: rgba.clone(), region })
-    }
-
-    /// The overlay box for the modern layer: the box (layout pixels), the map pixel at its top-left, layout pixels per
-    /// map pixel. Opened or resized, the whole map (as `draw`).
-    pub fn modern_view(&mut self, sw: f32, sh: f32) -> Option<([f32; 4], (f32, f32), f32)> {
-        let region = self.region?;
-        let side = (sw.min(sh) * OVERLAY_SIZE).round();
-        let rect = [((sw - side) / 2.0).round(), ((sh - side) / 2.0).round(), side, side];
-        if rect != self.rect {
-            self.rect = rect;
-            self.zoom = self.fit();
-            self.view = Some((region.ox as f32, region.oy as f32));
-        }
-        Some((self.rect, self.view?, self.zoom))
-    }
-
-    fn fit(&self) -> f32 {
-        self.rect[2] / 512.0
-    }
-
-    /// Keeps the image over the whole box.
-    fn clamp(&mut self) {
-        let (Some(r), Some(v)) = (self.region, self.view.as_mut()) else { return };
-        let span = (512.0 - self.rect[2] / self.zoom).max(0.0);
-        v.0 = v.0.clamp(r.ox as f32, r.ox as f32 + span);
-        v.1 = v.1.clamp(r.oy as f32, r.oy as f32 + span);
-    }
-
-    /// Wheel notches (+ in) at screen point `p`: the map pixel under it stays put.
-    pub fn zoom_at(&mut self, p: (f32, f32), notches: f32) {
-        let Some(v) = self.view else { return };
-        let z = (self.zoom * 1.25f32.powf(notches)).clamp(self.fit(), self.fit() * OVERLAY_ZOOM_MAX);
-        let (dx, dy) = (p.0 - self.rect[0], p.1 - self.rect[1]);
-        self.view = Some((v.0 + dx / self.zoom - dx / z, v.1 + dy / self.zoom - dy / z));
-        self.zoom = z;
-        self.clamp();
-    }
-
-    /// A drag of (dx, dy) screen pixels.
-    pub fn pan(&mut self, dx: f32, dy: f32) {
-        if let Some(v) = self.view.as_mut() {
-            *v = (v.0 - dx / self.zoom, v.1 - dy / self.zoom);
-        }
-        self.clamp();
+        Some(MapImage {
+            name: name.clone(),
+            size: *size,
+            rgba: rgba.clone(),
+            region,
+            marker: self.show != Show::NoMapNeeded,
+        })
     }
 
     /// The image once it is decoded, in the game UI's textures.
@@ -2636,18 +2633,17 @@ impl Overlay {
         self.shade.as_ref().map_or(0.0, |s| s.at(px - region.ox as f32, py - region.oy as f32))
     }
 
-    /// Extra, the minimap (client/minimap.rs): the style frame at `rect`, inside it `span` map pixels across centred on
-    /// `pos`, the dots (world x, z, colour, the target drawn larger) and our marker, coloured as the overlay's at
-    /// opacity `mix` (user, 2026-10-25: the two markers alike).
-    #[allow(clippy::too_many_arguments)]
-    /// The map's region and its image's texture once loaded (a Lua mod's map).
-    pub fn region(&self) -> Option<Region> {
-        self.region
-    }
-
-    /// A window onto the image (a Lua HUD map): `rect`, centred on world (x, z), `span` map pixels across, at
-    /// `alpha`; clipped to the rect.
-    pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32) {
+    /// A window onto the image (a Lua HUD map in the classic UI): `rect`, centred on world (x, z), `span` map pixels
+    /// across, at `alpha`; clipped to the rect. `me`: our marker at world (x, z) facing, as the classic map draws it.
+    pub fn draw_window(
+        &mut self,
+        gu: &mut GameUi,
+        rect: [f32; 4],
+        centre: (f32, f32),
+        span: f32,
+        alpha: f32,
+        me: Option<((f32, f32), f32)>,
+    ) {
         self.poll(gu);
         let (Some(region), Some(t)) = (self.region, self.texture.clone()) else { return };
         let (z, s) = (rect[2] / span.max(1.0), super::minimap::px_per_unit(&region));
@@ -2662,9 +2658,17 @@ impl Overlay {
             512.0 * z,
             [1.0, 1.0, 1.0, alpha],
         );
+        if let Some(((x, wz), facing)) = me.filter(|_| self.show != Show::NoMapNeeded) {
+            let (mx, my) = (x * s, -wz * s);
+            marker(gu, cx + (mx - px) * z, cy + (my - py) * z, facing, self.shade_at(&region, mx, my) * alpha);
+        }
         gu.clip(None);
     }
 
+    /// Extra, the minimap (client/minimap.rs): the style frame at `rect`, inside it `span` map pixels across centred on
+    /// `pos`, the dots (world x, z, colour, the target drawn larger) and our marker, coloured as the overlay's at
+    /// opacity `mix` (user, 2026-10-25: the two markers alike).
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_mini(
         &mut self,
         gu: &mut GameUi,
@@ -2709,40 +2713,9 @@ impl Overlay {
         marker(gu, cx, cy, facing, shade);
         gu.clip(None);
     }
-
-    /// The box centred on the screen, the image clipped to it at `opacity`, and the player marker.
-    pub fn draw(&mut self, gu: &mut GameUi, pos: (f32, f32), facing: f32, sw: f32, sh: f32, opacity: f32) {
-        self.poll(gu);
-        let Some(region) = self.region else { return };
-        let side = (sw.min(sh) * OVERLAY_SIZE).round();
-        let rect = [((sw - side) / 2.0).round(), ((sh - side) / 2.0).round(), side, side];
-        if rect != self.rect {
-            // Opened or resized: the whole map.
-            self.rect = rect;
-            self.zoom = self.fit();
-            self.view = Some((region.ox as f32, region.oy as f32));
-        }
-        let (Some(t), Some(v)) = (&self.texture, self.view) else { return };
-        let z = self.zoom;
-        gu.clip(Some(rect));
-        gu.image_rect(
-            t,
-            rect[0] + (region.ox as f32 - v.0) * z,
-            rect[1] + (region.oy as f32 - v.1) * z,
-            512.0 * z,
-            512.0 * z,
-            [1.0, 1.0, 1.0, opacity],
-        );
-        let (px, py) = region.px(pos.0, pos.1);
-        let (sx, sy) = (rect[0] + (px as f32 - v.0) * z, rect[1] + (py as f32 - v.1) * z);
-        // At low opacity the scene shows through: the map counts for that much of what lies under the marker.
-        let shade = self.shade_at(&region, px as f32, py as f32) * opacity;
-        marker(gu, sx, sy, facing, shade);
-        gu.clip(None);
-    }
 }
 
-/// The overlay's and the minimap's marker: the map window's (keytops3 159) at its size. Its added orange glow fades
+/// The HUD map's and the minimap's marker: the map window's (keytops3 159) at its size. Its added orange glow fades
 /// out on light parchment, so over light ground (`shade`, the map's luminance under it) it turns into a solid dark
 /// red, alpha blended by the cells' alpha.
 fn marker(gu: &mut GameUi, x: f32, y: f32, facing: f32, shade: f32) {
@@ -2857,32 +2830,6 @@ mod tests {
         let lossy = through_dxt3(&img.rgba, img.width, img.height);
         assert_eq!(lossy.len(), img.rgba.len());
         assert!(lossy != img.rgba);
-    }
-
-    /// The overlay keeps the map pixel under the cursor while zooming, and the image over the whole box.
-    #[test]
-    fn overlay_zoom_and_pan() {
-        let region = Region { zone: 1, key: 0, num: 0, flags: 0, scale: 1, ki: -1, file: 0, ox: -256, oy: -256 };
-        let mut o = Overlay::new(1, Some(region), None);
-        o.rect = [100.0, 50.0, 512.0, 512.0];
-        o.zoom = 1.0;
-        o.view = Some((-256.0, -256.0));
-        let p = (356.0, 306.0);
-        let under = |o: &Overlay| {
-            (o.view.unwrap().0 + (p.0 - o.rect[0]) / o.zoom, o.view.unwrap().1 + (p.1 - o.rect[1]) / o.zoom)
-        };
-        let before = under(&o);
-        o.zoom_at(p, 2.0);
-        assert!((o.zoom - 1.5625).abs() < 1e-4);
-        let after = under(&o);
-        assert!((before.0 - after.0).abs() < 1e-3 && (before.1 - after.1).abs() < 1e-3);
-        // Zoomed out past fitting: back to the whole map; panning can't leave the image.
-        o.zoom_at(p, -10.0);
-        assert_eq!((o.zoom, o.view), (1.0, Some((-256.0, -256.0))));
-        o.zoom_at(p, 3.0);
-        o.pan(10_000.0, -10_000.0);
-        let span = 512.0 - 512.0 / o.zoom;
-        assert_eq!(o.view, Some((-256.0, -256.0 + span)));
     }
 
     /// Mode 6 on Southern San d'Oria: nothing before the masks; then its 7 points (4 Home Points, 3 Beginner) as

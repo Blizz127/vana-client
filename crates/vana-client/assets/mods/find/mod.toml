@@ -1,0 +1,3 @@
+name = "Find"
+version = "1.0.0"
+description = "/find <words>: the bags holding each item whose name has them, the account's other characters' too (the find-all add-ons)."

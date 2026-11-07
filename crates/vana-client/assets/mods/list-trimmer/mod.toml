@@ -1,0 +1,10 @@
+name = "List Trimmer"
+version = "1.0.0"
+description = "Spells, abilities and mounts you never use left out of the game's lists, kept per character (the list trimming add-ons)."
+permissions = ["ui.native"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "List Trimmer"
+help = "//trim <spell, ability or mount> leaves it out of its list (again: puts it back); //trim list, //trim clear. Commands and macros still use them."

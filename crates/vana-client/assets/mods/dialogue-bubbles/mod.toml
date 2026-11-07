@@ -1,0 +1,32 @@
+name = "Dialogue Bubbles"
+version = "1.0.0"
+description = "NPC talk in a speech bubble with the speaker's face and name, its tail pointing at them, over the speaker or at the bottom of the screen (the balloon add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Dialogue Bubbles"
+help = "Shows the page of NPC talk being read in a bubble with the speaker's name; the log keeps its copy."
+
+[settings.place]
+type = "enum"
+default = "Over the Speaker"
+options = ["Over the Speaker", "Bottom of the Screen"]
+label = "Bubble Place"
+help = "Over the head of the one you talk to (the bottom of the screen when they are out of sight), or always at the bottom."
+
+[settings.portrait]
+type = "bool"
+default = true
+label = "Speaker Portrait"
+help = "The speaker's face inside the bubble, drawn live from their model while they are in view."
+
+[settings.size]
+type = "number"
+default = 1.2
+min = 0.8
+max = 2.0
+step = 0.1
+label = "Text Size"
+help = "The bubble's text size, 1 being the interface's."

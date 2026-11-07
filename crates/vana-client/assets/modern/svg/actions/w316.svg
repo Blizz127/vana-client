@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b2d91"/>
+      <stop offset="0.7" stop-color="#5b2d91"/>
+      <stop offset="1" stop-color="#2e1648"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2e1648"/>
+      <stop offset="1" stop-color="#2e1648"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="27.184" y1="14.028" x2="32.816" y2="45.972" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="47" y1="39.5" x2="47" y2="54.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8a59c"/>
+      <stop offset="0.45" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </linearGradient>
+  </defs>
+  <title>w316</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M56.547 48.724 C55.833 52.701 52.701 55.833 48.724 56.547 C43.949 59.806 38.185 61.7 32 61.7 C15.597 61.7 2.3 48.403 2.3 32 C2.3 15.597 15.597 2.3 32 2.3 C48.403 2.3 61.7 15.597 61.7 32 C61.7 38.185 59.806 43.949 56.547 48.724 Z" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#c6b6d8" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <polygon id="sparkle" points="27.631,25.979 30,16 32.369,25.979 36.069,23.931 34.021,27.631 44,30 34.021,32.369 36.069,36.069 32.369,34.021 30,44 27.631,34.021 23.931,36.069 25.979,32.369 16,30 25.979,27.631 23.931,23.931" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.03" stroke-linejoin="round" opacity="0.9"/>
+      <circle id="badge_x" cx="47" cy="47" r="7.5" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="badge_x_mark" d="M49.758 42.687 L51.313 44.242 C51.47 44.398 51.47 44.652 51.313 44.808 L44.808 51.313 C44.652 51.47 44.398 51.47 44.242 51.313 L42.687 49.758 C42.53 49.602 42.53 49.348 42.687 49.192 L49.192 42.687 C49.348 42.53 49.602 42.53 49.758 42.687 Z M42.687 44.242 L44.242 42.687 C44.398 42.53 44.652 42.53 44.808 42.687 L51.313 49.192 C51.47 49.348 51.47 49.602 51.313 49.758 L49.758 51.313 C49.602 51.47 49.348 51.47 49.192 51.313 L42.687 44.808 C42.53 44.652 42.53 44.398 42.687 44.242 Z" fill="#ffffff" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="24" cy="21" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a58cc2"/>
+      <stop offset="0.5" stop-color="#5b2d91"/>
+      <stop offset="1" stop-color="#2e1648"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="24" y1="13" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c6b6d8"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="32.001" y1="18.5" x2="32.001" y2="47.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c6b6d8"/>
+    </linearGradient>
+  </defs>
+  <title>white_dark</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="27.7" fill="#0a1118"/>
+      <circle id="orb" cx="32" cy="32" r="25.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <path id="sheen" d="M34.253 13.406 C36.067 16.31 33.172 21.392 27.785 24.758 C22.399 28.124 16.562 28.498 14.747 25.594 C12.933 22.69 15.828 17.608 21.215 14.242 C26.601 10.876 32.438 10.502 34.253 13.406 Z" fill="url(#linear-gradient-1)" opacity="0.42"/>
+      <path id="crescent" d="M17.801 32.929 C17.801 25.573 23.252 19.49 30.335 18.5 C27.934 20.763 26.435 23.973 26.435 27.532 C26.435 34.387 31.993 39.945 38.847 39.945 L38.847 39.945 C41.599 39.945 44.142 39.049 46.199 37.533 C44.272 43.325 38.81 47.5 32.372 47.5 C24.325 47.5 17.801 40.976 17.801 32.929 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

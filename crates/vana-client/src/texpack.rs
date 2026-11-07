@@ -103,6 +103,57 @@ pub fn status_dump(out: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `action-icon-dump`: every spell and ability list icon used (magiconw / magico2w) as `<lib>_<index>.png`, and
+/// actions.tsv (spell or ability, id, name, type, element, skill, standard and HD icon), the material for redrawing them.
+pub fn action_icon_dump(out: &Path) -> Result<()> {
+    use crate::dat::names::NameSource;
+    let cfg = crate::config::Config::load();
+    let index = dat::DatIndex::open_stock(&cfg.ffxi_dir())?;
+    let acts = dat::actions::Actions::load(&index)?;
+    let names = dat::names::Names::load(&index, dat::items::Lang::En)?;
+    let mut ui = dat::ui::UiFile::parse(&index.read(dat::ui::ICONS)?)?;
+    ui.absorb(dat::ui::UiFile::parse(&index.read(dat::ui::ICONS2)?)?, true);
+    // magic.rs list_icon: HD from 1000 in magico2w, 0xffff none.
+    let hd = |icon: u16, hd: u16| match hd {
+        0xffff => format!("magiconw_{icon}"),
+        1000.. => format!("magico2w_{}", hd - 1000),
+        _ => format!("magiconw_{hd}"),
+    };
+    std::fs::create_dir_all(out)?;
+    let mut tsv = std::fs::File::create(out.join("actions.tsv"))?;
+    writeln!(tsv, "what\tid\tname\ttype\telement\tskill\tstandard\thd")?;
+    let mut used = std::collections::BTreeSet::new();
+    for s in acts.spells.iter().filter(|s| s.id != 0) {
+        let name = names.spell(s.id as u32).unwrap_or_default();
+        let (std_key, hd_key) = (format!("magiconw_{}", s.icon), hd(s.icon, s.icon_hd));
+        writeln!(tsv, "spell\t{}\t{name}\t{}\t{}\t{}\t{std_key}\t{hd_key}", s.id, s.kind, s.element, s.skill)?;
+        used.extend([std_key, hd_key]);
+    }
+    for (i, a) in acts.abilities.iter().enumerate() {
+        let name = names.ability(i as u32).unwrap_or_default();
+        let (std_key, hd_key) = (format!("magiconw_{}", a.icon), hd(a.icon as u16, a.icon_hd));
+        writeln!(tsv, "ability\t{i}\t{name}\t{}\t\t\t{std_key}\t{hd_key}", a.kind)?;
+        used.extend([std_key, hd_key]);
+    }
+    let mut keys = std::fs::File::create(out.join("images.tsv"))?;
+    writeln!(keys, "image\twidth\theight\tcontent")?;
+    for k in &used {
+        let (lib, i) = k.split_once('_').context("key")?;
+        let Some((w, h, rgba)) = ui.sprite_rgba(&format!("menu    {lib}"), i.parse()?) else { continue };
+        let t = Texture { name: String::new(), format: 0, width: w, height: h, rgba, dxt: None };
+        save_png(&out.join(format!("{k}.png")), w, h, &t.rgba)?;
+        writeln!(keys, "{k}\t{w}\t{h}\t{}", key(&t))?;
+    }
+    println!(
+        "{} images for {} spells and {} abilities in {}",
+        used.len(),
+        acts.spells.iter().filter(|s| s.id != 0).count(),
+        acts.abilities.len(),
+        out.display()
+    );
+    Ok(())
+}
+
 /// `tex-export`: every stock file's images (files with a skipped prefix left out) once each as `<key>.png` in `out`,
 /// and `manifest.tsv` (file id, chunk index, key, name).
 pub fn export(out: &Path) -> Result<()> {
@@ -168,6 +219,7 @@ pub fn export(out: &Path) -> Result<()> {
 
 /// An IMG chunk's payload at the upscaled size: the stock header (name, flags) with the new width and height, DXT1
 /// for a DXT1 original (its 1-bit alpha), else DXT3 with the PS2-style alpha (0x80 opaque) the client doubles.
+#[cfg(test)]
 fn image_chunk(stock: &[u8], w: u32, h: u32, rgba: &[u8]) -> Vec<u8> {
     image_chunk_from(stock, w, h, &encode(is_dxt1(stock), w, h, rgba, None))
 }

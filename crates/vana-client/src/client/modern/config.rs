@@ -6,6 +6,7 @@ use super::super::World;
 use super::super::configui::{self, Act, ConfigUi, Ctl};
 use super::super::configui2;
 use super::super::game_ui::GameUi;
+use super::super::modsui::Pick as Picked;
 use super::super::settings::{self, SettingsUi};
 use super::kit::{self, At, Btn, Stop};
 use super::{Panels, Title};
@@ -21,9 +22,12 @@ enum Entry {
     List(&'static str, Option<&'static str>),
     /// Font Colors: the categories (conftxtc's rows) of colours.
     Colors,
-    /// Ours: the Mods page (Settings), and the Lua mods' own pages (Extras after its three).
+    /// Ours: System's DATs and Mods pages (Settings' DAT Packs and Mods tabs), a mod's settings page (Extras), and the
+    /// standard mods offered from GitHub.
+    Dats,
     Mods,
     ModPages,
+    Standard,
 }
 
 /// The pages opened from a topic page's button: (name, page, help).
@@ -35,14 +39,22 @@ const SUBS: [(&str, Entry, &str); 5] = [
         "Choose whose visual effects you see: yours, your party's and other players'.",
     ),
     ("Font Colors", Entry::Colors, "Choose the colour of each kind of chat and battle message."),
-    ("Mods", Entry::Mods, "Turn mod packs on or off, change their order, and install or remove them."),
-    ("Mod Settings", Entry::ModPages, "Settings for your Lua mods, one page per mod."),
+    ("Mod Settings", Entry::ModPages, "This mod's settings, and the permissions it asks for."),
+    (
+        "Standard Mods",
+        Entry::Standard,
+        "Our standard mods, kept on GitHub. Install downloads one into the mods folder; it then shows with your other installed mods, on.",
+    ),
 ];
 const SUB_CHAT: usize = 0;
 const SUB_EFFECTS: usize = 1;
 const SUB_COLOURS: usize = 2;
-const SUB_MODS: usize = 3;
-const SUB_MOD_PAGES: usize = 4;
+const SUB_MOD_PAGES: usize = 3;
+const SUB_STANDARD: usize = 4;
+
+/// What System's DATs and Mods pages are for (the details column).
+const DATS_HELP: &str = "DAT packs: textures and other game files laid over the game's. Installed: turn each on or off, order them (the higher wins), uninstall. Available: the packs found in the Downloads folder and in the catalogue.";
+const MODS_HELP: &str = "Lua mods: turn each on or off, open its settings, uninstall. Install from File takes an archive or a mod's folder; Download Standard Mods lists our mods on GitHub.";
 
 /// A topic page's line: a small heading, retail's setting (its Config page and first control), ours (its row's
 /// label in client/settings.rs), or a button opening a page of SUBS.
@@ -57,7 +69,7 @@ use Item::{Head, Open, Ours, Retail};
 
 /// The topic pages: (group, name, lines). Every retail setting of the old list and every row of ours has one place
 /// (the test `every_setting_has_a_page`).
-const PAGES: [(&str, &str, &[Item]); 14] = [
+const PAGES: [(&str, &str, &[Item]); 15] = [
     (
         "Game",
         "Gameplay",
@@ -70,10 +82,6 @@ const PAGES: [(&str, &str, &[Item]); 14] = [
             Retail("conf2win", 8),
             Retail("conf2win", 10),
             Retail("conf12wi", 3),
-            Ours("Synthesis Amount"),
-            Head("Events & Trusts"),
-            Ours("Text Auto-Advance"),
-            Ours("Trust Speech"),
         ],
     ),
     (
@@ -90,11 +98,8 @@ const PAGES: [(&str, &str, &[Item]); 14] = [
             Ours("Party TP"),
             Retail("conf12wi", 9),
             Retail("conf12wi", 11),
-            Ours("Target Distance"),
-            Ours("Target HP %"),
             Head("Other"),
             Retail("conf3win", 3),
-            Ours("Clock"),
             Retail("conf6win", 12),
             Retail("conf6win", 14),
         ],
@@ -110,11 +115,6 @@ const PAGES: [(&str, &str, &[Item]); 14] = [
             Retail("conf3win", 1),
             Head("Colours"),
             Open(SUB_COLOURS),
-            Ours("Battle Names"),
-            Head("Lines"),
-            Ours("Battle Text"),
-            Ours("Ready Lines"),
-            Ours("Timestamps on All Lines"),
         ],
     ),
     (
@@ -122,16 +122,11 @@ const PAGES: [(&str, &str, &[Item]); 14] = [
         "Maps & Timers",
         &[
             Head("Maps"),
-            Ours("Map Overlay"),
             Ours("Map Overlay Opacity"),
-            Ours("Minimap"),
             Ours("Minimap Position"),
             Ours("Minimap Size"),
-            Head("Timers & Helpers"),
-            Ours("Timers"),
+            Head("Timers"),
             Ours("Timers Position"),
-            Ours("Training Regime"),
-            Ours("Skillchain Helper"),
         ],
     ),
     (
@@ -269,12 +264,20 @@ const PAGES: [(&str, &str, &[Item]); 14] = [
             Ours("Send Rate"),
         ],
     ),
-    ("System", "Mods", &[Head("Mods"), Open(SUB_MODS), Open(SUB_MOD_PAGES)]),
+    ("System", "DATs", &[]),
+    ("System", "Mods", &[]),
 ];
 
-/// The page shown: a page opened from a topic page while one is, else the topic page chosen.
+/// The page shown: a page opened from another while one is, else the page chosen in the list.
 fn current(c: &ConfigUi) -> Entry {
-    c.m_sub.and_then(|k| SUBS.get(k)).map_or(Entry::Topic, |s| s.1)
+    if let Some(s) = c.m_sub.and_then(|k| SUBS.get(k)) {
+        return s.1;
+    }
+    match PAGES.get(c.m_entry).map(|p| p.1) {
+        Some("DATs") => Entry::Dats,
+        Some("Mods") => Entry::Mods,
+        _ => Entry::Topic,
+    }
 }
 
 /// Retail's setting `child` of Config page `menu` (its first control).
@@ -318,7 +321,7 @@ fn lines_of(items: &[Item], s: Option<&SettingsUi>) -> Vec<Line> {
                 Some(o) => Line { item, shape: None, ours: Some(o), retail: s.is_some_and(|s| s.retail(label)) },
                 None => continue,
             },
-            _ => Line { item, shape: None, ours: None, retail: matches!(item, Open(sub) if sub < SUB_MODS) },
+            _ => Line { item, shape: None, ours: None, retail: matches!(item, Open(sub) if sub < SUB_MOD_PAGES) },
         };
         if matches!(item, Head(_)) && out.last().is_some_and(|l| matches!(l.item, Head(_))) {
             out.pop();
@@ -351,7 +354,7 @@ fn view_items(c: &ConfigUi) -> Vec<Item> {
         None => PAGES[c.m_entry.min(PAGES.len() - 1)].2.to_vec(),
     };
     if c.m_retail {
-        items.retain(|i| !matches!(i, Open(SUB_MODS | SUB_MOD_PAGES)));
+        items.retain(|i| !matches!(i, Open(SUB_MOD_PAGES | SUB_STANDARD)));
     }
     items
 }
@@ -546,22 +549,21 @@ fn open_sub(w: &mut World, sub: usize) {
     settings_follow(w);
 }
 
-/// Back from a page of SUBS to its topic page, the cursor on its button.
+/// Back from a page of SUBS to the page it opened from: a topic page's cursor on its button, the Mods page's where it
+/// was.
 fn close_sub(w: &mut World) {
     let Some(c) = w.config.as_mut() else { return };
     let Some(sub) = c.m_sub.take() else { return };
     let all = view(c, w.settings.as_ref());
     c.m_row = stop_lines(&all).iter().position(|l| l.item == Open(sub)).unwrap_or(0);
     w.sounds.push(Se::Cancel as u32);
-    if let Some(s) = w.settings.as_mut().filter(|s| s.on_mods_page()) {
-        s.goto(0, 0);
-    }
     settings_follow(w);
 }
 
-/// `/lua settings`: the Settings window opened on the Lua mods' pages (the app turns Extras to the mod's).
+/// `/lua settings` or a mod's Settings button: the Settings window on that mod's page, from the Mods page (the app turns
+/// Extras to the mod's).
 pub fn open_mod_settings(c: &mut ConfigUi) {
-    let page = PAGES.iter().position(|p| p.2.contains(&Open(SUB_MOD_PAGES))).unwrap_or(0);
+    let page = PAGES.iter().position(|p| p.1 == "Mods").unwrap_or(0);
     (c.m_entry, c.m_sub, c.m_open, c.m_row) = (page, Some(SUB_MOD_PAGES), true, 0);
 }
 
@@ -1090,32 +1092,65 @@ fn shown_tabs(v: &settings::View, skip: usize) -> (Vec<&str>, usize) {
     (v.tabs.iter().skip(skip).map(String::as_str).collect(), v.tab.saturating_sub(skip))
 }
 
-/// The Mods page's stops: the tabs, Install from File, each pack's toggle / up / down / uninstall, each archive's
-/// Install; the picker's list while it is open.
-fn mods_stops(s: &SettingsUi, skip: usize) -> Vec<Stop> {
+/// What a DATs / Mods page act leads to.
+#[derive(Clone, PartialEq, Debug)]
+enum ModOut {
+    Stay,
+    /// Escape: back to the page list.
+    Back,
+    /// A mod's Settings button: its page.
+    Settings(String),
+    /// Download Standard Mods.
+    Standard,
+}
+
+/// The DATs and Mods pages' first stop (Install from File; Download Standard Mods too on Mods), and where their rows
+/// start: DATs has its Installed / Available tabs between.
+fn first_row(lua: bool) -> usize {
+    if lua { 1 } else { 2 }
+}
+
+/// Whether the Mods page's installed mod `i` has a settings page.
+fn has_page(s: &SettingsUi, i: usize) -> bool {
+    s.mod_id(i).is_some_and(|id| s.mod_pages.iter().any(|p| p.id == id))
+}
+
+/// The DATs / Mods page's stops: Install from File (and Download Standard Mods); on DATs the Installed / Available tabs,
+/// then the installed packs (toggle, up / down, Uninstall) or the available ones (Install); on Mods each installed mod
+/// (toggle, Settings, Uninstall), then the archives found (Install). The picker's list while it is open.
+fn mods_stops(s: &SettingsUi) -> Vec<Stop> {
     if let Some(b) = s.mods_state().and_then(|m| m.browse.as_ref()) {
         return vec![Stop::List { n: b.entries.len(), page: 10 }];
     }
-    let (packs, archives) = s.mods_rows();
+    let (packs, offers) = s.mods_rows();
     let busy = s.mods_state().is_some_and(|m| m.installing().is_some());
+    let lua = s.lua_page();
     let n = packs.len();
-    let mut out = vec![
-        Stop::Tabs { n: s.view().tabs.len().saturating_sub(skip).max(1), at: s.view().tab.saturating_sub(skip) },
-        Stop::Buttons { n: 1, off: busy as u64, pair: None },
-    ];
-    out.extend((0..n).map(|i| Stop::Buttons {
-        n: 4,
-        off: ((i == 0) as u64) << 1 | ((i + 1 == n) as u64) << 2,
-        pair: Some(1),
-    }));
-    out.extend(archives.iter().map(|_| Stop::Buttons { n: 1, off: busy as u64, pair: None }));
+    let mut out =
+        vec![Stop::Buttons { n: if lua && s.in_game { 2 } else { 1 }, off: if busy { 0b11 } else { 0 }, pair: None }];
+    if lua {
+        out.extend((0..n).map(|i| Stop::Buttons { n: 3, off: (!has_page(s, i) as u64) << 1, pair: None }));
+        out.extend(offers.iter().map(|_| Stop::Buttons { n: 1, off: busy as u64, pair: None }));
+    } else {
+        out.push(Stop::Tabs { n: 2, at: s.m_dat_tab.min(1) });
+        if s.m_dat_tab == 0 {
+            out.extend((0..n).map(|i| Stop::Buttons {
+                n: 4,
+                off: ((i == 0) as u64) << 1 | ((i + 1 == n) as u64) << 2,
+                pair: Some(1),
+            }));
+        } else {
+            out.extend(offers.iter().map(|_| Stop::Buttons { n: 1, off: busy as u64, pair: None }));
+        }
+    }
     out
 }
 
-/// A Mods page act; true when the page is left (Escape).
-fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
+/// A DATs / Mods page act.
+fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At) -> ModOut {
     let (packs, _) = s.mods_rows();
     let n = packs.len();
+    let lua = s.lua_page();
     if let Some(m) = s.mods_mut()
         && let Some(b) = m.browse.as_mut()
     {
@@ -1127,7 +1162,7 @@ fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
                     m.browse = None;
                     if !m.install_file(path) {
                         s.sounds.push(Se::Error);
-                        return false;
+                        return ModOut::Stay;
                     }
                 }
                 s.sounds.push(Se::Select);
@@ -1138,24 +1173,31 @@ fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
             }
             _ => {}
         }
-        return false;
+        return ModOut::Stay;
     }
+    let first = first_row(lua);
     match act {
-        kit::Act::Back => return true,
-        kit::Act::Set(0, t) => {
-            s.m_tab(t + skip);
-            s.m_mods = (0, 0);
+        kit::Act::Back => return ModOut::Back,
+        kit::Act::Set(1, t) if !lua => {
+            s.m_dat_tab = t.min(1);
+            s.m_mods = (1, 0);
+            s.sounds.push(Se::Cursor);
         }
         kit::Act::Moved => s.m_mods = (at.stop, at.sub),
-        kit::Act::Press(1, _) => {
+        kit::Act::Press(0, 0) => {
             if let Some(m) = s.mods_mut() {
-                m.browse = Some(super::super::modsui::Browse::open());
+                m.browse = Some(super::super::modsui::Browse::open(lua));
                 m.error = None;
             }
             s.sounds.push(Se::Select);
         }
-        kit::Act::Press(st, b) if st >= 2 && st - 2 < n => {
-            let i = st - 2;
+        kit::Act::Press(0, 1) if lua && s.in_game => {
+            s.sounds.push(Se::Select);
+            return ModOut::Standard;
+        }
+        // DATs, Installed: a pack's toggle, up, down, Uninstall.
+        kit::Act::Press(st, b) if !lua && s.m_dat_tab == 0 && st >= first && st - first < n => {
+            let i = st - first;
             s.m_mods = (st, b);
             match b {
                 0 => s.mod_enable(i, !packs[i].1),
@@ -1168,13 +1210,35 @@ fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
                 _ => {}
             }
         }
-        kit::Act::Press(st, _) if st >= 2 => s.archive_install(st - 2 - n),
+        // DATs, Available: Install.
+        kit::Act::Press(st, _) if !lua && st >= first => s.archive_install(st - first),
+        // Mods: a mod's toggle, Settings, Uninstall; then the archives found.
+        kit::Act::Press(st, b) if lua && st >= first && st - first < n => {
+            let i = st - first;
+            s.m_mods = (st, b);
+            match b {
+                0 => s.mod_enable(i, !packs[i].1),
+                1 => {
+                    if let Some(id) = s.mod_id(i).filter(|_| has_page(s, i)) {
+                        s.sounds.push(Se::Select);
+                        return ModOut::Settings(id);
+                    }
+                    s.sounds.push(Se::Error);
+                }
+                2 => {
+                    s.m_remove = Some((i, false));
+                    s.sounds.push(Se::Select);
+                }
+                _ => {}
+            }
+        }
+        kit::Act::Press(st, _) if lua && st >= first => s.archive_install(st - first - n),
         a => s.sounds.extend(a.sound()),
     }
-    false
+    ModOut::Stay
 }
 
-/// The Mods page's removal prompt keys: Left / Right move, Enter answers, Escape is No.
+/// The removal prompt's keys: Left / Right move, Enter answers, Escape is No.
 fn remove_key(s: &mut SettingsUi, key: egui::Key) {
     let Some((i, yes)) = s.m_remove else { return };
     match key {
@@ -1191,20 +1255,72 @@ fn remove_answer(s: &mut SettingsUi, yes: bool) {
     let Some((i, _)) = s.m_remove.take() else { return };
     if yes {
         s.mod_remove(i);
+        let first = first_row(s.lua_page());
         let n = s.mods_rows().0.len();
-        if s.m_mods.0 >= 2 + n {
-            s.m_mods.0 = (1 + n).max(1);
+        if s.m_mods.0 >= first + n {
+            s.m_mods = (if n == 0 { 0 } else { first + n - 1 }, 0);
         }
     } else {
         s.sounds.push(Se::Cancel);
     }
 }
 
-/// Our page's act (Settings / Extras, not Mods); true when the page is left.
-fn ours_act(s: &mut SettingsUi, v: &settings::View, act: kit::Act, at: At, skip: usize) -> bool {
-    let first = (!v.tabs.is_empty()) as usize;
+/// The DATs / Mods page's keys.
+fn mods_key(s: &mut SettingsUi, key: egui::Key, shift: bool) -> ModOut {
+    s.sounds.clear();
+    if s.m_remove.is_some() {
+        remove_key(s, key);
+        return ModOut::Stay;
+    }
+    let stops = mods_stops(s);
+    let mut at = match s.mods_state().and_then(|m| m.browse.as_ref()) {
+        Some(b) => At::new(0, b.cursor),
+        None => At::new(s.m_mods.0, s.m_mods.1),
+    };
+    let act = kit::key(&stops, &mut at, key, shift);
+    mods_act(s, act, at)
+}
+
+/// The Standard Mods page's stops: Back, then each standard mod with Install, Update or Installed.
+fn standard_stops(s: &SettingsUi) -> Vec<Stop> {
+    let busy = s.mods_state().is_some_and(|m| m.installing().is_some());
+    let rows = s.mods_state().map_or(Vec::new(), |m| {
+        m.standard()
+            .iter()
+            .map(|(_, st)| Stop::Buttons { n: 1, off: (busy || st.is_none()) as u64, pair: None })
+            .collect()
+    });
+    std::iter::once(Stop::Buttons { n: 1, off: 0, pair: None }).chain(rows).collect()
+}
+
+/// Standard mod `k` installed or updated.
+fn standard_install(s: &mut SettingsUi, k: usize) {
+    let ok = s.mods_mut().is_some_and(|m| m.install_standard(k));
+    s.sounds.push(if ok { Se::Select } else { Se::Error });
+}
+
+/// The Standard Mods page's keys (`row` 0 is Back); true when it is left.
+fn standard_key(s: &mut SettingsUi, row: &mut usize, key: egui::Key, shift: bool) -> bool {
+    s.sounds.clear();
+    let stops = standard_stops(s);
+    let mut at = At::new((*row).min(stops.len() - 1), 0);
+    let act = kit::key(&stops, &mut at, key, shift);
+    *row = at.stop;
+    match act {
+        kit::Act::Back | kit::Act::Press(0, _) => return true,
+        kit::Act::Press(k, _) => standard_install(s, k - 1),
+        a => s.sounds.extend(a.sound()),
+    }
+    false
+}
+
+/// Our page's act (Settings / Extras, not Mods); true when the page is left. `first`: a stop (the tabs, or a mod's
+/// page's Back) stands where SettingsUi's row 0 is.
+fn ours_act(s: &mut SettingsUi, v: &settings::View, act: kit::Act, at: At, skip: usize, first: usize) -> bool {
     match act {
         kit::Act::Back => return true,
+        // A mod's page: its Back button.
+        kit::Act::Press(0, _) if v.tabs.is_empty() && first == 1 => return true,
         kit::Act::Moved => {
             s.m_point(at.stop + 1 - first, at.sub);
             s.sounds.push(Se::Cursor);
@@ -1223,32 +1339,24 @@ fn ours_act(s: &mut SettingsUi, v: &settings::View, act: kit::Act, at: At, skip:
     false
 }
 
-/// Our page's keys (Settings, Extras, Mods); true when the page is left. `skip`: the tabs left out (shown_tabs).
-fn ours_key(s: &mut SettingsUi, key: egui::Key, shift: bool, skip: usize) -> bool {
+/// Our page's keys (a mod's settings page: `tabs` false: its Back button, then its rows); true when the page is left.
+fn ours_key(s: &mut SettingsUi, key: egui::Key, shift: bool, skip: usize, tabs: bool) -> bool {
     s.sounds.clear();
-    if s.m_remove.is_some() {
-        remove_key(s, key);
-        return false;
-    }
-    if s.on_mods_page() {
-        let stops = mods_stops(s, skip);
-        let mut at = match s.mods_state().and_then(|m| m.browse.as_ref()) {
-            Some(b) => At::new(0, b.cursor),
-            None => At::new(s.m_mods.0, s.m_mods.1),
-        };
-        let act = kit::key(&stops, &mut at, key, shift);
-        return mods_act(s, act, at, skip);
-    }
-    let v = s.view();
-    let stops = ours_stops(&v, skip);
-    let first = (!v.tabs.is_empty()) as usize;
+    let mut v = s.view();
+    let stops = if tabs {
+        ours_stops(&v, skip)
+    } else {
+        v.tabs.clear();
+        std::iter::once(Stop::Buttons { n: 1, off: 0, pair: None }).chain(ours_stops(&v, 0)).collect()
+    };
+    let first = if tabs { (!v.tabs.is_empty()) as usize } else { 1 };
     let mut at = At::new((v.row + first).saturating_sub(1), v.col);
     // Row 0 is the page name (the tabs) in SettingsUi; the kit's stops start there too when there are tabs.
     if first == 1 {
         at.stop = v.row;
     }
     let act = kit::key(&stops, &mut at, key, shift);
-    ours_act(s, &v, act, at, skip)
+    ours_act(s, &v, act, at, skip, first)
 }
 
 /// The key assignment list's keys: the kit's list, Escape back to the page, an assignable key to the cursor's row.
@@ -1302,16 +1410,24 @@ fn reset_answer(c: &mut ConfigUi, v: &mut Values, yes: bool, out: &mut configui:
 /// Our state follows the page: Settings' (our rows on the topic pages, the Mods page) or Extras' for the Lua mods'
 /// pages, asked for while it is another (the app makes it); turned to the Mods page or the first mod's while one shows.
 fn settings_follow(w: &mut World) {
-    let Some(c) = w.config.as_ref() else { return };
+    let Some(c) = w.config.as_mut() else { return };
     let page = current(c);
     let kind = if matches!(page, Entry::ModPages) { settings::Kind::Extras } else { settings::Kind::Settings };
     match w.settings.as_mut() {
         Some(s) if s.kind == kind => match page {
-            Entry::Mods if !s.on_mods_page() => s.goto_mods(),
+            Entry::Dats if !s.on_mods_page() || s.lua_page() => s.goto_page(false),
+            Entry::Mods | Entry::Standard if !s.on_mods_page() || !s.lua_page() => s.goto_page(true),
             Entry::ModPages if !s.mod_pages.is_empty() && s.view().tab < s.mods_tab() => s.goto_mods(),
             _ => {}
         },
         _ => w.want_settings = Some(kind),
+    }
+    // Back on the Mods page from a mod's: the cursor where it was.
+    if matches!(page, Entry::Mods)
+        && let Some(s) = w.settings.as_mut().filter(|s| s.kind == settings::Kind::Settings && s.lua_page())
+        && let Some(at) = c.m_mods_back.take()
+    {
+        s.m_mods = at;
     }
 }
 
@@ -1621,6 +1737,8 @@ fn colour_rows(
 /// while `open` (the page has the keys). What the mouse did comes back.
 enum Do {
     Tab(usize),
+    /// A click on a row (not on its options): it takes the cursor.
+    Select(usize),
     Click(usize, usize),
     Slide(usize, usize),
 }
@@ -1644,28 +1762,38 @@ fn settings_page(
     for (k, r) in v.rows.iter().enumerate() {
         let row = k + 1;
         let focus = open && v.row == row;
-        match &r.ctl {
+        let rect = match &r.ctl {
             settings::VCtl::Buttons(bs) => {
                 kit::setting(ui, m, &r.label, focus, true, follow, |ui| {
                     let labels: Vec<String> = bs.iter().map(|b| b.0.clone()).collect();
                     if let Some(c) = kit::choice(ui, m, &labels, bs.iter().position(|b| b.1).unwrap_or(usize::MAX), 0) {
                         act.push(Do::Click(row, c));
                     }
-                });
+                })
+                .1
             }
             settings::VCtl::Slider { n, at, shown } => {
-                if let (Some(i), _) = kit::slider_setting(ui, m, &r.label, focus, follow, *n, *at, shown) {
+                let (i, rect) = kit::slider_setting(ui, m, &r.label, focus, follow, *n, *at, shown);
+                if let Some(i) = i {
                     act.push(Do::Slide(row, i));
                 }
+                rect
             }
+        };
+        if kit::row_clicked(ui, rect) {
+            act.push(Do::Select(row));
         }
     }
 }
 
 /// The mouse's actions on our page.
 fn settings_do(s: &mut SettingsUi, act: Vec<Do>) {
+    // A click on an option selects its row through the click.
+    let chose = act.iter().any(|a| !matches!(a, Do::Select(_)));
     for a in act {
         match a {
+            Do::Select(r) if !chose && s.m_point(r, 0) => s.sounds.push(Se::Cursor),
+            Do::Select(_) => {}
             Do::Tab(k) => s.m_tab(k),
             Do::Click(r, c) => s.m_click(r, c),
             Do::Slide(r, i) => s.m_slide(r, i),
@@ -1673,31 +1801,46 @@ fn settings_do(s: &mut SettingsUi, act: Vec<Do>) {
     }
 }
 
-/// What the mouse did on the Mods page.
+/// What the mouse did on the DATs / Mods page.
 enum ModDo {
-    Tab(usize),
     Press(usize, usize),
+    /// A click on a row (not on its buttons): it takes the cursor.
+    Select(usize),
+    DatTab(usize),
     Browse(usize),
     Remove(bool),
 }
 
-/// The Mods page: Install from File at the top (or the file picker), each pack with its toggle, chevrons and
-/// Uninstall, the archives found with Install; the removal prompt in place while asked.
+/// A gold heading over a group of the DATs / Mods page's rows.
+fn mods_heading(ui: &mut Ui, m: &super::Modern, text: &str) {
+    ui.add_space(8.0);
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
+    ui.add_space(4.0);
+}
+
+/// A line of muted text on the DATs / Mods page.
+fn mods_note(ui: &mut Ui, m: &super::Modern, text: &str, colour: &str) {
+    ui.label(egui::RichText::new(text).size(m.theme.small).color(m.theme.color(colour)));
+}
+
+/// The DATs / Mods page: Install from File (and Download Standard Mods) at the top, or the file picker. DATs: the
+/// Installed / Available tabs, each pack with its toggle, chevrons and Uninstall, or the archives found and the
+/// catalogue's packs with Install. Mods: every installed mod with its toggle, Settings (when it has any) and Uninstall,
+/// then the archives found. The removal prompt in place while asked.
 fn mods_page(
     ui: &mut Ui,
     m: &super::Modern,
     s: &SettingsUi,
     open: bool,
     follow: bool,
-    skip: usize,
     act: &mut Vec<ModDo>,
-) {
-    let v = s.view();
-    let at = if open { Some(s.m_mods) } else { None };
-    let (tabs, tab) = shown_tabs(&v, skip);
-    if let Some(k) = kit::tab_strip(ui, m, "settings tabs", &tabs, tab, at.is_some_and(|a| a.0 == 0)) {
-        act.push(ModDo::Tab(k + skip));
-    }
+) -> Option<usize> {
+    let mut hover = None;
     let state = s.mods_state();
     if let Some(b) = state.and_then(|m| m.browse.as_ref()) {
         ui.label(egui::RichText::new(b.dir.display().to_string()).size(m.theme.small).color(m.theme.color("gold")));
@@ -1715,18 +1858,22 @@ fn mods_page(
             tall,
             |_| false,
             |ui, row| {
-                let (name, dir) = &b.entries[row.index];
+                let (name, pick) = &b.entries[row.index];
+                let dir = *pick == Picked::Folder;
                 let p = ui.painter();
-                // A folder's tabbed outline, or an archive's box with its strap.
+                // A folder's tabbed outline, or an archive's box with its strap (gold for a Lua mod's folder).
                 let r = Rect::from_center_size(pos2(row.rect.min.x + 22.0, row.rect.center().y), vec2(16.0, 12.0));
-                let st = egui::Stroke::new(1.5, if *dir { m.theme.color("gold") } else { m.theme.color("muted") });
+                let st = egui::Stroke::new(
+                    1.5,
+                    if *pick == Picked::Archive { m.theme.color("muted") } else { m.theme.color("gold") },
+                );
                 p.rect_stroke(r, 2.0, st, egui::StrokeKind::Inside);
-                if *dir {
+                if dir {
                     p.line_segment([r.left_top() + vec2(1.0, -2.0), r.left_top() + vec2(7.0, -2.0)], st);
                 } else {
                     p.line_segment([pos2(r.center().x, r.min.y), pos2(r.center().x, r.max.y)], st);
                 }
-                let label = if *dir && name != ".." { format!("{name}/") } else { name.clone() };
+                let label = if dir && name != ".." { format!("{name}/") } else { name.clone() };
                 p.text(
                     pos2(row.rect.min.x + 40.0, row.rect.center().y),
                     Align2::LEFT_CENTER,
@@ -1739,7 +1886,7 @@ fn mods_page(
         if let Some(k) = out.clicked {
             act.push(ModDo::Browse(k));
         }
-        return;
+        return None;
     }
     if let Some((i, yes)) = s.m_remove {
         let name = s.mods_rows().0.get(i).map_or(String::new(), |p| p.0.clone());
@@ -1747,92 +1894,213 @@ fn mods_page(
         if let Some(a) = kit::yes_no(ui, m, &q, ["Yes", "No"], yes, m.theme.small) {
             act.push(ModDo::Remove(a));
         }
-        return;
+        return None;
     }
-    let busy = state.and_then(|m| m.installing());
+    let lua = s.lua_page();
+    let at = if open { Some(s.m_mods) } else { None };
     let on = |st: usize| at.filter(|a| a.0 == st).map(|a| a.1);
-    kit::setting(ui, m, "Install", on(1).is_some(), false, follow, |ui| {
-        if kit::buttons(ui, m, &["Install from File..."], on(1), 0, busy.is_some() as u64).is_some() {
-            act.push(ModDo::Press(1, 0));
-        }
-        if let Some((slug, pm)) = &busy {
-            ui.label(
-                egui::RichText::new(format!("Installing {slug}: {}%", pm / 10))
-                    .size(m.theme.small)
-                    .color(m.theme.color("gold")),
-            );
-        }
-        if let Some(e) = state.and_then(|m| m.error.as_ref()) {
-            ui.label(
-                egui::RichText::new(format!("The last install failed: {e}"))
-                    .size(m.theme.small)
-                    .color(m.theme.color("hp")),
-            );
-        }
-    });
-    let (packs, archives) = s.mods_rows();
+    let busy = state.and_then(|m| m.installing());
+    let top: &[&str] =
+        if lua && s.in_game { &["Install from File...", "Download Standard Mods"] } else { &["Install from File..."] };
+    if let Some(k) = kit::buttons(ui, m, top, on(0), 0, if busy.is_some() { 0b11 } else { 0 }) {
+        act.push(ModDo::Press(0, k));
+    }
+    if let Some((slug, pm)) = &busy {
+        mods_note(ui, m, &format!("Installing {slug}: {}%", pm / 10), "gold");
+    }
+    if let Some(e) = state.and_then(|m| m.error.as_ref()) {
+        mods_note(ui, m, &format!("The last install failed: {e}"), "hp");
+    }
+    ui.add_space(6.0);
+    let (packs, offers) = s.mods_rows();
     let n = packs.len();
-    for (i, (name, enabled)) in packs.iter().enumerate() {
-        let st = i + 2;
-        let cur = on(st);
-        kit::line(ui, m, &format!("{}. {name}", i + 1), cur.is_some(), follow, |ui| {
-            let un = Btn { cursor: cur == Some(3), ..Default::default() };
-            if kit::clicked(&kit::button(ui, m, "Uninstall", 0.0, un), un) {
-                act.push(ModDo::Press(st, 3));
+    let first = first_row(lua);
+    let toggle = |ui: &mut Ui, enabled: bool, cur: Option<usize>, act: &mut Vec<ModDo>, st: usize| {
+        let t = Btn { lit: enabled, cursor: cur == Some(0), off: false };
+        if kit::clicked(&kit::button(ui, m, if enabled { "ON" } else { "OFF" }, 64.0, t), t) {
+            act.push(ModDo::Press(st, 0));
+        }
+    };
+    let offer_rows = |ui: &mut Ui, act: &mut Vec<ModDo>, base: usize, hover: &mut Option<usize>| {
+        for (k, o) in offers.iter().enumerate() {
+            if k == 0 && !o.catalogue {
+                mods_heading(ui, m, "Found in the Downloads folder");
             }
-            let ch = match cur {
-                Some(1) => Some(true),
-                Some(2) => Some(false),
-                _ => None,
-            };
-            if let Some(up) = kit::chevrons(ui, m, ("mod move", i), ch, i == 0, i + 1 == n) {
-                act.push(ModDo::Press(st, if up { 1 } else { 2 }));
+            if o.catalogue && offers.get(k.wrapping_sub(1)).is_none_or(|p| !p.catalogue) {
+                mods_heading(ui, m, "From the catalogue");
             }
-            let t = Btn { lit: *enabled, cursor: cur == Some(0), off: false };
-            if kit::clicked(&kit::button(ui, m, if *enabled { "ON" } else { "OFF" }, 64.0, t), t) {
-                act.push(ModDo::Press(st, 0));
+            let st = base + k;
+            let (_, r) = kit::line_elided(ui, m, &o.label, on(st).is_some(), follow, |ui| {
+                let b = Btn { cursor: on(st).is_some(), off: busy.is_some(), ..Default::default() };
+                if kit::clicked(&kit::button(ui, m, o.button, 0.0, b), b) {
+                    act.push(ModDo::Press(st, 0));
+                }
+            });
+            if ui.rect_contains_pointer(r) {
+                *hover = Some(st);
             }
-        });
+            if kit::row_clicked(ui, r) {
+                act.push(ModDo::Select(st));
+            }
+        }
+    };
+    if lua {
+        if n == 0 {
+            mods_note(ui, m, "No mods installed yet: Download Standard Mods, or Install from File.", "muted");
+        }
+        for (i, (name, enabled)) in packs.iter().enumerate() {
+            let st = first + i;
+            let cur = on(st);
+            let (_, r) = kit::line_elided(ui, m, name, cur.is_some(), follow, |ui| {
+                let un = Btn { cursor: cur == Some(2), ..Default::default() };
+                if kit::clicked(&kit::button(ui, m, "Uninstall", 0.0, un), un) {
+                    act.push(ModDo::Press(st, 2));
+                }
+                let set = Btn { cursor: cur == Some(1), off: !has_page(s, i), ..Default::default() };
+                if kit::clicked(&kit::button(ui, m, "Settings", 0.0, set), set) {
+                    act.push(ModDo::Press(st, 1));
+                }
+                toggle(ui, *enabled, cur, act, st);
+            });
+            if ui.rect_contains_pointer(r) {
+                hover = Some(st);
+            }
+            if kit::row_clicked(ui, r) {
+                act.push(ModDo::Select(st));
+            }
+        }
+        offer_rows(ui, act, first + n, &mut hover);
+        return hover;
     }
-    if !archives.is_empty() {
-        ui.add_space(6.0);
-        ui.label(
-            egui::RichText::new("Found in the Downloads folder")
-                .size(m.theme.small)
-                .family(FontFamily::Name(super::STRONG.into()))
-                .color(m.theme.color("muted")),
-        );
-        ui.add_space(4.0);
+    let available = format!("Available ({})", offers.len());
+    if let Some(k) =
+        kit::tab_strip(ui, m, "dat tabs", &["Installed", &available], s.m_dat_tab.min(1), at.is_some_and(|a| a.0 == 1))
+    {
+        act.push(ModDo::DatTab(k));
     }
-    for (k, (name, pm)) in archives.iter().enumerate() {
-        let st = 2 + n + k;
-        let label = pm.map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
-        kit::line(ui, m, &label, on(st).is_some(), follow, |ui| {
-            let b = Btn { cursor: on(st).is_some(), off: busy.is_some(), ..Default::default() };
-            if kit::clicked(&kit::button(ui, m, "Install", 0.0, b), b) {
-                act.push(ModDo::Press(st, 0));
+    if s.m_dat_tab == 0 {
+        if n == 0 {
+            mods_note(ui, m, "No DAT packs installed.", "muted");
+        }
+        for (i, (name, enabled)) in packs.iter().enumerate() {
+            let st = first + i;
+            let cur = on(st);
+            let (_, r) = kit::line_elided(ui, m, &format!("{}. {name}", i + 1), cur.is_some(), follow, |ui| {
+                let un = Btn { cursor: cur == Some(3), ..Default::default() };
+                if kit::clicked(&kit::button(ui, m, "Uninstall", 0.0, un), un) {
+                    act.push(ModDo::Press(st, 3));
+                }
+                let ch = match cur {
+                    Some(1) => Some(true),
+                    Some(2) => Some(false),
+                    _ => None,
+                };
+                if let Some(up) = kit::chevrons(ui, m, ("mod move", i), ch, i == 0, i + 1 == n) {
+                    act.push(ModDo::Press(st, if up { 1 } else { 2 }));
+                }
+                toggle(ui, *enabled, cur, act, st);
+            });
+            if kit::row_clicked(ui, r) {
+                act.push(ModDo::Select(st));
             }
-        });
+        }
+        return None;
     }
+    if offers.is_empty() {
+        mods_note(ui, m, "Nothing found in the Downloads folder.", "muted");
+    }
+    offer_rows(ui, act, first, &mut hover);
+    if let Some(e) = state.and_then(|m| m.dat_error.as_ref()).filter(|_| !offers.iter().any(|o| o.catalogue)) {
+        mods_heading(ui, m, "From the catalogue");
+        mods_note(ui, m, &format!("The catalogue could not be read: {e}"), "muted");
+    }
+    hover
 }
 
-fn mods_do(s: &mut SettingsUi, act: Vec<ModDo>) {
+/// The mouse on the DATs / Mods page: what it leads to.
+fn mods_do(s: &mut SettingsUi, act: Vec<ModDo>) -> ModOut {
+    let mut out = ModOut::Stay;
+    // A click on a button selects its row through the press.
+    let pressed = act.iter().any(|a| matches!(a, ModDo::Press(..) | ModDo::Browse(_) | ModDo::Remove(_)));
     for a in act {
         match a {
-            ModDo::Tab(k) => {
-                s.m_tab(k);
-                s.m_mods = (0, 0);
+            ModDo::Select(st) if !pressed && s.m_mods.0 != st => {
+                s.m_mods = (st, 0);
+                s.sounds.push(Se::Cursor);
+            }
+            ModDo::Select(_) => {}
+            ModDo::DatTab(k) => {
+                s.m_dat_tab = k.min(1);
+                s.m_mods = (1, 0);
+                s.sounds.push(Se::Cursor);
             }
             ModDo::Press(st, b) => {
                 s.m_mods = (st, b);
-                mods_act(s, kit::Act::Press(st, b), At::new(st, b), 0);
+                out = mods_act(s, kit::Act::Press(st, b), At::new(st, b));
             }
             ModDo::Browse(k) => {
-                mods_act(s, kit::Act::Press(0, k), At::new(0, k), 0);
+                mods_act(s, kit::Act::Press(0, k), At::new(0, k));
             }
             ModDo::Remove(yes) => remove_answer(s, yes),
         }
     }
+    out
+}
+
+/// The Standard Mods page: each of our mods on GitHub with its version and Install, Update or Installed; the help
+/// of the row under the pointer or the cursor. A click's row comes back.
+fn standard_page(
+    ui: &mut Ui,
+    m: &super::Modern,
+    s: &SettingsUi,
+    row: Option<usize>,
+    follow: bool,
+    act: &mut Option<usize>,
+    select: &mut Option<usize>,
+) -> Option<usize> {
+    let state = s.mods_state()?;
+    let busy = state.installing();
+    if let Some((slug, pm)) = &busy {
+        mods_note(ui, m, &format!("Installing {slug}: {}%", pm / 10), "gold");
+    }
+    if let Some(e) = state.error.as_ref() {
+        mods_note(ui, m, &format!("The last install failed: {e}"), "hp");
+    }
+    let list = state.standard();
+    if list.is_empty() {
+        let text = match &state.list_error {
+            Some(e) => format!("The standard mods could not be read: {e}"),
+            None if state.loading() => "Reading the list from GitHub...".into(),
+            None => "No standard mods are listed.".into(),
+        };
+        mods_note(ui, m, &text, "muted");
+        return None;
+    }
+    let mut hover = None;
+    for (k, (e, st)) in list.iter().enumerate() {
+        let label = match state.progress(&e.id) {
+            Some(pm) => format!("{}%  {}", pm / 10, e.name),
+            None => e.name.clone(),
+        };
+        let (_, rect) = kit::line(ui, m, &label, row == Some(k), follow, |ui| {
+            let (text, off) = match st {
+                Some(true) => ("Update", busy.is_some()),
+                Some(false) => ("Install", busy.is_some()),
+                None => ("Installed", true),
+            };
+            let b = Btn { cursor: row == Some(k), off, ..Default::default() };
+            if kit::clicked(&kit::button(ui, m, text, 96.0, b), b) {
+                *act = Some(k);
+            }
+        });
+        if ui.rect_contains_pointer(rect) {
+            hover = Some(k);
+        }
+        if kit::row_clicked(ui, rect) {
+            *select = Some(k);
+        }
+    }
+    hover
 }
 
 /// The key assignment list: each function and its key; a key pressed assigns to the cursor's row.
@@ -1917,7 +2185,7 @@ pub fn lobby_settings(c: &ConfigUi) -> bool {
 
 /// The help for our page's cursor.
 fn ours_help(s: &SettingsUi) -> String {
-    if s.on_mods_page() { s.help() } else { s.view().help }
+    if s.on_mods_page() { mods_help(s) } else { s.view().help }
 }
 
 /// The title's Config (lobycwin) in the modern style: the list, then retail's page or our Settings (`s`). Its step
@@ -1964,8 +2232,17 @@ pub fn lobby(
                     .show(ui, |ui| {
                         ui.vertical(|ui| {
                             ui.set_width(PAGE_W);
+                            ui.add_space(6.0);
                             match ours {
-                                Some(s) if s.on_mods_page() => mods_page(ui, m, s, open, follow, 0, &mut mact),
+                                Some(s) if s.on_mods_page() => {
+                                    // The title's Settings keeps its page tabs over the DAT Packs and Mods pages (Tab turns them).
+                                    let v = s.view();
+                                    let tabs: Vec<&str> = v.tabs.iter().map(String::as_str).collect();
+                                    if let Some(k) = kit::tab_strip(ui, m, "settings tabs", &tabs, v.tab, false) {
+                                        sact.push(Do::Tab(k));
+                                    }
+                                    mods_page(ui, m, s, open, follow, &mut mact);
+                                }
                                 Some(s) => settings_page(ui, m, &s.view(), open, follow, 0, &mut sact),
                                 None if lobby_settings(c) => {}
                                 None => {
@@ -2071,7 +2348,22 @@ pub fn lobby_key(
     }
     if lobby_settings(c) {
         if let Some(s) = s {
-            if ours_key(s, key, shift, 0) {
+            let back = if s.on_mods_page()
+                && key == egui::Key::Tab
+                && s.m_remove.is_none()
+                && s.mods_state().is_none_or(|m| m.browse.is_none())
+            {
+                // Tab turns the title's Settings pages here too (the DATs page's tabs take Left / Right).
+                let v = s.view();
+                let n = v.tabs.len().max(1);
+                s.m_tab((v.tab + if shift { n - 1 } else { 1 }) % n);
+                false
+            } else if s.on_mods_page() {
+                mods_key(s, key, shift) == ModOut::Back
+            } else {
+                ours_key(s, key, shift, 0, true)
+            };
+            if back {
                 c.m_open = false;
                 out.sounds.push(Se::Cancel);
             }
@@ -2118,12 +2410,16 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let m = p.m;
     let sw = w.ui_wh.0;
     let (open, row) = (c.m_open, c.m_row);
-    // Our page (Mods, the Lua mods'), when it is open and its state is up.
+    // Our page (DATs, Mods, Standard Mods, a mod's settings), when it is open and its state is up.
     let ours = w.settings.as_ref().filter(|s| match page {
-        Entry::Mods => s.kind == settings::Kind::Settings && s.on_mods_page(),
+        Entry::Dats => s.kind == settings::Kind::Settings && s.on_mods_page() && !s.lua_page(),
+        Entry::Mods | Entry::Standard => s.kind == settings::Kind::Settings && s.on_mods_page() && s.lua_page(),
         Entry::ModPages => s.kind == settings::Kind::Extras,
         _ => false,
     });
+    let mut std_click = None;
+    let mut std_select = None;
+    let mut mods_detail = None;
     let (mut sact, mut mact) = (Vec::new(), Vec::new());
     let v = &w.game;
     let all = match page {
@@ -2139,10 +2435,11 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     };
     // The cursor kept in view as it moves (only then, so the wheel stays free).
     let at = match ours {
+        Some(_) if matches!(page, Entry::Standard) => row,
         Some(s) if s.on_mods_page() => s
             .mods_state()
             .and_then(|m| m.browse.as_ref())
-            .map_or(s.m_mods.0 * 1000 + s.m_mods.1, |b| 900_000 + b.cursor),
+            .map_or(s.m_mods.0 * 1000 + s.m_mods.1 + s.m_dat_tab * 100, |b| 900_000 + b.cursor),
         Some(s) => s.view().row * 100 + s.view().tab,
         None => c.m_keys.map_or(row, |_| 500_000 + c.m_key_row),
     };
@@ -2176,6 +2473,9 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             let tall = ui.ctx().content_rect().height() * TALL;
             egui::ScrollArea::vertical().id_salt(("config page", entry, c.m_sub, find.is_some())).max_height(tall).min_scrolled_height(tall).auto_shrink([false, true]).show(ui, |ui| ui.vertical(|ui| {
                 ui.set_width(page_w);
+                // Room for a cursor ring round the page's first line (Back, the top buttons) inside the scroll area: the
+                // ring reaches 3 px out, its edge a pixel more.
+                ui.add_space(6.0);
                 if let Some(yes) = ask {
                     let q = gu.group_b(0x8f).unwrap_or_else(|| "Reset keyboard assignment to default?".into());
                     if let Some(a) = kit::yes_no(ui, m, &q, ["Yes", "No"], yes, m.theme.small) {
@@ -2188,14 +2488,25 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                     help = "Up / Down: a function. Press a key to give it that key; its key again takes it off. Escape: back.".into();
                     return;
                 }
-                // A page opened from a topic page: its name and the way back.
+                // A page opened from another: its name (a mod's page: the mod's) and the way back.
                 if let Some(k) = c.m_sub {
+                    let title = match (page, ours) {
+                        (Entry::ModPages, Some(s)) => s.view().tabs.get(s.view().tab).cloned().unwrap_or_else(|| SUBS[k].0.into()),
+                        _ => SUBS[k].0.to_string(),
+                    };
+                    // Back is a stop of ours: Standard Mods' first, a mod's page's row 0.
+                    let on_back = open
+                        && match page {
+                            Entry::Standard => row == 0,
+                            Entry::ModPages => ours.is_some_and(|s| s.view().row == 0),
+                            _ => false,
+                        };
                     ui.horizontal(|ui| {
-                        if kit::button(ui, m, "\u{2039} Back", 80.0, Btn::default()).clicked() {
+                        if kit::button(ui, m, "\u{2039} Back", 80.0, Btn { cursor: on_back, ..Default::default() }).clicked() {
                             click = Some(Click::Back);
                         }
                         ui.add_space(8.0);
-                        ui.label(egui::RichText::new(SUBS[k].0).size(m.theme.ui).color(m.theme.color("gold")));
+                        ui.label(egui::RichText::new(title).size(m.theme.ui).color(m.theme.color("gold")));
                     });
                     ui.add_space(6.0);
                 }
@@ -2232,42 +2543,79 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                         colour_rows(ui, m, gu, c, v, configui2::colour_rows(cat), colours.0, (open && row >= 1).then(|| row - 1), follow, &mut click);
                         help = "Up / Down: a colour and its hue, saturation and brightness; Left / Right change them. The mouse: the square and the strip.".into();
                     }
-                    Entry::Mods | Entry::ModPages => match ours {
-                        Some(s) if s.on_mods_page() => {
-                            mods_page(ui, m, s, open, follow, s.mods_tab(), &mut mact);
-                            help = s.help();
+                    Entry::Dats | Entry::Mods => {
+                        if let Some(s) = ours {
+                            let hover = mods_page(ui, m, s, open, follow, &mut mact);
+                            help = mods_help(s);
+                            mods_detail = hover.or(open.then_some(s.m_mods.0)).and_then(|st| row_detail(s, st));
                         }
+                    }
+                    Entry::Standard => {
+                        if let Some(s) = ours {
+                            let cur = row.checked_sub(1).filter(|_| open);
+                            let hover = standard_page(ui, m, s, cur, follow, &mut std_click, &mut std_select);
+                            if let Some((e, _)) = hover.or(cur).and_then(|k| s.mods_state().and_then(|st| st.standard().get(k).map(|x| (x.0.clone(), x.1)))) {
+                                let mut facts = vec![("Version", e.version.clone())];
+                                if !e.authors.is_empty() {
+                                    facts.push(("By", e.authors.join(", ")));
+                                }
+                                detail = Detail { name: e.name.clone(), text: e.description.clone(), facts };
+                            }
+                            help = "Up / Down: Back or a mod. Enter: Install (or Update), or Back. Escape: back to Mods.".into();
+                        }
+                    }
+                    Entry::ModPages => match ours {
                         Some(s) if s.mod_pages.is_empty() => {
-                            ui.label(egui::RichText::new("No mod has settings of its own.").size(m.theme.small).color(m.theme.color("muted")));
+                            ui.label(egui::RichText::new("This mod has no settings.").size(m.theme.small).color(m.theme.color("muted")));
                         }
                         Some(s) => {
-                            settings_page(ui, m, &s.view(), open, follow, s.mods_tab(), &mut sact);
-                            help = s.view().help;
+                            let mut v = s.view();
+                            v.tabs.clear();
+                            settings_page(ui, m, &v, open, follow, 0, &mut sact);
+                            help = v.help;
                         }
                         None => {}
                     },
                 }
             }));
             });
-            if let Some(k) = c.m_sub.filter(|_| keys.is_none()) {
-                detail = Detail { name: SUBS[k].0.into(), text: SUBS[k].2.into(), facts: vec![("Retail", if k < SUB_MODS { "Yes" } else { "No (Vana Client)" }.into())] };
+            match (c.m_sub.filter(|_| keys.is_none()), page) {
+                (Some(_), Entry::Standard) if !detail.name.is_empty() => {}
+                (Some(k), _) => detail = Detail { name: SUBS[k].0.into(), text: SUBS[k].2.into(), facts: vec![("Retail", if k < SUB_MOD_PAGES { "Yes" } else { "No (Vana Client)" }.into())] },
+                (None, Entry::Dats | Entry::Mods) if mods_detail.is_some() => detail = mods_detail.take().unwrap_or_default(),
+                (None, Entry::Dats) => detail = Detail { name: "DATs".into(), text: DATS_HELP.into(), facts: vec![("Retail", "No (Vana Client)".into())] },
+                (None, Entry::Mods) => detail = Detail { name: "Mods".into(), text: MODS_HELP.into(), facts: vec![("Retail", "No (Vana Client)".into())] },
+                _ => {}
             }
             ui.add_space(16.0);
             details(ui, m, &detail);
         });
         help_line(ui, m, &help);
     });
+    // A click on a standard mod's row: the cursor goes there.
+    if let (Some(k), None, Some(c)) = (std_select, std_click, w.config.as_mut()) {
+        (c.m_row, c.m_open) = (k + 1, true);
+        w.sounds.push(Se::Cursor as u32);
+    }
     // A click on our page gives it the keys.
-    if !sact.is_empty() || !mact.is_empty() {
+    if !sact.is_empty() || !mact.is_empty() || std_click.is_some() {
+        let mut out = ModOut::Stay;
         if let Some(s) = w.settings.as_mut() {
             s.sounds.clear();
             settings_do(s, sact);
-            mods_do(s, mact);
+            out = mods_do(s, mact);
+            if let Some(k) = std_click {
+                standard_install(s, k);
+            }
             w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
         }
         if let Some(c) = w.config.as_mut() {
             c.m_open = true;
+            if let Some(k) = std_click {
+                c.m_row = k + 1;
+            }
         }
+        mods_out(w, out);
     }
     if let (Some(pick), Entry::Topic) = (pick, page) {
         return topic_do(w, pick, sw);
@@ -2430,6 +2778,90 @@ fn fallback(ctl: Ctl) -> String {
     }
 }
 
+/// What a DATs / Mods page act leads to: the page list again, a mod's settings page, or the standard mods.
+fn mods_out(w: &mut World, out: ModOut) {
+    match out {
+        ModOut::Stay => {}
+        ModOut::Back => {
+            if let Some(c) = w.config.as_mut() {
+                c.m_open = false;
+            }
+            w.sounds.push(Se::Cancel as u32);
+        }
+        ModOut::Settings(id) => {
+            let back = w.settings.as_ref().map(|s| s.m_mods);
+            if let Some(c) = w.config.as_mut() {
+                open_mod_settings(c);
+                c.m_mods_back = back;
+            }
+            w.lua.open_page = Some(id);
+            settings_follow(w);
+        }
+        ModOut::Standard => {
+            if let Some(c) = w.config.as_mut() {
+                (c.m_sub, c.m_open, c.m_row) = (Some(SUB_STANDARD), true, 1);
+            }
+            settings_follow(w);
+        }
+    }
+}
+
+/// The details of the DATs / Mods page's row at stop `st`: an installed mod (its name, what it does, version, on or
+/// off), or an archive found or a catalogue entry (its name and what installing it does). None for the rest.
+fn row_detail(s: &SettingsUi, st: usize) -> Option<Detail> {
+    if s.mods_state().is_some_and(|m| m.browse.is_some()) || s.m_remove.is_some() {
+        return None;
+    }
+    let lua = s.lua_page();
+    let first = first_row(lua);
+    let (packs, offers) = s.mods_rows();
+    let i = st.checked_sub(first)?;
+    if lua && i < packs.len() {
+        let info = s.mod_id(i).and_then(|id| s.lua_info.get(&id).cloned()).unwrap_or_default();
+        let mut facts = vec![("State", if packs[i].1 { "On" } else { "Off" }.to_string())];
+        if !info.version.is_empty() {
+            facts.insert(0, ("Version", info.version));
+        }
+        return Some(Detail { name: packs[i].0.clone(), text: info.description, facts });
+    }
+    let k = if lua {
+        i - packs.len()
+    } else if s.m_dat_tab == 1 {
+        i
+    } else {
+        return None;
+    };
+    offers.get(k).map(|o| Detail { name: o.label.clone(), text: o.help.clone(), facts: Vec::new() })
+}
+
+/// The DATs / Mods page's help line: the cursor's row's.
+fn mods_help(s: &SettingsUi) -> String {
+    if s.mods_state().is_some_and(|m| m.browse.is_some()) {
+        return "Up / Down: a folder or an archive. Enter: open the folder, or install the archive (a mod's folder too). Escape: back.".into();
+    }
+    let lua = s.lua_page();
+    let first = first_row(lua);
+    let (packs, offers) = s.mods_rows();
+    let (st, b) = s.m_mods;
+    match st {
+        0 if b == 1 && lua => "Download Standard Mods: our mods on GitHub, each to install with a press.".into(),
+        0 => "Install from File: pick an archive (zip, 7z, rar) or a mod's folder.".into(),
+        1 if !lua => "Left / Right or Tab: Installed or Available.".into(),
+        st if st >= first && st - first < packs.len() && (lua || s.m_dat_tab == 0) => {
+            if lua {
+                "Left / Right: ON / OFF, Settings, Uninstall. ON starts the mod at once, OFF stops it.".into()
+            } else {
+                "Left / Right: ON / OFF, the order (the higher pack wins), Uninstall. Takes effect on restart.".into()
+            }
+        }
+        st if st >= first => {
+            let k = if lua { st - first - packs.len() } else { st - first };
+            offers.get(k).map_or_else(String::new, |o| o.help.clone())
+        }
+        _ => String::new(),
+    }
+}
+
 /// The list's entry `k` taken: its page gets the keys (Extras / Settings ours: their state takes them from here).
 fn choose(w: &mut World, k: usize) {
     let Some(c) = w.config.as_mut() else { return };
@@ -2540,15 +2972,29 @@ pub fn key(w: &mut World, key: egui::Key, shift: bool) -> bool {
                 a => w.sounds.extend(a.sound().map(|s| s as u32)),
             }
         }
-        Entry::Mods | Entry::ModPages => {
+        Entry::Dats | Entry::Mods => {
+            let Some(s) = w.settings.as_mut() else { return true };
+            let out = mods_key(s, key, shift);
+            w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
+            mods_out(w, out);
+        }
+        Entry::Standard => {
+            let mut row = c.m_row;
+            let Some(s) = w.settings.as_mut() else { return true };
+            let back = standard_key(s, &mut row, key, shift);
+            w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
+            if let Some(c) = w.config.as_mut() {
+                c.m_row = row;
+            }
+            if back {
+                close_sub(w);
+            }
+        }
+        Entry::ModPages => {
             let mut back = false;
             if let Some(s) = w.settings.as_mut() {
-                if matches!(page, Entry::ModPages) && s.mod_pages.is_empty() {
-                    back = key == egui::Key::Escape;
-                } else {
-                    let skip = s.mods_tab();
-                    back = ours_key(s, key, shift, skip);
-                }
+                back =
+                    if s.mod_pages.is_empty() { key == egui::Key::Escape } else { ours_key(s, key, shift, 0, false) };
                 w.sounds.extend(s.sounds.drain(..).map(|x| x as u32));
             }
             if back {
@@ -2593,7 +3039,7 @@ mod tests {
                 assert!(ours.contains(&label), "{label}");
             }
         }
-        for k in 0..SUBS.len() {
+        for k in 0..SUB_MOD_PAGES {
             assert_eq!(count(Open(k)), 1, "{}", SUBS[k].0);
         }
     }
@@ -2649,16 +3095,29 @@ mod tests {
         assert!(view(&c, Some(&s)).is_empty());
     }
 
-    /// A page of ours in the Settings window shows only its own tabs, and turning them keeps that offset.
+    /// System's DATs and Mods pages: the page list names both; DATs has Install from File, then its Installed /
+    /// Available tabs; Mods has Install from File and (in game) Download Standard Mods, and no tabs.
     #[test]
-    fn mod_tabs_only() {
+    fn dats_and_mods_pages() {
+        let names: Vec<&str> = PAGES.iter().filter(|p| p.0 == "System").map(|p| p.1).collect();
+        assert_eq!(names, ["Startup & Account", "DATs", "Mods"]);
+        let mut c = ConfigUi::default();
+        c.m_entry = PAGES.iter().position(|p| p.1 == "DATs").unwrap();
+        assert!(matches!(current(&c), Entry::Dats));
+        c.m_entry += 1;
+        assert!(matches!(current(&c), Entry::Mods));
+        c.m_sub = Some(SUB_STANDARD);
+        assert!(matches!(current(&c), Entry::Standard));
         let mut s = SettingsUi::open(&crate::config::Config::default(), [1920, 1080]);
-        s.goto_mods();
-        let skip = s.mods_tab();
-        let v = s.view();
-        let (tabs, at) = shown_tabs(&v, skip);
-        assert_eq!((tabs, at), (vec!["Mods"], 0));
-        assert!(matches!(mods_stops(&s, skip)[0], Stop::Tabs { n: 1, at: 0 }));
+        s.goto_page(false);
+        let st = mods_stops(&s);
+        assert!(matches!(st[0], Stop::Buttons { n: 1, .. }) && matches!(st[1], Stop::Tabs { n: 2, at: 0 }));
+        s.goto_page(true);
+        assert!(s.lua_page() && matches!(mods_stops(&s)[0], Stop::Buttons { n: 1, .. }));
+        s.in_game = true;
+        assert!(matches!(mods_stops(&s)[0], Stop::Buttons { n: 2, .. }));
+        assert_eq!(mods_act(&mut s, kit::Act::Press(0, 1), At::new(0, 1)), ModOut::Standard);
+        assert_eq!(mods_act(&mut s, kit::Act::Back, At::new(0, 0)), ModOut::Back);
     }
 
     /// A page's headings with nothing under them go (ours left out in game, here the lobby's volumes).

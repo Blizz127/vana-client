@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a35cf5"/>
+      <stop offset="0.7" stop-color="#a35cf5"/>
+      <stop offset="1" stop-color="#522e7a"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#522e7a"/>
+      <stop offset="1" stop-color="#522e7a"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="31.999" y1="15" x2="31.999" y2="49" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfc6fc"/>
+    </linearGradient>
+  </defs>
+  <title>w260</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#dfc6fc" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <polygon id="bolt" points="36.121,15 22.213,35.606 30.454,35.606 26.849,49 41.787,28.394 33.545,28.394 38.489,15" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.175" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

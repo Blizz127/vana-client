@@ -1,0 +1,10 @@
+name = "Auction Desk"
+version = "1.0.0"
+description = "Bids and sales at the auction house by command, and your listings in the log (the auction helper add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Auction Desk"
+help = "At the auction house: //ahbuy <item> <price> [stack], //ahsell <item> <price> [stack], //ahlist. Prices take k and m (12k). The game asks before each bid and sale."

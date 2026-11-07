@@ -51,6 +51,14 @@ pub(in crate::client) enum Action {
     Lock(bool),
     /// A BLU slot (0..19) set to a spell id or emptied (0), a PUP slot (0..13) to an item id or emptied.
     BlueSlot(usize, u16),
+    /// main, sub
+    ChangeJob(u8, u8),
+    /// objective n, set (else remove)
+    Roe(u16, bool),
+    /// item, price, single
+    AhBid(u16, u32, bool),
+    /// inventory slot, price, single
+    AhSell(u8, u32, bool),
     PupSlot(usize, u16),
     Scan,
     Track(u16),
@@ -66,6 +74,8 @@ pub(in crate::client) enum Action {
     /// A main menu row (page, child), as a pick there runs it; the nomad moogle menu.
     Menu(u8, u16),
     Moogle,
+    /// A synthesis by item ids: the crystal and one material per unit.
+    Synth(u16, Vec<u16>),
 }
 
 /// The main menu's rows by name: (name, page, child).
@@ -130,6 +140,22 @@ fn token(t: &Target) -> String {
     t.as_deref().map_or(String::new(), |s| {
         if s.contains(' ') && !s.starts_with('<') { format!(" \"{s}\"") } else { format!(" {s}") }
     })
+}
+
+/// A held actions.choose: the cursor and Enter once the menu takes input (a menu can show a moment before its
+/// event waits on it, and Enter then does nothing).
+pub(super) fn choose_pending(w: &mut World) {
+    use super::super::event;
+    let Some((k, at)) = w.lua.choose else { return };
+    if w.event.is_none() || at.elapsed() > std::time::Duration::from_secs(5) {
+        w.lua.choose = None;
+    } else if event::choice_ready(w) {
+        w.lua.choose = None;
+        if event::choice(w).is_some_and(|c| k < c.options.len()) {
+            event::set_choice(w, k);
+            event::key(w, egui::Key::Enter);
+        }
+    }
 }
 
 pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
@@ -256,6 +282,9 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
             }
         }
         Action::Moogle => super::super::moogle::open(w, true),
+        Action::Synth(crystal, items) => {
+            super::super::synth::synth_ids(w, crystal, &items);
+        }
         Action::Advance => {
             if event::active(w) {
                 event::key(w, egui::Key::Enter);
@@ -284,12 +313,7 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                 }
             }
         }
-        Action::Choose(k) => {
-            if event::choice(w).is_some_and(|c| k < c.options.len()) {
-                event::set_choice(w, k);
-                event::key(w, egui::Key::Enter);
-            }
-        }
+        Action::Choose(k) => w.lua.choose = Some((k, std::time::Instant::now())),
         Action::Talk(id) => {
             event::talk(w, id);
         }
@@ -300,6 +324,27 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                     format!("actions.{}: {e}", if spell == 0 { "blue_remove" } else { "blue_set" }),
                     super::ERROR,
                 );
+            }
+        }
+        Action::Roe(n, set) => {
+            if let Err(e) = super::super::roe::mod_change(w, n, set) {
+                w.chat
+                    .push_colour(format!("actions.{}: {e}", if set { "roe_set" } else { "roe_remove" }), super::ERROR);
+            }
+        }
+        Action::ChangeJob(main, sub) => {
+            if let Err(e) = super::super::moogle::mod_change(w, main, sub) {
+                w.chat.push_colour(format!("actions.change_job: {e}"), super::ERROR);
+            }
+        }
+        Action::AhBid(item, price, single) => {
+            if let Err(e) = super::super::auction::mod_bid(w, item, price, single) {
+                w.chat.push_colour(format!("actions.auction_bid: {e}"), super::ERROR);
+            }
+        }
+        Action::AhSell(inv, price, single) => {
+            if let Err(e) = super::super::auction::mod_sell(w, inv, price, single) {
+                w.chat.push_colour(format!("actions.auction_sell: {e}"), super::ERROR);
             }
         }
         Action::PupSlot(i, item) => {
@@ -597,6 +642,31 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
             queue(lua, Action::BlueSlot(blue(slot)?, spell))
         })?,
     )?;
+    t.set("roe_set", lua.create_function(|lua, n: u16| queue(lua, Action::Roe(n, true)))?)?;
+    t.set("roe_remove", lua.create_function(|lua, n: u16| queue(lua, Action::Roe(n, false)))?)?;
+    t.set(
+        "change_job",
+        lua.create_function(|lua, (main, sub): (u8, Option<u8>)| {
+            // no support job given: the one we have
+            let sub = match sub {
+                Some(s) => s,
+                None => super::api::world(lua)?.stats.as_ref().map_or(0, |s| s.sub.0),
+            };
+            queue(lua, Action::ChangeJob(main, sub))
+        })?,
+    )?;
+    t.set(
+        "auction_bid",
+        lua.create_function(|lua, (item, price, stack): (u16, u32, Option<bool>)| {
+            queue(lua, Action::AhBid(item, price, !stack.unwrap_or(false)))
+        })?,
+    )?;
+    t.set(
+        "auction_sell",
+        lua.create_function(|lua, (slot, price, stack): (u8, u32, Option<bool>)| {
+            queue(lua, Action::AhSell(slot, price, !stack.unwrap_or(false)))
+        })?,
+    )?;
     t.set("blue_remove", lua.create_function(move |lua, slot: usize| queue(lua, Action::BlueSlot(blue(slot)?, 0)))?)?;
     t.set(
         "attach",
@@ -621,6 +691,15 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
     t.set("mount", lua.create_function(|lua, name: String| queue(lua, Action::Line(format!("/mount \"{name}\""))))?)?;
     t.set("dismount", lua.create_function(|lua, ()| queue(lua, Action::Line("/dismount".into())))?)?;
     t.set("advance", lua.create_function(|lua, ()| queue(lua, Action::Advance))?)?;
+    // True when it goes out; false when it would not (its refusal line prints, as the synthesis window's would).
+    t.set(
+        "synth",
+        lua.create_function(|lua, (crystal, items): (u16, Vec<u16>)| {
+            let ok = super::super::synth::can_synth(super::api::world(lua)?, crystal, &items);
+            queue(lua, Action::Synth(crystal, items))?;
+            Ok(ok)
+        })?,
+    )?;
     t.set(
         "open_menu",
         lua.create_function(|lua, name: String| {

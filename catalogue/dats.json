@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "mods": [
+    {
+      "authors": [
+        "vana-client"
+      ],
+      "description": "Every game texture upscaled 4x with Upscayl's Standard model (the hd-pack-1 release: four parts and its fix). About 23 GB once installed.",
+      "files": [
+        {
+          "sha256": "43663db93cb6acea5b80504ddd9b41f0b72814e7fe2fa778ab5a52f857871f21",
+          "size": 1256579827,
+          "url": "https://github.com/lenonk/vana-client/releases/download/hd-pack-1/vana-upscale-01.7z"
+        },
+        {
+          "sha256": "cb1572e59c59429e4657eef2c492fce5e6ee7ab2934bf6a1784f75e2cfa3775b",
+          "size": 1235595266,
+          "url": "https://github.com/lenonk/vana-client/releases/download/hd-pack-1/vana-upscale-02.7z"
+        },
+        {
+          "sha256": "d485cac6905fa43231a850a4490e837b5d69b218f9fa002858a4006e50458290",
+          "size": 1363662210,
+          "url": "https://github.com/lenonk/vana-client/releases/download/hd-pack-1/vana-upscale-03.7z"
+        },
+        {
+          "sha256": "7a8bd3ceb134feef30f605a87f2b33dd3a21206e743b517d9c3e1a370b571031",
+          "size": 345005308,
+          "url": "https://github.com/lenonk/vana-client/releases/download/hd-pack-1/vana-upscale-04.7z"
+        },
+        {
+          "sha256": "1325aa4c644b44fa4e5edfa852aadd99c31033fc21c66dbe5a80d576dedfbf1f",
+          "size": 1419628488,
+          "url": "https://github.com/lenonk/vana-client/releases/download/hd-pack-1/vana-upscale-fix-1.7z"
+        }
+      ],
+      "homepage": "https://github.com/lenonk/vana-client/releases/tag/hd-pack-1",
+      "id": "vana-upscale",
+      "kind": "pack",
+      "name": "Vana Upscale",
+      "version": "1.1.0"
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 use super::super::World;
 use super::{Panels, Title, kit};
 use crate::config::ModernModes;
-use egui::{Align2, Context, FontId, Id, Sense, vec2};
+use egui::{Context, FontId, Id, Sense, pos2, vec2};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -23,7 +23,7 @@ pub const MODES: [(Mode, &str); 3] =
     [(Mode::Exploration, "Exploration"), (Mode::Combat, "Combat"), (Mode::Management, "Management")];
 
 /// The panels a mode may hide (panel id, name). Windows the player opens are never hidden.
-pub const PANELS: [(&str, &str); 11] = [
+pub const PANELS: [(&str, &str); 13] = [
     ("status", "Status icons"),
     ("party", "Party"),
     ("alliance1", "Alliance 1"),
@@ -32,7 +32,9 @@ pub const PANELS: [(&str, &str); 11] = [
     ("where", "Location"),
     ("cast", "Cast bar"),
     ("minimap", "Minimap"),
-    ("timers", "Timers"),
+    ("timers_recasts", "Recasts"),
+    ("timers_buffs", "Buffs"),
+    ("timers_debuffs", "Debuffs"),
     ("regime", "Training"),
     ("skillchains", "Skillchains"),
 ];
@@ -61,11 +63,14 @@ pub fn shows(cfg: &ModernModes, mode: Mode, id: &str) -> bool {
     cfg.pinned.iter().any(|p| p == id) || !cfg.hidden[mode as usize].iter().any(|p| p == id)
 }
 
-/// Each listed panel's opacity this frame (1 shown, 0 hidden; between while fading).
-pub fn visibility(ctx: &Context, cfg: &ModernModes, mode: Mode) -> HashMap<&'static str, f32> {
+/// Each listed panel's opacity this frame (1 shown, 0 hidden; between while fading): the built-in panels and the
+/// mods' windows (`mods`: key, label).
+pub fn visibility(ctx: &Context, cfg: &ModernModes, mode: Mode, mods: &[(String, String)]) -> HashMap<String, f32> {
     PANELS
         .iter()
-        .map(|&(id, _)| {
+        .map(|&(id, _)| id)
+        .chain(mods.iter().map(|m| m.0.as_str()))
+        .map(|id| {
             let on = shows(cfg, mode, id);
             let v = if cfg.fades {
                 ctx.animate_bool_with_time(Id::unique(("modern mode fade", id)), on, FADE)
@@ -74,14 +79,25 @@ pub fn visibility(ctx: &Context, cfg: &ModernModes, mode: Mode) -> HashMap<&'sta
             } else {
                 0.0
             };
-            (id, v)
+            (id.to_string(), v)
         })
         .collect()
 }
 
+/// The editor's rows: the built-in panels, then the mods' windows not standing in for one of them.
+fn rows(mods: &[(String, String)]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = PANELS.iter().map(|&(id, name)| (id.to_string(), name.to_string())).collect();
+    for (k, label) in mods {
+        if !out.iter().any(|o| &o.0 == k) {
+            out.push((k.clone(), label.clone()));
+        }
+    }
+    out
+}
+
 /// The editor (/uimodes): per panel a toggle for each mode (lit: shown) and a pin; fades on or off; Reset; Close.
 /// True when the config changed.
-pub fn editor(p: &mut Panels, open: &mut bool, cfg: &mut ModernModes, mode: Mode) -> bool {
+pub fn editor(p: &mut Panels, open: &mut bool, cfg: &mut ModernModes, mode: Mode, mods: &[(String, String)]) -> bool {
     if !*open {
         return false;
     }
@@ -89,55 +105,65 @@ pub fn editor(p: &mut Panels, open: &mut bool, cfg: &mut ModernModes, mode: Mode
     let mut changed = false;
     let mut close = false;
     let note = format!("now: {}", MODES[mode as usize].1);
-    let at = p.ctx.content_rect().center() - vec2(260.0, 230.0);
+    let at = p.ctx.content_rect().center() - vec2(300.0, 230.0);
     p.panel_at(
         "uimodes",
         Some(Title { icon: None, text: "UI Modes", note: Some(&note), name: false }),
-        560.0,
+        600.0,
         at,
         |ui| {
             ui.label(
-                egui::RichText::new("Which panels each mode shows. A pinned panel always shows.")
-                    .size(m.theme.small)
-                    .color(m.theme.color("muted")),
+                egui::RichText::new(
+                    "Which panels each mode shows, the mods' windows too. A pinned panel always shows.",
+                )
+                .size(m.theme.small)
+                .color(m.theme.color("muted")),
             );
             ui.add_space(6.0);
             let font = FontId::proportional(m.theme.small);
-            egui::Grid::new(Id::unique("modern ui modes")).spacing(vec2(8.0, 4.0)).show(ui, |ui| {
-                ui.label("");
-                for (_, name) in MODES {
-                    ui.label(egui::RichText::new(name).size(m.theme.small).color(m.theme.color("gold")));
-                }
-                ui.label(egui::RichText::new("Pinned").size(m.theme.small).color(m.theme.color("gold")));
-                ui.end_row();
-                for (id, name) in PANELS {
-                    let (r, _) = ui.allocate_exact_size(vec2(130.0, 26.0), Sense::hover());
-                    ui.painter().text(r.left_center(), Align2::LEFT_CENTER, name, font.clone(), m.theme.color("text"));
-                    let pinned = cfg.pinned.iter().any(|p| p == id);
-                    for (k, _) in MODES.iter().enumerate() {
-                        let on = !cfg.hidden[k].iter().any(|p| p == id);
-                        let s = kit::Btn { lit: on && !pinned, cursor: false, off: pinned };
-                        if kit::clicked(&kit::button(ui, m, if on || pinned { "Shown" } else { "Hidden" }, 84.0, s), s)
-                        {
-                            if on {
-                                cfg.hidden[k].push(id.to_string());
+            let max_h = (p.ctx.content_rect().height() * 0.6).max(200.0);
+            egui::ScrollArea::vertical().max_height(max_h).auto_shrink([false, true]).show(ui, |ui| {
+                egui::Grid::new(Id::unique("modern ui modes")).spacing(vec2(8.0, 4.0)).show(ui, |ui| {
+                    ui.label("");
+                    for (_, name) in MODES {
+                        ui.label(egui::RichText::new(name).size(m.theme.small).color(m.theme.color("gold")));
+                    }
+                    ui.label(egui::RichText::new("Pinned").size(m.theme.small).color(m.theme.color("gold")));
+                    ui.end_row();
+                    for (id, name) in rows(mods) {
+                        let id = id.as_str();
+                        let (r, _) = ui.allocate_exact_size(vec2(170.0, 26.0), Sense::hover());
+                        let g = super::one_line(ui.painter(), &name, font.clone(), m.theme.color("text"), r.width());
+                        ui.painter().galley(pos2(r.min.x, r.center().y - g.size().y / 2.0), g, egui::Color32::WHITE);
+                        m.tip(ui, r, &name, "");
+                        let pinned = cfg.pinned.iter().any(|p| p == id);
+                        for (k, _) in MODES.iter().enumerate() {
+                            let on = !cfg.hidden[k].iter().any(|p| p == id);
+                            let s = kit::Btn { lit: on && !pinned, cursor: false, off: pinned };
+                            if kit::clicked(
+                                &kit::button(ui, m, if on || pinned { "Shown" } else { "Hidden" }, 84.0, s),
+                                s,
+                            ) {
+                                if on {
+                                    cfg.hidden[k].push(id.to_string());
+                                } else {
+                                    cfg.hidden[k].retain(|p| p != id);
+                                }
+                                changed = true;
+                            }
+                        }
+                        let s = kit::Btn { lit: pinned, cursor: false, off: false };
+                        if kit::clicked(&kit::button(ui, m, if pinned { "Pinned" } else { "Pin" }, 84.0, s), s) {
+                            if pinned {
+                                cfg.pinned.retain(|p| p != id);
                             } else {
-                                cfg.hidden[k].retain(|p| p != id);
+                                cfg.pinned.push(id.to_string());
                             }
                             changed = true;
                         }
+                        ui.end_row();
                     }
-                    let s = kit::Btn { lit: pinned, cursor: false, off: false };
-                    if kit::clicked(&kit::button(ui, m, if pinned { "Pinned" } else { "Pin" }, 84.0, s), s) {
-                        if pinned {
-                            cfg.pinned.retain(|p| p != id);
-                        } else {
-                            cfg.pinned.push(id.to_string());
-                        }
-                        changed = true;
-                    }
-                    ui.end_row();
-                }
+                });
             });
             ui.add_space(8.0);
             ui.horizontal(|ui| {

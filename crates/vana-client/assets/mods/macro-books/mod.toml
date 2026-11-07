@@ -1,0 +1,10 @@
+name = "Macro Book Switch"
+version = "1.0.0"
+description = "Turns the macro palette to the book and set you keep for each job when the job changes (the macro changer add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Macro Book Switch"
+help = "When your job changes, turns the macro palette to the book and set saved for it with //macros save (or to a book titled with the job, such as WAR)."

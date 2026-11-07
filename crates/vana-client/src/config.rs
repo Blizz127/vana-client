@@ -108,7 +108,7 @@ pub fn is_copy() -> bool {
 }
 
 /// FFXI_CONFIG points test runs at a copy, so they never write the user's file.
-fn config_path() -> PathBuf {
+pub(crate) fn config_path() -> PathBuf {
     std::env::var_os("FFXI_CONFIG")
         .map(PathBuf::from)
         .unwrap_or_else(|| app_dir(dirs::config_dir()).join("config.json"))
@@ -193,18 +193,13 @@ pub struct Config {
     pub send_interval: u32,
     /// Party and alliance rows show TP (retail config 0xae bit 0, default off; ours on, as the add-ons do).
     pub party_tp: bool,
-    /// Extra: the map overlay (Ctrl / Alt + O; the add-ons' map overlay) and its opacity 0..1.
-    pub map_overlay: bool,
+    /// Per-window opacity the player set (no row for it yet), by window: a modern panel's id, a mod's window
+    /// ("mod:<mod>:<window>") or a mod's HUD window ("hud:<mod>:<window>"). It wins over a mod's own.
+    #[serde(default)]
+    pub window_opacity: std::collections::BTreeMap<String, f32>,
+    /// Extra: how opaque the map overlay's map is, 0..1: the drawing code applies it to HUD maps (the Map Overlay
+    /// mod's), and the minimap's marker shades by it (the two markers alike).
     pub map_overlay_opacity: f32,
-    /// Extra: Synthesize asks how many and repeats.
-    pub synth_amount: bool,
-    /// Extra (the timestamp add-on): retail's chat timestamps (config 0xb5) on every log line; seconds while 0xb5 is
-    /// off.
-    pub stamp_all_lines: bool,
-    /// Extra (the distance / target-info add-ons): the target's distance in the target window, and its HP percent in the
-    /// classic one (the modern one shows it anyway).
-    pub target_distance: bool,
-    pub target_hpp: bool,
     /// Not retail (Settings' Lamp Lights): real point lights at the zones' lamps in place of their baked lamplight
     /// (client/lamps.rs).
     pub lamp_lights: bool,
@@ -215,8 +210,6 @@ pub struct Config {
     pub shadow_map: u32,
     /// Ambient occlusion on the scenery (render/ssao.rs). Not a retail option.
     pub ssao: bool,
-    /// Extra (the clock add-ons): Earth time, the moon and the next day beside the Vana'diel clock (client/clock.rs).
-    pub earth_clock: bool,
     /// The Game Master window (ours, client/gm.rs): its request (c2s 0x1F0) goes out at a zone-in only while this is
     /// on and only to a private server. No Settings row: only a server with its GM extension can use it, so it is set
     /// in config.json by hand.
@@ -225,31 +218,15 @@ pub struct Config {
     /// config from before the notes has none, so its first newer build shows that build's own.
     #[serde(default)]
     pub notes_seen: String,
-    /// Extra (the trust chatter filters): trusts' party lines (battle message 711) are not printed.
-    pub hide_trust_speech: bool,
-    /// Extra (Battlemod's filters): "readies" / "starts casting" lines only for us and monsters.
-    pub hide_ready_lines: bool,
-    /// Extras (Battlemod's simplify and colours, client/battlemod.rs): battle lines in their short form; names in
-    /// battle lines coloured by who they are.
-    pub short_battle: bool,
-    pub battle_name_colours: bool,
-    /// Extra (the text auto-advance add-ons): an event message waiting for a key goes on by itself after this many
-    /// seconds; 0 off.
-    pub auto_advance: u32,
-    /// Extra (the Timers add-on): the timers window, its dock (0 left, 1 right, 2 top), its drawer out, folded
-    /// sections (a bit each).
-    pub timers: bool,
+    /// The Timers (the bundled Timers mod's windows): the classic window's dock (0 left, 1 right, 2 top), its drawer
+    /// out, folded sections (a bit each; the modern UI's three windows' folds).
     pub timers_dock: u32,
     pub timers_out: bool,
     pub timers_folded: u8,
-    /// Extra (ours): the training regime window (client/regime.rs) and its drawer out.
-    pub regime: bool,
+    /// The training regime window's drawer out (client/regime.rs; the bundled Training Regime mod's window).
     pub regime_out: bool,
-    /// Extra (the skillchain add-ons): in a party, the chains it can make and the open one on our target.
-    pub skillchain_helper: bool,
-    /// Extra (the minimap add-ons): the minimap, its place (0 top right, 1 top left), size (0..2) and the map pixels
-    /// across (the wheel's zoom).
-    pub minimap: bool,
+    /// The minimap (the bundled Minimap mod's window): its classic place (0 top right, 1 top left), size (0..2) and
+    /// the map pixels across (the wheel's zoom).
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub minimap_span: f32,
@@ -340,6 +317,17 @@ pub struct ModernModes {
     pub fades: bool,
 }
 
+impl ModernModes {
+    /// The one Timers window became three (recasts, buffs, debuffs): a mode or pin that named it names them.
+    pub fn split_timers(&mut self) {
+        for list in self.hidden.iter_mut().chain(std::iter::once(&mut self.pinned)) {
+            if let Some(k) = list.iter().position(|p| p == "timers") {
+                list.splice(k..=k, ["timers_recasts", "timers_buffs", "timers_debuffs"].map(String::from));
+            }
+        }
+    }
+}
+
 impl Default for ModernModes {
     fn default() -> Self {
         // Combat hides the location panel (user, 2026-11-01) and the training regime; the skillchain helper only in
@@ -393,7 +381,8 @@ pub struct ModRef {
 
 /// Where mod folders live.
 pub fn mods_dir() -> PathBuf {
-    data_dir().join("mods")
+    // VANA_MODS_DIR: another mods folder for test runs.
+    std::env::var_os("VANA_MODS_DIR").map_or_else(|| data_dir().join("mods"), PathBuf::from)
 }
 
 /// The enabled mods' folders, highest priority first (none with FFXI_NO_MODS set).
@@ -407,6 +396,11 @@ pub fn enabled_mod_dirs() -> Vec<PathBuf> {
 /// Merged overlay DATs (rebuilt when a source changes).
 pub fn merged_dir() -> PathBuf {
     app_dir(dirs::cache_dir()).join("merged")
+}
+
+/// The mod catalogue's last list and its downloads.
+pub fn catalogue_dir() -> PathBuf {
+    app_dir(dirs::cache_dir()).join("catalogue")
 }
 
 /// Config-tool values with our defaults (FFXiMain's own default in the comment where it differs).
@@ -464,32 +458,18 @@ impl Default for Config {
             draw_distance: 0,
             send_interval: 400,
             party_tp: true,
-            map_overlay: false,
+            window_opacity: Default::default(),
             map_overlay_opacity: 0.6,
-            synth_amount: false,
-            stamp_all_lines: false,
-            target_distance: false,
-            target_hpp: false,
-            earth_clock: false,
             gm_window: false,
             notes_seen: env!("CARGO_PKG_VERSION").into(),
             lamp_lights: true,
             actor_shadows: 0,
             shadow_map: 2048,
             ssao: false,
-            hide_trust_speech: false,
-            hide_ready_lines: false,
-            short_battle: false,
-            battle_name_colours: false,
-            auto_advance: 0,
-            timers: false,
             timers_dock: 0,
             timers_out: true,
             timers_folded: 0,
-            regime: false,
-            skillchain_helper: false,
             regime_out: true,
-            minimap: false,
             minimap_dock: 0,
             minimap_size: 1,
             minimap_span: 160.0,
@@ -557,6 +537,7 @@ impl Config {
         if c.logins.is_empty() && !c.server.trim().is_empty() && !c.username.trim().is_empty() {
             c.remember_login();
         }
+        c.modern_modes.split_timers();
         c
     }
 

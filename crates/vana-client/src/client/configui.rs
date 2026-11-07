@@ -390,6 +390,8 @@ pub struct ConfigUi {
     pub m_entry: usize,
     /// The page opened from it (modern/config.rs SUBS), while one is.
     pub m_sub: Option<usize>,
+    /// The Mods page's cursor to come back to from a mod's settings page.
+    pub m_mods_back: Option<(usize, usize)>,
     /// The Settings window's search while one is typed, and its hits ((page, line) of modern/config.rs PAGES) for
     /// the text they were found for; Retail only leaves ours out.
     pub m_find: Option<String>,

@@ -185,8 +185,11 @@ Milestone 1:
   [--backdrop PNG] --out PNG`: the panels with sample values and every frame, offscreen).
 - egui's zoom follows the window height against 1080, times Settings > Client > Interface Size (config modern_scale,
   50 .. 150% in 5% steps, default 60%).
+- Party: the members' rows, then retail's pet and fellow rows (by the classic party window: name, HP gauge, the
+  pet's TP), a click targets them (2026-11-07).
 - Panels: Status, Party, Target, Location (zone, grid, time, day, weather, and the compass: retail's disk turned so
-  the camera's heading is up and tilted by cos 1.0996, N E S W, the radar dots, the tracking / call-for-help arrow),
+  the camera's heading is up and tilted by cos 1.0996, N E S W, the radar dots, the tracking / call-for-help arrow
+  with its target's name beside the grid label),
   the cast bar, Chat (tabs, the log, the chat line, the Enter key cap), the Command Menu (the main menu with
   submenus), the combat window (the action menu's rows).
 - Every panel moves by a drag on its background (contents keep their clicks); places are screen fractions per
@@ -262,7 +265,9 @@ Milestone 1:
   sambas, debuffs, opening a chain with a partner, the strongest weapon skill, renewing buffs (MODLOG "Skillchain
   helper and the battle menu's suggestions"). They head the battle menu: Up from the first command walks into them,
   Enter or a click opens the list on the action and takes it, into retail's target prompt (on the member a
-  suggestion names). Seen live: Provoke, Berserk, a closing Fast Blade, an opening Red Lotus Blade.
+  suggestion names). Seen live: Provoke, Berserk, a closing Fast Blade, an opening Red Lotus Blade. Since 2026-11-07
+  the bundled Battle Suggestions mod shows them (on by default; off on its Extras page): the rules run while a mod
+  listens for the `suggestions` event, and the rows are the `battle_rows` slot, which any mod may fill.
 - The skillchain helper (an Extra, modern/extras.rs edge window; skillchain.rs): in a party, the open resonance on
   the target with its wait / window bar and closers, the chain made with its burst elements, and every chain the
   party can make with its elements and ways. Seen live with Naji and Ayame.
@@ -332,6 +337,15 @@ Milestone 1:
   `status-dump`'s stock icons, the bare set (user's pick): atlases/status_0@2x.png, manifest "status/s<id>",
   status_map.tsv (status id -> icon); Modern::status_icon draws them everywhere (effects, party rows, Timers, Level
   Sync), the game's icons only for an id without one. Sources ~/ffxi/lab/scratch/uiupdate/vc/status.
+- Spell and ability icons (2026-11-07): one of ours for each distinct retail list picture (the HD set, 688 for 2383
+  named spells and abilities), drawn in VectorCraft from `action-icon-dump`'s stock pictures and approved batch by
+  batch. Abilities sit on a tile in their job's colour (SP abilities framed in gold), weapon skills show the weapon on
+  the element's colour, spells a disc in the element's colour (light: holy gold); retail's tier numerals and area star
+  are redrawn; the 66 standard images (songs, ninjutsu, blue magic, Geomancy, the generic ability tiles) one per
+  school and element. atlases/actions_<n>@2x.png, manifest "actions/<name>", action_map.tsv (list picture: magiconw N
+  as N, magico2w N as 1000 + N -> icon); Modern::list_icon / row_icon draw them in the magic and ability lists, search,
+  the battle menu and its suggestions, favourites, Timers, the BLU set and mods' windows and HUD icons; the game's
+  icon for a picture without one.
 - Weather icons and target markers (2026-10-27, bare): weather/w00..w19 by weather id (the location panel shows one
   icon, Clear and the skies too, a double weather drawn as a stronger icon); the target arrow, subtarget arrow
   and the five relation rings redrawn under their indicators/ ids; indicators/party_invite_pending in place of
@@ -684,6 +698,10 @@ Milestone 1:
   `/uimodes` opens the editor (Shown / Hidden per mode, Pin, Fades, Reset, Close; Escape closes); config
   `modern_modes`. `modern-shot --modes`. The editor is mouse-only for now. The edge windows (Timers, Training,
   Skillchains, the minimap) fade as the other panels.
+  Every loaded mod's windows and HUD groups are rows too (2026-11-07, the user: "all of the windows created by mods"):
+  each window by its panel key (`mod:<mod>:<window>`, or the built-in panel it stands in for), each HUD window as
+  `hud:<mod>:<window>` ("<Mod> (on screen)" for the default one); shown in every mode until set otherwise, faded as
+  the panels are. The list scrolls past 60 % of the screen's height.
 - Open question, still open: "Which windows hide in combat and which stay pinned?" The defaults above are one
   candidate, every one changeable in the editor; they do not settle it.
 - The usable Items list (action menu > Items) puts a small bag name (Temporary, Inventory, Mog Wardrobe, Mog Wardrobe

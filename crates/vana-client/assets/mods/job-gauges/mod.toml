@@ -1,0 +1,10 @@
+name = "Job Gauges"
+version = "1.0.0"
+description = "Charges and counters your jobs use: stratagems, Ready and Quick Draw charges, Ninja shadows and tools, maneuvers (the job gauge add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Job Gauges"
+help = "Shows, in a window on a screen edge, the charges and counters of your main and sub jobs: Stratagems, Ready, Quick Draw, Ninja shadows and tools, Puppetmaster maneuvers."

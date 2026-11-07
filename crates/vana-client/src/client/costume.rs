@@ -90,7 +90,7 @@ pub(super) fn step_all(w: &mut World) {
                 if !w.costume_base.contains_key(&id)
                     && let Some(s) = w.actors.get(&id).and_then(|a| a.source).filter(|s| !is_model(s, model))
                 {
-                    w.costume_base.insert(id, s);
+                    w.costume_base.insert(id, super::base_source(w, id, s));
                 }
                 w.event_looks.push((id, Source::Npc(crate::dat::npc::NpcLook::Model(model))));
             }

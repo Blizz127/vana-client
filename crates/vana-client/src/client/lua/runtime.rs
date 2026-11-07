@@ -349,6 +349,15 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
         lua.create_function(|lua, s: String| lua.create_string(crate::dat::font::encode_sjis(&s)))?,
     )?;
     text.set("plain", lua.create_function(|lua, s: String| Ok(super::super::fep::plain(world(lua)?, &s)))?)?;
+    text.set("strip", lua.create_function(|_, s: String| Ok(crate::dat::font::strip_codes(&s)))?)?;
+    // `s` in the log's in-line colour code `code` (as the game colours names and items), then back to the line's own.
+    text.set(
+        "colour",
+        lua.create_function(|_, (s, code): (String, u8)| {
+            use crate::dat::font::colour_code;
+            Ok(if code == 0 { s } else { format!("{}{s}{}", colour_code(code), colour_code(1)) })
+        })?,
+    )?;
     text.set("phrase", lua.create_function(|_, (group, id): (u8, u8)| Ok(phrase([2, 2, group, id])))?)?;
     text.set(
         "autotranslate",

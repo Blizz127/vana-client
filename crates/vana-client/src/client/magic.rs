@@ -352,9 +352,21 @@ pub(super) fn remember(w: &mut World) {
     }
 }
 
+/// A list's rows as shown: those a mod leaves out (ui.native.trim) go.
+pub(super) fn shown(w: &World, kind: Kind, mut rows: Vec<u16>) -> Vec<u16> {
+    let list = match kind {
+        Kind::Magic => 0,
+        Kind::Ability => 1,
+        Kind::Mount => 2,
+        Kind::Emote => return rows,
+    };
+    rows.retain(|&id| !w.lua.trimmed(list, id));
+    rows
+}
+
 /// FUN_1022b220: the magic list, built and opened.
 pub fn open_magic(w: &mut World, ty: u16, list_mode: bool, exclude: u32) {
-    let rows = magic_rows(w, ty, list_mode, exclude);
+    let rows = shown(w, Kind::Magic, magic_rows(w, ty, list_mode, exclude));
     // Ours: the modern UI gives every magic list its sort window (retail: mgcmenu's list mode only, attached below).
     let sort = w.modern.then_some(if ty == 6 { "menu    blusortw" } else { "menu    mgcsortw" });
     let mut win = ListWin {
@@ -385,10 +397,12 @@ pub fn open_magic(w: &mut World, ty: u16, list_mode: bool, exclude: u32) {
 /// FUN_10222b90: the ability list of a type; `sortable` attaches abisortw (abimenu's Job Abilities / Weapon Skills,
 /// passed on to sub-lists and the Escape back to the parent).
 pub fn open_ability(w: &mut World, ty: u16, sortable: bool) {
-    let rows = ability_rows(w, ty);
+    let all = ability_rows(w, ty);
+    let empty = all.is_empty();
+    let rows = shown(w, Kind::Ability, all);
     // FUN_10223ec0 (type 2): with a pet and no pet command, c2s 0x01C {our ActIndex, 1} (FUN_100fc9c0); LSB resends
     // 0x0AC.
-    if ty == 2 && rows.is_empty() && w.my_pet != 0 {
+    if ty == 2 && empty && w.my_pet != 0 {
         let mut b = w.my_index.to_le_bytes().to_vec();
         b.extend([0, 0]);
         b.extend(1u32.to_le_bytes());
@@ -433,7 +447,7 @@ pub(super) fn mount_rows(w: &World) -> Vec<u16> {
 /// FUN_10226490(1, sortable): the mount list (abimenu row 6 attaches abisortw; abiselec row 5 does not), with subwindo
 /// in mode 10. Kept in `w.ability` (type 0xfffe for the cursor memory).
 pub fn open_mount(w: &mut World, sortable: bool) {
-    let rows = mount_rows(w);
+    let rows = shown(w, Kind::Mount, mount_rows(w));
     let sort = (sortable || w.modern).then_some("menu    abisortw");
     let mut win = ListWin {
         kind: Kind::Mount,
@@ -701,9 +715,16 @@ pub(super) fn row_icon(w: &World, kind: Kind, id: u16) -> Option<(&'static str, 
     })
 }
 
-/// A spell's (or an ability record's) list icon, as the magic and ability lists draw it.
-pub fn list_icon_of(w: &World, spell: bool, id: u16) -> Option<(&'static str, usize)> {
-    row_icon(w, if spell { Kind::Magic } else { Kind::Ability }, id)
+/// A spell's or ability record's list picture, which picks the modern UI's art: the HD value (magiconw below 1000,
+/// magico2w from 1000), else (0xffff) the standard icon.
+pub fn picture(w: &World, kind: Kind, id: u16) -> Option<u16> {
+    let acts = w.actions.as_ref()?;
+    let (icon, hd) = match kind {
+        Kind::Magic => acts.spell(id).map(|r| (r.icon, r.icon_hd))?,
+        Kind::Ability => acts.abilities.get(id as usize).map(|a| (a.icon as u16, a.icon_hd))?,
+        Kind::Emote | Kind::Mount => return None,
+    };
+    Some(if hd == 0xffff { icon } else { hd })
 }
 
 pub(super) fn spell_name(w: &World, s: u16) -> String {
@@ -1169,6 +1190,7 @@ fn rebuild(w: &mut World, kind: Kind) {
         Kind::Mount => mount_rows(w),
         Kind::Emote => emote_rows(w, ty & 0x7fff),
     };
+    let rows = shown(w, kind, rows);
     if let Some(win) = list_mut(w, kind) {
         let n = rows.len();
         win.rows = rows;

@@ -1,0 +1,18 @@
+name = "Target Bar"
+version = "1.0.0"
+description = "A large HP bar for your target near the top of the screen, with what it is readying or casting (the enemy bar add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Target Bar"
+help = "Shows a large HP bar for your target, with its name, distance and what it is readying or casting. Drag it to move it."
+
+[settings.width]
+type = "int"
+default = 420
+min = 200
+max = 900
+step = 20
+label = "Bar Width"

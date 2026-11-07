@@ -1,0 +1,10 @@
+name = "Item Details"
+version = "1.0.0"
+description = "A trial weapon's weapon skill points toward its unlock, shown while it is highlighted in a game list and listed by command (the latent checker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Item Details"
+help = "Highlight a trial weapon in a game list to see its weapon skill points toward unlocking; //trials lists every one you hold."

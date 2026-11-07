@@ -1,0 +1,10 @@
+name = "Automaton Sets"
+version = "1.0.0"
+description = "Saves your automaton's head, frame and attachments as named sets and puts a set on with one command (the automaton set add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Automaton Sets"
+help = "As a Puppetmaster: //automaton save <name> keeps the head, frame and attachments; //automaton <name> puts them on (the automaton must not be out); //automaton list, //automaton delete <name>."

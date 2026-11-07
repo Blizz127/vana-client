@@ -1,0 +1,10 @@
+name = "Zone Banner"
+version = "1.0.0"
+description = "The zone's name across the screen for a few seconds as you arrive (the zone name add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Zone Banner"
+help = "Shows the name of the zone you arrive in across the screen for a few seconds."

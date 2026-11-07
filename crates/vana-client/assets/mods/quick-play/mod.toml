@@ -1,0 +1,17 @@
+name = "Quick Play"
+version = "1.0.0"
+description = "Plays the character you choose as soon as the character list shows, once per start (the auto-login add-ons)."
+permissions = ["automation"]
+lobby = true
+
+[settings.on]
+type = "bool"
+default = false
+label = "Quick Play"
+help = "Once you have signed in, plays the character named below straight away (once per start of the client)."
+
+[settings.character]
+type = "string"
+default = ""
+label = "Character"
+help = "The character to play."

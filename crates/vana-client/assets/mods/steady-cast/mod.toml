@@ -1,0 +1,22 @@
+name = "Steady Cast"
+version = "1.0.0"
+description = "Holds a spell, item or ranged shot you start while moving until you stand still, so moving doesn't interrupt it (castdelay)."
+permissions = ["packets.read", "packets.write"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Steady Cast"
+help = "A spell started while you move waits until you stand still, then goes (after 3 seconds it goes anyway)."
+
+[settings.items]
+type = "bool"
+default = true
+label = "Hold Items"
+help = "Items used while moving wait too."
+
+[settings.shots]
+type = "bool"
+default = true
+label = "Hold Ranged Shots"
+help = "Ranged attacks started while moving wait too."

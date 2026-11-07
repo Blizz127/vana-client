@@ -1,0 +1,10 @@
+name = "Key Commands"
+version = "1.0.0"
+description = "Binds keys to command lines and makes short aliases for long commands, kept per character (the bind and alias add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Key Commands"
+help = "//bind <key> <line> (keys like f9, ctrl+1, alt+shift+q), //unbind <key>, //binds; //alias <name> <line> makes /name run the line, //unalias <name>, //aliases."

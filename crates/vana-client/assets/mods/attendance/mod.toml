@@ -1,0 +1,16 @@
+name = "Attendance"
+version = "1.0.0"
+description = "Writes down who is at an event: your party and alliance, and players nearby, with the time, to a file (the linkshell attendance add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Attendance"
+help = "//attend [note] writes your party, alliance and the players within 50 yalms to attendance/<date>.txt in this mod's data folder."
+
+[settings.nearby]
+type = "bool"
+default = true
+label = "Players Nearby"
+help = "Counts the players within 50 yalms too, not only your party and alliance."

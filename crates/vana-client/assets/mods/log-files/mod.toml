@@ -1,0 +1,16 @@
+name = "Log Files"
+version = "1.0.0"
+description = "Writes the chat log to a file a day per character, as plain text (the logger add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Log Files"
+help = "Writes the chat log to files, one a day per character, in this mod's data folder (logs/<character>/<date>.log)."
+
+[settings.battle]
+type = "bool"
+default = false
+label = "Battle Lines"
+help = "Writes the battle lines too, not only chat and the game's messages."

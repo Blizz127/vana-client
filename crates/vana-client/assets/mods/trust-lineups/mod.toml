@@ -1,0 +1,10 @@
+name = "Trust Lineups"
+version = "1.0.0"
+description = "Saves the trusts you call as named lineups and calls a lineup with one command (the trust set add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Trust Lineups"
+help = "//trusts save <name> keeps the trusts in your party as a lineup; //trusts <name> calls them one after another; //trusts list, //trusts delete <name>."

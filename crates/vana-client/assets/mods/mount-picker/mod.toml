@@ -1,0 +1,10 @@
+name = "Mount Picker"
+version = "1.0.0"
+description = "Calls a random mount of yours, or one by part of its name (the mount roulette add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Mount Picker"
+help = "//ride calls one of your mounts at random; //ride <part of a name> calls the first one it matches; //ride list names them."

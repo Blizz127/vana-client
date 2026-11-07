@@ -1,10 +1,12 @@
 # `hud`
 
-The `hud` namespace draws things over the game: texts, filled rectangles, bars, a map, PNG images and item, status,
-spell or ability icons. Each element has an id you choose. You create it once (`hud.text`, `hud.rect`, ...), change it with `hud.set`
+The `hud` namespace draws things over the game: texts, filled rectangles, speech bubbles, bars, a map, PNG images, live
+portraits of actors and item, status, spell or ability icons. Each element has an id you choose. You create it once (`hud.text`, `hud.rect`, ...), change it with `hud.set`
 as things happen, and it stays on screen until you remove it; you do not redraw it every frame. HUD elements draw over
 the game world and the name plates and under every window, in the game world only, and they hide while the player has
-the interface hidden. None of these functions needs a permission. Clicks, drags and the pointer coming and going on an
+the interface hidden. Each interface draws them as it draws its own: the classic UI with the game's art and fonts, the
+modern UI with its own painter (its faces, smooth shapes, the pack's gauges), so an element looks as a built-in one
+does. None of these functions needs a permission. Clicks, drags and the pointer coming and going on an
 element can be handled with `hud.on`, and any element can carry a tooltip.
 
 ```lua
@@ -21,15 +23,18 @@ end)
 | --- | --- |
 | [`hud.text(id, spec)`](#hudtext) | Creates or replaces a text. |
 | [`hud.rect(id, spec)`](#hudrect) | Creates or replaces a filled rectangle. |
+| [`hud.bubble(id, spec)`](#hudbubble) | Creates or replaces a speech bubble with a tail pointing at a place. |
 | [`hud.bar(id, spec)`](#hudbar) | Creates or replaces a bar filled from 0 to 1. |
 | [`hud.map(id, spec)`](#hudmap) | Creates or replaces a window onto the zone's map. |
 | [`hud.image(id, spec)`](#hudimage) | Creates or replaces a PNG image from the mod's folder. |
+| [`hud.portrait(id, spec)`](#hudportrait) | Creates or replaces a live portrait of an actor's face. |
 | [`hud.icon(id, spec)`](#hudicon) | Creates or replaces an item's, a status effect's, a spell's or an ability's icon. |
 | [`hud.set(id, fields)`](#hudset) | Changes some fields of an element. |
 | [`hud.remove(id)`](#hudremove) | Removes an element. |
 | [`hud.clear()`](#hudclear) | Removes every element of the mod. |
 | [`hud.on(id, handler)`](#hudon) | Sets the function called when the player clicks or drags an element, or the pointer comes or goes. |
 | [`hud.off(id)`](#hudoff) | Removes an element's handler. |
+| [`hud.opacity(window, opacity)`](#hudopacity) | Sets the opacity of one of your HUD windows. |
 | [`hud.screen()`](#hudscreen) | The game window's size in pixels, and the UI's scale. |
 | [`hud.bounds(id)`](#hudbounds) | Where an element was drawn last frame. |
 
@@ -61,6 +66,7 @@ hud.text("panel_text", {x = 20 + 8 * s, y = 200 + 10 * s, text = "Scaled with th
 | `layer` | `integer` | `0` | Elements on higher layers draw over those on lower ones. On the same layer, mods draw in their load order, and each mod's elements in the order it created them. |
 | `anchor` | `string` | none | A modern [panel](ui.native.md#modern-panels)'s name: `x` and `y` become offsets from one of the panel's corners (`corner`), negative ones going left or up, so the element follows the panel. A hidden panel keeps its last place; an element anchored to a panel never drawn yet is not drawn either. HUD elements draw under the panels, so put them beside a panel, or where a hidden one was. `false` in `hud.set` goes back to the window. Not in the classic UI. |
 | `corner` | `string` | `"top_left"` | With `anchor`: the panel's corner the offsets count from, `"top_left"`, `"top_right"`, `"bottom_left"` or `"bottom_right"`. `{anchor = "party", y = -24}` stands just above the party window. |
+| `window` | `string` | `"hud"` | The HUD window the element belongs to. A HUD window is a group of your elements the client treats as one window: [`hud.opacity`](#hudopacity) sets its opacity, over everything its elements draw. |
 | `tip` | `string` or `table` | none | A tooltip shown while the pointer rests on the element: a string, or `{title = ..., text = ...}` (the title above the text; `\n` breaks lines). `false` in `hud.set` removes it. The modern UI shows it in its tooltip frame, the classic UI in a dark box by the pointer. |
 
 **Create and set.** Each create call (`hud.text`, `hud.rect`, ...) makes a new element from its spec: fields you leave
@@ -147,6 +153,8 @@ Creates or replaces a filled rectangle. Use it as a panel behind other elements,
 | `w` | `number` | `100` | Its width in window pixels. |
 | `h` | `number` | `20` | Its height in window pixels. |
 | `colour` | `{r, g, b, a}` | `{0, 0, 0, 160}` | Its colour (a translucent black by default). |
+| `line` | `number` | none | Draws only its outline, this many window pixels wide (0.5 to 32), inside the rectangle, instead of filling it. `false` in `hud.set` fills it again. |
+| `round` | `number` | `0` | Rounds its corners this many window pixels (the outer edge's radius), as the modern UI's frames are. The classic UI draws square corners. |
 
 **Returns** nothing.
 
@@ -157,6 +165,64 @@ Creates or replaces a filled rectangle. Use it as a panel behind other elements,
 ```lua
 hud.rect("flash", {x = 0, y = 0, w = hud.screen().width, h = 6, colour = {255, 40, 40, 200}})
 timer.after(0.5, function() hud.remove("flash") end)
+```
+
+## `hud.bubble`
+
+```lua
+hud.bubble(id, spec)
+```
+
+Creates or replaces a speech bubble: a rectangle with rounded corners, an optional outline, and a short tail that
+points at a place on screen, such as a speaker's head. The tail leaves the side of the bubble that faces the point,
+as near the point as the corners allow, and is never longer than `tail_len` (it stops short of a near point, and leans
+out at most 60 degrees from its side). There is no tail while the point is inside the bubble. The outline goes round
+the tail too, and the edges are smoothed. Both interfaces draw the same shape. The bubble holds nothing itself: put
+texts, a portrait or icons over it on a higher `layer`.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The element's id. |
+| `spec` | `table` | yes | The bubble's fields. |
+
+**`spec` fields**
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `x`, `y`, `visible`, `layer` | | | As for [every element](#places-sizes-and-layers). |
+| `w`, `h` | `number` | `200`, `60` | Its size in window pixels, without the tail. |
+| `round` | `number` | `10` | The corners' radius in window pixels. |
+| `colour` | `{r, g, b, a}` | `{14, 16, 26, 235}` | The fill. |
+| `edge` | `{r, g, b, a}` or `false` | none | The outline's colour. |
+| `edge_w` | `number` | `2` | The outline's width in window pixels. |
+| `tail` | `{x, y}` or `false` | none | The point the tail aims at, in window pixels (as `draw.to_screen` gives). |
+| `tail_w` | `number` | `18` | The tail's width where it leaves the bubble. |
+| `tail_len` | `number` | `22` | The tail's longest length. |
+
+**Returns** nothing.
+
+**Errors**
+- A `tail` that is not a point or `false`: `tail is a point {x, y}, or false for none`.
+- A `colour` or `edge` that is not a table or `false`: `a colour is {r, g, b, a} (0..255), or false for none`.
+
+**Example**
+
+```lua
+-- a bubble over our target's head, its tail at the head
+events.on("frame", function()
+  local t = game.target()
+  local head = t and t.pos and draw.to_screen({x = t.pos.x, y = t.pos.y - (t.height or 1.8), z = t.pos.z})
+  if not (head and head.on_screen) then
+    hud.remove("say")
+    hud.remove("say_text")
+    return
+  end
+  hud.bubble("say", {x = head.x - 90, y = head.y - 90, w = 180, h = 50, round = 12, edge = {196, 160, 96},
+    tail = {x = head.x, y = head.y}})
+  hud.text("say_text", {x = head.x, y = head.y - 76, text = "Hello!", align = "center", layer = 1})
+end)
 ```
 
 ## `hud.bar`
@@ -206,9 +272,10 @@ end)
 hud.map(id, spec)
 ```
 
-Creates or replaces a window onto the map of the place the player is in: the same map the client shows there (see
-`game.map`). By default it is centred on the player and follows them. Where the client has no map for the place,
-nothing is drawn.
+Creates or replaces a window onto the map of the place the player is in, showing what the map window shows there
+(see `game.map`): the map; the game's NO MAP image over the map's place while the map is not yours (or not known to be
+yet), the marker still where you are; or a record's own image where the place needs no map, without a marker. By
+default it is centred on the player and follows them. Where no map exists, nothing is drawn.
 
 **Parameters**
 
@@ -226,7 +293,8 @@ nothing is drawn.
 | `h` | `number` | `200` | Its height in window pixels. |
 | `centre` | `{x, z}` | the player's position | A world position (both `x` and `z` required) to centre the map on, instead of following the player. |
 | `span` | `number` | `256` | How many map pixels show across the element's width (16 to 2048). The map image is 512 map pixels wide, so 512 shows the whole map across. |
-| `alpha` | `number` | `1` | Its opacity, 0 to 1. |
+| `alpha` | `number` | the player's Map Overlay Opacity | The map image's opacity, 0 to 1 (the marker stays solid). Left out (or `false` in `hud.set`), the client applies the player's Map Overlay Opacity, as it does to its own map overlay. |
+| `me` | `boolean` | `false` | Draws your marker at your position on the map, facing your way, as the game's map windows draw it in each interface (the classic map arrow, the modern UI's orange arrow). |
 
 **Returns** nothing.
 
@@ -293,6 +361,63 @@ hud.image("logo", {x = -74, y = -74, path = "img/logo.png", w = 64, h = 64, colo
 ```
 
 `hud.set(id, {path = "img/other.png"})` swaps the picture; it takes the new file's size unless the same call gives `w` and `h`. A file changed on disk shows the next time it is loaded (`hud.image` or a `path` in `hud.set`).
+
+## `hud.portrait`
+
+```lua
+hud.portrait(id, spec)
+```
+
+Creates or replaces a portrait: the actor's head and shoulders drawn live every frame from its model, from straight
+in front of its face, lit as the scene around it. It moves as the actor does (talking, turning its head, a changed
+look). An oval by default, or square; a backing and a frame ring are drawn into it, both following its shape. It shows
+only while the actor is drawn in the world: nothing while it is out of view, too far, hidden or not loaded, and nothing
+at all before its model is ready. Up to four actors have portraits at once; an actor shown by several elements is
+drawn once, as the first of them (by layer) asks.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The element's id. |
+| `spec` | `table` | yes | The portrait's fields. |
+
+**`spec` fields**
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `x`, `y`, `visible`, `layer` | | | As for [every element](#places-sizes-and-layers). |
+| `entity` | `integer` | (required) | The actor's server id, as `game.entity` and `game.target` give it. |
+| `size` | `number` | | Sets `w` and `h` at once. |
+| `w`, `h` | `number` | `96`, `96` | Its width and height in window pixels; the view widens or narrows with them. |
+| `shape` | `string` | `"oval"` | `"oval"` (the oval filling `w` by `h`) or `"square"`. |
+| `bg` | `{r, g, b, a}` or `false` | none (clear) | The backing behind the actor, in its shape. |
+| `frame` | `{r, g, b, a}` or `false` | none | A frame ring round its edge, lit from above. |
+| `frame_w` | `number` | `3` | The frame's width in window pixels. |
+| `colour` | `{r, g, b, a}` | white | A tint its colours are multiplied by; `a` fades it. |
+
+**Returns** nothing.
+
+**Errors**
+- No `entity`: `a portrait needs entity (a server id)`.
+- A `shape` other than those two: `shape "...": oval or square`.
+- A `colour`, `bg` or `frame` that is not a table or `false`: `a colour is {r, g, b, a} (0..255), or false for none`.
+
+**Example**
+
+```lua
+-- the current target's face in the top right corner
+events.on("target_change", function(id)
+  if id then
+    hud.portrait("face", {x = -120, y = 20, entity = id, w = 96, h = 120, bg = {14, 16, 26, 220},
+      frame = {196, 160, 96}})
+  else
+    hud.remove("face")
+  end
+end)
+```
+
+`hud.set(id, {entity = other})` moves the portrait to another actor.
 
 ## `hud.icon`
 
@@ -425,8 +550,8 @@ it away.
 - **Drag:** a press that moves 4 pixels or more is a drag. The handler gets `"drag_start"` (at the place the button
   went down), `"drag"` as the pointer moves (at most once a frame), and `"drag_end"` at the release, wherever the
   pointer is by then. `dx` and `dy` are the pointer's offset from where the button went down. `drag_end` names your
-  topmost element under the pointer in `over`; when it is another element with a handler, that one gets `"drop"`
-  with the dragged element in `from`. That is enough to drag one slot onto another, or to move a bar: set its `x` and
+  topmost other element with a handler under the pointer in `over` (an icon or a label over a slot is passed by), and
+  that one gets `"drop"` with the dragged element in `from`. That is enough to drag one slot onto another, or to move a bar: set its `x` and
   `y` from `dx` and `dy` while it drags.
 - **Pointer:** `"mouse_enter"` and `"mouse_leave"` come as the pointer comes onto the element and leaves it (with
   `x` and `y` only). Elements with a `tip` show it on their own; use these for anything more (a slot showing its
@@ -448,7 +573,7 @@ it away.
 | `button` | `string` | `"left"` or `"right"` (not on `"mouse_enter"` / `"mouse_leave"`). |
 | `x`, `y` | `integer` | The pointer, in window pixels. |
 | `dx`, `dy` | `integer` | The pointer's offset from where the button went down (0 for a click). |
-| `over` | `string` or `nil` | `"drag_end"` only: your topmost element under the pointer at the release. |
+| `over` | `string` or `nil` | `"drag_end"` only: your topmost other element with a handler under the pointer at the release. |
 | `from` | `string` | `"drop"` only: the element that was dragged. |
 
 **Returns** nothing.
@@ -516,6 +641,33 @@ id without a handler is ignored.
 events.on("status_change", function(status)
   if status == 1 then hud.off("heal") end
 end)
+```
+
+## `hud.opacity`
+
+```lua
+hud.opacity(window, opacity)
+```
+
+Sets the opacity of one of your HUD windows: every element whose `window` field names it (`"hud"` for elements that
+name none) draws at it, as the client draws every window, built in or a mod's, at its own opacity. The player's own
+setting for the window, when there is one, wins over yours.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `window` | `string` | yes | The HUD window's name. |
+| `opacity` | `number` | no | 0 (unseen) to 1 (opaque); `nil` gives it back (opaque). |
+
+**Returns** nothing.
+
+**Example**
+
+```lua
+hud.text("dps", {x = 20, y = 300, window = "meter", text = "DPS 0"})
+hud.bar("dps_bar", {x = 20, y = 320, w = 160, h = 8, window = "meter"})
+hud.opacity("meter", 0.7)
 ```
 
 ## `hud.screen`

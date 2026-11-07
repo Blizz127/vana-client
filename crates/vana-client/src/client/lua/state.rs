@@ -24,8 +24,16 @@ pub(super) struct FrameInfo {
     pub placed: std::collections::BTreeMap<String, (String, Placed)>,
     /// The modern panels as last drawn, in window pixels, and whether drawn last frame (ui.native.rect).
     pub native_rects: std::collections::BTreeMap<String, ([f32; 4], bool)>,
+    /// The whole room of the modern panels that fold or grow (the chat window), as last drawn.
+    pub native_rooms: std::collections::BTreeMap<String, [f32; 4]>,
     /// The modern UI's look mods changed (ui.skin).
     pub skin: super::skin::Skin,
+    /// The modern UI's pixels per point while it is on (the HUD's UI unit there).
+    pub modern_ppp: Option<f32>,
+    /// What mods put in the built-in panels' slots (ui.native.slot): slot -> (mod, value).
+    pub slots: std::collections::BTreeMap<String, (String, serde_json::Value)>,
+    /// Mods' opacity for their own windows ("mod:<mod>:<window>", "hud:<mod>:<window>"): window -> (mod, opacity).
+    pub opacity: std::collections::BTreeMap<String, (String, f32)>,
     /// This frame's view-projection, for draw.to_screen.
     pub view_proj: glam::Mat4,
     /// Entity looks mods set (render.entity): server id -> (mod, look).
@@ -35,6 +43,13 @@ pub(super) struct FrameInfo {
     /// Post-process passes mods set (render.shader), in order: mod, id, version, WGSL, parameters.
     pub shaders: Vec<crate::render::postfx::Want>,
     pub shader_ver: u64,
+    /// Rows mods leave out of the game's lists (ui.native.trim): (mod, list 0 magic / 1 abilities / 2 mounts) -> ids.
+    pub trimmed: std::collections::HashMap<(String, u8), std::collections::HashSet<u16>>,
+    /// Player looks mods set (render.look): server id -> (mod, the parts given); the version bumps on each change.
+    pub models: std::collections::HashMap<u32, (String, super::render::Model)>,
+    pub models_ver: u64,
+    /// The portraits drawn this frame (client/portrait.rs): entity -> (game UI image, modern UI texture).
+    pub portraits: std::collections::HashMap<u32, (String, egui::TextureId)>,
 }
 
 /// A modern panel's place from a mod: its top left in window pixels (negative from the right or bottom edge; none
@@ -240,10 +255,17 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
                 t.set("raw", lua.create_string(&b[..])?)?;
                 match b[0] {
                     // BLU: 20 slots, spell id - 0x200.
-                    0x10 => t.set(
-                        "blue_spells",
-                        b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>(),
-                    )?,
+                    0x10 => {
+                        t.set(
+                            "blue_spells",
+                            b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>(),
+                        )?;
+                        // By slot, 0 an empty one.
+                        t.set(
+                            "blue_slots",
+                            b[4..24].iter().map(|&s| if s == 0 { 0 } else { 0x200 + s as u16 }).collect::<Vec<u16>>(),
+                        )?;
+                    }
                     // PUP: head and frame items 0x2000 + n, attachments 0x2100 + n.
                     0x12 => {
                         let item = |i: usize, v: u8| {
@@ -252,6 +274,10 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
                         t.set("head", item(0, b[4]))?;
                         t.set("frame", item(1, b[5]))?;
                         t.set("attachments", (2..14).filter_map(|i| item(i, b[4 + i])).collect::<Vec<u16>>())?;
+                        t.set(
+                            "attachment_slots",
+                            (2..14).map(|i| item(i, b[4 + i]).unwrap_or(0)).collect::<Vec<u16>>(),
+                        )?;
                     }
                     _ => {}
                 }
@@ -293,12 +319,47 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         })?,
     )?;
     game.set(
+        "synth",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let t = lua.create_table()?;
+            t.set("busy", super::super::synth::busy(w))?;
+            t.set("window", w.synth.win.is_some())?;
+            Ok(t)
+        })?,
+    )?;
+    game.set(
+        "clock",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let Some(c) = super::super::clock::parts(w) else { return Ok(None) };
+            let t = lua.create_table()?;
+            t.set("earth", c.earth)?;
+            t.set("moon_name", c.moon.0)?;
+            t.set("moon", c.moon.1)?;
+            t.set("next_day", c.next.0)?;
+            t.set("next_minutes", c.next.1)?;
+            Ok(Some(t))
+        })?,
+    )?;
+    game.set(
         "map",
         lua.create_function(|lua, ()| {
             let w = world(lua)?;
             let gu = super::api::gu(lua)?;
-            let Some(r) = super::super::map::current(w, gu.map_regions()) else { return Ok(None) };
+            use super::super::map::Show;
+            let Some((r, show)) = super::super::map::record(w, gu.map_regions()) else { return Ok(None) };
             let t = lua.create_table()?;
+            // As the map window shows it: the map, NO MAP while not ours, or a record that needs no map.
+            t.set(
+                "kind",
+                match show {
+                    Show::Map => "map",
+                    Show::NotOwned => "not_owned",
+                    Show::NoMapNeeded => "no_map_needed",
+                },
+            )?;
+            t.set("owned", show == Show::Map)?;
             t.set("zone", r.zone)?;
             t.set("number", r.num)?;
             t.set("file", r.file_id())?;
@@ -316,7 +377,12 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, (x, z): (f32, f32)| {
             let w = world(lua)?;
             let gu = super::api::gu(lua)?;
-            let Some(r) = super::super::map::current(w, gu.map_regions()) else { return Ok((None, None)) };
+            // Also while the map is not ours: the map window puts markers there on NO MAP.
+            let Some((r, _)) =
+                super::super::map::record(w, gu.map_regions()).filter(|r| r.1 != super::super::map::Show::NoMapNeeded)
+            else {
+                return Ok((None, None));
+            };
             // The pixel on the map's 512 x 512 image (its top left at the map pixel `origin`).
             let (px, py) = r.px(x, z);
             Ok((Some(px - r.ox as i32), Some(py - r.oy as i32)))

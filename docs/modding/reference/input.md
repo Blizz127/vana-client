@@ -18,7 +18,9 @@ end)
 | --- | --- |
 | [`input.on_key(handler)`](#inputon_key) | Sees every key press, repeat and release first, and can take it. |
 | [`input.on_mouse(handler)`](#inputon_mouse) | Sees the mouse's buttons, movement and wheel first, and can take them. |
-| [`input.off(id)`](#inputoff) | Removes a key or mouse filter. |
+| [`input.on_pad(handler)`](#inputon_pad) | Sees the game controller's buttons first, and can take them. |
+| [`input.pad()`](#inputpad) | The game controller's buttons, sticks and triggers now. |
+| [`input.off(id)`](#inputoff) | Removes a key, mouse or pad filter. |
 | [`input.held(key)`](#inputheld) | Whether a key is held down. |
 | [`input.modifiers()`](#inputmodifiers) | Which of Ctrl, Alt, Shift and Win are held. |
 | [`input.mouse()`](#inputmouse) | The pointer's position and which buttons are held. |
@@ -118,19 +120,81 @@ end)
 
 Taking a button press takes its release too (the filters still see the release). A left or right press on a [HUD](hud.md) element that has a click handler goes to that element; the filters still see the press and its release, with `blocked = true`. The chain of filters, the time limit and the player's-input rule are as for [`input.on_key`](#inputon_key).
 
+## `input.on_pad`
+
+```lua
+input.on_pad(handler) -> integer
+```
+
+Calls `handler` for every press and release of a game controller button, before the game reads the pad. Return
+`true` from a press to take the button: the game does not see it until it comes up (the filters still see its
+release). Taking needs the `input.capture` permission. Filters chain across mods as key filters do: a taken press
+still reaches the later ones with `blocked = true`. The pad works while Settings' gamepad is on and the window has
+the focus (or Settings' background play is on).
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `handler` | `function` | yes | Called as `handler(e)`; return `true` to take the press. |
+
+`e` is a table:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `button` | `string` | `"a"`, `"b"`, `"x"`, `"y"`, `"up"`, `"down"`, `"left"`, `"right"`, `"lb"`, `"rb"`, `"lt"`, `"rt"`, `"l3"`, `"r3"`, `"start"` or `"back"` (an Xbox layout; other pads by position). |
+| `down` | `boolean` | `true` for a press, `false` for a release. |
+| `blocked` | `boolean` | An earlier filter took it. |
+
+**Returns** `integer`: an id for [`input.off`](#inputoff).
+
+**Example**
+
+```lua
+-- While RT is held, the face buttons are ours: a crossbar.
+input.on_pad(function(e)
+  if e.down and input.pad().buttons.rt and (e.button == "a" or e.button == "b" or e.button == "x" or e.button == "y") then
+    print("slot " .. e.button)
+    return true
+  end
+end)
+```
+
+It is the player's input: actions may act from the handler, as from key filters.
+
+## `input.pad`
+
+```lua
+input.pad() -> table
+```
+
+The game controller now: `{connected, buttons, lx, ly, rx, ry, lt, rt}`. `connected` is whether a pad plays (Settings'
+gamepad on, the window focused or background play on); `buttons` maps each button name of
+[`input.on_pad`](#inputon_pad) to whether it is held (taken buttons too); `lx`, `ly`, `rx`, `ry` are the sticks, -1 to
+1 with up positive; `lt` and `rt` the triggers, 0 to 1.
+
+**Returns** `table`.
+
+**Example**
+
+```lua
+local p = input.pad()
+if p.connected and p.buttons.lt then print("left trigger held") end
+```
+
 ## `input.off`
 
 ```lua
 input.off(id)
 ```
 
-Removes a key or mouse filter.
+Removes a key, mouse or pad filter.
 
 **Parameters**
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `id` | `integer` | yes | The id `input.on_key` or `input.on_mouse` returned. |
+| `id` | `integer` | yes | The id `input.on_key`, `input.on_mouse` or `input.on_pad` returned. |
 
 **Returns** nothing. An id that is not a filter of this mod is ignored.
 

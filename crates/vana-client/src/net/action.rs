@@ -2,7 +2,8 @@
 //! header and the WorkSize byte); the client's reader is FUN_10185a20 with FUN_10185550 (n bits),
 //! LSB's writer GP_SERV_COMMAND_BATTLE2::pack. At most 64 targets of 8 results are read.
 
-/// Category (cmd_no) values, LSB `ActionCategory`.
+/// Category (cmd_no) values, LSB `ActionCategory` (the whole set, some unused).
+#[allow(dead_code)]
 pub mod category {
     pub const BASIC_ATTACK: u8 = 1;
     pub const RANGED_FINISH: u8 = 2;

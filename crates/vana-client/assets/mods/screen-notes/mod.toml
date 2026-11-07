@@ -1,0 +1,10 @@
+name = "Screen Notes"
+version = "1.0.0"
+description = "Puts your own notes on the screen by command, where you drag them (the text add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Screen Notes"
+help = "//note <name> <text> puts a note on the screen (drag it to move it); //note <name> removes it; //notes lists them."

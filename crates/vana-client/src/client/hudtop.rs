@@ -510,11 +510,10 @@ impl HudTop {
             }
             let end =
                 gu.shape_text(&format!("{}:{:02}  {}", m / 60, m % 60, self.grid), cx - 50.0, cy + 26.0, tint, false);
-            // Ours (the Clock extra): Earth time and the moon over the next day, right of the compass and its time
-            // (under it is the log).
-            if w.earth_clock
-                && !w.lua.hides("clock")
-                && let Some(c) = super::clock::parts(w)
+            // Ours (the clock slot, the bundled Clock mod's): Earth time and the moon over the next day, right of the
+            // compass and its time (under it is the log).
+            if !w.lua.hides("clock")
+                && let Some(c) = w.lua.clock_slot()
             {
                 let x = end.max(cx + 40.0) + 16.0;
                 gu.shape_text(&format!("Earth {}  Moon {}%", c.earth, c.moon.1), x, cy + 12.0, tint, false);
@@ -748,16 +747,20 @@ pub fn topbar_shot(
         println!("wrote {} (downloading draw {n})", out.display());
         return Ok(());
     }
-    // --map ZONE,X,Z,overlay: the map overlay (extra) at 60 %, the player facing north.
+    // --map ZONE,X,Z,overlay: a HUD map as the map-overlay mod draws it (the whole map in a centred box at 60 %, our
+    // marker), the player facing north.
     if let Some(spec) = map.filter(|s| s.ends_with(",overlay")) {
         let f: Vec<&str> = spec.split(',').collect();
         let num = |i: usize| f.get(i).and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
-        let region = super::map::Region::find(gu.map_regions(), num(0) as u16);
-        let mut o = super::map::Overlay::new(num(0) as u16, region, Some(std::sync::Arc::new(index)));
-        o.draw(&mut gu, (num(1), num(2)), std::f32::consts::FRAC_PI_2, sw, sh, 0.6);
+        let region = super::map::Region::find(gu.map_regions(), num(0) as u16)
+            .ok_or_else(|| anyhow::anyhow!("no map record for zone {}", num(0)))?;
+        let mut o = super::map::Overlay::new(num(0) as u16, Some(region), Some(std::sync::Arc::new(index)));
         o.wait_image(&mut gu);
-        gu.clear();
-        o.draw(&mut gu, (num(1), num(2)), std::f32::consts::FRAC_PI_2, sw, sh, 0.6);
+        let side = (sw.min(sh) * 0.7).round();
+        let s = super::minimap::px_per_unit(&region);
+        let centre = ((region.ox as f32 + 256.0) / s, -(region.oy as f32 + 256.0) / s);
+        let me = Some(((num(1), num(2)), std::f32::consts::FRAC_PI_2));
+        o.draw_window(&mut gu, [(sw - side) / 2.0, (sh - side) / 2.0, side, side], centre, 512.0, 0.6, me);
         gu.save_png(width, height, [0.1, 0.2, 0.3], out)?;
         println!("wrote {} (map overlay)", out.display());
         return Ok(());
@@ -780,7 +783,7 @@ pub fn topbar_shot(
             (x - 4.0, z - 12.0, 0x8030_60e0, false),
             (x + 10.0, z - 10.0, 0x8080_8080, true),
         ];
-        o.draw_mini(&mut gu, rect, (x, z), std::f32::consts::FRAC_PI_2, num(6, 160.0), &dots, cfg.map_overlay_opacity);
+        o.draw_mini(&mut gu, rect, (x, z), std::f32::consts::FRAC_PI_2, num(6, 160.0), &dots, 0.6);
         mini = Some(rect);
     }
     // --map ZONE,X,Z[,owned]: the map window as the main menu's Map opens it, the player facing north.

@@ -94,6 +94,8 @@ pub struct UiBatch {
     pub frames: Vec<[f32; 4]>,
     /// The game font's text in the TrueType face without the modern skin (a mod's switch).
     pub ttf: bool,
+    /// The opacity of the window being drawn (per-window opacity), multiplied into what is pushed; None = 1.
+    opacity: Option<f32>,
 }
 
 impl UiBatch {
@@ -499,8 +501,18 @@ impl UiBatch {
         blend: Blend,
         corners: [[f32; 2]; 4],
         uvs: [[f32; 2]; 4],
-        colors: [[f32; 4]; 4],
+        mut colors: [[f32; 4]; 4],
     ) {
+        // The window's opacity: alpha, or every channel where the blend adds the colour whole.
+        if let Some(o) = self.opacity {
+            for c in &mut colors {
+                if blend == Blend::Glyph {
+                    c.iter_mut().for_each(|v| *v *= o);
+                } else {
+                    c[3] *= o;
+                }
+            }
+        }
         let first = self.vertices.len() as u32;
         for k in [0, 1, 2, 1, 3, 2] {
             self.vertices.push(UiVertex {
@@ -552,6 +564,11 @@ impl UiBatch {
                 }
             }
         }
+    }
+
+    /// Quads pushed from now on are drawn at this opacity (their window's); None = as given.
+    pub fn set_opacity(&mut self, opacity: Option<f32>) {
+        self.opacity = opacity.map(|o| o.clamp(0.0, 1.0));
     }
 
     /// Quads pushed from now on are hidden where the scene is nearer than `depth` (NDC z); None = no test.

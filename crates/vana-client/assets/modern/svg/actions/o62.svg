@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8a96a2"/>
+      <stop offset="0.7" stop-color="#8a96a2"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b444e"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="13" x2="32" y2="21.233" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6288bc"/>
+      <stop offset="1" stop-color="#2a3b51"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="17.116" x2="32" y2="50.367" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b0c7e8"/>
+      <stop offset="0.42" stop-color="#6f9ad6"/>
+      <stop offset="1" stop-color="#384d6b"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="32" y1="20.663" x2="32" y2="49.037" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6288bc"/>
+      <stop offset="1" stop-color="#2a3b51"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="31.344" y1="16.246" x2="32.656" y2="23.686" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-3" cx="32" cy="19.967" r="2.533" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.3" stop-color="#b0c7e8"/>
+      <stop offset="0.78" stop-color="#6f9ad6"/>
+      <stop offset="1" stop-color="#3d5576"/>
+    </radialGradient>
+  </defs>
+  <title>o62</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#eef2f5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="hood" d="M25.033 21.233 C24.4 15.533 27.566 13 32 13 C36.434 13 39.6 15.533 38.967 21.233 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.887" stroke-linejoin="round"/>
+      <path id="cape" d="M19.966 21.866 C22.5 18.383 26.933 17.116 32 17.116 C37.067 17.116 41.5 18.383 44.034 21.866 C45.3 30.733 46.883 38.967 49.1 47.2 C45.933 49.417 43.4 47.833 40.55 49.417 C37.7 51 34.533 49.734 32 50.367 C29.467 49.734 26.3 51 23.45 49.417 C20.6 47.833 18.067 49.417 14.9 47.2 C17.117 38.967 18.7 30.733 19.966 21.866 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.887" stroke-linejoin="round"/>
+      <path id="folds" d="M27.317 21.173 C27.35 20.86 27.631 20.633 27.944 20.667 C28.257 20.7 28.484 20.981 28.45 21.294 C27.499 30.174 26.23 39.054 24.644 47.934 C24.589 48.243 24.293 48.45 23.983 48.395 C23.673 48.339 23.467 48.043 23.522 47.733 C25.103 38.88 26.368 30.026 27.317 21.173 Z M36.056 20.667 C36.369 20.633 36.65 20.86 36.683 21.173 C37.632 30.026 38.897 38.88 40.478 47.733 C40.533 48.043 40.327 48.339 40.017 48.395 C39.707 48.45 39.411 48.243 39.356 47.934 C37.77 39.054 36.501 30.174 35.55 21.294 C35.516 20.981 35.743 20.7 36.056 20.667 Z M31.43 21.866 C31.43 21.551 31.685 21.297 32 21.297 C32.315 21.297 32.57 21.551 32.57 21.866 L32.57 48.467 C32.57 48.782 32.315 49.037 32 49.037 C31.685 49.037 31.43 48.782 31.43 48.467 Z" fill="url(#linear-gradient-3)" opacity="0.65"/>
+      <path id="collar" d="M25.033 17.75 L38.967 17.75 C40.189 17.75 41.183 18.744 41.183 19.967 L41.183 19.967 C41.183 21.189 40.189 22.183 38.967 22.183 L25.033 22.183 C23.811 22.183 22.817 21.189 22.817 19.967 L22.817 19.967 C22.817 18.744 23.811 17.75 25.033 17.75 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.887" stroke-linejoin="round"/>
+      <path id="clasp" d="M34.533 19.967 C34.533 21.366 33.4 22.5 32 22.5 C30.6 22.5 29.467 21.366 29.467 19.967 C29.467 18.567 30.6 17.433 32 17.433 C33.4 17.433 34.533 18.567 34.533 19.967 Z" fill="url(#radial-gradient-3)" stroke="#0a1118" stroke-width="0.76" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

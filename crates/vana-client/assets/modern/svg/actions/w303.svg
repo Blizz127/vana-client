@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3fc45a"/>
+      <stop offset="0.7" stop-color="#3fc45a"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20622d"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="29.212" y1="18.033" x2="29.212" y2="41.643" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="47" y1="39.5" x2="47" y2="54.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8a59c"/>
+      <stop offset="0.45" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </linearGradient>
+  </defs>
+  <title>w303</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M56.547 48.724 C55.833 52.701 52.701 55.833 48.724 56.547 C43.949 59.806 38.185 61.7 32 61.7 C15.597 61.7 2.3 48.403 2.3 32 C2.3 15.597 15.597 2.3 32 2.3 C48.403 2.3 61.7 15.597 61.7 32 C61.7 38.185 59.806 43.949 56.547 48.724 Z" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#bceac5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="gusts" d="M32.352 28.423 L17.749 28.423 C16.943 28.423 16.288 27.769 16.288 26.963 C16.288 26.156 16.943 25.503 17.749 25.503 L32.352 25.503 C35.231 25.503 37.051 23.87 35.817 21.689 C35.233 20.736 33.59 20.553 33.366 22.027 C33.246 22.825 32.501 23.373 31.704 23.253 C30.907 23.131 30.358 22.387 30.479 21.59 C31.113 17.404 36.336 16.877 38.328 20.198 C38.334 20.207 38.339 20.216 38.344 20.225 C40.581 24.139 37.879 28.423 32.352 28.423 Z M16.461 31.516 L37.506 31.516 C43.034 31.516 45 36.385 42.073 39.912 C39.49 43.123 34.328 41.653 34.328 37.271 C34.328 36.464 34.982 35.81 35.788 35.81 C36.595 35.81 37.248 36.464 37.248 37.271 C37.248 38.897 38.946 39.146 39.802 38.077 C39.808 38.069 39.814 38.062 39.82 38.054 C41.216 36.379 40.485 34.436 37.506 34.436 L16.461 34.436 C15.654 34.436 15 33.782 15 32.976 C15 32.169 15.654 31.516 16.461 31.516 Z M19.467 37.529 L28.487 37.529 C29.293 37.529 29.947 38.182 29.947 38.989 C29.947 39.795 29.293 40.449 28.487 40.449 L19.467 40.449 C18.66 40.449 18.007 39.795 18.007 38.989 C18.007 38.182 18.66 37.529 19.467 37.529 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.98" stroke-linejoin="round"/>
+      <circle id="badge_down" cx="47" cy="47" r="7.5" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="badge_down_mark" d="M47.277 51.911 L51.323 47.689 C51.476 47.529 51.421 47.4 51.2 47.4 L49.2 47.4 C48.979 47.4 48.8 47.221 48.8 47 L48.8 42.8 C48.8 42.579 48.621 42.4 48.4 42.4 L45.6 42.4 C45.379 42.4 45.2 42.579 45.2 42.8 L45.2 47 C45.2 47.221 45.021 47.4 44.8 47.4 L42.8 47.4 C42.579 47.4 42.524 47.529 42.677 47.689 L46.723 51.911 C46.876 52.071 47.124 52.071 47.277 51.911 Z" fill="#ffffff" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

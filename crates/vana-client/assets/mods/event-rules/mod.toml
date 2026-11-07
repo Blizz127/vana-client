@@ -1,0 +1,10 @@
+name = "Event Rules"
+version = "1.0.0"
+description = "Runs your command lines when things happen: a zone, a job, an effect gained or lost, HP or MP low, a word in chat, a new day or weather (the auto-exec add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Event Rules"
+help = "Runs the rules in rules.txt in this mod's data folder: one per line, event | match | command line. //rules lists them; //rules reload reads the file again."

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfae63"/>
+      <stop offset="0.7" stop-color="#cfae63"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6e5427"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="14" x2="32" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="30.94" y1="37.089" x2="33.06" y2="49.116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w205</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#fff6dc" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <polygon id="swords" points="15.682,16.693 18.715,14 32,28.947 45.285,14 48.318,16.693 34.713,32 48.318,47.307 45.285,50 32,35.053 18.715,50 15.682,47.307 29.287,32" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.001" stroke-linejoin="round"/>
+      <path id="guards" d="M18.865 41.44 L21.088 39.218 L26.634 44.764 L24.412 46.987 Z M37.366 44.764 L42.912 39.218 L45.135 41.44 L39.588 46.987 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.901" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

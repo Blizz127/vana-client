@@ -357,6 +357,48 @@ fn send(w: &mut World, id: u16, n: u16) {
     }
 }
 
+/// A mod's set or remove (actions.roe_set / roe_remove): c2s 0x10C / 0x10D for objective n, one a second.
+pub(super) fn mod_change(w: &mut World, n: u16, set: bool) -> Result<(), &'static str> {
+    if w.roe.flags & 2 == 0 {
+        return Err("the objectives have not come yet");
+    }
+    if !(1..0x1000).contains(&n) {
+        return Err("objectives are 1..4095");
+    }
+    if w.roe.mod_sent.is_some_and(|t| t.elapsed() < COOLDOWN)
+        || w.quests.as_ref().and_then(|q| q.roe.as_ref()).is_some_and(|l| !ready(l))
+    {
+        return Err("one change a second: wait and call again");
+    }
+    let id = n.wrapping_add(0xe000);
+    if set {
+        if w.roe.is_active(id) {
+            return Err("that objective is set already");
+        }
+        if w.roe.full() {
+            return Err("every objective slot is taken");
+        }
+    } else if !w.roe.is_active(id) {
+        return Err("that objective is not set");
+    }
+    w.roe.mod_sent = Some(Instant::now());
+    send(w, if set { 0x10C } else { 0x10D }, n);
+    Ok(())
+}
+
+/// The set objectives for mods (game.roe): slot, objective n, progress.
+pub(super) fn mod_active(w: &World) -> Vec<(usize, u16, u32)> {
+    if w.roe.flags & 2 == 0 {
+        return Vec::new();
+    }
+    w.roe.active[..30]
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| *r & 0xfff != 0)
+        .map(|(k, r)| (k + 1, (r & 0xfff) as u16, r >> 12))
+        .collect()
+}
+
 pub fn ask_text(gu: &GameUi, a: Ask) -> String {
     let id = match a.kind {
         AskKind::Set => 0x6f,

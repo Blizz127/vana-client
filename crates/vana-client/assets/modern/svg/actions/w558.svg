@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8a96a2"/>
+      <stop offset="0.7" stop-color="#8a96a2"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b444e"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="13" x2="32" y2="38.331" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b18533"/>
+      <stop offset="1" stop-color="#4c3916"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="27.024" y1="18.616" x2="27.024" y2="27.369" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ecdbba"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="31.642" y1="37.076" x2="31.642" y2="51" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d9b675"/>
+      <stop offset="0.5" stop-color="#c9973a"/>
+      <stop offset="1" stop-color="#8d6a29"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="28.994" y1="37.076" x2="28.994" y2="42.032" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e1c693"/>
+      <stop offset="0.42" stop-color="#c9973a"/>
+      <stop offset="1" stop-color="#644c1d"/>
+    </linearGradient>
+  </defs>
+  <title>w558</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#eef2f5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="cloud" d="M24.598 18.499 C26.043 15.259 29.29 13 33.071 13 C37.333 13 40.919 15.873 42.006 19.785 C42.118 19.78 42.23 19.778 42.344 19.778 C46.285 19.778 49.483 22.975 49.483 26.91 C49.483 28.036 49.222 29.1 48.758 30.048 C48.461 34.647 40.908 38.331 31.646 38.331 C22.188 38.331 14.517 34.496 14.517 29.767 C14.517 28.875 14.79 28.014 15.297 27.205 C15.254 26.876 15.233 26.541 15.233 26.201 C15.233 21.862 18.743 18.353 23.081 18.353 C23.6 18.353 24.107 18.403 24.598 18.499 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.993" stroke-linejoin="round"/>
+      <path id="cloud_light" d="M29.795 18.813 C32.9 18.268 35.601 18.891 35.835 20.21 C36.069 21.536 33.744 23.046 30.639 23.592 C27.534 24.145 24.832 23.514 24.591 22.195 C24.365 20.876 26.69 19.366 29.795 18.813 Z M20.359 23.875 C21.841 23.337 23.301 23.627 23.627 24.506 C23.946 25.4 23.01 26.555 21.529 27.101 C20.04 27.633 18.579 27.349 18.26 26.463 C17.934 25.57 18.87 24.414 20.359 23.875 Z" fill="url(#linear-gradient-2)" opacity="0.35"/>
+      <polygon id="mountains" points="21.798,51 28.923,37.076 32.05,42.507 35.041,38.09 41.486,51" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.922" stroke-linejoin="round"/>
+      <polygon id="snow" points="28.923,37.076 31.234,41.486 29.334,40.812 27.3,42.032 26.754,41.351" fill="url(#linear-gradient-4)"/>
+    </g>
+  </g>
+</svg>

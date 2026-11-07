@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8a96a2"/>
+      <stop offset="0.7" stop-color="#8a96a2"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b444e"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="18.128" y1="19.053" x2="18.128" y2="31.232" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="22.98" y1="12.053" x2="22.98" y2="22.303" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="12.831" y1="29.053" x2="12.831" y2="37.375" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="37" y1="24" x2="37" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e1c693"/>
+      <stop offset="0.45" stop-color="#c9973a"/>
+      <stop offset="1" stop-color="#644c1d"/>
+    </linearGradient>
+  </defs>
+  <title>w323</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118" opacity="0.3"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#eef2f5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="trail_0" d="M14.306 19.585 L24.265 27.942 C24.899 28.474 24.982 29.42 24.45 30.055 L24.064 30.514 C23.531 31.149 22.585 31.232 21.951 30.699 L11.992 22.343 C11.357 21.811 11.275 20.864 11.807 20.23 L12.193 19.77 C12.725 19.136 13.671 19.053 14.306 19.585 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <path id="trail_1" d="M20.306 12.585 L27.967 19.013 C28.601 19.546 28.684 20.492 28.151 21.126 L27.766 21.586 C27.233 22.221 26.287 22.303 25.652 21.771 L17.992 15.343 C17.357 14.811 17.275 13.864 17.807 13.23 L18.193 12.77 C18.725 12.136 19.671 12.053 20.306 12.585 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <path id="trail_2" d="M11.306 29.585 L16.668 34.085 C17.303 34.617 17.386 35.563 16.853 36.198 L16.468 36.658 C15.935 37.292 14.989 37.375 14.354 36.843 L8.992 32.343 C8.357 31.811 8.275 30.864 8.807 30.23 L9.193 29.77 C9.725 29.136 10.671 29.053 11.306 29.585 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <circle id="rock" cx="37" cy="37" r="13" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="crater" d="M36 34 C36 35.657 34.657 37 33 37 C31.343 37 30 35.657 30 34 C30 32.343 31.343 31 33 31 C34.657 31 36 32.343 36 34 Z M43.2 41 C43.2 42.215 42.215 43.2 41 43.2 C39.785 43.2 38.8 42.215 38.8 41 C38.8 39.785 39.785 38.8 41 38.8 C42.215 38.8 43.2 39.785 43.2 41 Z M41.6 31 C41.6 31.884 40.884 32.6 40 32.6 C39.116 32.6 38.4 31.884 38.4 31 C38.4 30.116 39.116 29.4 40 29.4 C40.884 29.4 41.6 30.116 41.6 31 Z" fill="#000000" opacity="0.3"/>
+    </g>
+  </g>
+</svg>

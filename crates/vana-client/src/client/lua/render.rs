@@ -26,6 +26,36 @@ impl Look {
     }
 }
 
+/// The parts of a player-style look a mod sets (render.look); the others stay the entity's own.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(in crate::client) struct Model {
+    pub race: Option<u8>,
+    pub face: Option<u16>,
+    /// head, body, hands, legs, feet, main, sub, range (model ids).
+    pub parts: [Option<u16>; 8],
+}
+
+/// The look's slot names in GrapIDTbl order after the face.
+pub(super) const PARTS: [&str; 8] = ["head", "body", "hands", "legs", "feet", "main", "sub", "range"];
+
+impl Model {
+    pub fn applied(&self, l: crate::dat::character::Look) -> crate::dat::character::Look {
+        let p = |k: usize, v: u16| self.parts[k].unwrap_or(v);
+        crate::dat::character::Look {
+            race: self.race.unwrap_or(l.race),
+            face: self.face.unwrap_or(l.face),
+            head: p(0, l.head),
+            body: p(1, l.body),
+            hands: p(2, l.hands),
+            legs: p(3, l.legs),
+            feet: p(4, l.feet),
+            main: p(5, l.main),
+            sub: p(6, l.sub),
+            range: p(7, l.range),
+        }
+    }
+}
+
 fn info(lua: &Lua) -> std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>> {
     lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
         .map(|f| f.clone())
@@ -81,9 +111,51 @@ pub(super) fn install(lua: &Lua, g: &Table, mod_id: &str) -> mlua::Result<()> {
     )?;
     let me = mod_id.to_string();
     t.set(
+        "look",
+        lua.create_function(move |lua, (id, spec): (u32, Option<Table>)| {
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            let Some(s) = spec else {
+                if f.models.get(&id).is_some_and(|m| m.0 == me) {
+                    f.models.remove(&id);
+                    f.models_ver += 1;
+                }
+                return Ok(());
+            };
+            let mut m =
+                Model { race: s.get::<Option<u8>>("race")?, face: s.get::<Option<u16>>("face")?, ..Model::default() };
+            if m.race.is_some_and(|r| !(1..=8).contains(&r)) {
+                return Err(mlua::Error::runtime("render.look: race is 1..8"));
+            }
+            if m.face.is_some_and(|f| f > 0xff) {
+                return Err(mlua::Error::runtime("render.look: face is 0..255"));
+            }
+            for (k, name) in PARTS.iter().enumerate() {
+                let v = s.get::<Option<u16>>(*name)?;
+                if v.is_some_and(|v| v > 0xfff) {
+                    return Err(mlua::Error::runtime(format!("render.look: {name} is a model id 0..4095")));
+                }
+                m.parts[k] = v;
+            }
+            if f.models.get(&id) != Some(&(me.clone(), m)) {
+                f.models.insert(id, (me.clone(), m));
+                f.models_ver += 1;
+            }
+            Ok(())
+        })?,
+    )?;
+    let me = mod_id.to_string();
+    t.set(
         "clear",
         lua.create_function(move |lua, ()| {
-            info(lua).borrow_mut().looks.retain(|_, l| l.0 != me);
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            f.looks.retain(|_, l| l.0 != me);
+            let n = f.models.len();
+            f.models.retain(|_, m| m.0 != me);
+            if f.models.len() != n {
+                f.models_ver += 1;
+            }
             Ok(())
         })?,
     )?;

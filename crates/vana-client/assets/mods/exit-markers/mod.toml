@@ -1,0 +1,25 @@
+name = "Exit Markers"
+version = "1.0.0"
+description = "The zone lines around you outlined on the ground, so you can see where a zone ends (the zone line add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Exit Markers"
+help = "Outlines each zone line near you on the ground, with a post at each corner."
+
+[settings.range]
+type = "number"
+default = 60
+min = 20
+max = 200
+step = 10
+label = "Marker Range"
+help = "How far away (in yalms) zone lines are outlined."
+
+[settings.colour]
+type = "colour"
+default = [110, 220, 255, 220]
+label = "Marker Colour"
+help = "The outlines' colour."

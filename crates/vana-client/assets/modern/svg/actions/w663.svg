@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ee9fa2"/>
+      <stop offset="0.45" stop-color="#c24a51"/>
+      <stop offset="1" stop-color="#5c1d22"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5c1d22"/>
+      <stop offset="1" stop-color="#5c1d22"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="30" y1="15.711" x2="30" y2="48.289" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fdf6e1"/>
+      <stop offset="0.5" stop-color="#e9d5a6"/>
+      <stop offset="1" stop-color="#b4935a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="29.505" y1="25.881" x2="29.505" y2="40.085" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8a59c"/>
+      <stop offset="0.45" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="47" y1="39.5" x2="47" y2="54.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a7e7c4"/>
+      <stop offset="0.42" stop-color="#5fd394"/>
+      <stop offset="1" stop-color="#306a4a"/>
+    </linearGradient>
+  </defs>
+  <title>w663</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="card_1" d="M29.626 16.189 L41.253 20.886 C42.436 21.364 43.007 22.71 42.529 23.893 L33.381 46.535 C32.903 47.718 31.557 48.289 30.374 47.811 L18.747 43.114 C17.564 42.636 16.993 41.29 17.471 40.107 L26.619 17.465 C27.097 16.282 28.443 15.711 29.626 16.189 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="card_2" d="M29.984 18.825 L39.164 22.533 C39.84 22.807 40.166 23.576 39.893 24.252 L31.734 44.446 C31.461 45.122 30.692 45.448 30.016 45.175 L20.836 41.467 C20.16 41.193 19.834 40.424 20.107 39.748 L28.266 19.554 C28.539 18.878 29.308 18.552 29.984 18.825 Z" fill="none" stroke="#b88b49" stroke-width="0.9"/>
+      <path id="card_3" d="M32.472 25.881 C33.437 30.541 35.39 32.754 34.401 35.202 C33.412 37.65 30.47 37.884 29.558 35.737 L28.869 40.085 L25.197 38.602 L27.722 34.995 C25.574 35.907 23.621 33.694 24.61 31.246 C25.599 28.798 28.541 28.563 32.472 25.881 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+      <circle id="badge_up" cx="47" cy="47" r="7.5" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="badge_up_mark" d="M47.277 42.089 L51.323 46.311 C51.476 46.471 51.421 46.6 51.2 46.6 L49.2 46.6 C48.979 46.6 48.8 46.779 48.8 47 L48.8 51.2 C48.8 51.421 48.621 51.6 48.4 51.6 L45.6 51.6 C45.379 51.6 45.2 51.421 45.2 51.2 L45.2 47 C45.2 46.779 45.021 46.6 44.8 46.6 L42.8 46.6 C42.579 46.6 42.524 46.471 42.677 46.311 L46.723 42.089 C46.876 41.929 47.124 41.929 47.277 42.089 Z" fill="#ffffff" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -155,6 +155,8 @@ impl VoiceChat {
                 value: ((level - DB_LOW as f32) / -DB_LOW as f32).clamp(0.0, 1.0),
                 text: shown,
                 kind: if self.status.talking { "tp".into() } else { "mp".into() },
+                row: false,
+                dim: false,
             },
             "",
         ));

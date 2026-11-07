@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c9973a"/>
+      <stop offset="0.7" stop-color="#c9973a"/>
+      <stop offset="1" stop-color="#644c1d"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#644c1d"/>
+      <stop offset="1" stop-color="#644c1d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="19.983" x2="32" y2="44.017" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ecdbba"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="27.429" y1="19.983" x2="27.429" y2="28.539" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e1c693"/>
+      <stop offset="0.42" stop-color="#c9973a"/>
+      <stop offset="1" stop-color="#644c1d"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="0" y1="46" x2="0" y2="61.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2b3644"/>
+      <stop offset="1" stop-color="#0e151d"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="49.6" y1="49" x2="49.6" y2="58.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="56.35" y1="49" x2="56.35" y2="58.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w334</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M59.164 44.026 C61.78 44.753 63.7 47.152 63.7 50 L63.7 57.5 C63.7 60.924 60.924 63.7 57.5 63.7 L46.1 63.7 C43.735 63.7 41.678 62.375 40.632 60.425 C37.896 61.255 34.997 61.7 32 61.7 C15.597 61.7 2.3 48.403 2.3 32 C2.3 15.597 15.597 2.3 32 2.3 C48.403 2.3 61.7 15.597 61.7 32 C61.7 36.271 60.797 40.342 59.164 44.026 Z" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#ecdbba" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <polygon id="mountains" points="15,44.017 27.31,19.983 32.699,29.362 37.863,21.741 49,44.017" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <polygon id="snow" points="27.31,19.983 31.301,27.603 28.01,26.431 24.492,28.539 23.557,27.367" fill="url(#linear-gradient-2)"/>
+      <path id="tab" d="M46.1 46 L57.5 46 C59.709 46 61.5 47.791 61.5 50 L61.5 57.5 C61.5 59.709 59.709 61.5 57.5 61.5 L46.1 61.5 C43.891 61.5 42.1 59.709 42.1 57.5 L42.1 50 C42.1 47.791 43.891 46 46.1 46 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <polygon id="numeral_0" points="45.6,49 48.3,49 49.6,54.3 50.9,49 53.6,49 51,58.5 48.2,58.5" fill="url(#linear-gradient-4)"/>
+      <rect id="numeral_1" x="54.7" y="49" width="3.3" height="9.5" fill="url(#linear-gradient-5)"/>
+    </g>
+  </g>
+</svg>

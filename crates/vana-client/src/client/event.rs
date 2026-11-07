@@ -771,7 +771,7 @@ impl LiveHost<'_> {
             Some(_) => self.w.costume_base.get(&id).copied(),
             None => None,
         }
-        .or_else(|| self.w.actors.get(&id).and_then(|a| a.source));
+        .or_else(|| self.w.actors.get(&id).and_then(|a| a.source).map(|s| super::base_source(self.w, id, s)));
         // A model NPC (0x00E SubKind 0): +0xfc is its model and +0xef its race code, so subs 0 / 1 change those; the
         // other subs build a race-and-gear look as for a PC.
         let model_npc = match cur {
@@ -1142,28 +1142,22 @@ impl Host for LiveHost<'_> {
                 }
             }
             Effect::Send(p) => match p {
-                Packet::EventUpdate { head, option } => {
-                    super::regime::on_send(self.w, true, option);
-                    self.send(NetCommand::EventEnd {
-                        target: head.target,
-                        index,
-                        option,
-                        zone: head.zone,
-                        event: head.event,
-                        mode: 1,
-                    })
-                }
-                Packet::EventEnd { head, option } => {
-                    super::regime::on_send(self.w, false, option);
-                    self.send(NetCommand::EventEnd {
-                        target: head.target,
-                        index,
-                        option,
-                        zone: head.zone,
-                        event: head.event,
-                        mode: 0,
-                    })
-                }
+                Packet::EventUpdate { head, option } => self.send(NetCommand::EventEnd {
+                    target: head.target,
+                    index,
+                    option,
+                    zone: head.zone,
+                    event: head.event,
+                    mode: 1,
+                }),
+                Packet::EventEnd { head, option } => self.send(NetCommand::EventEnd {
+                    target: head.target,
+                    index,
+                    option,
+                    zone: head.zone,
+                    event: head.event,
+                    mode: 0,
+                }),
                 Packet::Passwords { head, text } => {
                     let mut body = Vec::with_capacity(24);
                     body.extend_from_slice(&head.target.to_le_bytes());
@@ -2483,10 +2477,8 @@ pub fn update(w: &mut World, dt: f32) {
         }
     }
     // FUN_10136cd0: under the auto-advance the rem sends message 5 every frame: each waiting page goes on (SE 0015);
-    // the message's close clears it (FUN_10136ab0). Extra (ours): a page waiting the set seconds goes on the same way.
-    let extra = w.auto_advance as f32 * 60.0;
-    let timed = extra > 0.0 && live.st.choice.is_none() && live.st.msg.as_ref().is_some_and(|m| m.open >= extra);
-    if (live.st.auto_advance || timed)
+    // the message's close clears it (FUN_10136ab0).
+    if live.st.auto_advance
         && let Some(m) = live.st.msg.as_mut().filter(|m| m.waits_key())
     {
         w.sounds.push(crate::audio::Ui::Page as u32);
@@ -3178,8 +3170,27 @@ fn move_cursor(c: &mut Choice, to: isize, page: bool) {
     };
 }
 
+/// The event's message on screen: whether it waits for a key, and the seconds its page has been open.
+pub fn message_wait(w: &World) -> Option<(bool, f32)> {
+    let m = w.event.as_ref()?.st.msg.as_ref()?;
+    Some((m.waits_key(), m.open / 60.0))
+}
+
+/// The open message's page as wrapped for the log (all its lines before the first wrap), and the event's actor.
+pub fn message_page(w: &World) -> Option<(Vec<String>, u32)> {
+    let l = w.event.as_ref()?;
+    let m = l.st.msg.as_ref()?;
+    let page = m.pages.as_ref().and_then(|(_, p)| p.get(m.page).cloned()).unwrap_or_else(|| m.lines.clone());
+    Some((page, l.st.start.target))
+}
+
 pub fn choice(w: &World) -> Option<&Choice> {
     w.event.as_ref()?.st.choice.as_ref()
+}
+
+/// A menu shows and its event waits on it: Enter picks (not in cinema mode, where the menu takes no key).
+pub fn choice_ready(w: &World) -> bool {
+    w.event.as_ref().is_some_and(|l| l.st.choice.is_some() && l.rt.choice_open() && !l.st.place_on)
 }
 
 /// The mouse's cursor move onto option `k` (the view follows, as a step). True when it moved.
@@ -3549,8 +3560,9 @@ pub fn zone_text(w: &mut World, t: &ZoneText) {
         Some(m) if m.zones.contains_key(&zone) => m.map_near(zone, lsb),
         _ => Some(lsb),
     };
+    // The mods' zone_text event: the line's id in the install (after MsgShift), its actor, MesNum bit 15.
     if let Some(i) = id {
-        super::regime::on_zone_text(w, i, t.mes & 0x8000 != 0, t.actor);
+        w.lua.raise("zone_text", vec![i.into(), t.actor.into(), (t.mes & 0x8000 != 0).into(), t.packet.into()]);
     }
     let Some((_, d)) = &w.zone_text else { return };
     let raw = id.and_then(|i| d.raw(i));

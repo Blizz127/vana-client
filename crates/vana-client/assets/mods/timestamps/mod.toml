@@ -1,0 +1,13 @@
+name = "Timestamps"
+version = "1.0.0"
+description = "The time on every chat log line, not only chat (the timestamp add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Timestamps on All Lines"
+help = "Puts the time on every chat log line, not only chat."
+tab = "Misc."
+place = 1
+from = "stamp_all_lines"

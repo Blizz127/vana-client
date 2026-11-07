@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8c78a"/>
+      <stop offset="0.45" stop-color="#f39a2a"/>
+      <stop offset="1" stop-color="#7a4d15"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7a4d15"/>
+      <stop offset="1" stop-color="#7a4d15"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="13.209" x2="32" y2="50.791" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="32" y1="22" x2="32" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+  </defs>
+  <title>w373</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="sun_rays" d="M32.176 13.468 L34.8 20.424 C34.897 20.682 35.15 20.75 35.363 20.575 L41.113 15.862 C41.327 15.687 41.464 15.766 41.419 16.039 L40.213 23.375 C40.168 23.647 40.353 23.832 40.625 23.787 L47.961 22.581 C48.234 22.536 48.313 22.673 48.138 22.887 L43.425 28.637 C43.25 28.85 43.318 29.103 43.576 29.2 L50.532 31.824 C50.791 31.921 50.791 32.079 50.532 32.176 L43.576 34.8 C43.318 34.897 43.25 35.15 43.425 35.363 L48.138 41.113 C48.313 41.327 48.234 41.464 47.961 41.419 L40.625 40.213 C40.353 40.168 40.168 40.353 40.213 40.625 L41.419 47.961 C41.464 48.234 41.327 48.313 41.113 48.138 L35.363 43.425 C35.15 43.25 34.897 43.318 34.8 43.576 L32.176 50.532 C32.079 50.791 31.921 50.791 31.824 50.532 L29.2 43.576 C29.103 43.318 28.85 43.25 28.637 43.425 L22.887 48.138 C22.673 48.313 22.536 48.234 22.581 47.961 L23.787 40.625 C23.832 40.353 23.647 40.168 23.375 40.213 L16.039 41.419 C15.766 41.464 15.687 41.327 15.862 41.113 L20.575 35.363 C20.75 35.15 20.682 34.897 20.424 34.8 L13.468 32.176 C13.209 32.079 13.209 31.921 13.468 31.824 L20.424 29.2 C20.682 29.103 20.75 28.85 20.575 28.637 L15.862 22.887 C15.687 22.673 15.766 22.536 16.039 22.581 L23.375 23.787 C23.647 23.832 23.832 23.647 23.787 23.375 L22.581 16.039 C22.536 15.766 22.673 15.687 22.887 15.862 L28.637 20.575 C28.85 20.75 29.103 20.682 29.2 20.424 L31.824 13.468 C31.921 13.209 32.079 13.209 32.176 13.468 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.9" stroke-linejoin="round"/>
+      <circle id="sun" cx="32" cy="32" r="10" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

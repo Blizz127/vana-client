@@ -1,0 +1,10 @@
+name = "Web Search"
+version = "1.0.0"
+description = "Looks up an item, a spell, your target or any words on the wiki or the auction site, in your browser (the lookup add-ons)."
+permissions = ["net"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Web Search"
+help = "//wiki [words] and //ah [words] open the wiki or the auction site in your browser: the words given, else what the list cursor is on, else your target."

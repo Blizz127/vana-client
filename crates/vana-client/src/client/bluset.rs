@@ -243,6 +243,10 @@ pub(super) fn set_slot(w: &mut World, i: usize, spell: u16) -> Result<(), &'stat
     if i > 19 {
         return Err("slot 1..20");
     }
+    // The game sends one change a second (FUN_100fc3c0): a call sooner would go nowhere.
+    if w.ext_job_sent.is_some_and(|t| t.elapsed() < THROTTLE) {
+        return Err("one change a second: wait and call again");
+    }
     let cur = slot(w, side, i);
     if spell == 0 {
         if cur == 0 {

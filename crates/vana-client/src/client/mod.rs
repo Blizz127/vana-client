@@ -1,7 +1,6 @@
 //! The windowed client: login and character select (in place of PlayOnline), then the world.
 
 mod actmotion;
-mod battlemod;
 mod border;
 mod chair;
 mod charlnk;
@@ -41,6 +40,7 @@ mod augment;
 mod buffs;
 mod bump;
 mod camera;
+mod catalogue;
 mod cfgapply;
 mod clock;
 mod configui;
@@ -69,8 +69,8 @@ mod modsui;
 mod myroom;
 pub mod net;
 mod notes;
-mod pending;
 pub(crate) mod perf;
+mod portrait;
 pub mod script;
 pub mod select;
 mod settings;
@@ -458,6 +458,8 @@ struct Opts {
     /// The scenery drawn as lines, and the game font's text in the TrueType face (a mod's switches).
     wireframe: bool,
     ttf_text: bool,
+    /// The synthesis window asks how many after Synthesize (ours; the bundled Synthesis Amount).
+    synth_amount: bool,
 }
 
 impl Default for Opts {
@@ -479,6 +481,7 @@ impl Default for Opts {
             menu_reach: true,
             wireframe: false,
             ttf_text: false,
+            synth_amount: false,
         }
     }
 }
@@ -2475,7 +2478,7 @@ fn world_hud(
                     world.line_hist.record(&text);
                     let text = fep::outgoing(world, text);
                     if world.lua.synth_enter {
-                        lua::run_line(world, &text, textcmd::Mode::Typed, lua::From::Mod { mods: false });
+                        lua::run_line(world, &text, textcmd::Mode::Typed, lua::From::Mod { mods: false, input: false });
                     } else {
                         textcmd::run(world, &text, textcmd::Mode::Typed);
                     }
@@ -2587,19 +2590,8 @@ fn world_hud(
                     world.full_log = Some(logwin::FullLog::open(sh));
                     world.log_active = false;
                 }
-                // The map overlay closes first (after the windows, below).
-                egui::Key::Escape if world.log_active && world.overlay.is_none() => world.log_active = false,
+                egui::Key::Escape if world.log_active => world.log_active = false,
                 egui::Key::A if modifiers.ctrl || modifiers.alt => send_chat(world, "/attack".into()),
-                // Extra: the map overlay (a free Ctrl / Alt letter in retail's key set).
-                egui::Key::O if (modifiers.ctrl || modifiers.alt) && world.map_overlay => {
-                    if world.overlay.take().is_none() {
-                        let o = map::Overlay::open(world, gu.map_regions());
-                        if !o.has_map() {
-                            world.sounds.push(crate::audio::Ui::Error as u32);
-                        }
-                        world.overlay = Some(o);
-                    }
-                }
                 // The palette (FUN_101a3960): Left / Right move the cursor (wrapping), Down / Up the next / previous set,
                 // Enter runs the cell and closes, Escape closes. Other keys pass (Ctrl / Alt + M opens magic).
                 egui::Key::ArrowLeft
@@ -2704,7 +2696,7 @@ fn world_hud(
                 egui::Key::T
                     if !modifiers.ctrl
                         && !modifiers.alt
-                        && world.extra_timers
+                        && world.lua.timers_panels().iter().any(Option::is_some)
                         && world.win.is_none()
                         && world.menu.is_none()
                         && world.config.is_none()
@@ -2863,7 +2855,7 @@ fn world_hud(
                 {
                     let engaged = world.my_motion.status == 1;
                     // Ours (the modern UI): the suggestions above the commands are rows of the same ring.
-                    let sugg = if world.modern { world.root_sugg.len() } else { 0 };
+                    let sugg = if world.modern { world.battle_rows.len() } else { 0 };
                     let on_sugg = world.suggest_sel.filter(|&k| k < sugg);
                     // A family suggestion's submenu takes its keys first.
                     let family = suggest::family_key(world, on_sugg, *key);
@@ -2899,7 +2891,7 @@ fn world_hud(
                             combat::right(world);
                         }
                         egui::Key::Enter if on_sugg.is_some() => {
-                            if let Some(sg) = on_sugg.and_then(|k| world.root_sugg.get(k)).cloned() {
+                            if let Some(sg) = on_sugg.and_then(|k| world.battle_rows.get(k)).cloned() {
                                 listsearch::pick_root(world, sg.action, sg.target.as_deref());
                             }
                         }
@@ -2936,7 +2928,6 @@ fn world_hud(
                     modern::command_key(world, *key)
                 }
                 egui::Key::Escape if world.menu.is_some() => world.menu = None,
-                egui::Key::Escape if world.overlay.is_some() => world.overlay = None,
                 // FUN_102110c0: the raise prompt refuses Escape (+0x39 = 0: SE 0004) and keeps the key.
                 egui::Key::Escape if dead && world.ko_offer == 2 && world.confirm.is_none() => {
                     world.sounds.push(crate::audio::Ui::Error as u32)
@@ -3771,16 +3762,6 @@ fn world_hud(
     }
     // The Lua mods' HUD elements, over the plates and under every window.
     lua::draw_hud(gu, world);
-    if world.overlay.as_ref().is_some_and(|o| o.zone != world.pos_zone) {
-        world.overlay = Some(map::Overlay::open(world, gu.map_regions()));
-    } else if let Some(mut o) = world.overlay.take() {
-        o.follow(world, gu.map_regions());
-        world.overlay = Some(o);
-    }
-    if let Some(o) = world.overlay.as_mut().filter(|_| !world.modern) {
-        let facing = world.net.me.lock().map_or(0.0, |m| event::rad_of(m.dir));
-        o.draw(gu, (world.pos.x, world.pos.z), facing, sw, sh, world.map_opacity);
-    }
     if let Some(m) = world.cnq.as_mut() {
         region::poll_image(gu, m);
     }
@@ -3990,6 +3971,21 @@ fn world_hud(
     gu.log_top = Some(region[1]);
     gu.log_bottom = Some(region[1] + region[3]);
     gu.log_faded = region_faded;
+    // For mods (ui.native.rect "chat"): the log region and both windows at their full height.
+    if !world.modern {
+        let h1 = world.log.full_h();
+        let mut room = [log.rect[0], sh - 16.0 - h1, log.rect[2], h1];
+        if let Some(f) = &log2 {
+            let h2 = world.log2.full_h();
+            room = if second_mode == 2 {
+                let h = h1.max(h2);
+                [room[0], sh - 16.0 - h, f.rect[0] + f.rect[2] - room[0], h]
+            } else {
+                [room[0], room[1] - h2, room[2].max(f.rect[2]), h1 + h2]
+            };
+        }
+        world.lua.set_classic_chat(region, !region_faded, room);
+    }
     // The modern chat window stands for the log: stacked windows 2 px above the part of it showing (as it fades it
     // folds into its bottom edge).
     if world.modern
@@ -4029,7 +4025,6 @@ fn world_hud(
             blockers.extend(gu.window_rect(n, sw, sh));
         }
     }
-    blockers.extend(world.overlay.as_ref().filter(|o| o.has_map()).map(|o| o.rect));
     blockers.extend(world.minimap_rect);
     // Window 2 (FUN_10161d60): its frame, text and caption 740 at its own (x0 + textw - 352, y0); drawn before window 1,
     // which comes later in the window list (reopened after it), so window 1's caption sits over window 2's bottom edge.
@@ -4493,27 +4488,17 @@ fn world_hud(
                     let tid = world.target.unwrap_or(0);
                     let tint = name_colour(tid, e, world, |i| gu.ncol(i));
                     gu.wrapped_name(monstrosity::name(e), max, t.x, t.y, tint, true, e.no_gauge);
-                    // Extras: the distance left of the HP gauge, the HP percent at the window's right, on the gauge's row.
+                    // The mods' slots (the bundled Target Info's): the distance left of the HP gauge, the HP percent at the
+                    // window's right, on the gauge's row.
                     if !e.no_gauge {
-                        if world.target_distance {
-                            gu.shape_text(
-                                &format!("{:.1}", e.pos.distance(world.pos)),
-                                t.x,
-                                t.y + 17.0,
-                                0x8080_8080,
-                                false,
-                            );
+                        if let Some(d) = world.lua.slot_num("target_distance") {
+                            gu.shape_text(&format!("{:.1}", d as f32), t.x, t.y + 17.0, 0x8080_8080, false);
                         }
-                        if world.target_hpp
+                        if let Some(h) = world.lua.slot_num("target_hpp")
                             && let Some(r) = rect
                         {
-                            gu.shape_text(
-                                &format!("{}%", e.hpp),
-                                r[0] + r[2] - 6.0,
-                                t.y + 17.0,
-                                gu.hp_tint(e.hpp),
-                                true,
-                            );
+                            let h = h.clamp(0.0, 255.0) as u8;
+                            gu.shape_text(&format!("{h}%"), r[0] + r[2] - 6.0, t.y + 17.0, gu.hp_tint(h), true);
                         }
                     }
                 }
@@ -5467,6 +5452,14 @@ impl Default for NationShow {
     }
 }
 
+/// `s` (an actor's drawn source) as the look before the mods' (render.look): a player look is its look_base.
+fn base_source(w: &World, id: u32, s: Source) -> Source {
+    match s {
+        Source::Pc(_) => w.look_base.get(&id).map_or(s, |l| Source::Pc(*l)),
+        other => other,
+    }
+}
+
 /// A character drawn with its real model: our own, or another player's.
 /// What an actor is drawn from: a player-style look, or an NPC/monster look.
 #[derive(Clone, Copy, Debug)]
@@ -5484,6 +5477,8 @@ struct Actor {
     source: Option<Source>,
     character: Option<Arc<Model>>,
     gpu: Option<crate::render::ActorGpu>,
+    /// A changed look's model while its GPU copy goes up: the old one stays drawn (and targetable) until then.
+    next: Option<Arc<Model>>,
     /// Motion playing, and ticks (1/60 s, scaled by its rate) since it started.
     motion: String,
     ticks: f32,
@@ -5665,6 +5660,7 @@ impl Actor {
             source: None,
             character: None,
             gpu: None,
+            next: None,
             motion: String::new(),
             ticks: 0.0,
             prev: None,
@@ -6791,6 +6787,9 @@ struct World {
     costume_base: HashMap<u32, Source>,
     /// Changed looks waiting while their actor is held (FUN_10095dd0 waits for FUN_10095850).
     held_looks: Vec<(u32, Source)>,
+    /// Each actor's last player look before the mods' (render.look), and the mods' version it was built with.
+    look_base: HashMap<u32, Look>,
+    models_ver: u64,
     /// Event op 0xab 0x11 (DAT_1035af3c != -1): once no event runs, every model but ours is built again.
     rebuild_models: bool,
     /// Our riding fields (0x037, 0x067), and every rider's state (ride.rs).
@@ -7253,31 +7252,19 @@ struct World {
     log_find: Option<String>,
     /// The main menu's map window, and the key item bits by word (table * 16 + word, s2c 0x055).
     map: Option<map::MapWin>,
-    /// The map overlay (extra, Ctrl / Alt + O).
-    overlay: Option<map::Overlay>,
+    /// Extra: the map overlay's opacity (HUD maps take it unless a mod gives its own; the minimap's marker shades by
+    /// it) and the synthesis amount.
     map_opacity: f32,
-    /// Extras: the map overlay and the synthesis amount.
-    map_overlay: bool,
-    synth_amount: bool,
-    /// Config `stamp_all_lines` (extra).
+    /// Per-window opacity the player set (config `window_opacity`).
+    window_opacity: std::collections::BTreeMap<String, f32>,
+    /// Retail's chat timestamps on every log line (client option stamp_all_lines; the bundled Timestamps mod).
     stamp_all_lines: bool,
     /// The skillchain helper's resonances and seen skills (client/skillchain.rs).
     skillchain: skillchain::Tracker,
-    /// Config `target_distance` / `target_hpp` / `auto_advance` (extras).
-    target_distance: bool,
-    target_hpp: bool,
-    auto_advance: u32,
     /// The lamps' lights (client/lamps.rs, Settings' Lamp Lights).
     lamps: lamps::Lamps,
     /// The actor shadows' light-state slots (client/shadows.rs).
     shadow_slots: shadows::Slots,
-    /// Config `earth_clock` (an extra, client/clock.rs), `hide_trust_speech` and `hide_ready_lines`.
-    earth_clock: bool,
-    hide_trust_speech: bool,
-    hide_ready_lines: bool,
-    /// Config `short_battle` / `battle_name_colours` (extras, client/battlemod.rs).
-    short_battle: bool,
-    name_colours: bool,
     key_items: Vec<u32>,
     /// "Downloading data ..." (menu chdummy in mode 2, FUN_1022eca0): when it opened; up from the lobby's
     /// world entry or the server's zone change until the zone has loaded (FUN_100135c0 closes it).
@@ -7311,11 +7298,12 @@ struct World {
     favourites: Vec<String>,
     fav_strip: bool,
     fav_save: bool,
-    /// The action we asked the server for and its answer so far (pending.rs).
-    asked: Option<pending::Pending>,
     /// The battle menu's suggestions (suggest.rs::refresh_root), when they were taken, and the one the cursor is on.
     root_sugg: Vec<suggest::Suggestion>,
     root_sugg_at: Option<Instant>,
+    /// The rows above the battle menu's commands: a mod's (ui.native.slot battle_rows), and that slot's value.
+    battle_rows: Vec<suggest::Suggestion>,
+    battle_src: serde_json::Value,
     suggest_sel: Option<usize>,
     /// The open family submenu of the suggestion under the cursor: its cursor in the group.
     suggest_sub: Option<usize>,
@@ -7569,14 +7557,8 @@ struct World {
     /// Each 0x119 timer's Calc1 / Calc2 (the charge shares' adjustments).
     ability_calc: HashMap<u16, (u8, i16)>,
     recasts_seen: bool,
-    /// Extras: the Timers window (on, dock) and its state.
-    extra_timers: bool,
-    /// Extra: the training regime window (client/regime.rs).
-    extra_regime: bool,
-    /// Config `skillchain_helper` (extra).
-    extra_skillchain: bool,
-    /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
-    extra_minimap: bool,
+    /// The minimap (client/minimap.rs; the bundled Minimap mod's window): its map, its rect this frame, its config and
+    /// an unsaved zoom.
     minimap: Option<map::Overlay>,
     minimap_rect: Option<[f32; 4]>,
     minimap_frame: Option<minimap::Frame>,
@@ -7600,6 +7582,7 @@ struct World {
     inv_free: Option<u32>,
     sort_hold: bool,
     sort_wait: f32,
+    /// The Timers' classic dock and their state (the bundled Timers mod's windows).
     timers_dock: u32,
     timers: timers::Timers,
     regime: regime::Tracker,
@@ -7968,6 +7951,8 @@ pub struct App {
     /// A mod's recording (client.record), and the mods' post-process passes (render.shader).
     recorder: Option<record::Recorder>,
     post_fx: Option<crate::render::postfx::PostFx>,
+    /// The Lua HUD's portrait targets (client/portrait.rs).
+    portraits: portrait::Portraits,
     /// Frames per second, 0 = unlimited (config frame_limit), and the present mode must be picked again.
     frame_limit: u32,
     present_dirty: bool,
@@ -8259,6 +8244,7 @@ impl App {
             lobby_mods: Default::default(),
             recorder: None,
             post_fx: None,
+            portraits: Default::default(),
             frame_limit,
             present_dirty: false,
             window_dirty: false,
@@ -8382,20 +8368,9 @@ impl App {
             w.condense = self.cfg.modern_condense;
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.map_opacity = self.cfg.map_overlay_opacity;
-            w.map_overlay = self.cfg.map_overlay;
-            w.synth_amount = self.cfg.synth_amount;
-            w.stamp_all_lines = self.cfg.stamp_all_lines;
-            (w.target_distance, w.target_hpp, w.auto_advance) =
-                (self.cfg.target_distance, self.cfg.target_hpp, self.cfg.auto_advance);
-            (w.earth_clock, w.hide_trust_speech, w.hide_ready_lines) =
-                (self.cfg.earth_clock, self.cfg.hide_trust_speech, self.cfg.hide_ready_lines);
-            (w.short_battle, w.name_colours) = (self.cfg.short_battle, self.cfg.battle_name_colours);
-            w.extra_timers = self.cfg.timers;
-            w.extra_regime = self.cfg.regime;
-            w.extra_skillchain = self.cfg.skillchain_helper;
+            w.window_opacity = self.cfg.window_opacity.clone();
             w.timers_dock = self.cfg.timers_dock;
-            (w.extra_minimap, w.minimap_dock, w.minimap_size) =
-                (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
+            (w.minimap_dock, w.minimap_size) = (self.cfg.minimap_dock, self.cfg.minimap_size);
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
         self.window_dirty = true;
@@ -9374,22 +9349,12 @@ impl App {
                             follow: None,
                             translating: false,
                             last_proposer: String::new(),
-                            overlay: None,
                             map_opacity: self.cfg.map_overlay_opacity,
-                            map_overlay: self.cfg.map_overlay,
-                            synth_amount: self.cfg.synth_amount,
-                            stamp_all_lines: self.cfg.stamp_all_lines,
+                            window_opacity: self.cfg.window_opacity.clone(),
+                            stamp_all_lines: false,
                             skillchain: Default::default(),
-                            target_distance: self.cfg.target_distance,
-                            target_hpp: self.cfg.target_hpp,
-                            auto_advance: self.cfg.auto_advance,
-                            earth_clock: self.cfg.earth_clock,
                             lamps: Default::default(),
                             shadow_slots: Default::default(),
-                            hide_trust_speech: self.cfg.hide_trust_speech,
-                            hide_ready_lines: self.cfg.hide_ready_lines,
-                            short_battle: self.cfg.short_battle,
-                            name_colours: self.cfg.battle_name_colours,
                             target_since: Instant::now(),
                             cam_turn: (0.0, 0.0),
                             sounds: Vec::new(),
@@ -9554,6 +9519,8 @@ impl App {
                             costumes: HashMap::new(),
                             costume_base: HashMap::new(),
                             held_looks: Vec::new(),
+                            look_base: HashMap::new(),
+                            models_ver: 0,
                             rebuild_models: false,
                             my_ride: Default::default(),
                             my_aura: Default::default(),
@@ -9607,9 +9574,10 @@ impl App {
                             favourites: self.cfg.modern_favourites.get(&login.name).cloned().unwrap_or_default(),
                             fav_strip: self.cfg.modern_fav_strip,
                             fav_save: false,
-                            asked: None,
                             root_sugg: Vec::new(),
                             root_sugg_at: None,
+                            battle_rows: Vec::new(),
+                            battle_src: serde_json::Value::Null,
                             suggest_sel: None,
                             suggest_sub: None,
                             party_hp_max: HashMap::new(),
@@ -9754,10 +9722,6 @@ impl App {
                             spell_total: HashMap::new(),
                             ability_total: HashMap::new(),
                             ability_calc: HashMap::new(),
-                            extra_timers: self.cfg.timers,
-                            extra_regime: self.cfg.regime,
-                            extra_skillchain: self.cfg.skillchain_helper,
-                            extra_minimap: self.cfg.minimap,
                             minimap: None,
                             minimap_rect: None,
                             minimap_frame: None,
@@ -9867,9 +9831,12 @@ impl App {
                         let files: Vec<u32> = ch.files.iter().chain(&ch.part_files).copied().collect();
                         world.effects.preload(&files);
                         for a in world.actors.values_mut().filter(|a| a.key == key) {
-                            if a.character.is_none() {
-                                wepfx::seed(a, &ch);
+                            // Drawn already: the old model stays until the new one is on the GPU.
+                            if a.character.is_some() {
+                                a.next = Some(ch.clone());
+                                continue;
                             }
+                            wepfx::seed(a, &ch);
                             a.character = Some(ch.clone());
                             a.gpu = None;
                             (a.motion_names, a.rebase, a.fresh) = (None, true, true);
@@ -10628,7 +10595,6 @@ impl App {
                     world.my_id = char_id;
                     world.name = name;
                     timers::on_zone(world);
-                    regime::on_zone(world);
                     seacom::zone_in(world);
                     world.entities.clear();
                     world.new_challenge = false;
@@ -11122,17 +11088,10 @@ impl App {
                         vec![m.actor.into(), m.target.into(), m.message.into(), m.data[0].into(), m.data[1].into()],
                     );
                     timers::on_message(world, m.target, m.data[0] as u32, m.message);
-                    regime::on_battle(world, &m);
                     combat::on_battle_message(world, &m);
                 }
-                NetEvent::Event(s) => {
-                    regime::on_event_start(world, &s);
-                    event::queue(world, s)
-                }
-                NetEvent::EventParams(n) => {
-                    regime::on_params(world, n);
-                    event::params(world, n)
-                }
+                NetEvent::Event(s) => event::queue(world, s),
+                NetEvent::EventParams(n) => event::params(world, n),
                 NetEvent::EventStrings(s) => event::strings(world, s),
                 NetEvent::EventRelease { mode, event: e } => event::release(world, mode, e),
                 NetEvent::Fish(p) => fishing::on_fish(world, p),
@@ -11639,17 +11598,41 @@ impl App {
         // Looks the event scripts changed (op 0xb6) load like the server's; held ones go first, newer ones win.
         looks.extend(std::mem::take(&mut world.event_looks));
         looks.splice(0..0, std::mem::take(&mut world.held_looks));
+        // The mods' looks changed (render.look): every player look in sight again, before the newer ones.
+        let (models_ver, models) = world.lua.models();
+        if models_ver != world.models_ver {
+            world.models_ver = models_ver;
+            let again: Vec<(u32, Source)> = world
+                .look_base
+                .iter()
+                .filter(|(id, _)| **id == world.my_id || world.entities.contains_key(id))
+                .map(|(id, l)| (*id, Source::Pc(*l)))
+                .collect();
+            looks.splice(0..0, again);
+        }
         // Load a character model whenever an actor's look is new or changed.
         let mut wanted = Vec::new();
         for (id, source) in looks {
             if matches!(source, Source::Pc(l) if l.race == 0) {
                 continue;
             }
+            // The look before the mods': what waits (held, under a costume) is normalized again when it comes back.
+            let base = source;
+            let source = match source {
+                Source::Pc(l) => {
+                    world.look_base.insert(id, l);
+                    Source::Pc(models.get(&id).map_or(l, |m| m.applied(l)))
+                }
+                other => {
+                    world.look_base.remove(&id);
+                    other
+                }
+            };
             // FUN_100d2f60 case 2: in costume the model is the costume's whatever the look; the look waits for it to
             // come off.
             let source = match costume::worn(world, id) {
                 Some(c) if !costume::is_model(&source, c) => {
-                    world.costume_base.insert(id, source);
+                    world.costume_base.insert(id, base);
                     continue;
                 }
                 _ => source,
@@ -11661,7 +11644,7 @@ impl App {
             // FUN_10095dd0: a changed look waits while its actor is held (busy +0x11c: ops 0x1f / 0x20 / 0x59, a load).
             if world.actors.get(&id).is_some_and(|a| a.character.is_some() && a.key != key) && combat::held(world, id) {
                 world.held_looks.retain(|l| l.0 != id);
-                world.held_looks.push((id, source));
+                world.held_looks.push((id, base));
                 continue;
             }
             let actor = world.actors.entry(id).or_insert_with(Actor::new);
@@ -11682,17 +11665,21 @@ impl App {
             // The off-hand flag is drawobj +0x840 bit 6, so a new model starts without it.
             actor.off_hand = false;
             actor.source = Some(source);
-            // A look already loaded is shared at once; one load serves every actor waiting for it.
+            // A look already loaded is shared at once; one load serves every actor waiting for it. An actor already
+            // drawn keeps its old model until the new one is on the GPU (no blink: retail drops it and its target).
+            actor.next = None;
             if let Some(m) = world.models.get(&key) {
-                if actor.character.is_none() {
+                if actor.character.is_some() {
+                    actor.next = Some(m.clone());
+                } else {
                     wepfx::seed(actor, m);
+                    actor.character = Some(m.clone());
+                    actor.gpu = None;
+                    (actor.motion_names, actor.rebase, actor.fresh) = (None, true, true);
+                    (actor.rest, actor.bones, actor.motion_link) =
+                        (crate::dat::character::pose(&m.skeleton, &[]), Vec::new(), None);
+                    (actor.anchors, actor.anchor_at) = (ANCHORS, [None; 2]);
                 }
-                actor.character = Some(m.clone());
-                actor.gpu = None;
-                (actor.motion_names, actor.rebase, actor.fresh) = (None, true, true);
-                (actor.rest, actor.bones, actor.motion_link) =
-                    (crate::dat::character::pose(&m.skeleton, &[]), Vec::new(), None);
-                (actor.anchors, actor.anchor_at) = (ANCHORS, [None; 2]);
             } else if world.models_loading.insert(key.clone()) {
                 wanted.push((key, source));
             }
@@ -13139,7 +13126,7 @@ impl App {
         if let Some(line) = world.macros.as_mut().filter(|_| !sub_up).and_then(|m| m.step(dt * 60.0)) {
             let line = crate::dat::font::decode_sjis(&line);
             if by_mod {
-                lua::run_line(world, &line, textcmd::Mode::Macro, lua::From::Mod { mods: false });
+                lua::run_line(world, &line, textcmd::Mode::Macro, lua::From::Mod { mods: false, input: false });
             } else {
                 textcmd::run(world, &line, textcmd::Mode::Macro);
             }
@@ -15328,11 +15315,12 @@ impl App {
                     s.monitors = self.monitors.clone();
                     s.gpus = self.gpus.clone();
                     s.in_game = true;
-                    if kind == settings::Kind::Extras {
-                        s.mod_pages = world.lua.settings_pages();
-                        if let Some(id) = world.lua.open_page.take() {
-                            s.goto_mod(&id);
-                        }
+                    // The installed mods' settings pages.
+                    s.set_mod_pages(world.lua.settings_pages());
+                    if kind == settings::Kind::Extras
+                        && let Some(id) = world.lua.open_page.take()
+                    {
+                        s.goto_mod(&id);
                     }
                     world.settings = Some(s);
                 }
@@ -15342,11 +15330,28 @@ impl App {
                 // The Lua mods' settings changed on their Extras pages.
                 let changes = world.settings.as_mut().map(|s| std::mem::take(&mut s.mod_changes)).unwrap_or_default();
                 if !changes.is_empty() {
+                    let toggled = changes.iter().any(|c| c.1 == lua::ENABLED);
+                    // A setting that is a sound (manifest preview_sound): the sound its new value picks.
+                    for (id, key, value) in &changes {
+                        let base = world
+                            .settings
+                            .as_ref()
+                            .and_then(|s| s.mod_pages.iter().find(|p| &p.id == id))
+                            .and_then(|p| p.rows.iter().find(|r| &r.key == key))
+                            .and_then(|r| r.preview);
+                        if let (Some(base), Some(v)) = (base, value.as_u64()) {
+                            world.sounds.push(base + v as u32);
+                        }
+                    }
                     let mut mods = std::mem::take(&mut world.lua);
                     for (id, key, value) in changes {
                         mods.apply_setting(world, &id, &key, value);
                     }
                     world.lua = mods;
+                    // A mod turned on, off or installed: the pages follow.
+                    if toggled && let Some(s) = world.settings.as_mut() {
+                        s.set_mod_pages(world.lua.settings_pages());
+                    }
                 }
                 if let Some(s) = world.settings.as_mut().filter(|s| s.dirty) {
                     s.dirty = false;
@@ -15984,7 +15989,6 @@ impl App {
             combat::battle_frame(w);
             synth::update(w);
             resttick::update(w);
-            pending::update(w);
             servmes::frame(w);
             ranking::frame(w);
             // A server's certificate pin that could not be saved: told once a run.
@@ -16075,7 +16079,12 @@ impl App {
         };
         let keyboard = matches!(&self.phase, Phase::World(w) if w.swkbd.is_some());
         let ctx = gamepad::Ctx { menu, palette, tabs, field, keyboard };
-        let pad = self.gamepad.poll(&self.cfg, gfx.window.has_focus(), ctx, dt);
+        let phase = &mut self.phase;
+        let mut to_mods = |b: &[u8], a: [f32; 6], on: bool| match phase {
+            Phase::World(w) => lua::input::pad_filter(w, b, a, on),
+            _ => Vec::new(),
+        };
+        let pad = self.gamepad.poll(&self.cfg, gfx.window.has_focus(), ctx, dt, &mut to_mods);
         self.input.set_pad(pad.pad);
         self.input.set_stick(pad.stick);
         self.keep_awake.update(pad.used);
@@ -16206,9 +16215,15 @@ impl App {
             if let Some(n) =
                 action.as_deref().and_then(|a| a.strip_prefix("wheel:")).and_then(|n| n.parse::<f32>().ok())
             {
-                // Over a modern panel it is egui's, as egui-winit consumes the window's; off the world (the lobby's
-                // windows read it from egui) too.
-                if (consumed && matches!(&self.phase, Phase::World(w) if w.modern))
+                // The mods' mouse filters first, as the window's wheel goes. Over a modern panel it is egui's, as
+                // egui-winit consumes the window's; off the world (the lobby's windows read it from egui) too.
+                let taken = match &mut self.phase {
+                    Phase::World(w) => lua::input::drive_wheel(w, n),
+                    _ => false,
+                };
+                if taken {
+                    // A mod's.
+                } else if (consumed && matches!(&self.phase, Phase::World(w) if w.modern))
                     || !matches!(&self.phase, Phase::World(_))
                 {
                     let (unit, delta, phase, source) = (
@@ -16628,6 +16643,14 @@ impl App {
                 None
             };
             let ev_clock = event::clock(w);
+            // The Lua HUD's portraits: each wanted actor's face camera (client/portrait.rs).
+            let portrait_cams: Vec<(lua::hud::Wanted, crate::render::Camera)> = w
+                .lua
+                .portraits_wanted()
+                .into_iter()
+                .take(portrait::SLOTS)
+                .filter_map(|p| Some((p, portrait::camera(w, &places, p.entity, p.look.oval)?)))
+                .collect();
             if let Some(r) = &mut w.renderer {
                 if let Some(l) = &new_lamps {
                     r.set_lamps(&gfx.gpu, &l.iter().map(|l| (l.pos, l.slot)).collect::<Vec<_>>());
@@ -16838,6 +16861,19 @@ impl App {
                     w.pos,
                 );
                 for (id, a) in w.actors.iter_mut() {
+                    // A changed look goes up in the background; the swap is one frame, the old model drawn till then.
+                    if let Some(nx) = a.next.clone()
+                        && let Some(g) = r.skinned_actor(&gfx.gpu, &nx)
+                    {
+                        a.next = None;
+                        a.character = Some(nx.clone());
+                        a.gpu = Some(g);
+                        a.top_key.clear();
+                        (a.motion_names, a.rebase, a.fresh) = (None, true, true);
+                        (a.rest, a.bones, a.motion_link) =
+                            (crate::dat::character::pose(&nx.skeleton, &[]), Vec::new(), None);
+                        (a.anchors, a.anchor_at) = (ANCHORS, [None; 2]);
+                    }
                     let Some(ch) = a.character.clone() else { continue };
                     let Some(&Place { pos, forward, tilt, status, ratio, size }) = places.get(id) else { continue };
                     if a.gpu.is_none() {
@@ -17722,6 +17758,19 @@ impl App {
                     || r.render(&gfx.gpu, &mut encoder, &scene_raw, &scene_depth, &camera, aspect, &actors),
                 );
                 mark!("scene");
+                // The portraits, of actors drawn this frame.
+                let want: Vec<(lua::hud::Wanted, crate::render::Camera, &crate::render::ActorGpu)> =
+                    portrait_cams.iter().filter_map(|(p, c)| Some((*p, *c, *drawn_map.get(&p.entity)?))).collect();
+                let drawn = self.portraits.draw(
+                    &gfx.gpu,
+                    &mut gfx.egui_renderer,
+                    self.game_ui.as_mut(),
+                    r,
+                    &mut encoder,
+                    scene_fmt,
+                    &want,
+                );
+                w.lua.set_portraits(drawn);
                 // The actors' ground shadows over the scene (client/shadows.rs, render/shadow.rs).
                 if !r.has_shadow_texture()
                     && let Some(t) = w.index.as_ref().and_then(|i| shadows::kage_texture(i))
@@ -18605,23 +18654,6 @@ impl ApplicationHandler for App {
                 {
                     self.mouse.visible = true;
                 }
-                // A left-drag that starts on the map overlay pans it instead of turning the camera.
-                let k = self.ui_k;
-                let on_overlay = |w: &World, p: (f64, f64)| {
-                    w.overlay
-                        .as_ref()
-                        .is_some_and(|o| o.has_map() && inside(&o.rect, (p.0 as f32 * k.0, p.1 as f32 * k.1)))
-                };
-                if let (true, Some(a), Some((x, y)), Phase::World(world)) =
-                    (self.left_down, self.press_at, self.last_cursor, &mut self.phase)
-                    && on_overlay(world, a)
-                {
-                    if let Some(o) = world.overlay.as_mut() {
-                        o.pan((position.x - x) as f32 * k.0, (position.y - y) as f32 * k.1);
-                    }
-                    self.last_cursor = Some((position.x, position.y));
-                    return;
-                }
                 let looking = self.dragging
                     || self.middle_down
                     || (self.left_down
@@ -18651,13 +18683,6 @@ impl ApplicationHandler for App {
                     };
                     let k = self.ui_k;
                     let at = self.last_cursor.map(|c| (c.0 as f32 * k.0, c.1 as f32 * k.1));
-                    if let (Some(o), Some(p)) = (world.overlay.as_mut(), at)
-                        && o.has_map()
-                        && inside(&o.rect, p)
-                    {
-                        o.zoom_at(p, d);
-                        return;
-                    }
                     if at.is_some_and(|p| minimap::wheel(world, p, d)) {
                         return;
                     }

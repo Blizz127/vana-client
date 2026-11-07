@@ -1,0 +1,27 @@
+name = "Pad Bars"
+version = "1.0.0"
+description = "Controller crossbars: hold LT or RT and the d-pad and face buttons use that side's eight actions, set per job (the crossbar add-ons)."
+permissions = ["automation", "input.capture"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Pad Bars"
+help = "With a controller: hold LT (left side) or RT (right side) and press the d-pad or a face button to use that slot. //padbars opens the editor. While on, LT and RT belong to the bars."
+
+[settings.size]
+type = "int"
+default = 46
+min = 30
+max = 72
+step = 2
+label = "Slot Size"
+
+[settings.offset_y]
+type = "int"
+default = 12
+min = 0
+max = 600
+step = 4
+label = "Distance from Bottom"
+help = "How far the bars sit above the bottom of the screen, or above the chat window when that is under them."

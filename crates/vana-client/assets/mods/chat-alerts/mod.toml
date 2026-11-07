@@ -1,0 +1,74 @@
+name = "Chat Alerts"
+version = "1.0.0"
+description = "A call sound when you get a tell, someone says your name or a word you chose, invites you or checks you (the chat monitor add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Chat Alerts"
+help = "Plays one of the game's call sounds when chat needs your attention."
+
+[settings.sound]
+type = "int"
+default = 0
+min = 0
+max = 21
+step = 1
+label = "Sound"
+help = "Which of the game's call sounds (<call0> to <call21>) plays."
+preview_sound = 17
+
+[settings.tells]
+type = "bool"
+default = true
+label = "Tells"
+help = "When someone sends you a tell."
+
+[settings.mentions]
+type = "bool"
+default = true
+label = "Your Name"
+help = "When someone says your name in say, shout, yell, party or linkshell chat."
+
+[settings.party]
+type = "bool"
+default = false
+label = "Party Chat"
+help = "On every party line from someone else."
+
+[settings.linkshell]
+type = "bool"
+default = false
+label = "Linkshell Chat"
+help = "On every linkshell line from someone else."
+
+[settings.invites]
+type = "bool"
+default = true
+label = "Invites"
+help = "When you are invited to a party or an alliance."
+
+[settings.examined]
+type = "bool"
+default = false
+label = "Checked"
+help = "When someone checks you."
+
+[settings.emotes]
+type = "bool"
+default = false
+label = "Emotes at You"
+help = "When someone uses an emote on you."
+
+[settings.away]
+type = "bool"
+default = false
+label = "Only When Away"
+help = "Only while the game window does not have the keyboard."
+
+[settings.words]
+type = "string"
+default = ""
+label = "Words"
+help = "More words to listen for in any chat line, separated by commas."

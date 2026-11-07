@@ -1,0 +1,15 @@
+name = "Trust Speech"
+version = "1.0.0"
+description = "Shows or hides what your trusts say in the chat log (the trust chatter filters)."
+permissions = ["packets.read", "packets.write"]
+
+[settings.hide]
+type = "bool"
+default = false
+options = ["Shown", "Hidden"]
+values = [false, true]
+label = "Trust Speech"
+help = "Shows or hides what your trusts say in the chat log."
+tab = "Battle"
+place = 2
+from = "hide_trust_speech"
