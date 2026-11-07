@@ -922,6 +922,10 @@ function game.bag_size(bag) end
 ---@return table<integer, {number: integer, name: string, repeatable: boolean, current: boolean, completed: boolean}[]>
 function game.quests() end
 
+--- The zone lines of the zone we are in (its boxes that zone us when touched): name (8 letters: its own tag, then its destination's), centre {x, y, z}, size {x, y, z}, yaw (radians), corners (the four corners of its floor, {x, y, z} each, in order around it). Entity coordinates (y down).
+---@return {name: string, centre: table, size: table, yaw: number, corners: table[]}[]
+function game.zone_lines() end
+
 --- Records of Eminence: sparks, and active (the objectives set, each {slot, id, progress}; id n is res.item(0xE000 + n)'s objective).
 ---@return {sparks: integer, active: {slot: integer, id: integer, progress: integer}[]}
 function game.roe() end

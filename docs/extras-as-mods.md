@@ -457,6 +457,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   names `//mapnote track` follows, each a dot with its label. The Map Overlay mod provides its box and view
   (`mods.provide("view")`); its own look is unchanged. Seen live in Southern San d'Oria: a note at our marker and the
   tracked Rumoie beside it.
+- **Exit Markers** (assets/mods/exit-markers; ZoneLines, off by default): each zone line within range (a setting)
+  outlined on the ground with a post at each corner, in a colour setting. New `game.zone_lines` (the zone's own 'z'
+  boxes: centre, size, yaw, the floor's corners; dat::zone Region::corners, tested against its containment). The box
+  reaches below the street, so the outline is drawn at our feet' height while that is within the box. Seen live at
+  Southern San d'Oria's east gate.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
 

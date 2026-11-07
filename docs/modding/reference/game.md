@@ -269,6 +269,39 @@ for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
 end
 ```
 
+## `game.zone_lines`
+
+```lua
+game.zone_lines() -> table[]
+```
+
+The zone lines of the zone we are in: the boxes in the zone's data that zone us when we touch them (their names are 8
+letters, the line's own tag and its destination's).
+
+**Returns** a list of:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | `string` | Its 8-letter name. |
+| `centre` | `{x, y, z}` | The box's centre. |
+| `size` | `{x, y, z}` | Its size along its own axes. |
+| `yaw` | `number` | Its turn about the vertical, in radians. |
+| `corners` | `{x, y, z}[]` | The four corners of the floor it stands on (its bottom face), in order around it. |
+
+Entity coordinates, as `game.entity().pos` (y goes down, so the floor is the centre's y plus half the height).
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for i, z in ipairs(game.zone_lines()) do
+  for k = 1, 4 do
+    draw.line("zl" .. i .. ":" .. k, { from = z.corners[k], to = z.corners[k % 4 + 1], colour = { 110, 220, 255, 220 } })
+  end
+end
+```
+
 ## `game.quests`
 
 ```lua

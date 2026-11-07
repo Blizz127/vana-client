@@ -834,6 +834,38 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // The zone's zone lines (its 'z' boxes with 8-character names): centre, size, yaw and the four corners of the
+    // floor they stand on (y down: the box's bottom is its centre's y plus half its height).
+    game.set(
+        "zone_lines",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            for r in &w.zone_lines {
+                let t = lua.create_table()?;
+                t.set("name", r.name.as_str())?;
+                let v = |x: f32, y: f32, z: f32| -> mlua::Result<Table> {
+                    let p = lua.create_table()?;
+                    p.set("x", x)?;
+                    p.set("y", y)?;
+                    p.set("z", z)?;
+                    Ok(p)
+                };
+                let [sx, sy, sz] = r.scale.map(f32::abs);
+                t.set("centre", v(r.pos[0], r.pos[1], r.pos[2])?)?;
+                t.set("size", v(sx, sy, sz)?)?;
+                t.set("yaw", r.rot[1])?;
+                let floor = r.pos[1] + sy / 2.0;
+                let corners = lua.create_table()?;
+                for c in r.corners() {
+                    corners.push(v(c[0], floor, c[1])?)?;
+                }
+                t.set("corners", corners)?;
+                out.push(t)?;
+            }
+            Ok(out)
+        })?,
+    )?;
     // Records of Eminence: the sparks and the objectives set, with their progress (s2c 0x110 / 0x111).
     game.set(
         "roe",
