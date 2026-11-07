@@ -1606,6 +1606,8 @@ mod panel_tests {
     #[test]
     fn skin_replaces_and_gives_back() {
         let ctx = egui::Context::default();
+        let mut o = ctx.run_ui(egui::RawInput { max_texture_side: Some(16384), ..Default::default() }, |_| {});
+        o.textures_delta.clear();
         let m = Modern::new(&ctx);
         let base = m.art.sprite("gauges/hp_full").unwrap();
         let img = std::sync::Arc::new((64u32, 8u32, vec![255u8; 64 * 8 * 4]));
