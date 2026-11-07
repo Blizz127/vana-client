@@ -447,6 +447,17 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   progress), list and delete; `//roeshow` lists what is set. New `game.roe`, `actions.roe_set` and
   `actions.roe_remove` (one change a second, as the list's). Seen live: First Step Forward set, saved, removed and put
   back by its set.
+
+### Built-ins that are not retail (the user, 2026-11-07)
+
+- **Focus and Last Target** (assets/mods/focus-target, on by default): the modern UI's focus panel (Steve's, PR #74)
+  as a mod. New: an ordinary window's `panel = "focus"` stands in for that panel (its place on the target panel,
+  `/uimodes`, hiding; not drawn while an event takes the target window down, nor in the classic UI), the `targets`
+  element (rows of entities drawn by the client as the panel's rows were; a click targets), and `game.player()`'s
+  `focus_target` / `last_target`. `<lt>` / `<ft>` stay the client's. Compared live with master: the same panel.
+- `/uimodes` lists every loaded mod's windows and HUD groups (the user: all mods' windows there): each a row with
+  Shown / Hidden per mode and a pin, faded as the built-in panels are. Seen live: Hotbars and the XP Tracker's
+  window hidden in Exploration.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

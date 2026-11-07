@@ -27,6 +27,8 @@ Your own character, as `game.player()` returns it. Fields that need data from th
 | `sub_job` | `integer?` | Support job id. |
 | `sub_level` | `integer?` | Support job level. |
 | `target` | `integer?` | Your target's server id; nil without a target. |
+| `focus_target` | `integer?` | The focus target's server id (`/focustarget`: a member of your party, not you); nil without one. |
+| `last_target` | `integer?` | The target before the current one, while it is here and can be targeted; nil otherwise. |
 | `away` | `boolean` | The /away flag as the server last sent it (/online clears it). |
 | `anonymous` | `boolean` | The /anon flag. |
 | `seeking` | `boolean` | Seeking a party (the search comment's flag). |

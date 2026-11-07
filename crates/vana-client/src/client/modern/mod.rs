@@ -304,11 +304,13 @@ impl Modern {
         *self.retail.borrow_mut() = w.retail_frames.iter().map(|r| Rect::from_min_size(pos2(r[0], r[1]), vec2(r[2], r[3]))).collect();
         topbar::draw(self, ctx, &w.hud_top.view);
         pointers(self, ctx, w);
-        // The Lua mods' HUD elements, under every panel, as the modern layer draws its own.
-        hudmods::draw(self, ctx, gu, w);
         let focus = focus_panel(w);
         let mode = modes::current(w, &self.engaged_at, focus);
-        let vis = modes::visibility(ctx, &cfg.modern_modes, mode);
+        let mod_windows = w.lua.mode_windows();
+        let vis = modes::visibility(ctx, &cfg.modern_modes, mode, &mod_windows);
+        // The Lua mods' HUD elements, under every panel, as the modern layer draws its own (each HUD window faded by
+        // the mode as a panel is).
+        hudmods::draw(self, ctx, gu, w, &vis);
         // Places per display: this window size and UI scale's layout, else the character's last one (the
         // template); a change saves both. A display shown the template for 2 s keeps it as its own, so a change on
         // another display doesn't move its panels; sizes passed through while resizing store nothing.
@@ -381,7 +383,7 @@ impl Modern {
         charlnk::draw(&mut p, w);
         mogdoor(&mut p, w);
         event_input(&mut p, w);
-        if modes::editor(&mut p, &mut w.uimodes_open, &mut cfg.modern_modes, mode) {
+        if modes::editor(&mut p, &mut w.uimodes_open, &mut cfg.modern_modes, mode, &mod_windows) {
             *p.changed = true;
         }
         ctxmenu::draw(self, ctx, w);
@@ -542,7 +544,7 @@ struct Panels<'a> {
     /// The panel with the keys (focus_panel): drawn in the focused frame.
     focus: Option<&'static str>,
     /// The mode presets' panels' opacity this frame (modes.rs): 0 not drawn; others always drawn.
-    vis: HashMap<&'static str, f32>,
+    vis: HashMap<String, f32>,
     /// Panels a Lua mod hid (ui.native.hide).
     hidden: Vec<&'static str>,
     /// Panels a Lua mod placed, scaled or faded (ui.native.place).

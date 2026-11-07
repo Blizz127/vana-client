@@ -317,7 +317,8 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     if opts.modes {
         let mut cfg = crate::config::ModernModes::default();
         cfg.pinned.push("party".into());
-        super::modes::editor(&mut p, &mut true, &mut cfg, super::modes::Mode::Combat);
+        let mods = [("mod:loot-tracker:loot".to_string(), "Loot Tracker: Loot".to_string()), ("hud:zone-banner:hud".to_string(), "Zone Banner (on screen)".to_string())];
+        super::modes::editor(&mut p, &mut true, &mut cfg, super::modes::Mode::Combat, &mods);
     }
     if opts.favs {
         favs_sample(&mut p);

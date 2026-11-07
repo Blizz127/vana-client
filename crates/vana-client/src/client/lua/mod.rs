@@ -500,6 +500,10 @@ macro_rules! bundled {
 /// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
 pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts", "timers_buffs", "timers_debuffs", "skillchains", "minimap"];
 
+/// The built-in modern panels a mod's ordinary window may stand in for (ui.window's `panel`): its place and docking,
+/// /uimodes and hiding; not drawn in the classic UI.
+pub(in crate::client) const STAND_IN_PANELS: [&str; 1] = ["focus"];
+
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
@@ -517,6 +521,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "gear-stats",
     "item-details" ["src/trials.lua"],
     "objective-sets",
+    "focus-target",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -3435,6 +3440,32 @@ pub(super) fn draw_classic(gu: &mut super::game_ui::GameUi, w: &World) -> Vec<[f
 
 impl Host {
     /// The open windows (mod id, a copy of the window), for the modern UI's panels.
+    /// What /uimodes lists of the mods: each running mod's windows (not its prompts) by panel key, and each of its
+    /// HUD windows as hud:<mod>:<window>, with a label.
+    pub(in crate::client) fn mode_windows(&self) -> Vec<(String, String)> {
+        let mut out: Vec<(String, String)> = Vec::new();
+        for vm in self.vms.iter().filter(|v| v.suspended.is_none()) {
+            let st = vm.st.borrow();
+            let name = &vm.manifest.name;
+            for win in st.windows.iter().filter(|w| !w.modal) {
+                let key = win.panel.clone().unwrap_or_else(|| format!("mod:{}:{}", vm.manifest.id, win.id));
+                let what = [&win.title, &win.heading].into_iter().find(|t| !t.is_empty()).cloned().unwrap_or_else(|| win.id.clone());
+                let label = if what.eq_ignore_ascii_case(name) || win.panel.is_some() { name.clone() } else { format!("{name}: {what}") };
+                if !out.iter().any(|o| o.0 == key) {
+                    out.push((key, label));
+                }
+            }
+            let mut groups: Vec<&str> = st.hud.iter().map(|e| e.window.as_str()).collect();
+            groups.sort_unstable();
+            groups.dedup();
+            for g in groups {
+                let label = if g == "hud" { format!("{name} (on screen)") } else { format!("{name}: {g}") };
+                out.push((format!("hud:{}:{g}", vm.manifest.id), label));
+            }
+        }
+        out
+    }
+
     pub(super) fn open_windows(&self) -> Vec<(String, window::Window)> {
         let mut out = Vec::new();
         if self.all_hidden {
@@ -3469,6 +3500,11 @@ pub(super) fn close_popup(w: &mut World, k: usize, id: &str) {
 
 /// The pointer on a mod window (modern UI): it takes the focus, then the click acts as the window model says.
 pub(super) fn window_click(w: &mut World, mod_id: &str, win_id: &str, click: super::modern::ModClick) {
+    // A `targets` row picks its entity, as the target list does.
+    if let super::modern::ModClick::Pick(id) = click {
+        super::target::pick(w, Some(id));
+        return;
+    }
     let host = &mut w.lua;
     // An open modal window takes no clicks meant for another.
     if let Some((k, id)) = host.modal()

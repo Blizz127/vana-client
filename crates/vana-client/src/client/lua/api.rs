@@ -351,8 +351,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             w.heading = spec.get::<Option<String>>("heading")?.unwrap_or_default();
             w.resize = spec.get::<Option<bool>>("resize")?.unwrap_or(false);
             w.panel = spec.get::<Option<String>>("panel")?;
-            if let Some(p) = w.panel.as_deref().filter(|p| !super::EDGE_PANELS.contains(p)) {
-                return Err(mlua::Error::runtime(format!("no edge panel {p:?} ({})", super::EDGE_PANELS.join(", "))));
+            if let Some(p) = w.panel.as_deref() {
+                let (list, kind) = if w.edge { (&super::EDGE_PANELS[..], "edge panel") } else { (&super::STAND_IN_PANELS[..], "panel") };
+                if !list.contains(&p) {
+                    return Err(mlua::Error::runtime(format!("no {kind} {p:?} ({})", list.join(", "))));
+                }
             }
             w.popup = spec.get::<Option<bool>>("popup")?.unwrap_or(false);
             w.modal = w.popup || spec.get::<Option<bool>>("modal")?.unwrap_or(false);
@@ -404,6 +407,7 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let t = lua.create_table()?;
             match e {
                 Elem::Timers { builtin, .. } => t.set("builtin", *builtin)?,
+                Elem::Targets { rows, .. } => t.set("count", rows.len())?,
                 Elem::Text { text, .. } | Elem::Input { text, .. } => t.set("text", text.as_str())?,
                 Elem::Buttons { marked, .. } => t.set("at", marked.map(|m| m + 1))?,
                 Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => t.set("at", at + 1)?,
@@ -1616,6 +1620,9 @@ fn player(lua: &Lua) -> mlua::Result<Table> {
         t.set("sub_level", s.sub.1)?;
     }
     t.set("target", w.target)?;
+    // The focus target (/focustarget, one of our six) and the target before the current one, while here.
+    t.set("focus_target", super::super::target::focus_member(w))?;
+    t.set("last_target", super::super::target::last_target(w).map(|t| t.0))?;
     Ok(t)
 }
 
@@ -1763,8 +1770,24 @@ fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
             dim: t.get::<Option<bool>>("dim")?.unwrap_or(false),
         },
         "separator" => Elem::Separator,
+        "targets" => Elem::Targets { id: t.get::<Option<String>>("id")?.unwrap_or_default(), rows: target_rows(t.get("rows")?)? },
         other => return Err(mlua::Error::runtime(format!("unknown element type {other:?}"))),
     })
+}
+
+/// A `targets` element's rows: {entity, label, tag} each.
+fn target_rows(v: Option<Table>) -> mlua::Result<Vec<super::window::TargetRow>> {
+    let Some(t) = v else { return Ok(Vec::new()) };
+    t.sequence_values::<Table>()
+        .map(|r| {
+            let r = r?;
+            Ok(super::window::TargetRow {
+                entity: r.get::<Option<u32>>("entity")?.ok_or_else(|| mlua::Error::runtime("a targets row needs entity (a server id)"))?,
+                label: r.get::<Option<String>>("label")?.unwrap_or_default(),
+                tag: r.get::<Option<String>>("tag")?.unwrap_or_default(),
+            })
+        })
+        .collect()
 }
 
 /// ui.update: the fields given replace the element's.
@@ -1808,6 +1831,9 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
         }
         Elem::Timers { builtin, .. } => {
             if let Some(v) = t.get::<Option<bool>>("builtin")? { *builtin = v; }
+        }
+        Elem::Targets { rows, .. } => {
+            if t.contains_key("rows")? { *rows = target_rows(t.get("rows")?)?; }
         }
         Elem::Gauge { label, value, text, kind, dim, .. } => {
             if let Some(v) = t.get::<Option<bool>>("dim")? { *dim = v; }

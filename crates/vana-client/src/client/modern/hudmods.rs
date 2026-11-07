@@ -25,7 +25,7 @@ fn flat(kind: &str) -> Color32 {
     }
 }
 
-pub(super) fn draw(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World) {
+pub(super) fn draw(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World, vis: &std::collections::HashMap<String, f32>) {
     let host = &w.lua;
     let ppp = ctx.pixels_per_point();
     host.set_modern_scale(Some(ppp));
@@ -42,9 +42,14 @@ pub(super) fn draw(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World) {
         }
         let Some((px, py)) = super::super::lua::hud::place(&e, &panels, win) else { continue };
         let at = pos2(pt(px), pt(py));
-        // Its HUD window's opacity, over everything it draws.
+        // Its HUD window's opacity and the UI mode's (/uimodes), over everything it draws.
+        let key = format!("hud:{mod_id}:{}", e.window);
+        let fade = vis.get(&key).copied().unwrap_or(1.0);
+        if fade <= 0.01 {
+            continue;
+        }
         let mut painter = painter.clone();
-        painter.multiply_opacity(host.window_opacity(&w.window_opacity, &format!("hud:{mod_id}:{}", e.window)));
+        painter.multiply_opacity(host.window_opacity(&w.window_opacity, &key) * fade);
         let Some(r) = element(m, ctx, gu, w, &painter, &e, at, ppp) else { continue };
         rects.push((mod_id, e.id.clone(), [r.min.x * ppp, r.min.y * ppp, r.width() * ppp, r.height() * ppp]));
     }

@@ -22,6 +22,8 @@ pub enum Click {
     Canvas(usize, f32, f32),
     /// A canvas drag: element, phase (0 start, 1 move, 2 release), where.
     CanvasDrag(usize, u8, f32, f32),
+    /// A `targets` row: the entity to target.
+    Pick(u32),
 }
 
 fn rgba(c: [u8; 4]) -> Color32 {
@@ -115,14 +117,22 @@ impl Click {
             Click::Sort(i, c) => win.sort(i, c),
             Click::Canvas(i, x, y) => win.canvas_click(i, x, y),
             Click::CanvasDrag(i, phase, x, y) => win.canvas_drag(i, phase, x, y),
+            // The client picks it (lua::window_click).
+            Click::Pick(_) => (Vec::new(), Vec::new()),
         }
     }
 }
 
 pub fn draw(p: &mut Panels, w: &mut World) {
     // Edge windows are the edge layer's (extras.rs).
+    // The focus panel goes with the target window when an event takes it down (hud.rs).
+    let target_down = !super::super::event::keeps_target(w);
     for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| !x.edge) {
-        let id = format!("mod:{mod_id}:{}", win.id);
+        // One standing in for a built-in panel takes its id: its place, docking, /uimodes and hiding.
+        let id = win.panel.clone().unwrap_or_else(|| format!("mod:{mod_id}:{}", win.id));
+        if id == "focus" && target_down {
+            continue;
+        }
         let (clicks, shown) = panel(p, Some(&*w), &id, &win);
         // A click outside a popup closes it.
         if let Some(r) = shown
@@ -189,6 +199,13 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
         match e {
             // The Timers' panels draw their sections (extras.rs).
             Elem::Timers { .. } => {}
+            Elem::Targets { rows, .. } => {
+                if let Some(w) = world
+                    && let Some(id) = super::hud::other_rows(ui, m, &super::hud::other_views(w, gu, rows))
+                {
+                    clicks.push(Click::Pick(id));
+                }
+            }
             Elem::Text { text, dim, colour, .. } => {
                 ui.label(RichText::new(text).size(m.theme.small).color(colour.map_or(if *dim { muted } else { text_c }, rgba)));
                 ui.add_space(4.0);

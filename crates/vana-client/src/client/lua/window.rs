@@ -121,6 +121,17 @@ pub enum Elem {
     Timers { id: String, section: usize, builtin: bool },
     /// A region `w` x `h` the mod draws in (local units: classic pixels, modern points); a click sends where.
     Canvas { id: String, w: f32, h: f32, cmds: Vec<Cmd> },
+    /// Rows naming entities (a label, the entity's name in its colour, its HP), drawn as the focus panel's; a click
+    /// targets the entity. Modern UI only.
+    Targets { id: String, rows: Vec<TargetRow> },
+}
+
+/// A `targets` row: the entity by server id, a short label before its name, the tag that names it in commands.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TargetRow {
+    pub entity: u32,
+    pub label: String,
+    pub tag: String,
 }
 
 /// A canvas drawing command, in the canvas's own units.
@@ -144,7 +155,7 @@ pub struct Meta {
 
 impl Elem {
     pub fn stop(&self) -> bool {
-        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. } | Elem::Timers { .. })
+        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. } | Elem::Timers { .. } | Elem::Targets { .. })
     }
 
     pub fn id(&self) -> Option<&str> {
@@ -158,7 +169,7 @@ impl Elem {
             | Elem::Colour { id, .. }
             | Elem::Section { id, .. }
             | Elem::Canvas { id, .. } => Some(id),
-            Elem::Text { id, .. } | Elem::Gauge { id, .. } | Elem::Timers { id, .. } if !id.is_empty() => Some(id),
+            Elem::Text { id, .. } | Elem::Gauge { id, .. } | Elem::Timers { id, .. } | Elem::Targets { id, .. } if !id.is_empty() => Some(id),
             _ => None,
         }
     }
@@ -936,8 +947,8 @@ impl Window {
             return 0.0;
         }
         match &self.elems[i] {
-            // The Timers' panels draw their sections (timers.rs, modern/extras.rs).
-            Elem::Timers { .. } => 0.0,
+            // The Timers' panels draw their sections (timers.rs, modern/extras.rs); target rows are modern only.
+            Elem::Timers { .. } | Elem::Targets { .. } => 0.0,
             Elem::Text { .. } => LINE,
             Elem::Buttons { .. } | Elem::Slider { .. } | Elem::Input { .. } | Elem::Choice { .. } => PITCH,
             Elem::List { height, columns, .. } => LINE * (*height + usize::from(has_header(columns))) as f32 + 6.0,
@@ -982,7 +993,7 @@ impl Window {
             }
             let here = self.focus && i == self.at;
             match e {
-                Elem::Timers { .. } => {}
+                Elem::Timers { .. } | Elem::Targets { .. } => {}
                 Elem::Text { text, dim, colour, .. } => {
                     gu.text_fit(text, x + 20.0, ey, w - 40.0, colour.map_or(if *dim { DIM } else { N }, tint));
                 }

@@ -698,6 +698,10 @@ Milestone 1:
   `/uimodes` opens the editor (Shown / Hidden per mode, Pin, Fades, Reset, Close; Escape closes); config
   `modern_modes`. `modern-shot --modes`. The editor is mouse-only for now. The edge windows (Timers, Training,
   Skillchains, the minimap) fade as the other panels.
+  Every loaded mod's windows and HUD groups are rows too (2026-11-07, the user: "all of the windows created by mods"):
+  each window by its panel key (`mod:<mod>:<window>`, or the built-in panel it stands in for), each HUD window as
+  `hud:<mod>:<window>` ("<Mod> (on screen)" for the default one); shown in every mode until set otherwise, faded as
+  the panels are. The list scrolls past 60 % of the screen's height.
 - Open question, still open: "Which windows hide in combat and which stay pinned?" The defaults above are one
   candidate, every one changeable in the editor; they do not settle it.
 - The usable Items list (action menu > Items) puts a small bag name (Temporary, Inventory, Mog Wardrobe, Mog Wardrobe

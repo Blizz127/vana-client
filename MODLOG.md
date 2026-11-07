@@ -22831,6 +22831,12 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
 - The modern focus panel (hud.rs others_panel, place "focus" on the target panel): a row for the focus target
   (retail's /focustarget, a member of our six) and one for the last target, each with its HP; a click targets it.
   Hidden when neither is set.
+- 2026-11-07: the panel is the bundled mod Focus and Last Target (assets/mods/focus-target, the user: a mod, not a
+  built-in): a window with `panel = "focus"` (stands in for the panel: its place on the target panel, /uimodes,
+  hiding; skipped while an event takes the target window down, and in the classic UI) holding a `targets` element,
+  whose rows the client draws as others_panel drew them (hud.rs other_rows / other_views) and whose click is
+  target::pick. `<lt>` and `<ft>` stay the client's; `game.player()` has focus_target and last_target. Compared
+  with master live (Last: Aurelie): the same panel.
 
 ## netstat: the Help Desk reply mark (2026-11-02)
 
