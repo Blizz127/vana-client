@@ -274,6 +274,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   received Japanese.
 - **Zone Banner** (assets/mods/zone-banner; zonename): the zone's name across the upper screen for about 4 s on
   arrival, faded in and out. Seen live: Northern and Southern San d'Oria.
+- **Item Use Queue** (assets/mods/use-all; Pouches, nomorecrap): `//useall <item>` uses each copy in the inventory in
+  turn, the next once the last use finished (or was refused); `//useall stop`. Seen live: two bolt quivers opened.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

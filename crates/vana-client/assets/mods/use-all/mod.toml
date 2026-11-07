@@ -1,0 +1,10 @@
+name = "Item Use Queue"
+version = "1.0.0"
+description = "Uses every copy of an item one after another, such as a stack of pouches or bags (the pouch add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Item Use Queue"
+help = "//useall <item> uses each copy of it in your inventory in turn; //useall stop ends it."
