@@ -306,6 +306,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   their effect (the messages the Timers read), gone when they wear off, are removed or the target is defeated. A Rust
   test drives it; live the bot's Dia showed it cannot see effects whose message is plain damage (Dia, Bio), which needs
   a spell -> effect table. Not seen live with an effect landing (the hares died first).
+- **Skill-up Log** (assets/mods/skill-log; skilluptracker, craftmon, prism): our skill-up lines get the session's
+  total for the skill (`(+0.5 this session)`, through filters.battle); `//skills` lists combat and magic skills with
+  level, cap and gain. Seen live: hand-to-hand rises in two hare fights. Not yet: craft skills, the synthesis result
+  shown at the start.
 - Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
