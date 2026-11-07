@@ -1,0 +1,28 @@
+name = "Loot Rules"
+version = "1.0.0"
+description = "Lots, passes and drops treasure by your lists (the treasury and loot add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Loot Rules"
+help = "Lots on treasure pool items on your Lot list and passes those on your Pass list. //loot opens the lists."
+
+[settings.pass_rest]
+type = "bool"
+default = false
+label = "Pass Everything Else"
+help = "Passes every pool item that is not on the Lot list."
+
+[settings.drop]
+type = "bool"
+default = true
+label = "Drop Listed Items"
+help = "Drops items on the Drop list as soon as they reach your inventory."
+
+[settings.stack]
+type = "bool"
+default = false
+label = "Stack Loot"
+help = "Sorts the inventory after loot arrives, so its stacks merge."

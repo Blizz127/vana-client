@@ -169,3 +169,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   job point taken in counting what rolled over. Seen live (two `!givexp` gains: 33.8k/h over a minute).
 - **Cutscene Speed** (assets/mods/cutscene-speed; FastCS and its kin): events play 1 to 4 times faster through the
   client's `cutscene_speed` switch, back to the game's speed when off. Seen live: the switch at 3.0, then 1.0.
+- **Loot Rules** (assets/mods/loot-rules; Treasury, Lootwhore, lottery and kin): the character's Lot, Pass and Drop
+  lists (names, `*` patterns or ids; a window from `//loot`, or `//loot lot add <item>`...). Pool items on the Lot
+  list are lotted, on the Pass list (or all others, with Pass Everything Else) passed; Drop list items are dropped as
+  they reach the inventory; Stack Loot sorts the inventory after loot. Seen live in a party with a bot: a rabbit hide
+  passed by a `*Hide` rule, hare meat dropped by the Drop list; a lot not seen (no lot-listed drop came).
