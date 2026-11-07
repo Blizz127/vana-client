@@ -492,12 +492,12 @@ macro_rules! bundled {
     };
 }
 /// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
-pub(in crate::client) const EDGE_PANELS: [&str; 4] = ["regime", "timers_recasts", "timers_buffs", "timers_debuffs"];
+pub(in crate::client) const EDGE_PANELS: [&str; 5] = ["regime", "timers_recasts", "timers_buffs", "timers_debuffs", "skillchains"];
 
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {

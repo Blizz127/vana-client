@@ -222,8 +222,6 @@ pub struct Config {
     pub timers_folded: u8,
     /// The training regime window's drawer out (client/regime.rs; the bundled Training Regime mod's window).
     pub regime_out: bool,
-    /// Extra (the skillchain add-ons): in a party, the chains it can make and the open one on our target.
-    pub skillchain_helper: bool,
     /// Extra (the minimap add-ons): the minimap, its place (0 top right, 1 top left), size (0..2) and the map pixels
     /// across (the wheel's zoom).
     pub minimap: bool,
@@ -459,7 +457,6 @@ impl Default for Config {
             timers_dock: 0,
             timers_out: true,
             timers_folded: 0,
-            skillchain_helper: false,
             regime_out: true,
             minimap: false,
             minimap_dock: 0,

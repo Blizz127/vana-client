@@ -27,7 +27,6 @@ pub struct Settings {
     pub shadow_map: u32,
     pub ssao: bool,
     pub timers_dock: u32,
-    pub skillchain_helper: bool,
     pub minimap: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
@@ -70,7 +69,6 @@ impl Settings {
             shadow_map: c.shadow_map,
             ssao: c.ssao,
             timers_dock: c.timers_dock,
-            skillchain_helper: c.skillchain_helper,
             minimap: c.minimap,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
@@ -110,7 +108,6 @@ impl Settings {
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
         c.timers_dock = self.timers_dock;
-        c.skillchain_helper = self.skillchain_helper;
         c.minimap = self.minimap;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
@@ -160,7 +157,6 @@ enum Val {
     ShadowMap,
     Ssao,
     TimersDock,
-    Skillchains,
     Minimap,
     MinimapDock,
     MinimapSize,
@@ -330,12 +326,10 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
-    const SKILLCHAIN_ROW: SRow = row("Skillchain Helper", "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.", Skillchains, OFF_ON, Now);
     const TIMERS: &[SRow] = &[
         row("Timers Position", "Docks the timers window on the left, on the right above the party list, or at the top.", TimersDock, &[(0, "Left"), (1, "Right"), (2, "Top")], Now),
-        SKILLCHAIN_ROW,
     ];
-    const TIMERS_MODERN: &[SRow] = &[SKILLCHAIN_ROW];
+    const TIMERS_MODERN: &[SRow] = &[];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[];
@@ -539,7 +533,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
-            Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
             Val::Minimap => self.s.minimap as u32,
             Val::MinimapDock => self.s.minimap_dock,
@@ -574,7 +567,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
-            Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
             Val::Minimap => self.s.minimap = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,

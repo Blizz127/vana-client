@@ -97,6 +97,10 @@ Done so far (checked live, Lnxcsfix):
   drawer (/timers, T) folds all three, the recasts' window in the old window's saved place and the others under it,
   mode presets that named "timers" name the three. The classic UI keeps the one window with three sections:
   compared with master, the same.
+- **Skillchain Helper** (assets/mods/skillchain): the edge window panel `skillchains`, drawing the client's view
+  (skillchain.rs, its party skills, resonances and LSB's properties stay the client's) whatever the window's elements;
+  in the classic UI under the Timers and the regime as before. Not seen live: with a trust in the party (Kupipi, Nanaa
+  Mihgo) neither master nor the mod shows it (it needs party members' known weapon skills).
 
 ### Edge windows
 

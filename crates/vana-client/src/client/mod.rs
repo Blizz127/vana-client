@@ -6750,8 +6750,6 @@ struct World {
     /// Each 0x119 timer's Calc1 / Calc2 (the charge shares' adjustments).
     ability_calc: HashMap<u16, (u8, i16)>,
     recasts_seen: bool,
-    /// Config `skillchain_helper` (extra).
-    extra_skillchain: bool,
     /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
     extra_minimap: bool,
     minimap: Option<map::Overlay>,
@@ -7534,7 +7532,6 @@ impl App {
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
-            w.extra_skillchain = self.cfg.skillchain_helper;
             w.timers_dock = self.cfg.timers_dock;
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
         }
@@ -8763,7 +8760,6 @@ impl App {
                             spell_total: HashMap::new(),
                             ability_total: HashMap::new(),
                             ability_calc: HashMap::new(),
-                            extra_skillchain: self.cfg.skillchain_helper,
                             extra_minimap: self.cfg.minimap,
                             minimap: None,
                             minimap_rect: None,

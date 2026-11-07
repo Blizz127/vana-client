@@ -126,12 +126,13 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
         return;
     }
     // A built-in panel's layer held while no mod's window is in it (the timers' panels hold theirs in timers_panel).
-    for name in super::super::lua::EDGE_PANELS.iter().filter(|n| !n.starts_with("timers_")) {
+    for name in super::super::lua::EDGE_PANELS.iter().filter(|n| !n.starts_with("timers_") && **n != "skillchains") {
         if w.lua.edge_panel(name).is_none() || w.lua.hides(name) {
             hold_layer(p.ctx, name);
         }
     }
-    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge && !x.panel.as_deref().is_some_and(|n| n.starts_with("timers_"))) {
+    // The timers' and skillchains' panels draw their client views (timers_panel, skillchain_panel).
+    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge && !x.panel.as_deref().is_some_and(|n| n.starts_with("timers_") || n == "skillchains")) {
         if win.panel.as_deref().is_some_and(|n| w.lua.hides(n)) {
             continue;
         }
@@ -170,10 +171,17 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
 /// everything in the party that closes it; then every chain the party can make, the strongest first, with its ways.
 /// Lines wrap; past 60% of the screen's height it scrolls (its height never follows where it stands).
 fn skillchain_panel(p: &mut Panels, w: &mut World) {
-    if !w.extra_skillchain || hidden(w) {
+    if hidden(w) {
         return;
     }
-    let Some(v) = super::super::skillchain::view(w) else { return };
+    // The bundled Skillchain Helper mod's window (panel skillchains); its view is the client's.
+    let win = w.lua.edge_panel("skillchains").filter(|_| !w.lua.hides("skillchains"));
+    let Some((win, v)) = win.and_then(|win| Some((win, super::super::skillchain::view(w)?))) else {
+        hold_layer(p.ctx, "skillchains");
+        return;
+    };
+    let title = if win.title.is_empty() { "Skillchains".to_string() } else { win.title.clone() };
+    let heading = if win.heading.is_empty() { title.clone() } else { win.heading.clone() };
     let m = p.m;
     let screen = p.ctx.content_rect();
     let room = screen.height() * 0.6;
@@ -183,8 +191,8 @@ fn skillchain_panel(p: &mut Panels, w: &mut World) {
         pl.edge != 0 && !pl.float
     };
     let width = skillchain_width(p.ctx, m, &v).clamp(240.0, screen.width() * if across { 0.9 } else { 0.5 });
-    let toggle = edge_window(p, "skillchains", width, true, w.skillchain.folded, "Skillchains", |ui, side, fixed| {
-        let toggle = flyout_header(ui, m, "Skillchains", side).clicked();
+    let toggle = edge_window(p, "skillchains", width, true, w.skillchain.folded, &title, |ui, side, fixed| {
+        let toggle = flyout_header(ui, m, &heading, side).clicked();
         edge_body(ui, "skillchains", fixed, room, |ui| skillchain_body(ui, m, &v));
         toggle
     });
