@@ -220,7 +220,9 @@ Built (client/lua/, modern/modwin.rs), each checked live:
   through the world and logout, and was unloaded as the client closed.
   - checked live: a call returning two values, an emitted table, files written, appended, listed and read back, the
     mod's own file read, `..` and `shared/` refused, JSON both ways, the os subset, Shift-JIS round trip
-- **Bundled mods:** `/dps` (the first Extra ported).
+- **Bundled mods:** `/dps` (the first Extra ported), then Text Auto-Advance, Trust Speech and `/find` (the Extras as
+  mods, docs/extras-as-mods.md): granted their manifests' permissions, their settings on our Extras tabs (`tab`,
+  `place`), carried over from the config (`from`).
 - **Mods folder:** `mods/<id>/` (enabled through config `mods`); a test run uses `mods` beside its FFXI_CONFIG copy.
 
 Next (docs/lua-mods.md 6): packet layouts and decoded views, batch order (the rest of phase 4); the rest of phase 5

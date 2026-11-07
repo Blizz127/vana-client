@@ -159,7 +159,7 @@ pub const FUNCS: &[Func] = &[
     Func { ns: "game", name: "weather", doc: "The weather id.", params: &[], ret: "integer" },
     Func { ns: "game", name: "key_items", doc: "The key item ids we hold.", params: &[], ret: "integer[]" },
     Func { ns: "game", name: "treasure", doc: "The treasure pool: {slot (0..9), item, count, dropper, lotted, passed, lot, high_lot, high_name} per item in it.", params: &[], ret: "table[]" },
-    Func { ns: "game", name: "event", doc: "The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (cursor from 1).", params: &[], ret: "table?" },
+    Func { ns: "game", name: "event", doc: "The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (cursor from 1); text = {waiting, open} while it shows a message (waiting: it waits for a key; open: seconds its page has been up).", params: &[], ret: "table?" },
     Func { ns: "game", name: "entity_by_tag", doc: "The entity a target tag names (t, bt, pet, me, ht, scan, p0..p5, a10..a25, with or without <>), a player's name or a server id; nil when none.", params: &[("tag", "string", "")], ret: "vana.Entity?" },
     Func { ns: "game", name: "skills", doc: "Our skills by id: combat (1..31) and magic (32..47) {level, capped}; crafts (48..) {rank, level, capped}.", params: &[], ret: "{combat: table<integer, table>, magic: table<integer, table>, crafts: table<integer, table>}" },
     Func { ns: "game", name: "jobs", doc: "Each unlocked job's level, and the master levels, by job id.", params: &[], ret: "{levels: table<integer, integer>, master: table<integer, integer>}" },

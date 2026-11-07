@@ -479,7 +479,13 @@ fn changes(a: &Snap, b: &Snap) -> Vec<(&'static str, Vec<serde_json::Value>)> {
 
 /// Mods built into the client (assets/mods): our own features on the mod API (docs/lua-mods.md 7.4). Each is (id,
 /// mod.toml, files).
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = &[("dps", include_str!("../../../assets/mods/dps/mod.toml"), &[("init.lua", include_str!("../../../assets/mods/dps/init.lua"))])];
+/// Our own features on the mod API (docs/extras-as-mods.md): id, mod.toml, files.
+macro_rules! bundled {
+    ($($id:literal),* $(,)?) => {
+        &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
+    };
+}
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -550,9 +556,12 @@ impl Host {
         let data = data_dir().join(&m.id);
         let char_file = Self::char_file(w);
         let storage = (read_json(&data.join("account.json")), char_file.as_ref().map_or(serde_json::Value::Null, |f| read_json(&data.join(f))));
+        migrate_settings(&m, &data, char_file.as_deref());
         let settings = load_settings(&m, &data, char_file.as_deref());
         let given: Vec<String> = grants().get(&m.id).and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
-        let granted: Vec<String> = m.permissions.iter().filter(|p| given.contains(p)).cloned().collect();
+        // A bundled mod is the client's own code: it has what it asks for.
+        let bundled = matches!(src, vm::Source::Bundled(_));
+        let granted: Vec<String> = m.permissions.iter().filter(|p| bundled || given.contains(p)).cloned().collect();
         let missing: Vec<String> = m.permissions.iter().filter(|p| !granted.contains(p)).cloned().collect();
         let vm = Vm::new(m, dir, src).map_err(|e| format!("{e:#}"))?;
         vm.st.borrow_mut().char_file = Self::char_file(w);
@@ -1686,6 +1695,51 @@ mod tests {
         assert_eq!(n as usize, native::PANELS.len());
     }
 
+    /// Every bundled mod's manifest parses and its Lua compiles; settings on our Extras tabs name one and label their
+    /// values.
+    #[test]
+    fn bundled_mods_load() {
+        for (id, text, files) in BUNDLED {
+            let m = manifest::parse(text, id).unwrap_or_else(|e| panic!("{id}: {e:#}"));
+            for (name, src) in files.iter() {
+                let lua = mlua::Lua::new();
+                lua.load(*src).set_name(*name).into_function().unwrap_or_else(|e| panic!("{id}/{name}: {e}"));
+            }
+            for (key, d) in &m.settings {
+                assert!(d.tab.is_empty() || !d.label.is_empty(), "{id}.{key}: a tabbed setting needs its row's label");
+            }
+        }
+    }
+
+    /// A setting `from` a config field takes its value once, when not saved yet; others are left alone.
+    #[test]
+    fn settings_carry_over_from_the_config() {
+        let m = manifest::parse(
+            r#"
+            [settings.a]
+            type = "int"
+            from = "x"
+            [settings.b]
+            type = "bool"
+            from = "y"
+            scope = "character"
+            [settings.c]
+            type = "bool"
+            from = "missing"
+            [settings.d]
+            type = "bool"
+            "#,
+            "t",
+        )
+        .unwrap();
+        let config = serde_json::json!({"x": 3, "y": true});
+        assert_eq!(migrations(&m, &config, |_, _| false), [("a".to_string(), false, 3.into()), ("b".to_string(), true, true.into())]);
+        assert_eq!(migrations(&m, &config, |k, character| k == "b" && character), [("a".to_string(), false, 3.into())]);
+        // Labelled values need a label each; a tab must be one of ours.
+        assert!(manifest::parse("[settings.e]\ntype = \"int\"\noptions = [\"OFF\"]\nvalues = [0, 3]", "t").is_err());
+        assert!(manifest::parse("[settings.e]\ntype = \"int\"\ntab = \"Nope\"", "t").is_err());
+    }
+
     /// A suspended mod's provided functions don't run for other mods either.
     #[test]
     fn mods_call_skips_a_suspended_mod() {
@@ -1947,6 +2001,46 @@ pub(super) fn filter_typed(w: &mut World, line: &str) -> Option<String> {
     (!blocked).then_some(line)
 }
 
+/// Settings declared `from` a client config field (a bundled mod's, replacing an extra that kept its value there) and
+/// not set yet take that field's value, written to their scope's file so the config may drop it.
+fn migrate_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Option<&str>) {
+    if m.settings.values().all(|d| d.from.is_empty()) {
+        return;
+    }
+    let config = read_json(&crate::config::config_path());
+    let file = |character: bool| match char_file {
+        Some(c) if character => data.join(format!("settings-{c}")),
+        _ => data.join("settings.json"),
+    };
+    for (key, character, old) in migrations(m, &config, |key, character| read_json(&file(character)).get(key).is_some()) {
+        let file = file(character);
+        let mut v = read_json(&file);
+        if !v.is_object() {
+            v = serde_json::json!({});
+        }
+        log::info!("lua mod {}: setting {key} from the config ({old})", m.id);
+        v[key.as_str()] = old;
+        let _ = std::fs::create_dir_all(data);
+        if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+            log::warn!("lua mod {}: saving {}: {e}", m.id, file.display());
+        }
+    }
+}
+
+/// The settings declared `from` a config field `config` holds that are not saved yet (`saved(key, character scope)`):
+/// (key, character scope, the field's value).
+fn migrations(m: &manifest::Manifest, config: &serde_json::Value, saved: impl Fn(&str, bool) -> bool) -> Vec<(String, bool, serde_json::Value)> {
+    m.settings
+        .iter()
+        .filter(|(_, d)| !d.from.is_empty())
+        .filter_map(|(key, d)| {
+            let character = d.scope == "character";
+            let old = config.get(&d.from)?;
+            (!saved(key, character)).then(|| (key.clone(), character, old.clone()))
+        })
+        .collect()
+}
+
 /// A mod's settings: the account file's keys, then the character file's for character-scoped ones.
 fn load_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Option<&str>) -> serde_json::Map<String, serde_json::Value> {
     let mut out = serde_json::Map::new();
@@ -1979,6 +2073,8 @@ impl Host {
             for (key, d) in &vm.manifest.settings {
                 let current = st.settings.get(key).cloned().or_else(|| d.default.as_ref().and_then(|v| serde_json::to_value(v).ok())).unwrap_or(serde_json::Value::Null);
                 let choices: Vec<(String, serde_json::Value)> = match d.kind.as_str() {
+                    // Labelled values (any type).
+                    _ if !d.values.is_empty() => d.options.iter().cloned().zip(d.values.iter().map(|v| serde_json::to_value(v).unwrap_or_default())).collect(),
                     "bool" => vec![("ON".into(), true.into()), ("OFF".into(), false.into())],
                     "enum" => d.options.iter().map(|o| (o.clone(), o.as_str().into())).collect(),
                     "int" | "number" => {
@@ -1996,14 +2092,15 @@ impl Host {
                 };
                 let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-9)).unwrap_or(0);
                 let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
-                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at });
+                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: d.tab.clone(), place: d.place });
             }
-            // The permissions it asks for, each allowed or not (docs/lua-mods.md 3.5).
-            for p in &vm.manifest.permissions {
+            // The permissions it asks for, each allowed or not (docs/lua-mods.md 3.5); a bundled mod's are given.
+            let bundled = matches!(vm.src, vm::Source::Bundled(_));
+            for p in vm.manifest.permissions.iter().filter(|_| !bundled) {
                 let (label, help) = permission_text(p);
                 let on = st.granted.contains(p);
                 let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
-                rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 } });
+                rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 }, tab: String::new(), place: None });
             }
             if !rows.is_empty() {
                 pages.push(ModPage { id: vm.manifest.id.clone(), name: vm.manifest.name.clone(), rows });
@@ -2308,6 +2405,12 @@ mod stub_tests {
     fn committed_stubs_current() {
         assert_eq!(include_str!("../../../assets/mods/library/vana.lua"), super::stubs(), "assets/mods/library/vana.lua is stale");
     }
+}
+
+/// The labels of the bundled mods' settings on our Extras tabs (the Settings window's test that each has a place).
+#[cfg(test)]
+pub(in crate::client) fn bundled_tab_labels() -> Vec<String> {
+    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| d.label)).collect()
 }
 
 /// A bundled mod's manifest.

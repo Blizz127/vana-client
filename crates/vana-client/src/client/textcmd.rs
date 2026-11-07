@@ -647,11 +647,6 @@ pub(super) fn run_unfiltered(w: &mut World, line: &str, mode: Mode) {
         }
         return;
     }
-    // Ours (not retail; the find-all add-ons): /find <words> lists the bags holding each item whose name has them.
-    if first.eq_ignore_ascii_case("/find") {
-        find(w, line[first.len()..].trim());
-        return;
-    }
     // Ours (not retail; the modern UI's mode presets): /uimodes opens or closes their editor.
     if first.eq_ignore_ascii_case("/uimodes") && w.modern {
         w.uimodes_open = !w.uimodes_open;
@@ -2427,7 +2422,7 @@ fn atoi(s: &str) -> i64 {
     if neg { -n } else { n }
 }
 
-/// A container's name for /find (the wardrobes and safes numbered) and the Modern UI's bag headers.
+/// A container's name (the wardrobes and safes numbered) for the Modern UI's bag headers.
 pub(super) fn bag_name(c: u8) -> String {
     match c {
         0 => "Inventory".into(),
@@ -2442,31 +2437,6 @@ pub(super) fn bag_name(c: u8) -> String {
         9 => "Mog Safe 2".into(),
         10..=16 => format!("Mog Wardrobe {}", c - 8),
         _ => format!("Bag {c}"),
-    }
-}
-
-/// /find: one line per matching item, its bags with the count in each; "(none)" without a match.
-fn find(w: &mut World, what: &str) {
-    let Some(info) = w.item_info.clone() else { return };
-    let want = what.to_lowercase();
-    if want.is_empty() {
-        return;
-    }
-    let mut found: std::collections::BTreeMap<String, std::collections::BTreeMap<u8, u32>> = Default::default();
-    for (&(c, _), &(id, n)) in &w.inv.slots {
-        let Some(it) = info.item(id).filter(|_| id != 0 && id != 0xffff) else { continue };
-        if it.name.to_lowercase().contains(&want) {
-            *found.entry(it.name.clone()).or_default().entry(c).or_default() += n.max(1);
-        }
-    }
-    let colour = w.battle.as_ref().map_or([0x80; 4], |bt| bt.colour_in(0x8b, &w.game));
-    if found.is_empty() {
-        w.chat.push_colour(format!("/find {what}: (none)"), colour);
-        return;
-    }
-    for (name, bags) in found {
-        let at: Vec<String> = bags.iter().map(|(c, n)| format!("{} {n}", bag_name(*c))).collect();
-        w.chat.push_colour(format!("{name}: {}", at.join(", ")), colour);
     }
 }
 

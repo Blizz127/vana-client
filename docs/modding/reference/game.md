@@ -460,15 +460,17 @@ end
 game.event() -> table?
 ```
 
-The event (a cutscene or NPC conversation) under way, and the menu it shows, if any.
+The event (a cutscene or NPC conversation) under way, the menu it shows, and its message, if any.
 
-**Returns** `table?`: nil when no event runs. While one runs, a table that has a `menu` field only while the event shows a menu:
+**Returns** `table?`: nil when no event runs. While one runs, a table that has a `menu` field only while the event shows a menu, and a `text` field only while it shows a message:
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `menu.question` | `string` | The menu's question. |
 | `menu.options` | `string[]` | The options' texts, in order. |
 | `menu.cursor` | `integer` | The option the cursor is on, from 1. |
+| `text.waiting` | `boolean` | The message waits for a key (Enter, or `actions.advance()`) before it goes on. |
+| `text.open` | `number` | Seconds its page has been on screen. |
 
 **Errors** "game state is not available here" in the lobby or a chat filter.
 
@@ -484,7 +486,17 @@ if ev and ev.menu then
 end
 ```
 
-Pick an option with `actions.choose(i)`, using the same numbers.
+Pick an option with `actions.choose(i)`, using the same numbers. A message that waits goes on with `actions.advance()`:
+
+```lua
+-- Move waiting messages on after 3 seconds (needs automation).
+timer.every(0.1, function()
+  local ev = game.event()
+  if ev and ev.text and ev.text.waiting and not ev.menu and ev.text.open >= 3 then
+    actions.advance()
+  end
+end)
+```
 
 ## `game.entity_by_tag`
 

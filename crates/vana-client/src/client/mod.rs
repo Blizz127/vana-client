@@ -6475,17 +6475,15 @@ struct World {
     stamp_all_lines: bool,
     /// The skillchain helper's resonances and seen skills (client/skillchain.rs).
     skillchain: skillchain::Tracker,
-    /// Config `target_distance` / `target_hpp` / `auto_advance` (extras).
+    /// Config `target_distance` / `target_hpp` (extras).
     target_distance: bool,
     target_hpp: bool,
-    auto_advance: u32,
     /// The lamps' lights (client/lamps.rs, Settings' Lamp Lights).
     lamps: lamps::Lamps,
     /// The actor shadows' light-state slots (client/shadows.rs).
     shadow_slots: shadows::Slots,
-    /// Config `earth_clock` (an extra, client/clock.rs), `hide_trust_speech` and `hide_ready_lines`.
+    /// Config `earth_clock` (an extra, client/clock.rs) and `hide_ready_lines`.
     earth_clock: bool,
-    hide_trust_speech: bool,
     hide_ready_lines: bool,
     /// Config `short_battle` / `battle_name_colours` (extras, client/battlemod.rs).
     short_battle: bool,
@@ -7570,8 +7568,8 @@ impl App {
             w.map_overlay = self.cfg.map_overlay;
             w.synth_amount = self.cfg.synth_amount;
             w.stamp_all_lines = self.cfg.stamp_all_lines;
-            (w.target_distance, w.target_hpp, w.auto_advance) = (self.cfg.target_distance, self.cfg.target_hpp, self.cfg.auto_advance);
-            (w.earth_clock, w.hide_trust_speech, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_trust_speech, self.cfg.hide_ready_lines);
+            (w.target_distance, w.target_hpp) = (self.cfg.target_distance, self.cfg.target_hpp);
+            (w.earth_clock, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_ready_lines);
             (w.short_battle, w.name_colours) = (self.cfg.short_battle, self.cfg.battle_name_colours);
             w.extra_timers = self.cfg.timers;
             w.extra_regime = self.cfg.regime;
@@ -8442,11 +8440,9 @@ impl App {
                             skillchain: Default::default(),
                             target_distance: self.cfg.target_distance,
                             target_hpp: self.cfg.target_hpp,
-                            auto_advance: self.cfg.auto_advance,
                             earth_clock: self.cfg.earth_clock,
                             lamps: Default::default(),
                             shadow_slots: Default::default(),
-                            hide_trust_speech: self.cfg.hide_trust_speech,
                             hide_ready_lines: self.cfg.hide_ready_lines,
                             short_battle: self.cfg.short_battle,
                             name_colours: self.cfg.battle_name_colours,
@@ -13466,11 +13462,12 @@ impl App {
                     s.monitors = self.monitors.clone();
                     s.gpus = self.gpus.clone();
                     s.in_game = true;
-                    if kind == settings::Kind::Extras {
-                        s.mod_pages = world.lua.settings_pages();
-                        if let Some(id) = world.lua.open_page.take() {
-                            s.goto_mod(&id);
-                        }
+                    // The mods' settings: their pages (Extras) and bundled mods' rows in our pages' places.
+                    s.set_mod_pages(world.lua.settings_pages());
+                    if kind == settings::Kind::Extras
+                        && let Some(id) = world.lua.open_page.take()
+                    {
+                        s.goto_mod(&id);
                     }
                     world.settings = Some(s);
                 }

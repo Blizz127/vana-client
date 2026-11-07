@@ -32,11 +32,9 @@ pub struct Settings {
     pub actor_shadows: u32,
     pub shadow_map: u32,
     pub ssao: bool,
-    pub hide_trust_speech: bool,
     pub hide_ready_lines: bool,
     pub short_battle: bool,
     pub battle_name_colours: bool,
-    pub auto_advance: u32,
     pub timers: bool,
     pub timers_dock: u32,
     pub regime: bool,
@@ -88,11 +86,9 @@ impl Settings {
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
             ssao: c.ssao,
-            hide_trust_speech: c.hide_trust_speech,
             hide_ready_lines: c.hide_ready_lines,
             short_battle: c.short_battle,
             battle_name_colours: c.battle_name_colours,
-            auto_advance: c.auto_advance,
             timers: c.timers,
             timers_dock: c.timers_dock,
             regime: c.regime,
@@ -141,11 +137,9 @@ impl Settings {
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
-        c.hide_trust_speech = self.hide_trust_speech;
         c.hide_ready_lines = self.hide_ready_lines;
         c.short_battle = self.short_battle;
         c.battle_name_colours = self.battle_name_colours;
-        c.auto_advance = self.auto_advance;
         c.timers = self.timers;
         c.timers_dock = self.timers_dock;
         c.regime = self.regime;
@@ -205,11 +199,9 @@ enum Val {
     ActorShadows,
     ShadowMap,
     Ssao,
-    TrustSpeech,
     ReadyLines,
     ShortBattle,
     NameColours,
-    AutoAdvance,
     Timers,
     TimersDock,
     Skillchains,
@@ -235,6 +227,8 @@ enum Val {
     MouseCamSpeed,
     /// A Lua mod's declared setting: its row on the mod's page (docs/lua-mods.md 4.12).
     Mod(usize),
+    /// A bundled mod's setting on one of our Extras tabs (`SettingsUi::tab_rows`).
+    Tabbed(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -285,6 +279,9 @@ pub struct ModRow {
     pub help: String,
     pub choices: Vec<(String, serde_json::Value)>,
     pub at: usize,
+    /// One of our Extras tabs it shows on (a bundled mod's, in the rows of the extra it replaces), at row `place`.
+    pub tab: String,
+    pub place: Option<usize>,
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
@@ -391,7 +388,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const EXTRA_BATTLE: &[SRow] = &[
         row("Target Distance", "Shows how far away your target is in the target window.", TargetDistance, OFF_ON, Now),
         row("Target HP %", "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it.", TargetHpp, OFF_ON, Now),
-        row("Trust Speech", "Shows or hides what your trusts say in the chat log.", TrustSpeech, &[(0, "Shown"), (1, "Hidden")], Now),
         row("Ready Lines", "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.", ReadyLines, &[(0, "All"), (1, "Mine, Monsters'")], Now),
         row("Battle Text", "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".", ShortBattle, &[(0, "Retail"), (1, "Short")], Now),
         row("Battle Names", "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.", NameColours, &[(0, "Plain"), (1, "Coloured")], Now),
@@ -400,7 +396,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
         row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
         row("Clock", "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.", EarthClock, OFF_ON, Now),
-        row("Text Auto-Advance", "Event messages that wait for a key move on by themselves after this many seconds.", AutoAdvance, &[(0, "OFF"), (3, "3 s"), (5, "5 s"), (8, "8 s")], Now),
     ];
     match kind {
         Kind::Extras if modern => [&MAPS[..3], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
@@ -467,6 +462,8 @@ pub struct SettingsUi {
     /// Extras: the Lua mods' pages after our own, and their changes for the app to apply (mod, key, value).
     pub mod_pages: Vec<ModPage>,
     pub mod_changes: Vec<(String, String, serde_json::Value)>,
+    /// Mods' settings shown on our own Extras tabs: (mod, row).
+    tab_rows: Vec<(String, ModRow)>,
 }
 
 /// What a row's controls are.
@@ -481,7 +478,7 @@ impl SettingsUi {
     }
 
     pub fn open_kind(c: &Config, window: [u32; 2], kind: Kind) -> Self {
-        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new() };
+        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new(), tab_rows: Vec::new() };
         s.col = s.marked_col();
         s
     }
@@ -492,6 +489,26 @@ impl SettingsUi {
         } else {
             TABS.iter().map(|t| t.to_string()).collect()
         }
+    }
+
+    /// The mods' Extras pages: rows that name one of our tabs go there, the rest make the mod's own page.
+    pub fn set_mod_pages(&mut self, pages: Vec<ModPage>) {
+        self.tab_rows.clear();
+        self.mod_pages.clear();
+        for mut p in pages {
+            let (tabbed, own): (Vec<ModRow>, Vec<ModRow>) = p.rows.into_iter().partition(|r| EXTRA_TABS.contains(&r.tab.as_str()));
+            self.tab_rows.extend(tabbed.into_iter().map(|r| (p.id.clone(), r)));
+            if !own.is_empty() {
+                p.rows = own;
+                self.mod_pages.push(p);
+            }
+        }
+    }
+
+    /// A mod's setting on our Extras tabs as a row.
+    fn tab_row(&self, i: usize) -> Row {
+        let r = &self.tab_rows[i].1;
+        Row { label: r.label.clone(), help: r.help.clone(), val: Val::Tabbed(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now }
     }
 
     /// The Lua mod page on screen (Extras, past our own pages).
@@ -511,7 +528,18 @@ impl SettingsUi {
                 .map(|(i, r)| Row { label: r.label.clone(), help: r.help.clone(), val: Val::Mod(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now })
                 .collect();
         }
-        rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect()
+        let mut out: Vec<Row> = rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect();
+        // Mods' settings on this Extras tab, at their places.
+        if self.kind == Kind::Extras
+            && let Some(tab) = EXTRA_TABS.get(self.tab)
+        {
+            let mut mine: Vec<(usize, Row)> = self.tab_rows.iter().enumerate().filter(|(_, (_, r))| r.tab == *tab).map(|(i, (_, r))| (r.place.unwrap_or(usize::MAX), self.tab_row(i))).collect();
+            mine.sort_by_key(|m| m.0);
+            for (place, r) in mine {
+                out.insert(place.min(out.len()), r);
+            }
+        }
+        out
     }
 
     fn ctl(r: &Row) -> Ctl {
@@ -575,11 +603,9 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
-            Val::TrustSpeech => self.s.hide_trust_speech as u32,
             Val::ReadyLines => self.s.hide_ready_lines as u32,
             Val::ShortBattle => self.s.short_battle as u32,
             Val::NameColours => self.s.battle_name_colours as u32,
-            Val::AutoAdvance => self.s.auto_advance,
             Val::Timers => self.s.timers as u32,
             Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
@@ -593,6 +619,7 @@ impl SettingsUi {
             Val::CursorSize => self.s.cursor_size,
             Val::KeysHideCursor => self.s.keys_hide_cursor as u32,
             Val::Mod(i) => self.mod_page().and_then(|p| p.rows.get(i)).map_or(0, |r| r.at as u32),
+            Val::Tabbed(i) => self.tab_rows.get(i).map_or(0, |r| r.1.at as u32),
         }
     }
 
@@ -622,11 +649,9 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
-            Val::TrustSpeech => self.s.hide_trust_speech = x != 0,
             Val::ReadyLines => self.s.hide_ready_lines = x != 0,
             Val::ShortBattle => self.s.short_battle = x != 0,
             Val::NameColours => self.s.battle_name_colours = x != 0,
-            Val::AutoAdvance => self.s.auto_advance = x,
             Val::Timers => self.s.timers = x != 0,
             Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
@@ -637,6 +662,15 @@ impl SettingsUi {
             Val::RetailAspect => self.s.retail_aspect = x != 0,
             Val::CursorSize => self.s.cursor_size = x,
             Val::KeysHideCursor => self.s.keys_hide_cursor = x != 0,
+            Val::Tabbed(i) => {
+                if let Some((id, r)) = self.tab_rows.get_mut(i)
+                    && let Some(c) = r.choices.get(x as usize)
+                    && r.at != x as usize
+                {
+                    r.at = x as usize;
+                    self.mod_changes.push((id.clone(), r.key.clone(), c.1.clone()));
+                }
+            }
             Val::Mod(i) => {
                 let Some(k) = self.tab.checked_sub(EXTRA_TABS.len()) else { return };
                 if let Some(p) = self.mod_pages.get_mut(k)
@@ -1087,7 +1121,9 @@ impl SettingsUi {
 impl SettingsUi {
     fn find(&self, label: &str) -> Option<Row> {
         let pages = (0..TABS.len()).filter(|&t| t != MODS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        pages.flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter()).find(|r| r.label == label).map(Row::from)
+        let ours = pages.flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter()).find(|r| r.label == label).map(Row::from);
+        // Else a bundled mod's, in its extra's place.
+        ours.or_else(|| self.tab_rows.iter().position(|(_, r)| r.label == label).map(|i| self.tab_row(i)))
     }
 
     fn vrow(&self, r: &Row) -> VRow {
@@ -1151,7 +1187,8 @@ impl SettingsUi {
     #[cfg(test)]
     pub fn all_labels(in_game: bool, modern: bool) -> Vec<&'static str> {
         let pages = (0..TABS.len()).filter(|&t| t != MODS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).collect()
+        let bundled = super::lua::bundled_tab_labels().into_iter().map(|l| &*Box::leak(l.into_boxed_str()));
+        pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).chain(bundled).collect()
     }
 }
 
@@ -1623,6 +1660,23 @@ mod tests {
         let (title, game) = (rows(Kind::Settings, 6, false, false), rows(Kind::Settings, 6, true, false));
         assert_eq!(title.len() + 1, game.len());
         assert!(!title.iter().any(|r| matches!(r.val, Val::ResetPlaces)) && matches!(game.last().unwrap().val, Val::ResetPlaces));
+    }
+
+    /// A bundled mod's rows on our Extras tabs stand at their places; its other rows make its own page; a choice there
+    /// goes to the app as the mod's change.
+    #[test]
+    fn mod_rows_on_our_tabs() {
+        let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
+        let row = |key: &str, tab: &str, place| ModRow { key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place };
+        ui.set_mod_pages(vec![ModPage { id: "m".into(), name: "M".into(), rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)] }]);
+        assert_eq!((ui.mod_pages.len(), ui.mod_pages[0].rows.len()), (1, 1));
+        ui.tab = 3;
+        let shown = ui.rows();
+        assert_eq!((shown.first().unwrap().label.as_str(), shown.last().unwrap().label.as_str()), ("first", "last"));
+        assert_eq!(shown.len(), rows(Kind::Extras, 3, false, false).len() + 2);
+        ui.set(shown[0].val, 1);
+        assert_eq!(ui.mod_changes, [("m".to_string(), "first".to_string(), serde_json::Value::from(3))]);
+        assert_eq!(ui.get(shown[0].val), 1);
     }
 
     #[test]

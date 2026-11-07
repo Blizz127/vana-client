@@ -2205,10 +2205,8 @@ pub fn update(w: &mut World, dt: f32) {
         }
     }
     // FUN_10136cd0: under the auto-advance the rem sends message 5 every frame: each waiting page goes on (SE 0015);
-    // the message's close clears it (FUN_10136ab0). Extra (ours): a page waiting the set seconds goes on the same way.
-    let extra = w.auto_advance as f32 * 60.0;
-    let timed = extra > 0.0 && live.st.choice.is_none() && live.st.msg.as_ref().is_some_and(|m| m.open >= extra);
-    if (live.st.auto_advance || timed)
+    // the message's close clears it (FUN_10136ab0).
+    if live.st.auto_advance
         && let Some(m) = live.st.msg.as_mut().filter(|m| m.waits_key())
     {
         w.sounds.push(crate::audio::Ui::Page as u32);
@@ -2871,6 +2869,12 @@ fn move_cursor(c: &mut Choice, to: isize, page: bool) {
     let row = c.cursor.saturating_sub(c.scroll);
     c.cursor = to.clamp(0, n as isize - 1) as usize;
     c.scroll = if page { c.cursor.saturating_sub(row).min(n.saturating_sub(3)) } else { c.scroll.min(c.cursor).max(c.cursor.saturating_sub(2)) };
+}
+
+/// The event's message on screen: whether it waits for a key, and the seconds its page has been open.
+pub fn message_wait(w: &World) -> Option<(bool, f32)> {
+    let m = w.event.as_ref()?.st.msg.as_ref()?;
+    Some((m.waits_key(), m.open / 60.0))
 }
 
 pub fn choice(w: &World) -> Option<&Choice> {

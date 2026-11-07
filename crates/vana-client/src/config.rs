@@ -107,7 +107,7 @@ pub fn is_copy() -> bool {
 }
 
 /// FFXI_CONFIG points test runs at a copy, so they never write the user's file.
-fn config_path() -> PathBuf {
+pub(crate) fn config_path() -> PathBuf {
     std::env::var_os("FFXI_CONFIG").map(PathBuf::from).unwrap_or_else(|| app_dir(dirs::config_dir()).join("config.json"))
 }
 
@@ -222,17 +222,12 @@ pub struct Config {
     /// config from before the notes has none, so its first newer build shows that build's own.
     #[serde(default)]
     pub notes_seen: String,
-    /// Extra (the trust chatter filters): trusts' party lines (battle message 711) are not printed.
-    pub hide_trust_speech: bool,
     /// Extra (Battlemod's filters): "readies" / "starts casting" lines only for us and monsters.
     pub hide_ready_lines: bool,
     /// Extras (Battlemod's simplify and colours, client/battlemod.rs): battle lines in their short form; names in
     /// battle lines coloured by who they are.
     pub short_battle: bool,
     pub battle_name_colours: bool,
-    /// Extra (the text auto-advance add-ons): an event message waiting for a key goes on by itself after this many
-    /// seconds; 0 off.
-    pub auto_advance: u32,
     /// Extra (the Timers add-on): the timers window, its dock (0 left, 1 right, 2 top), its drawer out, folded
     /// sections (a bit each).
     pub timers: bool,
@@ -470,11 +465,9 @@ impl Default for Config {
             actor_shadows: 0,
             shadow_map: 2048,
             ssao: false,
-            hide_trust_speech: false,
             hide_ready_lines: false,
             short_battle: false,
             battle_name_colours: false,
-            auto_advance: 0,
             timers: false,
             timers_dock: 0,
             timers_out: true,

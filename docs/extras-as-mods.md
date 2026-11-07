@@ -26,14 +26,24 @@ Today's code is listed under client/ unless a path says otherwise.
 | Timers | timers.rs (1308), durations.rs (874), data/timers | three windows: recasts, buffs, debuffs, so `/uimodes` shows and hides each (user, 2026-11-06); durations as mod data; `game.recasts().totals` | edge windows; the `timers.add` rows move to a service the Timers mod provides (`mods.provide`); party buffs (0x076) and wear-offs as events |
 | Battle menu suggestions (not a row: modern UI) | suggest.rs (1034), dat/resists.rs, data | | rows in the modern battle menu, and the magic list and target prompt driven from them |
 
-## The framework, first
+## The framework, first (done)
 
 1. **Bundled mods are ours**: granted what their manifest asks, without the player's grant (a bundled mod is the
-   client's code).
-2. **Settings carry over**: an extra's config field (`timers`, `earth_clock` ...) becomes the bundled mod's enabled
-   flag or one of its settings at first start, so nobody's choice is lost; its Extras rows stay where they are (the
-   mod's settings page under the Extras tab it came from).
-3. **The Extras page lists bundled mods' settings in the old rows' places**, so the page looks the same.
+   client's code; the user, 2026-11-06). Their pages list no permission rows.
+2. **Settings carry over**: a setting declared `from` a config field takes that field's value at its first load and
+   saves it in the mod's settings file (the config keeps a field it no longer knows, so a converted extra's field
+   stays readable).
+3. **The Extras page shows bundled mods' settings in the old rows' places**: a setting's `tab` and `place` put it on
+   one of our Extras tabs, in both UIs and the modern Settings window's topic pages (by its label); `options` with
+   `values` give it the old row's choices.
+
+Done so far (checked live, Lnxcsfix):
+
+- **Text Auto-Advance** (assets/mods/auto-advance): `game.event().text` (waiting, open) and `actions.advance`; a
+  signpost's message went on after the 3 s carried over from the config.
+- **Trust Speech** (assets/mods/trust-speech): s2c 0x029 / 0x02D with message 711 blocked while Hidden, nothing hooked
+  while Shown; the setting carried over (not seen live: it needs a trust's party line).
+- **/find** (assets/mods/find): `/find crystal` listed the crystals by bag.
 
 ## Order
 

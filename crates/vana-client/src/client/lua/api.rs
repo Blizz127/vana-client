@@ -876,6 +876,12 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 m.set("cursor", c.cursor + 1)?;
                 t.set("menu", m)?;
             }
+            if let Some((waiting, open)) = super::super::event::message_wait(w) {
+                let m = lua.create_table()?;
+                m.set("waiting", waiting)?;
+                m.set("open", open)?;
+                t.set("text", m)?;
+            }
             Ok(Some(t))
         })?,
     )?;

@@ -1,0 +1,15 @@
+name = "Text Auto-Advance"
+version = "1.0.0"
+description = "Event messages that wait for a key move on by themselves after a few seconds (the text auto-advance add-ons)."
+permissions = ["automation"]
+
+[settings.seconds]
+type = "int"
+default = 0
+options = ["OFF", "3 s", "5 s", "8 s"]
+values = [0, 3, 5, 8]
+label = "Text Auto-Advance"
+help = "Event messages that wait for a key move on by themselves after this many seconds."
+tab = "Misc."
+place = 3
+from = "auto_advance"
