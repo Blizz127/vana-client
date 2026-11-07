@@ -1499,15 +1499,11 @@ impl Host {
         m.as_mut()?.modern_image()
     }
 
-    /// A mod's setting: the running mod's, else its settings file's, else a bundled mod's default (our own features
-    /// reading each other's, as the minimap's marker the map overlay's opacity).
+    /// A running mod's setting, else its declared default (never a file read: callers ask every frame).
     pub(in crate::client) fn setting(&self, id: &str, key: &str) -> Option<serde_json::Value> {
-        if let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) {
-            let st = vm.st.borrow();
-            return st.settings.get(key).cloned().or_else(|| vm.manifest.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()));
-        }
-        let saved = read_json(&data_dir().join(id).join("settings.json"));
-        saved.get(key).cloned().or_else(|| bundled_manifest(id)?.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
+        let vm = self.vms.iter().find(|v| v.manifest.id == id)?;
+        let st = vm.st.borrow();
+        st.settings.get(key).cloned().or_else(|| vm.manifest.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
     }
 
     /// The tooltip of the mod HUD element under the pointer: (title, text, seconds there).

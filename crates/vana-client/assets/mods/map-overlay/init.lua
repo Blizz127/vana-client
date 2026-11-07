@@ -26,17 +26,35 @@ end
 local function close()
   open, view, drag = false, nil, nil
   hud.remove("overlay")
+  hud.remove("overlay_empty")
   hud.remove("overlay_edge")
 end
 
-local function show()
-  local m = game.map()
-  if not open or not m then
-    hud.remove("overlay")
+-- The modern UI's bronze edge: 2 points outside the box, its corners rounded 6 points inside.
+local function edge(x, y, side)
+  if game.info().modern_ui then
+    local u = hud.screen().ui_scale
+    hud.rect("overlay_edge", { x = x - 2 * u, y = y - 2 * u, w = side + 4 * u, h = side + 4 * u, line = 2 * u, round = 8 * u, colour = { 184, 139, 73, 204 } })
+  else
     hud.remove("overlay_edge")
+  end
+end
+
+local function show()
+  if not open then
+    close()
     return
   end
+  local m = game.map()
   local x, y, side = box()
+  -- No map here (none, not ours, or not in yet): the box, empty, until there is one.
+  if not m then
+    hud.remove("overlay")
+    hud.rect("overlay_empty", { x = x, y = y, w = side, h = side, colour = { 0, 0, 0, math.floor(160 * settings.get("opacity")) } })
+    edge(x, y, side)
+    return
+  end
+  hud.remove("overlay_empty")
   -- A new zone, map page or window size: the whole map again.
   local key = table.concat({ m.zone, m.number, side }, ":")
   if not view or seen ~= key then
@@ -56,16 +74,10 @@ local function show()
       show()
     end
   end)
-  -- The modern UI's bronze edge: 2 points outside the box, its corners rounded 6 points inside.
-  if game.info().modern_ui then
-    local u = hud.screen().ui_scale
-    hud.rect("overlay_edge", { x = x - 2 * u, y = y - 2 * u, w = side + 4 * u, h = side + 4 * u, line = 2 * u, round = 8 * u, colour = { 184, 139, 73, 204 } })
-  else
-    hud.remove("overlay_edge")
-  end
+  edge(x, y, side)
 end
 
--- With no map here (yet) the error sound plays, and it opens all the same: the map shows once there is one.
+-- With no map here (yet) the error sound plays, and it opens empty: the map shows once there is one.
 local function toggle()
   if open then
     close()
