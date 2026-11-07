@@ -890,7 +890,14 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         })?,
     )?;
     game.set("weather", lua.create_function(|lua, ()| Ok(world(lua)?.weather))?)?;
-    game.set("key_items", lua.create_function(|lua, ()| Ok(world(lua)?.key_items.clone()))?)?;
+    // The held key items' ids, from the server's bit table (one bit per id, 32 to a word).
+    game.set(
+        "key_items",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            Ok(w.key_items.iter().enumerate().flat_map(|(k, &word)| (0..32u32).filter(move |b| word & (1 << b) != 0).map(move |b| k as u32 * 32 + b)).collect::<Vec<u32>>())
+        })?,
+    )?;
     // The treasure pool: each item in it by slot (0..9, as actions.lot / pass take them).
     game.set(
         "treasure",

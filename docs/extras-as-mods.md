@@ -199,6 +199,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   saved (`//macros save [sub]`) for main / sub or the main job, else to a book titled with the job, when the job
   changes and once at the start (the first frame that knows the job and has the macros: the login event comes
   before mods run). Seen live: book 2 set 3 saved for WAR, the palette there at the next login.
+- **Mount Picker** (assets/mods/mount-picker; MountRoulette, mountme): `//ride` calls one of our mounts at random,
+  `//ride <part of a name>` the first that matches, `//ride list` names them (key items 3072 + the mount's index).
+  Seen live: Chocobo and Raptor listed, the Raptor ridden. It found `game.key_items()` returning the bit table's raw
+  words, not ids: fixed (Inventory HUD's key item rows read it too).
 
-Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
-regime's windows and under the mods' drawn before them, so two never open on one place.
+A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
+built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
+it does not move as other windows come and go.

@@ -137,9 +137,11 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
             continue;
         }
         let key = win.panel.clone().unwrap_or_else(|| format!("mod:{mod_id}:{}", win.id));
+        // Its first place, kept as if the player had put it there: it never moves as other windows come and go.
         if win.panel.is_none() && !p.layout.contains_key(&key) {
-            let y = stack_below(p);
-            p.retail.insert(key.clone(), super::Place { x: 0.0, y, ..Default::default() });
+            let y = stack_below(p, &key);
+            p.layout.insert(key.clone(), super::Place { x: 0.0, y, ..Default::default() });
+            *p.changed = true;
         }
         let regime = win.panel.as_deref() == Some("regime");
         let folded = if regime { !w.regime.out } else { p.folded.get(&key).copied().unwrap_or(false) };
@@ -170,15 +172,16 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
     }
 }
 
-/// Where a mod's edge window that was never moved starts (a fraction of the screen's height): on the left edge, under
-/// the built-in windows there (last frame's) and the mods' drawn before it this frame, so none stand on another.
-fn stack_below(p: &Panels) -> f32 {
+/// Where a mod's edge window first shows (a fraction of the screen's height): on the left edge, under the built-in
+/// windows there (last frame's) and the other mods' left-edge windows by their places (their last height, else a
+/// tenth of the screen), so none stand on another.
+fn stack_below(p: &Panels, key: &str) -> f32 {
     let screen = p.ctx.content_rect();
-    let on_left = |r: &Rect| r.min.x <= screen.min.x + 4.0;
-    let built: Vec<Rect> = p.m.rects.borrow().iter().filter(|(k, _)| ["timers_recasts", "timers_buffs", "timers_debuffs", "regime"].contains(&k.as_str())).map(|(_, r)| *r).collect();
-    let mods = p.this.iter().filter(|(k, _)| k.starts_with("mod:")).map(|(_, r)| *r);
-    let bottom = built.into_iter().chain(mods).filter(on_left).map(|r| r.max.y).fold(screen.height() * 0.3, f32::max);
-    ((bottom + 8.0 - screen.min.y) / screen.height().max(1.0)).min(0.9)
+    let h = screen.height().max(1.0);
+    let rects = p.m.rects.borrow();
+    let built = rects.iter().filter(|(k, r)| ["timers_recasts", "timers_buffs", "timers_debuffs", "regime"].contains(&k.as_str()) && r.min.x <= screen.min.x + 4.0).map(|(_, r)| (r.max.y - screen.min.y) / h);
+    let mods = p.layout.iter().filter(|(k, pl)| k.starts_with("mod:") && k.as_str() != key && pl.x <= 0.01 && !pl.float).map(|(k, pl)| pl.y + rects.get(k).map_or(0.1, |r| r.height() / h));
+    (built.chain(mods).fold(0.3, f32::max) + 8.0 / h).min(0.9)
 }
 
 /// The skillchain helper (skillchain.rs's view) on a screen edge, in a party: on our target the open resonance (its
