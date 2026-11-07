@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2166,6 +2166,40 @@ mod tests {
             act(123, 426, 0)
             assert(said[#said] == "Chaos Roll: Bust!")
             assert(F('/ja "Double-Up" <me>') == nil)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Automaton Sets: a saved set puts its head, frame and attachments back in order after taking the old ones off.
+    #[test]
+    fn automaton_sets_round_trip() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "automaton-sets").unwrap().2;
+        let vm = Vm::new(bundled_manifest("automaton-sets").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, ops, said = {}, {}, {}
+            local job = { job = 18, head = 8193, frame = 8226, attachments = { 8449, 8450 } }
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            storage = { account = {}, save = function() end }
+            sleep = function() end
+            res = { item = function(id) return { name = "item" .. id } end }
+            actions = { attach = function(slot, id) ops[#ops + 1] = "a" .. slot .. ":" .. id end,
+              detach = function(slot) ops[#ops + 1] = "d" .. slot end }
+            game = { job_data = function() return { main = job } end, entity_by_tag = function() return nil end }
+            load(INIT)()
+            C.automaton("save", "Tank")
+            assert(storage.account.sets.tank.head == 8193)
+            job = { job = 18, head = 8194, frame = 8227, attachments = {} }
+            C.automaton("tank")
+            local s = table.concat(ops, " ")
+            assert(s:find("^d3 d4 .* d14 a1:8193 a2:8226 a3:8449 a4:8450$"), s)
+            assert(said[#said]:find("but not"), said[#said])
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

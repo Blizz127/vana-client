@@ -357,6 +357,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   420 / 422 / 424 / 425, 426 the bust) a line with the roll's number, lucky / unlucky and its power, from
   LandSandBoat's roll table (31 rolls; the lucky number its spike, the unlucky its dip); Guard Lucky Rolls holds back
   a Double-Up typed at a lucky number or 11. A Rust test covers it; not seen live (no Corsair on the test character).
+- **Automaton Sets** (assets/mods/automaton-sets; autocontrol, pupatt, pupsets): `//automaton save <name>` keeps the
+  head, frame and attachments (game.job_data), `//automaton <name>` takes the attachments off and puts the set on
+  (actions.attach), then says which the server refused; list and delete. The customization window is the client's
+  own. A Rust test covers the round trip; not seen live (no Puppetmaster with attachments). Not yet: the burden
+  tracker.
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
