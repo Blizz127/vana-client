@@ -1,0 +1,14 @@
+name = "Training Regime"
+version = "1.0.0"
+description = "The Fields or Grounds of Valor regime in force and your kills, in a window beside the timers."
+permissions = ["packets.read"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Training Regime"
+help = "While a Fields or Grounds of Valor regime is active, shows its targets and your kills in a window beside the timers."
+tab = "Timers"
+place = 2
+place_modern = 1
+from = "regime"

@@ -38,6 +38,7 @@
 ---| "battle_message" # A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
 ---| "synth_amount" # The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
 ---| "synth_result" # Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
+---| "zone_text" # A zone dialogue line came (s2c 0x036 / 0x02A / 0x027): its id in the install (res.zone_text), its actor, whether MesNum's bit 15 marks it plain, the packet.
 ---| "damage" # A damage number: a battle message that puts one up (main and proc records), whatever the chat filters show.
 ---| "ipc_message" # Text the same mod sent from another game window on this machine (ipc.send; needs multibox).
 ---| "item_change" # A bag slot's count changed.
@@ -147,6 +148,10 @@
 ---@field modal boolean? keeps the keys and the pointer while open
 ---@field popup boolean? modal, opened at the pointer, closed by a click outside it
 ---@field opacity number? the whole window's opacity, 0..1 (per-window opacity)
+---@field edge boolean? an edge window, as the Timers and the training regime
+---@field heading string? an edge window's line over its elements
+---@field resize boolean? an edge window can be made wider
+---@field panel string? the built-in panel an edge window stands in for: 'regime'
 
 --- A packet as a hook sees it (packets.on_in / on_out).
 ---@class vana.Packet
@@ -364,7 +369,7 @@ function timers.remove(name) end
 --- Removes every row of the mod's.
 function timers.clear() end
 
---- Creates or replaces a window: title, width, help, and elements in order. Element types: text {id, text, dim, colour}; buttons {id, label, items, marked} (marked makes them options); slider {id, label, steps, at, shown}; list {id, rows, columns, at, height} (a row is a string or {cells..., icon = {kind = 'item' | 'status' | 'spell' | 'ability', id}, colour}; columns {title, width, align = 'right'}, a heading click sends 'sort'); gauge {id, label, value 0..1, text, kind hp|mp|tp|cast|experience|recast}; separator; tabs {id, items, at} (pages: an element's page = n shows only on page n of the tabs above it); input {id, label, text, max} (a typed line: Enter starts and ends it, Escape undoes it); choice {id, label, items, at} (Left / Right turn it); colour {id, label, value = {r, g, b, a}, alpha} (Enter edits it a channel at a time); section {id, label, open} (folds what is under it, to the next section or tabs); canvas {id, w, h, draw} (a region the mod draws in, in its own units: draw is a list of {type = 'line', x1, y1, x2, y2, width} | {type = 'rect', x, y, w, h, to (a bottom colour: a gradient), line (outline width)} | {type = 'circle', x, y, r, line} | {type = 'tri', x1, y1, x2, y2, x3, y3} | {type = 'text', x, y, text} | {type = 'icon', x, y, size, kind = 'item' | 'status' | 'spell' | 'ability', id}, each with a colour; ui.update(window, canvas, {draw = ...}) redraws it; a click sends 'click' {x, y}, a drag 'drag_start', 'drag' and 'drag_end' {x, y, dx, dy}, held to the release wherever the pointer goes). Every element may have tip (the help shown while the cursor or pointer is on it) and page. Indexes are 1-based. Window options: opacity (0..1, the whole window: per-window opacity; ui.opacity changes it), hud (never takes the keys), frame = false (no frame), x / y (its place in the classic UI), modal (keeps the keys and the pointer while open; centred unless placed), popup (modal, opened at the pointer, closed by a click outside it). It draws in the active UI's look (classic Config page or modern panel).
+--- Creates or replaces a window: title, width, help, and elements in order. Element types: text {id, text, dim, colour}; buttons {id, label, items, marked} (marked makes them options); slider {id, label, steps, at, shown}; list {id, rows, columns, at, height} (a row is a string or {cells..., icon = {kind = 'item' | 'status' | 'spell' | 'ability', id}, colour}; columns {title, width, align = 'right'}, a heading click sends 'sort'); gauge {id, label, value 0..1, text, kind hp|mp|tp|cast|experience|recast, style = 'row' (a list row: the label, the text at the right, a thin bar under, as the training regime's; dim when done)}; separator; tabs {id, items, at} (pages: an element's page = n shows only on page n of the tabs above it); input {id, label, text, max} (a typed line: Enter starts and ends it, Escape undoes it); choice {id, label, items, at} (Left / Right turn it); colour {id, label, value = {r, g, b, a}, alpha} (Enter edits it a channel at a time); section {id, label, open} (folds what is under it, to the next section or tabs); canvas {id, w, h, draw} (a region the mod draws in, in its own units: draw is a list of {type = 'line', x1, y1, x2, y2, width} | {type = 'rect', x, y, w, h, to (a bottom colour: a gradient), line (outline width)} | {type = 'circle', x, y, r, line} | {type = 'tri', x1, y1, x2, y2, x3, y3} | {type = 'text', x, y, text} | {type = 'icon', x, y, size, kind = 'item' | 'status' | 'spell' | 'ability', id}, each with a colour; ui.update(window, canvas, {draw = ...}) redraws it; a click sends 'click' {x, y}, a drag 'drag_start', 'drag' and 'drag_end' {x, y, dx, dy}, held to the release wherever the pointer goes). Every element may have tip (the help shown while the cursor or pointer is on it) and page. Indexes are 1-based. Window options: opacity (0..1, the whole window: per-window opacity; ui.opacity changes it), hud (never takes the keys), frame = false (no frame), x / y (its place in the classic UI), modal (keeps the keys and the pointer while open; centred unless placed), popup (modal, opened at the pointer, closed by a click outside it), edge (an edge window, as the Timers and the training regime: on a screen edge, the title its tab when folded, heading a line over the elements whose click folds it; never takes the keys; resize lets it be made wider), panel ('regime': it stands in for that built-in panel, with its place, fold, ui.native.hide and /uimodes; the classic UI draws only such edge windows in the Timers' dock). It draws in the active UI's look (classic Config page or modern panel).
 ---@param id string 
 ---@param spec vana.WindowSpec 
 function ui.window(id, spec) end
@@ -1246,6 +1251,18 @@ function actions.stop() end
 ---@param heading number 
 function actions.turn(heading) end
 
+--- A zone's dialogue entry by its id in the install, as the file holds it: Shift-JIS bytes with the game's codes (text.from_shift_jis reads it); nil when there is none.
+---@param zone integer 
+---@param id integer 
+---@return string?
+function res.zone_text(zone, id) end
+
+--- The first id of a zone's dialogue whose entry starts with these bytes; nil when none does.
+---@param zone integer 
+---@param prefix string Shift-JIS bytes
+---@return integer?
+function res.zone_text_find(zone, prefix) end
+
 --- An item's record (65535 gil): name, description, kind (general, usable, automaton, armor, weapon, maze, instinct, objective, instinct_catalogue, monster, roe_category, teleport_point, primer_category, primer_topic, currency), flags, stack, type, targets, level, slots, races, jobs (bits), superior_level, damage, delay, skill, max_charges, cast_time, use_delay, reuse_delay.
 ---@param id integer 
 ---@return table?
@@ -1635,6 +1652,7 @@ function settings.get(key) end
 --   battle_message(actor: integer, target: integer, message: integer, param1: integer, param2: integer): A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
 --   synth_amount(count: integer, recipe: table): The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
 --   synth_result(result: integer, item: integer, count: integer, grade: integer): Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
+--   zone_text(id: integer, actor: integer, plain: boolean, packet: integer): A zone dialogue line came (s2c 0x036 / 0x02A / 0x027): its id in the install (res.zone_text), its actor, whether MesNum's bit 15 marks it plain, the packet.
 --   damage(actor: integer, target: integer, value: integer, message: integer): A damage number: a battle message that puts one up (main and proc records), whatever the chat filters show.
 --   ipc_message(text: string, from: string): Text the same mod sent from another game window on this machine (ipc.send; needs multibox).
 --   item_change(bag: integer, slot: integer, id: integer, count: integer, previous: integer): A bag slot's count changed.

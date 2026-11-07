@@ -66,6 +66,8 @@ pub struct Setting {
     /// a bundled mod's settings where the extra it replaces had its rows.
     pub tab: String,
     pub place: Option<usize>,
+    /// Its row in the modern UI's page, where that differs (rows only the classic page has).
+    pub place_modern: Option<usize>,
     /// The client config field its first value comes from (the extra it replaces kept it there).
     pub from: String,
 }

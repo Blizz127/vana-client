@@ -82,6 +82,25 @@ Done so far (checked live, Lnxcsfix):
   `synth_result` that is neither made nor failed, or a zone change. Seen live in the classic UI: the count step, the
   event, the next synthesis tried at the moment the built-in tried it. On LSB today both stop after one (the server
   leaves the crystal stack locked: MODLOG "Ours, not retail: a synthesis amount"), master's built-in the same way.
+- **Training Regime** (assets/mods/regime): the first edge window. `ui.window` takes `edge`, `heading`, `resize` and
+  `panel = "regime"` (its place, fold, /uimodes and hiding; in the classic UI the Timers' dock); gauges take
+  `style = "row"` and `dim`. The modern body is the mod window's (modwin::body, shared with the panels); the classic
+  one draws the row gauges as the regime window drew its rows. The tracking moved to Lua (packets.on_in / on_out, the
+  new `zone_text` event, `res.zone_text` / `zone_text_find`; the Rust tests run against it); the kept state carries
+  over into storage. The modern layer keeps the panel's egui layer shown (empty) until the mod's window is in it, so it
+  stacks under the HUD panels as the built-in did (a layer first shown later goes on top). Compared with master in
+  both UIs (the same kept regime); seen live at a Field Manual: accept, Review, cancel.
+
+### Edge windows
+
+`ui.window` gains `edge = true`: the window is drawn as the built-in edge windows are (modern: `edge_window` with
+its flyout label = `title`, a header line = `heading`, fold, sides, drags, `resize`; classic: the Timers' dock with
+the frame, the drawer arrow and the slide, stacked as Timers / Regime are). `panel = "regime"` (also timers,
+minimap, skillchain) makes it stand in for that built-in panel: its saved place and fold, `ui.native.hide` and
+`/uimodes`. Elements keep their kinds; a gauge's `row` style is the regime's row (label, count at the right, a thin
+bar, dim when done). Specialised bodies (the timers' rows, the map, the skillchain view) become element kinds drawn
+by the existing Rust, fed by the mod's data. First user: Training Regime (its tracking moves to Lua: event packets,
+battle messages, the zone dialogue's regime block through res, state in storage.character).
 
 ## Order
 

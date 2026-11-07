@@ -10,7 +10,7 @@ use egui::{Align2, Color32, FontFamily, FontId, Pos2, Rect, Sense, Shape, Stroke
 
 pub fn draw(p: &mut Panels, w: &mut World) {
     timers_panel(p, w);
-    regime_panel(p, w);
+    mod_edges(p, w);
     skillchain_panel(p, w);
     minimap_panel(p, w);
     widescan_panel(p, w);
@@ -88,40 +88,50 @@ fn timers_panel(p: &mut Panels, w: &mut World) {
     }
 }
 
-/// The training regime (regime.rs) on a screen edge: the area as its heading (a click folds it to a tab), a row per
-/// target with its kills of the needed and a bar; a full one dims.
-fn regime_panel(p: &mut Panels, w: &mut World) {
-    if !w.extra_regime || hidden(w) {
+/// The mods' edge windows (ui.window's edge), drawn as the built-in ones: the flyout's label (the title), a header
+/// line (the heading, a click folds it to a tab), the window's elements. One standing in for a built-in panel (the
+/// training regime) takes that panel's key: its place, fold, /uimodes and ui.native.hide.
+fn mod_edges(p: &mut Panels, w: &mut World) {
+    if hidden(w) {
         return;
     }
-    let Some(r) = w.regime.shown().cloned() else { return };
-    let m = p.m;
-    let toggle = edge_window(p, "regime", WIDTH, true, !w.regime.out, "Training", |ui, side, fixed| {
-        let toggle = flyout_header(ui, m, &r.heading(), side).clicked();
-        ui.add_space(4.0);
-        edge_body(ui, "regime", fixed, f32::INFINITY, |ui| regime_rows(ui, m, &r));
-        toggle
-    });
-    if toggle {
-        w.regime.toggle();
-        w.sounds.push(crate::audio::Ui::Cursor as u32);
+    // A built-in panel's layer held while no mod's window is in it, as its built-in window held it: the mods start a
+    // few frames after the HUD, and a layer that was not shown the frame before goes on top of the others.
+    for name in super::super::lua::EDGE_PANELS {
+        if w.lua.edge_panel(name).is_none() || w.lua.hides(name) {
+            egui::Area::new(egui::Id::unique(("modern edge", name))).order(egui::Order::Middle).fixed_pos(pos2(-1.0e5, -1.0e5)).interactable(false).constrain(false).show(p.ctx, |_| {});
+        }
     }
-}
-
-/// The regime's rows: each target's kills of the needed and a bar; a full one dims.
-fn regime_rows(ui: &mut Ui, m: &super::Modern, r: &super::super::regime::Regime) {
-    for s in &r.slots {
-        let (text, done, f) = super::super::regime::row_text(s);
-        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
-        let colour = if done { m.theme.color("muted") } else { m.theme.color("text") };
-        let (label, count) = text.rsplit_once(": ").unwrap_or((text.as_str(), ""));
-        ui.painter().text(pos2(rect.min.x, rect.min.y + 2.0), Align2::LEFT_TOP, label, FontId::proportional(m.theme.small), colour);
-        ui.painter().text(pos2(rect.max.x, rect.min.y + 2.0), Align2::RIGHT_TOP, count, FontId::monospace(m.theme.small), colour);
-        let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 6.0), pos2(rect.max.x, rect.max.y - 2.0));
-        ui.painter().rect_filled(bar, 2.0, m.theme.color("charcoal"));
-        if let Some(f) = f.filter(|f| *f > 0.0) {
-            let fill = Rect::from_min_max(bar.min, pos2(bar.min.x + bar.width() * f.min(1.0), bar.max.y));
-            ui.painter().rect_filled(fill, 2.0, if done { m.theme.color("muted") } else { m.theme.color("gold") });
+    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge) {
+        if win.panel.as_deref().is_some_and(|n| w.lua.hides(n)) {
+            continue;
+        }
+        let key = win.panel.clone().unwrap_or_else(|| format!("mod:{mod_id}:{}", win.id));
+        let regime = win.panel.as_deref() == Some("regime");
+        let folded = if regime { !w.regime.out } else { p.folded.get(&key).copied().unwrap_or(false) };
+        let (m, ctx, gu) = (p.m, p.ctx, p.gu);
+        let label = if win.title.is_empty() { win.id.clone() } else { win.title.clone() };
+        let width = if win.width > 0.0 { win.width } else { WIDTH };
+        let mut clicks = Vec::new();
+        let world: &World = w;
+        let toggle = edge_window(p, &key, width, win.resize, folded, &label, |ui, side, fixed| {
+            let heading = if win.heading.is_empty() { &label } else { &win.heading };
+            let toggle = flyout_header(ui, m, heading, side).clicked();
+            ui.add_space(4.0);
+            edge_body(ui, &key, fixed, f32::INFINITY, |ui| super::modwin::body(ui, m, ctx, gu, Some(world), &key, &win, &mut clicks));
+            toggle
+        });
+        if toggle {
+            if regime {
+                w.regime.toggle();
+            } else {
+                p.folded.insert(key.clone(), !folded);
+                *p.changed = true;
+            }
+            w.sounds.push(crate::audio::Ui::Cursor as u32);
+        }
+        for c in clicks {
+            super::super::lua::window_click(w, &mod_id, &win.id, c);
         }
     }
 }

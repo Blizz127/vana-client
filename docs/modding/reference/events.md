@@ -118,7 +118,7 @@ Some things hold for all of them:
 | [Chat](#chat) | [`chat_message`](#chat_message), [`emote`](#emote), [`examined`](#examined) |
 | [Crafting](#crafting) | [`synth_amount`](#synth_amount), [`synth_result`](#synth_result) |
 | [Items](#items) | [`item_add`](#item_add), [`item_remove`](#item_remove), [`item_change`](#item_change) |
-| [World](#world) | [`zone_change`](#zone_change), [`time_change`](#time_change), [`day_change`](#day_change), [`moon_change`](#moon_change), [`weather_change`](#weather_change) |
+| [World](#world) | [`zone_change`](#zone_change), [`zone_text`](#zone_text), [`time_change`](#time_change), [`day_change`](#day_change), [`moon_change`](#moon_change), [`weather_change`](#weather_change) |
 | [Input and UI](#input-and-ui) | [`focus_change`](#focus_change), [`settings_changed`](#settings_changed) |
 | [Network](#network) | [`ipc_message`](#ipc_message), [events from other mods](#events-from-other-mods) |
 
@@ -662,6 +662,26 @@ fires then.
 ```lua
 events.on("zone_change", function(zone, previous)
   print("Entered " .. (res.zone(zone) or zone))
+end)
+```
+
+
+## `zone_text`
+
+A zone dialogue line came from the server (s2c 0x036, 0x02A or 0x027): an NPC's or an event's line printed in the
+log. The id is the entry's in the installed game files (the server's id mapped to it), for
+[`res.zone_text`](res.md#reszone_text).
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `id` | `integer` | The dialogue entry's id in this zone's file. |
+| `actor` | `integer` | The server id the line is about (the NPC, or us). |
+| `plain` | `boolean` | The server marked it plain (MesNum bit 15): printed without the speaker's name. |
+| `packet` | `integer` | The packet it came in: `0x036`, `0x02A` or `0x027`. |
+
+```lua
+events.on("zone_text", function(id, actor, plain)
+  log.info(("zone text %d about %d"):format(id, actor))
 end)
 ```
 

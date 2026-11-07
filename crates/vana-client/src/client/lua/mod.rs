@@ -491,7 +491,10 @@ macro_rules! bundled {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
     };
 }
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount"];
+/// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
+pub(in crate::client) const EDGE_PANELS: [&str; 1] = ["regime"];
+
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -561,6 +564,11 @@ impl Host {
         }
         let data = data_dir().join(&m.id);
         let char_file = Self::char_file(w);
+        if m.id == "regime"
+            && let (Some(w), Some(f)) = (w, char_file.as_deref())
+        {
+            migrate_regime(w, &data, f);
+        }
         let storage = (read_json(&data.join("account.json")), char_file.as_ref().map_or(serde_json::Value::Null, |f| read_json(&data.join(f))));
         migrate_settings(&m, &data, char_file.as_deref());
         let settings = load_settings(&m, &data, char_file.as_deref());
@@ -1488,6 +1496,14 @@ impl Host {
         self.info.borrow().slots.get(name).map(|s| s.1.clone())
     }
 
+    /// The open edge window standing in for a built-in panel (the newest mod's).
+    pub(in crate::client) fn edge_panel(&self, panel: &str) -> Option<window::Window> {
+        if self.all_hidden {
+            return None;
+        }
+        self.vms.iter().rev().filter(|v| v.suspended.is_none()).find_map(|v| v.st.borrow().windows.iter().find(|w| w.open && w.edge && w.panel.as_deref() == Some(panel)).cloned())
+    }
+
     /// A number slot (target_distance, target_hpp).
     pub(in crate::client) fn slot_num(&self, name: &str) -> Option<f64> {
         self.info.borrow().slots.get(name).and_then(|s| s.1.as_f64())
@@ -1755,6 +1771,57 @@ mod tests {
         let c = s(&["Lnxcsfix misses the Wild Rabbit."], &me, &red).unwrap();
         assert_eq!(crate::dat::font::strip_codes(&c), "Lnxcsfix → Wild Rabbit: miss");
         assert!(c.contains(crate::dat::font::colour_code(8)));
+    }
+
+    /// The bundled Training Regime's page labels, credit attribution, and its block on the real zone 100 dialogue.
+    #[test]
+    fn regime_labels_and_credits() {
+        let host = Host::default();
+        let vm = Vm::new(bundled_manifest("regime").unwrap(), PathBuf::from("."), vm::Source::Dir(PathBuf::from("."))).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.st.borrow_mut().granted.push("packets.read".into());
+        let src = BUNDLED.iter().find(|b| b.0 == "regime").and_then(|b| b.2.iter().find(|f| f.0 == "init.lua")).unwrap().1;
+        let module: mlua::Table = vm.lua.load(src).eval().unwrap();
+        let lua = &vm.lua;
+        let label = |b: &[u8]| module.get::<mlua::Function>("label").unwrap().call::<String>(lua.create_string(b).unwrap()).unwrap();
+        assert_eq!(label(b"\x0a\x00 \x7f\x92\x00[Siege Bat/Siege Bats]."), "Siege Bat");
+        assert_eq!(label(b"\x0a\x01 member\x7f\x92\x01[/s] of the worm family."), "Worm family");
+        assert_eq!(label(b"\x0a\x02 undead-type creature\x7f\x92\x02[/s]."), "Undead-type");
+        // Credits: by counts, then names; a family slot takes the monster no name fits; nothing fits a full slot.
+        let attribute = |slots: &[(&str, u8, u8, bool)], k: u8, n: u8, name: Option<&str>| {
+            let t = lua.create_table().unwrap();
+            for (i, (l, needed, killed, known)) in slots.iter().enumerate() {
+                let s = lua.create_table().unwrap();
+                (s.set("label", *l).unwrap(), s.set("needed", *needed).unwrap(), s.set("killed", *killed).unwrap(), s.set("known", *known).unwrap());
+                t.set(i + 1, s).unwrap();
+            }
+            module.get::<mlua::Function>("attribute").unwrap().call::<Option<usize>>((t, k, n, name)).unwrap()
+        };
+        let s = [("Siege Bat", 4, 2, true), ("Borer Beetle", 2, 0, true)];
+        assert_eq!((attribute(&s, 3, 4, None), attribute(&s, 1, 2, None)), (Some(1), Some(2)));
+        assert_eq!(attribute(&[("Goblin family", 4, 1, true), ("Gigas family", 4, 1, true)], 2, 4, Some("Goblin Mugger")), Some(1));
+        let s = [("Crab family", 6, 2, true), ("Hill Lizard", 6, 2, true)];
+        assert_eq!((attribute(&s, 3, 6, Some("Snipper")), attribute(&s, 3, 6, Some("Hill Lizard"))), (Some(1), Some(2)));
+        // Counts unknown (a book's page, no kills yet): the name decides.
+        assert_eq!(attribute(&[("Siege Bat", 0, 0, false), ("Borer Beetle", 0, 0, false)], 3, 4, Some("Borer Beetle")), Some(2));
+        let matches = |a: &str, b: &str| module.get::<mlua::Function>("matches").unwrap().call::<bool>((a, b)).unwrap();
+        assert!(matches("Bat family", "Seeker Bats") && matches("Siege Bat", "siege bat") && !matches("Siege Bat", "Siege Bats"));
+        // The real block of zone 100, through stand-ins for res.zone_text / zone_text_find.
+        let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
+        let Ok(d) = crate::dat::dialog::Dialog::load(&index, 100) else { return };
+        let d = std::sync::Arc::new(d);
+        let res: mlua::Table = lua.globals().get("res").unwrap();
+        let d1 = d.clone();
+        res.set("zone_text", lua.create_function(move |lua, (_z, id): (u16, u32)| d1.raw(id).map(|b| lua.create_string(&b)).transpose()).unwrap()).unwrap();
+        let d2 = d.clone();
+        res.set("zone_text_find", lua.create_function(move |_, (_z, p): (u16, mlua::LuaString)| Ok((0..d2.len() as u32).find(|&i| d2.raw(i).is_some_and(|r| r.starts_with(&p.as_bytes()))))).unwrap()).unwrap();
+        let r: u32 = res.get::<mlua::Function>("zone_text_find").unwrap().call((100, "New training regime registered!")).unwrap();
+        let page = |id: u32| module.get::<mlua::Function>("page").unwrap().call::<(Vec<String>, String)>((100, r, id)).unwrap();
+        let (l, area) = page(2);
+        assert_eq!(l, ["Forest Hare"]);
+        assert!(area.contains("Ronfaure"), "{area}");
+        assert_eq!(page(704), (vec!["Siege Bat".to_string(), "Borer Beetle".to_string()], "Garlaige Citadel".to_string()));
     }
 
     /// ui.native.place / rect / panels and ui.skin: names checked, the permission asked, each change its mod's (another
@@ -2232,6 +2299,35 @@ pub(super) fn filter_typed(w: &mut World, line: &str) -> Option<String> {
     (!blocked).then_some(line)
 }
 
+/// The training regime the client kept before the bundled Training Regime mod (its file per server and character)
+/// goes into the mod's character storage, once ("migrated" marks it).
+fn migrate_regime(w: &World, data: &std::path::Path, char_file: &str) {
+    let file = data.join(char_file);
+    let mut v = read_json(&file);
+    if v.get("regime").is_some() || v.get("migrated").is_some() || w.name.is_empty() {
+        return;
+    }
+    let server = format!("{}-{}", w.search_addr.0, w.search_addr.1);
+    let read = |p: &std::path::Path| std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+    let kept = read(&crate::config::regime_path(&server, &w.name)).or_else(|| crate::config::regime_moved_path(&server, &w.name).and_then(|p| read(&p))).or_else(|| {
+        let mut old: Vec<_> = crate::config::regime_legacy_paths(&w.name).into_iter().filter_map(|p| Some((std::fs::metadata(&p).and_then(|m| m.modified()).ok()?, p))).collect();
+        old.sort_by(|a, b| b.0.cmp(&a.0));
+        old.into_iter().find_map(|(_, p)| read(&p))
+    });
+    if !v.is_object() {
+        v = serde_json::json!({});
+    }
+    if let Some(k) = kept.filter(|k| !k.is_null()) {
+        log::info!("lua mod regime: the client's kept regime for {}: {k}", w.name);
+        v["regime"] = k;
+    }
+    v["migrated"] = true.into();
+    let _ = std::fs::create_dir_all(data);
+    if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+        log::warn!("lua mod regime: {}: {e}", file.display());
+    }
+}
+
 /// Settings declared `from` a client config field (a bundled mod's, replacing an extra that kept its value there) and
 /// not set yet take that field's value, written to their scope's file so the config may drop it.
 fn migrate_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Option<&str>) {
@@ -2323,7 +2419,7 @@ impl Host {
                 };
                 let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-6)).unwrap_or(0);
                 let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
-                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: d.tab.clone(), place: d.place });
+                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: d.tab.clone(), place: d.place, place_modern: d.place_modern });
             }
             // The permissions it asks for, each allowed or not (docs/lua-mods.md 3.5); a bundled mod's are given.
             let bundled = matches!(vm.src, vm::Source::Bundled(_));
@@ -2331,7 +2427,7 @@ impl Host {
                 let (label, help) = permission_text(p);
                 let on = st.granted.contains(p);
                 let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
-                rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 }, tab: String::new(), place: None });
+                rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 }, tab: String::new(), place: None, place_modern: None });
             }
             if !rows.is_empty() {
                 pages.push(ModPage { id: vm.manifest.id.clone(), name: vm.manifest.name.clone(), rows });
@@ -2533,7 +2629,8 @@ fn classic_places(w: &World) -> Vec<(usize, String, f32, f32)> {
     let (sw, sh) = (screen[0] * uk.0, screen[1] * uk.1);
     let mut k = 0.0;
     for (v, vm) in w.lua.vms.iter().enumerate().filter(|(_, v)| v.suspended.is_none()) {
-        for win in vm.st.borrow().windows.iter().filter(|w| w.open) {
+        // A panel's edge window is the Timers' dock's (regime.rs).
+        for win in vm.st.borrow().windows.iter().filter(|w| w.open && w.panel.is_none()) {
             let (ww, wh) = win.classic_size();
             match (win.anchor, win.place) {
                 (Some((ax, ay)), _) => modal.push((v, win.id.clone(), (ax * uk.0).min(sw - ww).max(0.0), (ay * uk.1).min(sh - wh).max(0.0))),
@@ -2644,8 +2741,8 @@ mod stub_tests {
 
 /// The bundled mods' settings on our Extras tabs: (label, tab, place).
 #[cfg(test)]
-pub(in crate::client) fn bundled_tab_rows() -> Vec<(String, String, Option<usize>)> {
-    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| (d.label, d.tab, d.place))).collect()
+pub(in crate::client) fn bundled_tab_rows() -> Vec<(String, String, Option<usize>, Option<usize>)> {
+    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| (d.label, d.tab, d.place, d.place_modern))).collect()
 }
 
 /// A bundled mod's manifest.

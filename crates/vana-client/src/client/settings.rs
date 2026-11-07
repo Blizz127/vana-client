@@ -28,7 +28,6 @@ pub struct Settings {
     pub ssao: bool,
     pub timers: bool,
     pub timers_dock: u32,
-    pub regime: bool,
     pub skillchain_helper: bool,
     pub minimap: bool,
     pub minimap_dock: u32,
@@ -73,7 +72,6 @@ impl Settings {
             ssao: c.ssao,
             timers: c.timers,
             timers_dock: c.timers_dock,
-            regime: c.regime,
             skillchain_helper: c.skillchain_helper,
             minimap: c.minimap,
             minimap_dock: c.minimap_dock,
@@ -115,7 +113,6 @@ impl Settings {
         c.ssao = self.ssao;
         c.timers = self.timers;
         c.timers_dock = self.timers_dock;
-        c.regime = self.regime;
         c.skillchain_helper = self.skillchain_helper;
         c.minimap = self.minimap;
         c.minimap_dock = self.minimap_dock;
@@ -168,7 +165,6 @@ enum Val {
     Timers,
     TimersDock,
     Skillchains,
-    Regime,
     Minimap,
     MinimapDock,
     MinimapSize,
@@ -246,6 +242,7 @@ pub struct ModRow {
     /// One of our Extras tabs it shows on (a bundled mod's, in the rows of the extra it replaces), at row `place`.
     pub tab: String,
     pub place: Option<usize>,
+    pub place_modern: Option<usize>,
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
@@ -338,15 +335,13 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
     const TIMERS_ROW: SRow = row("Timers", "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers).", Timers, OFF_ON, Now);
-    const REGIME_ROW: SRow = row("Training Regime", "While a Fields or Grounds of Valor regime is active, shows its targets and your kills in a window beside the timers.", Regime, OFF_ON, Now);
     const SKILLCHAIN_ROW: SRow = row("Skillchain Helper", "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.", Skillchains, OFF_ON, Now);
     const TIMERS: &[SRow] = &[
         TIMERS_ROW,
         row("Timers Position", "Docks the timers window on the left, on the right above the party list, or at the top.", TimersDock, &[(0, "Left"), (1, "Right"), (2, "Top")], Now),
-        REGIME_ROW,
         SKILLCHAIN_ROW,
     ];
-    const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, REGIME_ROW, SKILLCHAIN_ROW];
+    const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, SKILLCHAIN_ROW];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[];
@@ -486,7 +481,7 @@ impl SettingsUi {
         if self.kind == Kind::Extras
             && let Some(tab) = EXTRA_TABS.get(self.tab)
         {
-            let mut mine: Vec<(usize, Row)> = self.tab_rows.iter().enumerate().filter(|(_, (_, r))| r.tab == *tab).map(|(i, (_, r))| (r.place.unwrap_or(usize::MAX), self.tab_row(i))).collect();
+            let mut mine: Vec<(usize, Row)> = self.tab_rows.iter().enumerate().filter(|(_, (_, r))| r.tab == *tab).map(|(i, (_, r))| ((if self.s.modern_ui { r.place_modern.or(r.place) } else { r.place }).unwrap_or(usize::MAX), self.tab_row(i))).collect();
             mine.sort_by_key(|m| m.0);
             for (place, r) in mine {
                 out.insert(place.min(out.len()), r);
@@ -553,7 +548,6 @@ impl SettingsUi {
             Val::Timers => self.s.timers as u32,
             Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
-            Val::Regime => self.s.regime as u32,
             Val::Minimap => self.s.minimap as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
@@ -590,7 +584,6 @@ impl SettingsUi {
             Val::Timers => self.s.timers = x != 0,
             Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
-            Val::Regime => self.s.regime = x != 0,
             Val::Minimap => self.s.minimap = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
@@ -1602,7 +1595,7 @@ mod tests {
     #[test]
     fn mod_rows_on_our_tabs() {
         let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
-        let row = |key: &str, tab: &str, place| ModRow { key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place };
+        let row = |key: &str, tab: &str, place| ModRow { key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place, place_modern: None };
         ui.set_mod_pages(vec![ModPage { id: "m".into(), name: "M".into(), rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)] }]);
         assert_eq!((ui.mod_pages.len(), ui.mod_pages[0].rows.len()), (1, 1));
         ui.tab = 3;
@@ -1620,7 +1613,7 @@ mod tests {
         let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
         let rows = crate::client::lua::bundled_tab_rows()
             .into_iter()
-            .map(|(label, tab, place)| ModRow { key: label.clone(), label, help: String::new(), choices: vec![("ON".into(), true.into()), ("OFF".into(), false.into())], at: 0, tab, place })
+            .map(|(label, tab, place, place_modern)| ModRow { key: label.clone(), label, help: String::new(), choices: vec![("ON".into(), true.into()), ("OFF".into(), false.into())], at: 0, tab, place, place_modern })
             .collect();
         ui.set_mod_pages(vec![ModPage { id: "bundled".into(), name: "Bundled".into(), rows }]);
         let tab = |ui: &mut SettingsUi, t: usize| {
@@ -1630,6 +1623,11 @@ mod tests {
         assert_eq!(tab(&mut ui, 0), ["Map Overlay", "Map Overlay Opacity", "Minimap", "Minimap Position", "Minimap Size"]);
         assert_eq!(tab(&mut ui, 2), ["Target Distance", "Target HP %", "Trust Speech", "Ready Lines", "Battle Text", "Battle Names"]);
         assert_eq!(tab(&mut ui, 3), ["Synthesis Amount", "Timestamps on All Lines", "Clock", "Text Auto-Advance"]);
+        // The Timers tab differs by UI (Timers Position is the classic one's).
+        ui.s.modern_ui = false;
+        assert_eq!(tab(&mut ui, 1), ["Timers", "Timers Position", "Training Regime", "Skillchain Helper"]);
+        ui.s.modern_ui = true;
+        assert_eq!(tab(&mut ui, 1), ["Timers", "Training Regime", "Skillchain Helper"]);
     }
 
     #[test]

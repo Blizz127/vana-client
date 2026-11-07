@@ -89,7 +89,9 @@ pub enum Elem {
     List { id: String, rows: Vec<Row>, columns: Vec<Col>, at: usize, top: usize, height: usize },
     /// A bar filled `value` (0..1) with its label and text; `kind` is the art pack's gauge (hp, mp, tp, cast,
     /// experience, recast).
-    Gauge { id: String, label: String, value: f32, text: String, kind: String },
+    /// `row`: a list row (label, the text at the right, a thin bar under; `dim` when done; a value below 0: no bar
+    /// known), as the training regime's rows.
+    Gauge { id: String, label: String, value: f32, text: String, kind: String, row: bool, dim: bool },
     Separator,
     /// Pages: elements with a `page` show only on theirs (of the tabs above them); Left / Right turn it.
     Tabs { id: String, items: Vec<String>, at: usize },
@@ -192,6 +194,12 @@ pub struct Window {
     /// classic UI: a press and release in place is a click, a move past 3 units starts the drag).
     pub drag: Option<(usize, f32, f32)>,
     pub press: Option<(usize, f32, f32)>,
+    /// An edge window (drawn as the Timers and the training regime are): its header line, whether it can be made
+    /// wider, and the built-in panel it stands in for (its place, fold, hiding).
+    pub edge: bool,
+    pub heading: String,
+    pub resize: bool,
+    pub panel: Option<String>,
 }
 
 /// What happened in a window, for the mod's handler.
@@ -293,6 +301,10 @@ impl Window {
             anchor: None,
             drag: None,
             press: None,
+            edge: false,
+            heading: String::new(),
+            resize: false,
+            panel: None,
         }
     }
 

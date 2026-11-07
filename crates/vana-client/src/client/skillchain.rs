@@ -460,7 +460,7 @@ pub fn prepare(w: &mut World, base: Place) {
         return;
     }
     // Under the Timers and the training regime windows (above them on the right).
-    let over = [if w.extra_timers { w.timers.rect() } else { None }, if w.extra_regime { w.regime.rect() } else { None }];
+    let over = [if w.extra_timers { w.timers.rect() } else { None }, w.regime.rect()];
     let place = over.iter().flatten().fold(base, |p, r| match p.dock {
         Dock::Right if r[1] - 4.0 < p.y => Place { y: r[1] - 4.0, max_h: (p.max_h - (p.y - r[1] + 4.0)).max(0.0), ..p },
         Dock::Right => p,

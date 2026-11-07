@@ -1016,11 +1016,9 @@ impl Host for LiveHost<'_> {
             }
             Effect::Send(p) => match p {
                 Packet::EventUpdate { head, option } => {
-                    super::regime::on_send(self.w, true, option);
                     self.send(NetCommand::EventEnd { target: head.target, index, option, zone: head.zone, event: head.event, mode: 1 })
                 }
                 Packet::EventEnd { head, option } => {
-                    super::regime::on_send(self.w, false, option);
                     self.send(NetCommand::EventEnd { target: head.target, index, option, zone: head.zone, event: head.event, mode: 0 })
                 }
                 Packet::Passwords { head, text } => {
@@ -3234,8 +3232,9 @@ pub fn zone_text(w: &mut World, t: &ZoneText) {
         Some(m) if m.zones.contains_key(&zone) => m.map_near(zone, lsb),
         _ => Some(lsb),
     };
+    // The mods' zone_text event: the line's id in the install (after MsgShift), its actor, MesNum bit 15.
     if let Some(i) = id {
-        super::regime::on_zone_text(w, i, t.mes & 0x8000 != 0, t.actor);
+        w.lua.raise("zone_text", vec![i.into(), t.actor.into(), (t.mes & 0x8000 != 0).into(), t.packet.into()]);
     }
     let Some((_, d)) = &w.zone_text else { return };
     let raw = id.and_then(|i| d.raw(i));

@@ -24,6 +24,8 @@ end)
 | [`res.ability(id)`](#resability) | A job ability, weapon skill or pet command's record. |
 | [`res.status(id)`](#resstatus) | A status effect's name. |
 | [`res.zone(id)`](#reszone) | A zone's name. |
+| [`res.zone_text(zone, id)`](#reszone_text) | A zone dialogue entry's bytes, as the game file holds them. |
+| [`res.zone_text_find(zone, prefix)`](#reszone_text_find) | The first zone dialogue entry starting with some bytes. |
 | [`res.title(id)`](#restitle) | A title's name. |
 | [`res.key_item(id)`](#reskey_item) | A key item's name and description. |
 | [`res.augments(item, extdata)`](#resaugments) | An item's augments, decoded from its extdata. |
@@ -250,6 +252,58 @@ A zone's name, by the zone id `game.zone` returns and the `zone_change` event pa
 events.on("zone_change", function(zone, previous)
   print("Entered " .. (res.zone(zone) or "?") .. " from " .. (previous and res.zone(previous) or "?"))
 end)
+```
+
+## `res.zone_text`
+
+```lua
+res.zone_text(zone, id) -> string?
+```
+
+A zone's dialogue entry (the lines NPCs and events print there), by its id in the installed game files, as the file
+holds it: Shift-JIS bytes with the game's codes in them (`0x07` a new line, `0x0a n` a value, `0x7f ...` the other
+codes). [`text.from_shift_jis`](text.md#textfrom_shift_jis) turns the plain parts into text.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `zone` | `integer` | yes | The zone id. |
+| `id` | `integer` | yes | The entry's id, as the [`zone_text`](events.md#zone_text) event gives it. |
+
+**Returns** `string`, or `nil` when the zone has no such entry.
+
+**Example**
+
+```lua
+events.on("zone_text", function(id)
+  local raw = res.zone_text(game.player().zone, id)
+  if raw then log.info(text.from_shift_jis((raw:gsub("[\0-\31\127]", "")))) end
+end)
+```
+
+## `res.zone_text_find`
+
+```lua
+res.zone_text_find(zone, prefix) -> integer?
+```
+
+The id of the first entry of a zone's dialogue that starts with `prefix` (compared as bytes).
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `zone` | `integer` | yes | The zone id. |
+| `prefix` | `string` | yes | The bytes the entry starts with (Shift-JIS; plain English text is the same bytes). |
+
+**Returns** `integer`, or `nil` when no entry starts with it.
+
+**Example**
+
+```lua
+-- The training regime block of this zone's dialogue.
+local r = res.zone_text_find(game.player().zone, "New training regime registered!")
 ```
 
 ## `res.title`

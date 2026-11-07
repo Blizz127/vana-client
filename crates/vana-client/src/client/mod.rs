@@ -6752,8 +6752,6 @@ struct World {
     recasts_seen: bool,
     /// Extras: the Timers window (on, dock) and its state.
     extra_timers: bool,
-    /// Extra: the training regime window (client/regime.rs).
-    extra_regime: bool,
     /// Config `skillchain_helper` (extra).
     extra_skillchain: bool,
     /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
@@ -7538,7 +7536,6 @@ impl App {
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
             w.extra_timers = self.cfg.timers;
-            w.extra_regime = self.cfg.regime;
             w.extra_skillchain = self.cfg.skillchain_helper;
             w.timers_dock = self.cfg.timers_dock;
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
@@ -8769,7 +8766,6 @@ impl App {
                             ability_total: HashMap::new(),
                             ability_calc: HashMap::new(),
                             extra_timers: self.cfg.timers,
-                            extra_regime: self.cfg.regime,
                             extra_skillchain: self.cfg.skillchain_helper,
                             extra_minimap: self.cfg.minimap,
                             minimap: None,
@@ -9514,7 +9510,6 @@ impl App {
                     world.my_id = char_id;
                     world.name = name;
                     timers::on_zone(world);
-                    regime::on_zone(world);
                     seacom::zone_in(world);
                     world.entities.clear();
                     world.new_challenge = false;
@@ -9971,17 +9966,10 @@ impl App {
                 NetEvent::Battle(m) => {
                     world.lua.raise("battle_message", vec![m.actor.into(), m.target.into(), m.message.into(), m.data[0].into(), m.data[1].into()]);
                     timers::on_message(world, m.target, m.data[0] as u32, m.message);
-                    regime::on_battle(world, &m);
                     combat::on_battle_message(world, &m);
                 }
-                NetEvent::Event(s) => {
-                    regime::on_event_start(world, &s);
-                    event::queue(world, s)
-                }
-                NetEvent::EventParams(n) => {
-                    regime::on_params(world, n);
-                    event::params(world, n)
-                }
+                NetEvent::Event(s) => event::queue(world, s),
+                NetEvent::EventParams(n) => event::params(world, n),
                 NetEvent::EventStrings(s) => event::strings(world, s),
                 NetEvent::EventRelease { mode, event: e } => event::release(world, mode, e),
                 NetEvent::Fish(p) => fishing::on_fish(world, p),

@@ -17700,8 +17700,16 @@ Supersedes "Not done: the idle variants +0x1a8 / +0x1ac" under "Motion name base
 
 ## Training regime window (an Extra, 2026-10-28)
 
-Not retail (retail has no tracker and no regime packet; the user's wish). client/regime.rs, Extras > Timers > Training
-Regime (config `regime`, its drawer `regime_out`). The state comes from packets alone; nothing is sent for it:
+Not retail (retail has no tracker and no regime packet; the user's wish). Since 2026-11-06 the bundled Training Regime
+mod (assets/mods/regime) tracks it and fills the edge window `panel = "regime"`; client/regime.rs keeps the panel
+(its drawer `regime_out`, slide, place in the Timers' dock, the classic drawing). The mod's setting carries over
+config `regime`; the client's kept state (regime/<server>/<name>.json) goes into its storage.character once. The
+packets: the event start (0x032..0x034) and the page answer (0x05C) through packets.on_in, our option (c2s 0x05B:
+option @8, mode @0xe, 1 an update) through packets.on_out, the confirmation through the zone_text event (the installed
+id after MsgShift), the battle messages through battle_message; the labels through res.zone_text / zone_text_find.
+Seen live 2026-11-06 (East Ronfaure's Field Manual, page 1 "6 members of the pugil family"): accepted, Review and
+cancel each logged by the mod, the window as master drew it in both UIs. The state comes from packets alone; nothing
+is sent for it:
 - the book's event (an NPC named "Field Manual" / "Grounds Tome"): the start's num[7] is the server's regime id
   (0 or a hunt's 147..559: none); our update option 2 | page << 4 gets s2c 0x05C num[0..3] needed, num[7] the id; our
   end with that option (bit 31 repeat) and then s2c 0x02A with MesNum bit 15 about us is the accept, its installed id

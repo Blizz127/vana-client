@@ -51,6 +51,7 @@ scope = "character"
 | `values` | any TOML values | `[]` | The values the row offers, one per label in `options`, for a row of named values of any type (`values = [0, 3, 5]` with `options = ["OFF", "3 s", "5 s"]`). Not as many as `options` stops the mod from loading. |
 | `tab` | string | `""` | Shows the row on one of the client's own Extras tabs (`"Maps"`, `"Timers"`, `"Battle"`, `"Misc."`) instead of the mod's page. The client's bundled mods put their rows where the features they replaced had theirs. Any other tab stops the mod from loading. |
 | `place` | integer | the end | With `tab`: the row's place on that tab, from 0. |
+| `place_modern` | integer | `place` | With `tab`: its place in the modern UI's page, where that differs (a row only the classic page has, such as Timers Position, comes before it). |
 | `from` | string | `""` | A client config field (config.json) the setting takes its first value from, while the user has saved none: a bundled mod keeps the choice the player made for the feature it replaced. |
 
 The value a row stores: `true` or `false` for `bool`; the chosen option's text for `enum`; an integer for `int`; a

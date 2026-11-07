@@ -337,6 +337,15 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 (Some(x), Some(y)) => Some((x, y)),
                 _ => None,
             };
+            // An edge window is a HUD one: it never takes the keys.
+            w.edge = spec.get::<Option<bool>>("edge")?.unwrap_or(false);
+            w.hud |= w.edge;
+            w.heading = spec.get::<Option<String>>("heading")?.unwrap_or_default();
+            w.resize = spec.get::<Option<bool>>("resize")?.unwrap_or(false);
+            w.panel = spec.get::<Option<String>>("panel")?;
+            if let Some(p) = w.panel.as_deref().filter(|p| !super::EDGE_PANELS.contains(p)) {
+                return Err(mlua::Error::runtime(format!("no edge panel {p:?} ({})", super::EDGE_PANELS.join(", "))));
+            }
             w.popup = spec.get::<Option<bool>>("popup")?.unwrap_or(false);
             w.modal = w.popup || spec.get::<Option<bool>>("modal")?.unwrap_or(false);
             // A popup opens at the pointer.
@@ -907,6 +916,22 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
 
     // res: the game's static data from its DATs (docs/lua-mods.md 4.9).
     let res = lua.create_table()?;
+    // A zone's dialogue entry as the file holds it (Shift-JIS with its codes), and the first entry starting with bytes.
+    res.set(
+        "zone_text",
+        lua.create_function(|lua, (zone, id): (u16, u32)| {
+            let Some(d) = zone_dialog(world(lua)?, zone) else { return Ok(None) };
+            d.raw(id).map(|b| lua.create_string(&b)).transpose()
+        })?,
+    )?;
+    res.set(
+        "zone_text_find",
+        lua.create_function(|lua, (zone, prefix): (u16, mlua::LuaString)| {
+            let Some(d) = zone_dialog(world(lua)?, zone) else { return Ok(None) };
+            let p = prefix.as_bytes();
+            Ok((0..d.len() as u32).find(|&i| d.raw(i).is_some_and(|r| r.starts_with(&p))))
+        })?,
+    )?;
     res.set(
         "item",
         lua.create_function(|lua, id: u32| {
@@ -1290,6 +1315,14 @@ const WEATHER: [(&str, Option<u8>); 20] = [
     ("Darkness", Some(7)),
 ];
 
+/// A zone's dialogue: the one loaded for this zone, or read for another.
+fn zone_dialog(w: &World, zone: u16) -> Option<std::sync::Arc<crate::dat::dialog::Dialog>> {
+    match &w.zone_text {
+        Some((z, d)) if *z == zone => Some(d.clone()),
+        _ => crate::dat::dialog::Dialog::load(w.index.as_ref()?, zone).ok().map(std::sync::Arc::new),
+    }
+}
+
 const ELEMENTS: [&str; 8] = ["Fire", "Ice", "Wind", "Earth", "Lightning", "Water", "Light", "Dark"];
 
 /// An entity as a table: who, where, how it stands.
@@ -1573,7 +1606,15 @@ fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
         "choice" => Elem::Choice { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(), at: index("at")?.unwrap_or(0) },
         "colour" | "color" => Elem::Colour { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), value: super::hud::colour(t.get("value")?)?.unwrap_or([255; 4]), alpha: t.get::<Option<bool>>("alpha")?.unwrap_or(false) },
         "section" => Elem::Section { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), open: t.get::<Option<bool>>("open")?.unwrap_or(true) },
-        "gauge" => Elem::Gauge { id: t.get::<Option<String>>("id")?.unwrap_or_default(), label: t.get::<Option<String>>("label")?.unwrap_or_default(), value: t.get::<Option<f32>>("value")?.unwrap_or(0.0), text: t.get::<Option<String>>("text")?.unwrap_or_default(), kind: t.get::<Option<String>>("kind")?.unwrap_or_else(|| "hp".into()) },
+        "gauge" => Elem::Gauge {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            value: t.get::<Option<f32>>("value")?.unwrap_or(0.0),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            kind: t.get::<Option<String>>("kind")?.unwrap_or_else(|| "hp".into()),
+            row: t.get::<Option<String>>("style")?.as_deref() == Some("row"),
+            dim: t.get::<Option<bool>>("dim")?.unwrap_or(false),
+        },
         "separator" => Elem::Separator,
         other => return Err(mlua::Error::runtime(format!("unknown element type {other:?}"))),
     })
@@ -1618,7 +1659,8 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
             if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
             if let Some(v) = t.get::<Option<usize>>("height")? { *height = v.max(1); }
         }
-        Elem::Gauge { label, value, text, kind, .. } => {
+        Elem::Gauge { label, value, text, kind, dim, .. } => {
+            if let Some(v) = t.get::<Option<bool>>("dim")? { *dim = v; }
             if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
             if let Some(v) = t.get::<Option<f32>>("value")? { *value = v; }
             if let Some(v) = t.get::<Option<String>>("text")? { *text = v; }

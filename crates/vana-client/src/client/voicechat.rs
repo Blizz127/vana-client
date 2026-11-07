@@ -103,7 +103,7 @@ impl VoiceChat {
             Some(Ok(Some(_))) if self.status.talking => format!("{level:.0} dB  sending"),
             Some(Ok(Some(_))) => format!("{level:.0} dB"),
         };
-        v.push((Elem::Gauge { id: "level".into(), label: "Microphone Level".into(), value: ((level - DB_LOW as f32) / -DB_LOW as f32).clamp(0.0, 1.0), text: shown, kind: if self.status.talking { "tp".into() } else { "mp".into() } }, ""));
+        v.push((Elem::Gauge { id: "level".into(), label: "Microphone Level".into(), value: ((level - DB_LOW as f32) / -DB_LOW as f32).clamp(0.0, 1.0), text: shown, kind: if self.status.talking { "tp".into() } else { "mp".into() }, row: false, dim: false }, ""));
         v.push((Elem::Slider { id: "gain".into(), label: "Microphone Volume".into(), n: 21, at: (c.mic_gain / 10).min(20) as usize, shown: format!("{}%", c.mic_gain) }, "Your voice before it is sent."));
         v.push((onoff("noise", "Noise Suppression", ["On", "Off"], c.noise_suppression), "Takes the hiss and background noise out of your microphone before it is sent."));
         v.push((Elem::Slider { id: "volume".into(), label: "Voice Volume".into(), n: 21, at: (c.volume / 10).min(20) as usize, shown: format!("{}%", c.volume) }, "Everyone you hear."));

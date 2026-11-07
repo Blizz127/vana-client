@@ -132,6 +132,8 @@ A bar filled from 0 to 1, with a label and a text. It is not a cursor stop.
 | `value` | `number` | `0` | How full it is, 0 to 1. |
 | `text` | `string` | `""` | A text shown with the bar, for example `"75%"`. |
 | `kind` | `string` | `"hp"` | The bar's colour: `"hp"`, `"mp"`, `"tp"`, `"cast"`, `"experience"` or `"recast"`. |
+| `style` | `string` | none | `"row"`: a list row, as the training regime window's: the label at the left, the text at the right, a thin bar under them (a `value` of 0 or less: no bar fill, the bar dim). |
+| `dim` | `boolean` | `false` | A `row` drawn dim, as a finished one is. |
 
 ### separator
 
@@ -372,6 +374,10 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `modal` | `boolean` | `false` | While a modal window is open it keeps the keys and is the only mod window the pointer reaches; other mod windows cannot take the keys from it. It is centred on the screen (in the classic UI, at `x`, `y` when given). A click outside it does not close it. |
 | `popup` | `boolean` | `false` | A pop-up: a modal window placed with its top left at the pointer, which a click outside it closes (sending `close`). It opens where the pointer is when `ui.open` opens it. |
 | `opacity` | `number` | `1` | The whole window's opacity, 0 to 1: its frame and everything in it (per-window opacity). `ui.opacity` changes it later. A value the player sets for the window wins. |
+| `edge` | `boolean` | `false` | An edge window, drawn as the Timers and the training regime windows are: on a screen edge (in the modern UI the player drags it along the edges), folding to a tab that shows `title`, with `heading` as a line over the elements; a click on that line folds it. It is a HUD window: it never takes the keys. |
+| `heading` | `string` | the title | An edge window's line over its elements. |
+| `resize` | `boolean` | `false` | An edge window the player can make wider (modern UI). |
+| `panel` | `string` | none | `"regime"`: the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows. |
 
 **Returns** nothing.
 
