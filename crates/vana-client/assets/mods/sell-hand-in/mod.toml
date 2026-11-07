@@ -1,0 +1,10 @@
+name = "Sell and Hand In"
+version = "1.0.0"
+description = "Sells items by name to the open shop and hands items to your target NPC by command (the sell and trade add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Sell and Hand In"
+help = "//sell <item> [all] sells a stack (or every stack) of an item to the open shop; //trade <item> [count], <item> [count]... hands items to the NPC you target."

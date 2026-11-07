@@ -75,7 +75,9 @@ commands.run(line)
 ```
 
 Runs a line as if the player had typed it in the chat line: a game command (`/ma "Cure" <me>`), a client command, a
-mod's command (`//name`), or plain text, which is said in the current chat mode.
+mod's command (`//name`), or plain text, which is said in the current chat mode. A mod's command run this way is the
+player's input when your mod runs it on the player's input (a click, a key bind): its game actions need only the
+`actions` permission then, as when the player types it.
 
 **Parameters**
 

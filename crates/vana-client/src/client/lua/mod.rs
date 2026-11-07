@@ -38,7 +38,8 @@ pub(super) enum Op {
     Chat { text: String, mode: Option<u8>, colour: Option<u8> },
     Print(String),
     /// commands.run: the line, and whether the mod holds the mods permission.
-    Run(String, bool),
+    /// A line run as typed, whether the mod may control mods, and whether it ran it on the player's input.
+    Run(String, bool, bool),
     Act(actions::Action),
     /// A key the mod pressed (input.press / input.send).
     Key(input::Synth),
@@ -500,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -1063,7 +1064,7 @@ pub(super) fn frame(w: &mut World, gu: Option<&super::game_ui::GameUi>) {
                 }
                 continue;
             }
-            let input = !matches!(from, From::Mod { .. });
+            let input = !matches!(from, From::Mod { input: false, .. });
             let owner = host.vms.iter().find(|v| v.suspended.is_none() && v.st.borrow().commands.iter().any(|(n, _)| *n == name));
             match owner {
                 Some(vm) => lend(vm, w, |vm| {
@@ -1250,13 +1251,14 @@ pub(super) enum From {
     /// A mod's key bind the player pressed: the mod's command runs as the player's input, but /lua grant, revoke,
     /// run, set and watch do not.
     Bind { mods: bool },
-    /// A mod's own line (commands.run, actions): runs as the mod's own, not the player's input.
-    Mod { mods: bool },
+    /// A mod's own line (commands.run, actions): runs as the mod's own, and as the player's input only when the mod ran
+    /// it on the player's input (a hotbar slot clicked runs another mod's command as the player would).
+    Mod { mods: bool, input: bool },
 }
 
 impl From {
     fn controls_mods(self) -> bool {
-        matches!(self, From::Player | From::Bind { mods: true } | From::Mod { mods: true })
+        matches!(self, From::Player | From::Bind { mods: true } | From::Mod { mods: true, .. })
     }
 }
 
@@ -1404,7 +1406,7 @@ fn apply(w: &mut World, gu: Option<&super::game_ui::GameUi>, op: Op) {
             }
             (None, None, text) => w.chat.push(text),
         },
-        Op::Run(line, mods) => run_line(w, &line, super::textcmd::Mode::Typed, From::Mod { mods }),
+        Op::Run(line, mods, input) => run_line(w, &line, super::textcmd::Mode::Typed, From::Mod { mods, input }),
         Op::Act(a) => actions::apply(w, gu, a),
         Op::Key(k) => w.lua.synth.push(k),
         Op::Copy(text) => w.copied = Some(text),
@@ -2296,10 +2298,10 @@ mod tests {
         vm.lua.load("commands.run('//lua list')").exec().unwrap();
         vm.st.borrow_mut().granted.push("mods".into());
         vm.lua.load("commands.run('//lua unload other')").exec().unwrap();
-        let ops: Vec<bool> = vm.st.borrow().ops.iter().filter_map(|o| if let Op::Run(_, m) = o { Some(*m) } else { None }).collect();
+        let ops: Vec<bool> = vm.st.borrow().ops.iter().filter_map(|o| if let Op::Run(_, m, _) = o { Some(*m) } else { None }).collect();
         assert_eq!(ops, [false, true]);
-        assert!(!From::Mod { mods: false }.controls_mods() && !From::Bind { mods: false }.controls_mods());
-        assert!(From::Player.controls_mods() && From::Mod { mods: true }.controls_mods());
+        assert!(!From::Mod { mods: false, input: false }.controls_mods() && !From::Bind { mods: false }.controls_mods());
+        assert!(From::Player.controls_mods() && From::Mod { mods: true, input: false }.controls_mods());
     }
 
     /// Injected and hook-built packets carry a size field that matches their bytes, and none overflows it.

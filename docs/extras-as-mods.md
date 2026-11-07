@@ -217,6 +217,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   trusts (or the party's), `//trusts <lineup>` calls those not in the party one after another, each once the last
   stands in the party and the game takes a spell again (4 s after). Seen live: Kupipi and Nanaa Mihgo called in turn;
   saving from the party not seen (names compare without spaces: the party shows "NanaaMihgo").
+- **Sell and Hand In** (assets/mods/sell-hand-in; SellNPC, TradeNPC, sellit and kin): `//sell <item> [all]` sells a
+  stack (or every stack) to the open shop; `//trade <item> [count], ...` hands items to the targeted NPC (8 stacks at
+  most). Seen live: 12 pebbles sold to Carautia from a Hotbars slot running `//sell pebble all`; //trade not seen.
+  It showed that a mod's command run by another mod on the player's input (a hotbar click) was not the player's
+  input: `commands.run` now carries it (From::Mod's `input`).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
