@@ -106,6 +106,13 @@ Done so far (checked live, Lnxcsfix):
   client's rows for the classic place. Its layer is made when its map first draws, Wide Scan's held from the first
   frame, as the built-in ones were (the map over Wide Scan's tab). Compared with master in both UIs.
 
+Every row of the Extras tabs is now a bundled mod's setting or a client setting for a native panel's place (Map
+Overlay Opacity, Minimap Position and Size, Timers Position).
+
+Deferred: the battle menu's suggestions (suggest.rs) have no Extras row (the modern battle menu always shows them);
+moving them needs mod rows in the battle menu (with their family submenus and the target prompt) and the engine as an
+API. The user's order puts the gear-swap mod next (2026-11-06), so they wait.
+
 ### Edge windows
 
 `ui.window` gains `edge = true`: the window is drawn as the built-in edge windows are (modern: `edge_window` with
