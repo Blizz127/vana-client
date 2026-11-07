@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2045,6 +2045,40 @@ mod tests {
             assert(#storage.character.inbox == 2)
             C.r("see", "you")
             assert(ran[#ran] == "/tell Other see you", ran[#ran])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Chat Filter: a listed player, a listed word, a hidden kind and a repeat are dropped; others pass.
+    #[test]
+    fn chat_filter_drops() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "chat-filter").unwrap().2;
+        let vm = Vm::new(bundled_manifest("chat-filter").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local S = { on = true, players = "Spammer, Bot", words = "gil selling", shouts = false, yells = true, repeats = true }
+            local F, clock = nil, 0
+            settings = { get = function(k) return S[k] end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function() end }
+            text = { strip = function(t) return t end }
+            os.clock = function() return clock end
+            load(INIT)()
+            assert(F("Spammer : hi", 9) == false)
+            assert(F("[1]<Bot> hi", 14) == false)
+            assert(F("(Friend) hi", 13) == nil)
+            assert(F("Friend : cheap GIL SELLING here", 10) == false)
+            assert(F("Friend : party?", 11) == false)
+            assert(F("Friend : need a healer", 10) == nil)
+            clock = 30
+            assert(F("Friend : need a healer", 10) == false)
+            clock = 100
+            assert(F("Friend : need a healer", 10) == nil)
+            assert(F("The Forest Hare is paralyzed.", 36) == nil)
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

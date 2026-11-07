@@ -228,6 +228,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   runs open no browser).
 - **Camera Range** (assets/mods/camera-range; XICamera, zoom, xicamera): the camera's distance, its battle distance and
   the pan speed through render.set_camera, the game's back when off or unloaded. Seen live: distance 2.
+- **Chat Filter** (assets/mods/chat-filter; blist, Silence, stfu, Hush, antiemote and kin): others' chat (log modes 9
+  say .. 15 emote) hidden by speaker, by word, shouts or yells, and repeated says / shouts / yells within a minute;
+  the speaker read from the line's form (`Name :`, `(Name)`, `<Name>`, `[1]<Name>`, `Name>>`). A Rust test covers the
+  rules; live our own lines pass as they should and no bot chat came in the minute watched. Linkshell 2 and Unity
+  lines are not taken yet (their log modes still to be read).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
