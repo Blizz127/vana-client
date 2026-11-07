@@ -226,6 +226,11 @@ impl Shared {
                     None => {
                         log::info!("voice: {name} at {from} (channel {channel:?})");
                         peers.insert(session, Peer { name, channel, addr: from, seen: now, heard: None });
+                        drop(peers);
+                        // A hello back at once, so the newcomer has us now rather than at our next beacon (up to
+                        // BEACON later). Only for a peer not listed yet: a known one answers nothing, so two
+                        // engines settle after one hello each way.
+                        let _ = self.sock.send_to(&self.hello(), from);
                     }
                 }
             }
@@ -635,9 +640,10 @@ mod tests {
         let port = 55400 + (std::process::id() % 500) as u16 * 2;
         let cfg = Settings { enabled: true, peers: vec![format!("127.0.0.1:{}", port + 1)], ..Default::default() };
         let none = || Stand { mic: None, rec: None };
-        let a = Engine::start_on(&cfg, "Alpha", None, port, none()).unwrap();
+        // Beta first: Alpha's hello to the typed address, sent as it starts, finds Beta listening.
         let b =
             Engine::start_on(&Settings { peers: Vec::new(), ..cfg.clone() }, "Beta", None, port + 1, none()).unwrap();
+        let a = Engine::start_on(&cfg, "Alpha", None, port, none()).unwrap();
         let sees = |e: &Engine, name: &str| e.status().peers.iter().any(|p| p.name == name);
         assert!(wait(|| sees(&a, "Beta") && sees(&b, "Alpha")));
         let talking = |e: &Engine| e.status().peers.iter().any(|p| p.talking);
@@ -670,11 +676,8 @@ mod tests {
     fn mic_opens_unless_muted() {
         let port = 57000 + (std::process::id() % 500) as u16 * 2;
         let cfg = Settings { enabled: true, peers: vec![format!("127.0.0.1:{}", port + 1)], ..Default::default() };
-        let mut a =
-            Engine::start_on(&cfg, "Alpha", Some("null"), port, Stand { mic: Some("tone".into()), rec: None }).unwrap();
-        a.linger = Duration::ZERO;
-        a.tick();
-        assert_eq!(a.mic(), Ok(Some("test tone 440 Hz")));
+        // Beta first: Alpha's hello to the typed address, sent as it starts, finds Beta listening, so they meet
+        // while the tone is still in its first second on.
         let b = Engine::start_on(
             &Settings { peers: Vec::new(), ..cfg.clone() },
             "Beta",
@@ -683,6 +686,11 @@ mod tests {
             Stand { mic: None, rec: None },
         )
         .unwrap();
+        let mut a =
+            Engine::start_on(&cfg, "Alpha", Some("null"), port, Stand { mic: Some("tone".into()), rec: None }).unwrap();
+        a.linger = Duration::ZERO;
+        a.tick();
+        assert_eq!(a.mic(), Ok(Some("test tone 440 Hz")));
         assert!(wait(|| {
             a.tick();
             b.status().peers.iter().any(|p| p.name == "Alpha" && p.talking)
@@ -697,6 +705,24 @@ mod tests {
         a.apply(&Settings { input: "other".into(), ..cfg.clone() });
         a.tick();
         assert!(a.mic().is_ok_and(|m| m.is_some()) && a.opened_with == "other");
+    }
+
+    /// A newcomer's hello is answered at once: the side with the typed address has the other well before the
+    /// other's next beacon (BEACON).
+    #[test]
+    fn hello_answered_at_once() {
+        let port = 59000 + (std::process::id() % 500) as u16 * 2;
+        let cfg = Settings { enabled: true, peers: vec![format!("127.0.0.1:{}", port + 1)], ..Default::default() };
+        let none = || Stand { mic: None, rec: None };
+        let b =
+            Engine::start_on(&Settings { peers: Vec::new(), ..cfg.clone() }, "Beta", None, port + 1, none()).unwrap();
+        let a = Engine::start_on(&cfg, "Alpha", None, port, none()).unwrap();
+        let end = Instant::now() + BEACON / 2;
+        let sees = |e: &Engine, name: &str| e.status().peers.iter().any(|p| p.name == name);
+        while !(sees(&a, "Beta") && sees(&b, "Alpha")) {
+            assert!(Instant::now() < end, "no answer before the next beacon");
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 
     /// A Bye or a frame counts only from the address the peer's hellos come from, port included.
