@@ -994,7 +994,7 @@ function game.spells() end
 ---@return integer[]
 function game.abilities() end
 
---- The job setups of main and sub: job, raw (the server's bytes), and for BLU blue_spells (ids), for PUP head, frame and attachments (item ids).
+--- The job setups of main and sub: job, raw (the server's bytes), and for BLU blue_spells (ids) and blue_slots (the 20 slots' ids, 0 empty), for PUP head, frame, attachments (item ids) and attachment_slots (the 12 slots, 0 empty).
 ---@return {main: table?, sub: table?}
 function game.job_data() end
 
@@ -1199,21 +1199,21 @@ function actions.buy(row, count) end
 ---@param count? integer default 1
 function actions.sell(slot, count) end
 
---- Sets a blue magic slot (1..20) to a spell id, as Set Spells does.
+--- Sets a blue magic slot (1..20) to a spell id, as Set Spells does. One change a second, as the game sends them: a call sooner is an error.
 ---@param slot integer 
 ---@param spell integer 
 function actions.blue_set(slot, spell) end
 
---- Empties a blue magic slot (1..20).
+--- Empties a blue magic slot (1..20); one change a second, as blue_set.
 ---@param slot integer 
 function actions.blue_remove(slot) end
 
---- Sets an automaton slot to an item id: 1 head, 2 frame, 3..14 attachments.
+--- Sets an automaton slot to an item id: 1 head, 2 frame, 3..14 attachments. One change a second, as the game sends them: a call sooner is an error.
 ---@param slot integer 
 ---@param item integer 
 function actions.attach(slot, item) end
 
---- Empties an automaton slot (1..14).
+--- Empties an automaton slot (1..14); one change a second, as attach.
 ---@param slot integer 
 function actions.detach(slot) end
 

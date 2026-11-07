@@ -242,13 +242,18 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
                 t.set("raw", lua.create_string(&b[..])?)?;
                 match b[0] {
                     // BLU: 20 slots, spell id - 0x200.
-                    0x10 => t.set("blue_spells", b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>())?,
+                    0x10 => {
+                        t.set("blue_spells", b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>())?;
+                        // By slot, 0 an empty one.
+                        t.set("blue_slots", b[4..24].iter().map(|&s| if s == 0 { 0 } else { 0x200 + s as u16 }).collect::<Vec<u16>>())?;
+                    }
                     // PUP: head and frame items 0x2000 + n, attachments 0x2100 + n.
                     0x12 => {
                         let item = |i: usize, v: u8| (v != 0).then(|| if i < 2 { 0x2000 + v as u16 } else { 0x2100 + v as u16 });
                         t.set("head", item(0, b[4]))?;
                         t.set("frame", item(1, b[5]))?;
                         t.set("attachments", (2..14).filter_map(|i| item(i, b[4 + i])).collect::<Vec<u16>>())?;
+                        t.set("attachment_slots", (2..14).map(|i| item(i, b[4 + i]).unwrap_or(0)).collect::<Vec<u16>>())?;
                     }
                     _ => {}
                 }

@@ -850,9 +850,11 @@ The setup of your main and sub job as the server sent it: the blue magic set for
 | `job` | `integer` | The job id. |
 | `raw` | `string` | The setup's 156 bytes as the server sent them. |
 | `blue_spells` | `integer[]?` | Blue Mage (job 16) only: the spell ids set, in slot order, empty slots left out. |
+| `blue_slots` | `integer[]?` | Blue Mage only: the 20 slots in order, each a spell id or 0 when empty. |
 | `head` | `integer?` | Puppetmaster (job 18) only: the automaton head's item id; nil when none. |
 | `frame` | `integer?` | Puppetmaster only: the frame's item id; nil when none. |
 | `attachments` | `integer[]?` | Puppetmaster only: the attachments' item ids, empty slots left out. |
+| `attachment_slots` | `integer[]?` | Puppetmaster only: the 12 attachment slots in order, each an item id or 0 when empty. |
 
 **Errors** "game state is not available here" in the lobby or a chat filter.
 

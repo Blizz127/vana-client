@@ -1,0 +1,10 @@
+name = "Blue Magic Sets"
+version = "1.0.0"
+description = "Saves your set blue magic as named sets and puts a set back with one command (the blue magic set add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Blue Magic Sets"
+help = "As a Blue Mage: //blu save <name> keeps the spells set now; //blu <name> sets them again; //blu list, //blu delete <name>."

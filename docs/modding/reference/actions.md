@@ -1068,7 +1068,7 @@ Whether the shop takes the item is the server's to decide.
 actions.blue_set(slot, spell) -> nil
 ```
 
-Sets a blue magic slot to a spell, as the Set Spells window does. Read the slots back with `game.job_data()` (`blue_spells`).
+Sets a blue magic slot to a spell, as the Set Spells window does. Read the slots back with `game.job_data()` (`blue_slots`, or `blue_spells` without the empty slots).
 
 **Parameters**
 
@@ -1098,7 +1098,7 @@ commands.register("blu", function(...)
 end)
 ```
 
-Problems found when the action runs are printed in the log in red, not raised: `actions.blue_set: not a blue mage` (neither job is Blue Mage). One change goes out per second: a change within a second of the last blue magic or automaton change, or before the server has sent your setup, does nothing. Whether you know the spell and have the points for it is the server's to check.
+Problems found when the action runs are printed in the log in red, not raised: `actions.blue_set: not a blue mage` (neither job is Blue Mage). The server takes one change a second: a change within a second of the last blue magic or automaton change prints `actions.blue_set: one change a second: wait and call again`, so wait 1.1 seconds between calls. Before the server has sent your setup a change does nothing. Whether you know the spell and have the points for it is the server's to check.
 
 ## `actions.blue_remove`
 
@@ -1139,7 +1139,7 @@ Problems are printed in the log in red: `actions.blue_remove: not a blue mage`, 
 actions.attach(slot, item) -> nil
 ```
 
-Sets an automaton slot to a head, frame or attachment, as the automaton customization window does. Read the setup back with `game.job_data()` (`head`, `frame`, `attachments`).
+Sets an automaton slot to a head, frame or attachment, as the automaton customization window does. Read the setup back with `game.job_data()` (`head`, `frame`, `attachment_slots`).
 
 **Parameters**
 
@@ -1167,7 +1167,7 @@ commands.register("pupset", function()
 end)
 ```
 
-Problems are printed in the log in red: `actions.attach: not a puppetmaster` (neither job is Puppetmaster). Nothing happens when the slot already holds the item, within a second of the last blue magic or automaton change, or before the server has sent your setup.
+Problems are printed in the log in red: `actions.attach: not a puppetmaster` (neither job is Puppetmaster). Within a second of the last blue magic or automaton change it prints `actions.attach: one change a second: wait and call again`. Nothing happens when the slot already holds the item or before the server has sent your setup.
 
 ## `actions.detach`
 
@@ -1200,7 +1200,7 @@ commands.register("pupclear", function()
 end)
 ```
 
-Problems are printed in the log in red: `actions.detach: not a puppetmaster`. An empty slot, or a change within a second of the last one, does nothing.
+Problems are printed in the log in red: `actions.detach: not a puppetmaster`, `actions.detach: one change a second: wait and call again` within a second of the last change. An empty slot does nothing.
 
 ## `actions.invite`
 

@@ -23,6 +23,10 @@ local function item_name(id)
   return r and r.name or tostring(id)
 end
 
+-- One change a second (the game's rate): only the slots that differ; attachments off first, as a new head or frame
+-- may refuse them.
+local GAP = 1.1
+
 local function put_on(name, set)
   local now = setup()
   if not now then
@@ -33,25 +37,38 @@ local function put_on(name, set)
     chat.add("Automaton Sets: deactivate your automaton first.")
     return
   end
-  -- Attachments off first: a new head or frame may refuse them.
-  for slot = 3, 14 do
-    actions.detach(slot)
+  local want = set.slots or set.attachments or {}
+  local have = now.attachment_slots or {}
+  for i = 12, 1, -1 do
+    if (have[i] or 0) ~= 0 and have[i] ~= (want[i] or 0) then
+      actions.detach(2 + i)
+      sleep(GAP)
+    end
   end
-  sleep(0.5)
-  if set.head then actions.attach(1, set.head) end
-  if set.frame then actions.attach(2, set.frame) end
-  sleep(0.5)
-  for i, id in ipairs(set.attachments or {}) do
-    actions.attach(2 + i, id)
-    sleep(0.2)
+  if set.head and set.head ~= now.head then
+    actions.attach(1, set.head)
+    sleep(GAP)
+  end
+  if set.frame and set.frame ~= now.frame then
+    actions.attach(2, set.frame)
+    sleep(GAP)
+  end
+  for i = 1, 12 do
+    local id = want[i] or 0
+    if id ~= 0 and (have[i] or 0) ~= id then
+      actions.attach(2 + i, id)
+      sleep(GAP)
+    end
   end
   sleep(1)
   local after = setup()
+  local count = {}
+  for _, id in ipairs(after and after.attachments or {}) do count[id] = (count[id] or 0) + 1 end
   local missing = {}
-  local have = {}
-  for _, id in ipairs(after and after.attachments or {}) do have[id] = (have[id] or 0) + 1 end
-  for _, id in ipairs(set.attachments or {}) do
-    if (have[id] or 0) > 0 then have[id] = have[id] - 1 else missing[#missing + 1] = item_name(id) end
+  for _, id in ipairs(want) do
+    if id ~= 0 then
+      if (count[id] or 0) > 0 then count[id] = count[id] - 1 else missing[#missing + 1] = item_name(id) end
+    end
   end
   chat.add(#missing == 0 and ("Automaton Sets: %s is on."):format(name)
     or ("Automaton Sets: %s is on, but not: %s (the server refused them)."):format(name, table.concat(missing, ", ")))
@@ -68,7 +85,7 @@ commands.register("automaton", function(cmd, ...)
       chat.add("Automaton Sets: you are not a Puppetmaster now.")
       return
     end
-    s[name] = { head = j.head, frame = j.frame, attachments = j.attachments or {} }
+    s[name] = { head = j.head, frame = j.frame, slots = j.attachment_slots or {}, attachments = j.attachments or {} }
     storage.save()
     chat.add(("Automaton Sets: %s saved (%d attachments)."):format(name, #(j.attachments or {})))
   elseif cmd == "delete" and name ~= "" then

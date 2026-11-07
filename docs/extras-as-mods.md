@@ -358,10 +358,14 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   LandSandBoat's roll table (31 rolls; the lucky number its spike, the unlucky its dip); Guard Lucky Rolls holds back
   a Double-Up typed at a lucky number or 11. A Rust test covers it; not seen live (no Corsair on the test character).
 - **Automaton Sets** (assets/mods/automaton-sets; autocontrol, pupatt, pupsets): `//automaton save <name>` keeps the
-  head, frame and attachments (game.job_data), `//automaton <name>` takes the attachments off and puts the set on
-  (actions.attach), then says which the server refused; list and delete. The customization window is the client's
-  own. A Rust test covers the round trip; not seen live (no Puppetmaster with attachments). Not yet: the burden
-  tracker.
+  head, frame and attachments (game.job_data's `attachment_slots`), `//automaton <name>` changes only the slots that
+  differ, one a second (the server takes one setup change a second), then says which the server refused; list and
+  delete. The customization window is the client's own. A Rust test covers the round trip; not seen live (no
+  Puppetmaster with attachments). Not yet: the burden tracker.
+- **Blue Magic Sets** (assets/mods/blue-sets; azuresets, BlueMagic sets): `//blu save <name>` keeps the 20 slots
+  (game.job_data's `blue_slots`), `//blu <name>` changes only the slots that differ, one a second, and names any spell
+  not learned; list and delete. Seen live as BLU 75: a three-spell set saved, two slots changed, the set put back in
+  three changes.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
