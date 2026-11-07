@@ -271,6 +271,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(())
         })?,
     )?;
+    commands.set(
+        "is_game",
+        lua.create_function(|_, name: String| Ok(super::super::textcmd::is_game_command(&name.trim_start_matches('/').to_ascii_lowercase())))?,
+    )?;
     g.set("commands", commands)?;
 
     // filters.chat / typed / battle(fn) -> id; filters.off(id). Run inline: no sleeping; chat filters have no game state.

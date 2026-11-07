@@ -337,6 +337,11 @@ function events.off(id) end
 ---@param handler fun(...: string) 
 function commands.register(name, handler) end
 
+--- Whether /name is one of the game's text commands (a mod's command may not take such a name; a typed-line filter can leave them alone).
+---@param name string with or without the slash
+---@return boolean
+function commands.is_game(name) end
+
 --- Runs a line as if the player had typed it (game commands, our commands, other mods' commands). Any line but a //mod command is a game action: it needs actions (while handling the player's input) or automation. /lua load, unload, reload, hide and show need mods.
 ---@param line string e.g. '/ma "Cure" <t>'
 function commands.run(line) end

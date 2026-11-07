@@ -245,6 +245,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   top (name, HP %, distance), with the line the game prints when it readies a move or starts a spell (the start's
   message through res.message) until it finishes or 5 s pass; dragged by its top, it keeps the place. Seen live on
   a Forest Hare; the readying line not seen yet (no move came). Not yet: the engaged enemies' bars.
+- **Quick Commands** (assets/mods/quick-commands; shortcuts, Shorthand and kin): a typed `/<spell or ability>
+  [target]` for anything we can use becomes the full command (any case, no spaces or marks, 2..6 for II..VI; targets
+  t, me, st, bt, p0..p5 or the start of a member's name), the game's commands left alone through the new
+  `commands.is_game`. Seen live: `/berserk` and `/provoke` on a hare. Not yet: one nuke / cure command by element and
+  tier, upcasting and stepping down.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
