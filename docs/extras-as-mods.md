@@ -257,6 +257,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (`*` anyone), others optionally declined; a tell holding the Invite Word gets its sender an invite (optionally only
   listed players). Seen live: a bot's invite accepted in Southern San d'Oria; the invite word not tried. Not yet:
   AnnounceTarget's call-outs, ready checks.
+- **Key Commands** (assets/mods/key-commands; Windower's binds and aliases, Binder, GBinder and kin): `//bind <key>
+  <line>`, `//unbind`, `//binds`; `//alias <name> <line>` (with $1.. and $*) makes /name run the line, `//unalias`,
+  `//aliases`; kept per character and bound again at login. Seen live: F9 bound to an /echo, an alias with $1 and $*.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
