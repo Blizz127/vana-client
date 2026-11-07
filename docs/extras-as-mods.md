@@ -149,10 +149,12 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 
 ### Ports so far
 
-- **Gearshift** (assets/mods/gearshift, docs/mods/gearshift.md): GearSwap job files and LuAshitacast profiles,
-  unchanged, from its data folder. One engine (src/core.lua: held items resolved by name, bag and augments, the
-  wear check, 0x050 / 0x051 built and sent, what was sent counted as worn until the server agrees) under two front
-  ends (src/gs.lua with a Windower shim, src/lac.lua with gFunc / gData / a little of AshitaCore). Our outgoing
+- **Gearshift** (assets/mods/gearshift, docs/mods/gearshift.md): GearSwap job files, LuAshitacast profiles and
+  Ashitacast XML profiles, unchanged, from its data folder. One engine (src/core.lua: held items resolved by name,
+  bag and augments, the wear check, 0x050 / 0x051 built and sent, what was sent counted as worn until the server
+  agrees) under three front ends (src/gs.lua with a Windower shim, src/lac.lua with gFunc / gData / a little of
+  AshitaCore, src/acxml.lua with src/xml.lua: Ashitacast's sections, rules and variables, v3 files through its import
+  rules; a Rust test runs its rules and a profile, and the cast below). Our outgoing
   action packet (0x01A categories 3 / 7 / 9 / 16, 0x037) is held by a packets.on_out hook and sent again with the gear
   around it: the precast gear, the action, the midcast gear, in one batch, as both add-ons send them. GearSwap's
   hooks follow the command lines (filters.typed); LuAshitacast's every action. A Rust test runs both kinds of file

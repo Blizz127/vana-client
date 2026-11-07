@@ -132,7 +132,8 @@ local function named(r, name, log_names)
   return (r.name and r.name:lower() == n) or (log_names and r.log_name and r.log_name:lower() == n) or false
 end
 
--- `wants`: {[slot] = {name=, augments=, bag=, priority=, remove=true}}; `opt`: {log_names, bags (search order)}.
+-- `wants`: {[slot] = {name=, augments=, bag=, priority=, test=, remove=true}} (`test(extdata)`: a further check on the
+-- item); `opt`: {log_names, bags (search order)}.
 -- Returns the changes, in send order: {slot, bag, index, id, priority} (index 0 takes the slot off).
 function M.resolve(wants, opt)
   local p = M.H.player() or {}
@@ -151,7 +152,8 @@ function M.resolve(wants, opt)
           if it.slot == cur.index then ext = it.extdata break end
         end
       end
-      if cur and named(r, w.name, opt.log_names) and (not w.bag or w.bag == cur.bag) and M.augments_match(ext, w.augments, cur.id) then
+      if cur and named(r, w.name, opt.log_names) and (not w.bag or w.bag == cur.bag) and M.augments_match(ext, w.augments, cur.id)
+        and (not w.test or w.test(ext)) then
         used[key(cur.bag, cur.index)] = true
       else
         left[slot] = w
@@ -169,7 +171,8 @@ function M.resolve(wants, opt)
         if (lock == 0 or lock == 5) and not used[key(bag, it.slot)] then
           local r = M.record(it.id)
           for slot, w in pairs(left) do
-            if named(r, w.name, opt.log_names) and (not w.bag or w.bag == bag) and wearable(r, slot, p) and M.augments_match(it.extdata, w.augments, it.id) then
+            if named(r, w.name, opt.log_names) and (not w.bag or w.bag == bag) and wearable(r, slot, p)
+              and M.augments_match(it.extdata, w.augments, it.id) and (not w.test or w.test(it.extdata)) then
               out[#out + 1] = { slot = slot, bag = bag, index = it.slot, id = it.id, priority = w.priority or 0 }
               used[key(bag, it.slot)] = true
               left[slot] = nil

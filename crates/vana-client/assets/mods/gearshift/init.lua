@@ -1,22 +1,27 @@
 -- Gear swapping from players' own files: a GearSwap job file (gearswap/ in this mod's data folder, named as GearSwap
--- names them) or a LuAshitacast profile (ashitacast/<Name>_<Id>/<JOB>.lua or ashitacast/<Name>_<JOB>.lua), loaded
--- for the main job. Both run around the action packets we send: the gear before an action, the action, the gear
--- after it, in one batch.
+-- names them), a LuAshitacast profile (ashitacast/<Name>_<Id>/<JOB>.lua or ashitacast/<Name>_<JOB>.lua) or an
+-- Ashitacast XML profile (the same names, .xml), loaded for the main job. All run around the action packets we send:
+-- the gear before an action, the action, the gear after it, in one batch.
 
 local core = require("src.core")
 local gs = require("src.gs")
 local lac = require("src.lac")
+local acxml = require("src.acxml")
 
 local job_now
 
 local function load_for_job()
   gs.unload()
   lac.unload()
+  acxml.unload()
   if not settings.get("on") then return end
   local f = gs.find()
   if f then gs.load(f) return end
   f = lac.find()
-  if f then lac.load(f) end
+  if f then lac.load(f) return end
+  f = acxml.find()
+  -- A job change keeps the XML profile's variables, as Ashitacast does.
+  if f then acxml.load(f, true) end
 end
 
 local function main_job()
@@ -38,15 +43,20 @@ local function on_out(p)
   if not act then return end
   if gs.loaded() then return gs.action(act) end
   if lac.loaded() then return lac.action(act) end
+  if acxml.loaded() then return acxml.action(act) end
 end
 packets.on_out(0x01A, on_out)
 packets.on_out(0x037, on_out)
 
-filters.typed(function(line) gs.typed(line) end)
+filters.typed(function(line)
+  gs.typed(line)
+  return acxml.typed(line)
+end)
 
 events.on("action", function(a)
   gs.on_action(a)
   lac.on_action(a)
+  acxml.on_action(a)
 end)
 events.on("battle_message", function(actor, target, message) gs.battle_message(actor, target, message) end)
 events.on("status_change", function(new, old)
@@ -80,20 +90,25 @@ events.on("frame", function()
     start()
   end
 end)
-timer.every(0.4, lac.tick)
+timer.every(0.4, function()
+  lac.tick()
+  acxml.tick()
+end)
 
 -- For other mods (Bag Manager): the item names the loaded file's sets hold, and which file.
 mods.provide("gear_names", function()
   if gs.loaded() then return { file = gs.file, names = gs.gear_names() } end
   if lac.loaded() then return { file = lac.file, names = lac.gear_names() } end
+  if acxml.loaded() then return { file = acxml.file, names = acxml.gear_names() } end
   return nil
 end)
 
 commands.register("gs", function(...) gs.command({ ... }) end)
 commands.register("lac", function(...) lac.command({ ... }) end)
+commands.register("ac", function(...) acxml.command({ ... }) end)
 commands.register("gearshift", function(cmd)
   cmd = (cmd or ""):lower()
   if cmd == "reload" then start() end
-  chat.add("Gearshift: " .. (gs.file or lac.file or "no file for this job (gearswap/ or ashitacast/ in its data folder)"))
+  chat.add("Gearshift: " .. (gs.file or lac.file or acxml.file or "no file for this job (gearswap/ or ashitacast/ in its data folder)"))
 end)
 

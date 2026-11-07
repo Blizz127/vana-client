@@ -528,7 +528,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "exit-markers",
     "list-trimmer",
     "bag-manager",
-    "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
+    "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua", "src/xml.lua", "src/acxml.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
     "pad-bars" ["src/actions.lua", "src/runner.lua"],
@@ -2012,14 +2012,259 @@ mod tests {
             assert(lac.load(lac.find()), table.concat(said, " | "))
             act = core.parse_action({ id = 0x01A, data = cast_packet() })
             assert(lac.action(act) == false)
-            return gs_order, ids()
+            local lac_order = ids()
+            lac.unload()
+
+            sent = {}
+            core.sent = {}
+            FILES["ashitacast/Tester_WHM.xml"] = [[<?xml version="1.0"?>
+              <ashitacast>
+                <sets>
+                  <set name="Base"><head>Idle Hat</head></set>
+                  <set name="FC" baseset="Base"><head>Fast Hat</head><body>Cast Coat</body></set>
+                </sets>
+                <precast><equip set="FC"/></precast>
+                <midcast>
+                  <if ad_name="Cure*" p_mainjob="WHM"><equip><hands>Heal Gloves</hands></equip></if>
+                  <else><echo>not a cure</echo></else>
+                </midcast>
+              </ashitacast>]]
+            local ac = require("src.acxml")
+            assert(ac.find() == "ashitacast/Tester_WHM.xml", tostring(ac.find()))
+            assert(ac.load(ac.find()), table.concat(said, " | "))
+            act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(ac.action(act) == false)
+            return gs_order, lac_order, ids()
         "#;
-        let (gs, lac): (String, String) = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        let (gs, lac, xml): (String, String, String) = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
         // GearSwap: two pieces go as single equips, then the action, then the midcast piece.
         assert_eq!(gs, "050 050 01A 050");
         // LuAshitacast: its precast is one equipset, its midcast single equips.
         assert_eq!(lac, "051 01A 050");
+        // Ashitacast XML: precast as single equips, the action, midcast as one equipset.
+        assert_eq!(xml, "050 050 01A 051");
     }
+
+    /// Gearshift's Ashitacast XML rules: substitution, basic and advanced rules with the original's quirks, setvar
+    /// arithmetic, augment paths; then a profile's commands, default and sets, and a v3 file through the import rules.
+    #[test]
+    fn gearshift_ashitacast_rules() {
+        let files = BUNDLED.iter().find(|b| b.0 == "gearshift").unwrap().2;
+        for (script, want) in [(ACXML_EVAL, "acxml eval ok"), (ACXML_FLOW, "acxml flow ok")] {
+            let host = Host::default();
+            let vm = Vm::new(bundled_manifest("gearshift").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+            vm.lua.set_app_data(host.info.clone());
+            api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+            let got: String = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+            assert_eq!(got, want);
+        }
+    }
+
+    const ACXML_EVAL: &str = r#"local said, ran, sent = {}, {}, {}
+local BUFFS = { { id = 5 }, { id = 33 } }
+local PLAYER = { name = "Tester", id = 100, index = 1, main_job = 1, main_level = 75, sub_job = 13, sub_level = 37,
+  hp = 300, hp_max = 1000, mp = 50, mp_max = 100, tp = 1000, hpp = 75, mpp = 50, status = 1, zone = 230, pos = { x = 0, y = 0, z = 0 } }
+game = {
+  player = function() return PLAYER end,
+  buffs = function() return BUFFS end,
+  party = function() return {} end,
+  target = function() return nil end,
+  entity = function() return nil end,
+  entities = function() return {} end,
+  entity_by_tag = function() return nil end,
+  stats = function() return { attack = 300, defense = 250, resist = { 1, 2, 3, 4, 5, 6, 7, 8 } } end,
+  time = function() return { earth = 0, weekday = 0, hour = 7, minute = 5, moon = 50, moon_phase = 0 } end,
+  weather = function() return 4 end,
+  equipment = function() return {} end,
+  items = function() return {} end,
+}
+res = {
+  job = function(id) return ({ [0] = nil, "WAR", "MNK", "WHM", [13] = "NIN" })[id] end,
+  status = function(id) return ({ [5] = "Blindness", [33] = "Haste", [580] = "Haste" })[id] end,
+  spell = function(id) if id == 1 then return { name = "Cure", mp = 8, cast_time = 2, element = 6, skill = 33, kind = 1 } end end,
+  ability = function() return nil end,
+  item = function() return nil end,
+  zone = function() return "Somewhere" end,
+  mob_skill = function() return nil end,
+}
+chat = { add = function(t) said[#said + 1] = t end }
+clock = function() return 1000 end
+timer = { after = function(_, f) f() end }
+commands = { run = function(l) ran[#ran + 1] = l end }
+packets = { inject_out = function(d) sent[#sent + 1] = d end, build = function(id, b) return string.pack("<I2", id) .. b end }
+fs = { list = function() return {} end, read = function() return nil end }
+
+local ac = require("src.acxml")
+local R, B, A, S = ac._resolve, ac._basic, ac._advanced, ac._setvar
+
+-- Substitution: longest names, text after a name kept, unknown names lose their $, right to left.
+assert(R("$p_hpp") == "75" and R("$p_hp") == "300" and R("$p_hpmax") == "1000", R("$p_hpp"))
+assert(R("$p_hppx") == "75x", R("$p_hppx"))
+assert(R("$U_x") == "U_x" and R("$nope") == "nope")
+ac._uvars({ x = "p" })
+assert(R("$p_hp$u_x") == "75", R("$p_hp$u_x"))
+assert(R("$p_job") == "WAR/NIN" and R("$e_time") == "07.05" and R("$e_weather") == "fire")
+-- Buffs by id and by name (the longest name; several ids under one name summed).
+assert(R("$b_33") == "1" and R("$b_haste") == "1" and R("$b_5 ") == "1 ")
+-- The single-digit quirk: $b_5=1 reads "5=" as the id.
+assert(R("$b_5=1") == "11")
+assert(B("b_5", "1") == false)
+-- Arguments only inside a command match.
+assert(R("$arg1") == "arg1")
+ac._args({ [0] = "/acc", "x", "y", text = "x y" })
+assert(R("$args|$arg0|$arg1|$arg2|$arg9") == "x y|/acc|x|y|arg9", R("$args|$arg0|$arg1|$arg2|$arg9"))
+assert(R("$arg1st") == "x")
+ac._args(nil)
+
+-- Basic rules: | before &, operators anywhere, wildcards, the stray character of two-character operators.
+assert(B("p_hpp", "<50") == false and B("p_hpp", ">=75") == true and B("p_hpp", "75") == true)
+assert(B("p_mainjob", "WAR|NIN") == true and B("p_mainjob", "NIN|THF") == false)
+assert(B("p_mainjob", "W*") == true and B("p_mainjob", "w*R") == true and B("p_mainjob", "WA**") == true and B("p_mainjob", "WAR**") == false)
+assert(B("p_mainjob", "!WAR") == false and B("p_mainjob", "!=WAR") == true)
+assert(B("p_mainjob", "THF|") == true, "an empty piece compares as numbers")
+assert(B("p_hpp", ">50&<80") == true and B("p_hpp", ">50&<70") == false)
+
+-- Advanced rules: precedence, left association, signed values (no hang), no crash on division by zero.
+assert(A("$p_hpp > 50 & $p_mp >= 10") == true)
+assert(A("($p_hp - 500) > 0") == false and A("$p_hp-500<0") == true)
+assert(A("2^3^2=64.000000") == true and A("8-2-1=5") == true and A("7/2=3") == true and A("-7/2=-3") == true)
+assert(A("5/0=0") == true and A("$p_job=WAR/NIN") == true)
+-- "*" multiplies here: WAR=W* is WAR=0, true for any name (as in the original).
+assert(A("$p_mainjob=war") == true and A("$p_mainjob=W*") == true and A("$p_mainjob=NIN") == false)
+assert(A("($p_mainjob=WAR)|($p_mainjob=NIN)") == true and A("!true") == false)
+
+-- setvar arithmetic: * / + - only, names with - become numbers.
+ac._uvars({ n = "3" })
+assert(S("$u_n + 1") == "4" and S("$u_n - 5") == "-2" and S("Mid-Acc") == "0" and S("Plain") == "Plain")
+
+-- Augment path / rank / trial from extdata.
+local ext = string.char(2, 0x20, 0x07, 0) .. string.rep("\0", 20)
+local p, r = ac._aug_meta(ext)
+assert(p == 4 and r == 1, p .. " " .. r)
+
+return "acxml eval ok"
+"#;
+
+    const ACXML_FLOW: &str = r#"local said, ran, sent = {}, {}, {}
+local FILES = {}
+local BUFFS = {}
+local ITEMS = {
+  [11] = { name = "Idle Hat", slots = 1 << 4, jobs = 1 << 1, level = 1 },
+  [12] = { name = "Acc Hat", slots = 1 << 4, jobs = 1 << 1, level = 1 },
+  [13] = { name = "Ear A", slots = (1 << 11) | (1 << 12), jobs = 1 << 1, level = 1 },
+  [14] = { name = "Body B", slots = 1 << 5, jobs = 1 << 1, level = 1 },
+}
+local PLAYER = { name = "Tester", id = 100, index = 1, main_job = 1, main_level = 75, sub_job = 13, sub_level = 37,
+  hp = 900, hp_max = 1000, mp = 50, mp_max = 100, tp = 0, hpp = 90, mpp = 50, status = 0, zone = 230, pos = { x = 0, y = 0, z = 0 } }
+game = {
+  player = function() return PLAYER end,
+  buffs = function() return BUFFS end,
+  party = function() return {} end,
+  target = function() return nil end,
+  entity = function() return nil end,
+  entities = function() return {} end,
+  entity_by_tag = function() return nil end,
+  time = function() return { earth = 0, weekday = 0, hour = 7, minute = 5 } end,
+  weather = function() return 0 end,
+  equipment = function() return {} end,
+  items = function(bag)
+    if bag ~= 0 then return {} end
+    return { { bag = 0, slot = 1, id = 11 }, { bag = 0, slot = 2, id = 12 }, { bag = 0, slot = 3, id = 13 }, { bag = 0, slot = 4, id = 14 } }
+  end,
+}
+res = {
+  job = function(id) return ({ "WAR", "MNK", "WHM", [13] = "NIN" })[id] end,
+  status = function(id) return ({ [33] = "Haste" })[id] end,
+  spell = function() return nil end,
+  ability = function() return nil end,
+  item = function(id) return ITEMS[id] end,
+  zone = function() return "Somewhere" end,
+}
+chat = { add = function(t) said[#said + 1] = t end }
+clock = function() return 1000 end
+timer = { after = function(_, f) f() end }
+commands = { run = function(l) ran[#ran + 1] = l end }
+packets = { inject_out = function(d) sent[#sent + 1] = d end, build = function(id, b) return string.pack("<I2", id) .. b end }
+fs = {
+  list = function(dir)
+    local t = {}
+    for k in pairs(FILES) do
+      local n = k:match("^" .. dir:gsub("%p", "%%%0") .. "([^/]+)$")
+      if n then t[#t + 1] = n end
+    end
+    return t
+  end,
+  read = function(p) return FILES[p] end,
+}
+local function ids()
+  local t = {}
+  for _, d in ipairs(sent) do
+    local id = string.unpack("<I2", d)
+    if id == 0x050 then
+      local index, slot = string.unpack("BB", d, 3)
+      t[#t + 1] = string.format("%d:%d", slot, index)
+    else
+      t[#t + 1] = string.format("%03X", id)
+    end
+  end
+  sent = {}
+  return table.concat(t, " ")
+end
+
+local core = require("src.core")
+local ac = require("src.acxml")
+
+FILES["ashitacast/Tester_WAR.xml"] = [==[<?xml version="1.0"?>
+<!-- a comment with <tags> in it -->
+<ashitacast>
+  <sets>
+    <set name="Idle"><head>Idle Hat</head></set>
+    <set name="Acc" baseset="Idle"><head>Acc Hat</head><body>Body B</body></set>
+  </sets>
+  <load><setvar name="mode" value="Idle"/><echo>loaded $p_name</echo></load>
+  <commands>
+    <command input="/mode"><setvar name="mode" value="$arg1"/><echo>mode $u_mode</echo></command>
+    <command input="/modex"><echo>never: the shorter input wins</echo></command>
+  </commands>
+  <default>
+    <if u_mode="Acc"><equip set="Acc"/></if>
+    <else><equip set="Idle"/></else>
+  </default>
+</ashitacast>]==]
+
+assert(ac.find() == "ashitacast/Tester_WAR.xml", tostring(ac.find()))
+assert(ac.load(ac.find()), table.concat(said, " | "))
+assert(said[#said] == "loaded Tester", said[#said])
+ac.tick()
+assert(ids() == "4:1", "idle hat")
+-- /modex is taken by /mode (a prefix, the shorter input); the line is consumed.
+assert(ac.typed("/modex Acc") == false and said[#said] == "mode Acc", said[#said])
+assert(ac.typed("/other") == nil)
+core.sent = {}
+ac.tick()
+assert(ids() == "4:2 5:4", "acc set over its baseset")
+
+-- A v3 file through the import rules: idlegear, buffactive, lear, variables.
+ac.unload()
+core.sent = {}
+FILES["ashitacast/Tester_WAR.xml"] = [==[<ashitacast>
+  <variables><var name="x">7</var></variables>
+  <sets><set name="Ears" lock="true"><lear>Ear A</lear></set></sets>
+  <idlegear>
+    <if buffactive="Haste"><equip set="Ears"/></if>
+    <elseif advanced="%p_hpp &lt; 50"><equip><head>Acc Hat</head></equip></elseif>
+    <doidlegear/>
+  </idlegear>
+</ashitacast>]==]
+assert(ac.load(ac.find()), table.concat(said, " | "))
+assert(ac._uvars().x == "7")
+ac.tick()
+assert(ids() == "", "no haste: nothing")
+BUFFS = { { id = 33 } }
+ac.tick()
+assert(ids() == "11:3", "ear1 from lear under haste")
+return "acxml flow ok"
+"#;
 
     /// Chat Alerts: a tell, our name and a chosen word call; our own lines, other people's names and a second call
     /// within a second do not.

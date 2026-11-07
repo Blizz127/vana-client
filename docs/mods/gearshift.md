@@ -1,7 +1,8 @@
-# Gearshift: GearSwap and LuAshitacast files
+# Gearshift: GearSwap, LuAshitacast and Ashitacast files
 
 Gearshift is a bundled mod that changes your gear around your actions from the job files you already have. It reads
-**GearSwap** job files and **LuAshitacast** profiles as they are; you don't rewrite them.
+**GearSwap** job files, **LuAshitacast** profiles and **Ashitacast** XML profiles (v4, and v3 files) as they are;
+you don't rewrite them.
 
 ## Where the files go
 
@@ -11,11 +12,12 @@ Put them in the mod's data folder, `mod-data/gearshift/files/` in the client's d
 | --- | --- | --- |
 | GearSwap | `gearswap/<Name>/`, `gearswap/common/`, `gearswap/` | `Name_JOB.lua`, `Name-JOB.lua`, `Name_Job.lua`, `Name-Job.lua`, `Name.lua`, `JOB.lua`, `Job.lua`, `default.lua` |
 | LuAshitacast | `ashitacast/<Name>_<Id>/`, then `ashitacast/` | `JOB.lua` in the first, `Name_JOB.lua` in the second |
+| Ashitacast XML | `ashitacast/<Name>_<Id>/`, then `ashitacast/` | `JOB.xml` in the first, `Name_JOB.xml` in the second |
 
 `JOB` is the three-letter job (`WAR`), `Job` its full name (`Warrior`), `Name` your character's name and `Id` its
 server id. Case doesn't matter. When there is a GearSwap file for the job it is used; otherwise a LuAshitacast
-profile. The file loads when you log in and again when your main job changes. Files a GearSwap file `include`s are
-looked for in the same GearSwap folders.
+profile; otherwise an Ashitacast XML profile. The file loads when you log in and again when your main job changes.
+Files a GearSwap file `include`s are looked for in the same GearSwap folders.
 
 ## What it does
 
@@ -31,6 +33,16 @@ looked for in the same GearSwap folders.
   `Combine`, `ForceEquip(Set)`, `LockSet`, `CancelAction`, `ChangeActionTarget`, `Disable` / `Enable`,
   `EvaluateLevels`, `ApplyBaseSets`, `SetMidDelay` with `InterimEquip(Set)`; `gData.GetPlayer`, `GetAction`,
   `GetActionTarget`, `GetTarget`, `GetEntity`, `GetBuffCount`, `GetEnvironment`, `GetEquipment`, `GetPet`.
+- **Ashitacast XML profiles:** every section (`load`, `unload`, `commands`, `default`, `precast` / `midcast`,
+  `preranged` / `midranged`, `ability`, `weaponskill`, `item`, `petskill`, `petspell`), `sets` with `baseset`,
+  `<settings>`, plain and merged `<include>`s; `if` / `elseif` / `else` / `return`; basic and `advanced` rules with
+  every built-in variable, `$u_` user variables, `$b_` buff counts and `$args` / `$argN`; `equip` (lock, priority,
+  `ignore`, `displaced`, `remove`, `augment`, `augpath`, `augrank`, `augtrial`), `command`, `echo`, `setvar`,
+  `clearvar`, `change`, `gearlock`, `registerbuff`, `clearbuff`, `cancel`, `override`. The rules evaluate as
+  Ashitacast's do, odd cases included (string `!=` in a rule never matches, `*` in an advanced rule multiplies);
+  what only hangs or crashes Ashitacast (a negative number, a division by zero, a set that is its own baseset) does
+  what was meant, and `fastcast` / `snapshot` shorten the wait after an action as documented. A v3 file
+  (`idlegear`, `premagic`, `buffactive` and so on) is read through Ashitacast's own v3 import rules.
 
 Around an action the gear goes out as each add-on sends it: the precast gear, the action, the midcast gear, in that
 order in one batch.
@@ -41,6 +53,9 @@ order in one batch.
   `//gs showswaps`, `//gs debugmode`.
 - `/lac fwd <args>`, `/lac load [file]`, `/lac reload`, `/lac unload`, `/lac set <set> [seconds]`,
   `/lac enable|disable [slot|all]`, `/lac equip <slot> <item> ...`, `/lac naked`, `/lac list`, `/lac debug`.
+- `/ac load [file]`, `/ac reload`, `/ac unload`, `/ac set <set> [ms]`, `/ac enable|disable [slot]`, `/ac naked`,
+  `/ac setvar <name> <value>`, `/ac clearvar <name>`, `/ac clearvars`, `/ac eval <text>`, `/ac print vars|uvars`,
+  `/ac debug`. A profile's `<commands>` take the lines they match first.
 - `//gearshift` says which file is loaded; `//gearshift reload` loads it again.
 
 ## Not there yet
@@ -52,3 +67,5 @@ order in one batch.
 - LuAshitacast: `ChangeActionId`, `LockStyle`, `AddSet`, `CompareItem`, pet actions; augments are compared loosely
   (as GearSwap compares them), not with LuAshitacast's own wording; only the parts of `AshitaCore` most profiles use
   (chat commands, the player's jobs and levels).
+- Ashitacast XML: `/ac addset`, `newxml`, `import` (v3 files are read directly instead), `gear`, `validate`, the
+  packer commands; slots the server marks encumbered are not skipped; augments are compared loosely, as above.
