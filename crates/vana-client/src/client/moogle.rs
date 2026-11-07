@@ -15,7 +15,7 @@ const STORAGE2: &str = "menu    storage2";
 const JOBCHANG: &str = "menu    jobchang";
 const JOBCSELU: &str = "menu    jobcselu";
 const MOGPOST: &str = "menu    mogpost";
-/// FUN_101d32c0: the moogle's dance, scheduler 'main' of file 0x13ae.
+/// FUN_101d32c0: the job change effect, scheduler 'main' of file 0x13ae on (us, moogle).
 const DANCE_FILE: u32 = 0x13ae;
 const DANCE: u32 = u32::from_le_bytes(*b"main");
 
@@ -104,9 +104,14 @@ pub fn update(w: &mut World) {
         }
         w.moogle = None;
     }
-    // The per-frame send: c2s 0x100 {main, sub} once the moogle's dance is over (or there is no moogle).
+    // The per-frame send: c2s 0x100 {main, sub} (FUN_101d4a80 / FUN_101d5370). Retail asks FUN_10062ed0 about the
+    // dance with (moogle, us), the reverse of how FUN_101d32c0 started it, so only a dance file still loading holds the
+    // send; the dance itself plays on while the job changes.
     if let Some(r) = w.job_req.filter(|r| r.pending) {
-        let busy = r.moogle.is_some_and(|id| w.entities.contains_key(&id) && w.effects.event_scheduler_running(DANCE_FILE, DANCE, Who::Actor(id), Who::Actor(w.my_id)));
+        let busy = r.moogle.is_some_and(|id| {
+            w.entities.contains_key(&id)
+                && (!w.effects.libs_ready(&[DANCE_FILE]) || w.effects.event_scheduler_running(DANCE_FILE, DANCE, Who::Actor(id), Who::Actor(w.my_id)))
+        });
         if !busy {
             let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x100, body: vec![r.main, r.sub, 0, 0] });
             w.job_req = Some(JobReq { pending: false, ..r });
@@ -182,8 +187,10 @@ fn request(w: &mut World, main: u8, sub: u8) {
     }
     let moogle = moogle_actor(w);
     log::debug!("job change ({main}, {sub}), moogle {moogle:?}");
+    // FUN_10062e20(0x13ae, 'main', us, moogle): actor1 is our own actor (FUN_10081550 on 0x1047d600), so the
+    // effect plays on us, with the moogle as its target.
     if let Some(id) = moogle {
-        w.effects.on_event_scheduler(DANCE_FILE, DANCE, Who::Actor(id), Who::Actor(w.my_id));
+        w.effects.on_event_scheduler(DANCE_FILE, DANCE, Who::Actor(w.my_id), Who::Actor(id));
     }
     w.job_req = Some(JobReq { main, sub, pending: true, moogle });
     let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x053, body: vec![0; 0x84] });
