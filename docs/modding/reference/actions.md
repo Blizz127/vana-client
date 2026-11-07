@@ -841,7 +841,7 @@ Nothing happens during an event, while an earlier talk is still waiting for the 
 actions.choose(option) -> nil
 ```
 
-Picks an option of the event menu showing, as moving the cursor to it and pressing Enter does.
+Picks an option of the event menu showing, as moving the cursor to it and pressing Enter does. A menu can show a moment before its event waits on it, when Enter does nothing; the pick then waits for it, up to 5 seconds, and is dropped if the event ends first.
 
 **Parameters**
 

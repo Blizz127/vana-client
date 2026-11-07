@@ -269,6 +269,32 @@ for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
 end
 ```
 
+## `game.can_wear`
+
+```lua
+game.can_wear(item) -> boolean
+```
+
+Whether our character can wear the item now, by the client's own rule (the one that colours wearable gear yellow in
+shops): the item's races, our main job and its level, the superior level, and no encumbrance on the item's slots.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `item` | `integer` | yes | The item id. |
+
+**Returns** `boolean`: false for an item that is not gear, and before the character's stats have come.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+-- Warp Cudgel needs level 36.
+if not game.can_wear(17040) then print("not yet") end
+```
+
 ## `game.bag_size`
 
 ```lua
@@ -548,8 +574,8 @@ The event (a cutscene or NPC conversation) under way, the menu it shows, and its
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `menu.question` | `string` | The menu's question. |
-| `menu.options` | `string[]` | The options' texts, in order. |
+| `menu.question` | `string` | The menu's question, as the window reads it: the game's curly quotes and full-width forms as ordinary characters, colour codes left out (`Teleport where?(Lower Jeuno)`). |
+| `menu.options` | `string[]` | The options' texts, in order, the same way. |
 | `menu.cursor` | `integer` | The option the cursor is on, from 1. |
 | `text.waiting` | `boolean` | The message waits for a key (Enter, or `actions.advance()`) before it goes on. |
 | `text.open` | `number` | Seconds its page has been on screen. |

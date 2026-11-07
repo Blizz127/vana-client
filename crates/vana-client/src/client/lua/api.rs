@@ -805,6 +805,14 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // The client's wear rule (the shops' yellow): race, main job and level, superior level, encumbrance.
+    game.set(
+        "can_wear",
+        lua.create_function(|lua, id: u16| {
+            let w = world(lua)?;
+            Ok(w.item_info.as_ref().and_then(|c| c.item(id)).is_some_and(|it| super::super::shop::can_wear(w, &it, id)))
+        })?,
+    )?;
     game.set(
         "bag_size",
         lua.create_function(|lua, bag: u8| {
@@ -939,8 +947,9 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let t = lua.create_table()?;
             if let Some(c) = super::super::event::choice(w) {
                 let m = lua.create_table()?;
-                m.set("question", c.question.as_str())?;
-                m.set("options", c.options.iter().map(|o| o.1.as_str()).collect::<Vec<_>>())?;
+                // As the window reads: the game's quotes and full-width forms as characters, in-line codes dropped.
+                m.set("question", crate::dat::font::plain(&c.question))?;
+                m.set("options", c.options.iter().map(|o| crate::dat::font::plain(&o.1)).collect::<Vec<_>>())?;
                 m.set("cursor", c.cursor + 1)?;
                 t.set("menu", m)?;
             }

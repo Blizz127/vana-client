@@ -2879,6 +2879,11 @@ pub fn choice(w: &World) -> Option<&Choice> {
     w.event.as_ref()?.st.choice.as_ref()
 }
 
+/// A menu shows and its event waits on it: Enter picks (not in cinema mode, where the menu takes no key).
+pub fn choice_ready(w: &World) -> bool {
+    w.event.as_ref().is_some_and(|l| l.st.choice.is_some() && l.rt.choice_open() && !l.st.place_on)
+}
+
 /// The mouse's cursor move onto option `k` (the view follows, as a step). True when it moved.
 pub(super) fn set_choice(w: &mut World, k: usize) -> bool {
     let Some(c) = w.event.as_mut().and_then(|l| l.st.choice.as_mut()).filter(|c| c.cursor != k && k < c.options.len()) else { return false };

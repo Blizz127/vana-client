@@ -251,6 +251,8 @@ pub struct Host {
     pub(in crate::client) synth: Vec<input::Synth>,
     /// A mod pressed Enter this frame: a chat line it submits is the mod's, not the player's.
     pub(in crate::client) synth_enter: bool,
+    /// actions.choose's pick, held until the event's menu takes input (5 s at most).
+    pub(in crate::client) choose: Option<(usize, std::time::Instant)>,
     /// Every loaded mod, for mods.list / call / emit.
     dir: runtime::Shared,
     /// Sounds the mods asked for, for the app's mixer.
@@ -502,6 +504,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
 const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log", "casket-solver", "blue-sets",
+    "warp-helper" ["src/places.lua"],
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -1239,6 +1242,7 @@ pub(super) fn frame(w: &mut World, gu: Option<&super::game_ui::GameUi>) {
     for op in ops {
         apply(w, gu, op);
     }
+    actions::choose_pending(w);
     for line in bind_lines {
         run_line(w, &line, super::textcmd::Mode::Typed, From::Bind { mods: false });
     }
@@ -2307,6 +2311,62 @@ mod tests {
             F("You have a hunch that the lock's combination is greater than 57.")
             T()
             assert(said[#said] == "Casket Solver: the combination is 59.", said[#said])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Warp Helper: the Home Point and Survival Guide walks pick the rows the menus showed live, through a second page.
+    #[test]
+    fn warp_helper_walks() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "warp-helper").unwrap().2;
+        let vm = Vm::new(bundled_manifest("warp-helper").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, said, picks, menus, at = {}, {}, {}, {}, 0
+            settings = { get = function(k) return k == "fare" and "Gil" or true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            events = { on = function() end }
+            sleep = function() end
+            game = {
+              event = function()
+                if at == 0 or at > #menus then return nil end
+                return { menu = { question = menus[at][1], options = menus[at][2], cursor = 1 } }
+              end,
+              entities = function() return { { id = 7, name = "Home Point #1", distance = 3, pos = { x = 0, z = 0 } },
+                { id = 8, name = "Survival Guide", distance = 40, pos = { x = 0, z = 0 } } } end,
+            }
+            actions = {
+              talk = function() at = 1 end,
+              choose = function(i) picks[#picks + 1] = i; at = at + 1 end,
+            }
+            load(INIT)()
+            menus = {
+              { "What will you do?", { "Travel to another home point.", "Set this as your home point.", "Other settings.", "On second thought, never mind." } },
+              { "Teleport to which region?", { "On second thought, none.", "Select from favorites.", "Current region.", "San d'Oria.", "Bastok.", "Windurst.", "Jeuno.", "Next page." } },
+              { "Teleport where?", { "Never mind.", "Ru'Lude Gardens.", "Upper Jeuno.", "Lower Jeuno.", "Port Jeuno." } },
+              { "Teleport where?(Lower Jeuno)", { "Nowhere.", "Home Point #1 (E).", "Home Point #2 (M)." } },
+              { "Teleport? (Current gil: 97531)", { "Add to favorites.", "Yes, please.", "No, thank you." } },
+            }
+            C.warp("hp", "lower", "jeuno", "2")
+            assert(table.concat(picks, " ") == "1 7 4 3 2", table.concat(picks, " "))
+            C.warp("jeuno")
+            assert(said[#said] == "Warp Helper: which one: Upper Jeuno, Lower Jeuno, Port Jeuno?", said[#said])
+            picks, at = {}, 0
+            game.entities = function() return { { id = 8, name = "Survival Guide", distance = 2, pos = { x = 0, z = 0 } } } end
+            menus = {
+              { "What chapter will you read?", { "None.", "\u{201C}Teleportation Assistance.\u{201D}", "\u{201C}Other mysteries.\u{201D}" } },
+              { "Travel to which region?", { "On second thought, none.", "Select from amongst favorites.", "Bastok.", "Ronfaure.", "Next page." } },
+              { "Travel to which region?", { "On second thought, none.", "Select from amongst favorites.", "Movalpolos.", "Mamool Ja Savage.", "Previous page." } },
+              { "Where will you travel?", { "Nowhere.", "Wajaom Woodlands.", "Mamook.", "Aydeewa Subterrane." } },
+              { "Travel to Wajaom Woodlands?", { "Add to favorites.", "Travel using 1000 gil. (97531 gil)", "Travel using 50 tabs. (0 total)", "Not just yet." } },
+            }
+            C.warp("wajaom")
+            assert(table.concat(picks, " ") == "2 5 4 2 2", table.concat(picks, " "))
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

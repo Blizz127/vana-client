@@ -119,6 +119,22 @@ fn token(t: &Target) -> String {
     t.as_deref().map_or(String::new(), |s| if s.contains(' ') && !s.starts_with('<') { format!(" \"{s}\"") } else { format!(" {s}") })
 }
 
+/// A held actions.choose: the cursor and Enter once the menu takes input (a menu can show a moment before its
+/// event waits on it, and Enter then does nothing).
+pub(super) fn choose_pending(w: &mut World) {
+    use super::super::event;
+    let Some((k, at)) = w.lua.choose else { return };
+    if w.event.is_none() || at.elapsed() > std::time::Duration::from_secs(5) {
+        w.lua.choose = None;
+    } else if event::choice_ready(w) {
+        w.lua.choose = None;
+        if event::choice(w).is_some_and(|c| k < c.options.len()) {
+            event::set_choice(w, k);
+            event::key(w, egui::Key::Enter);
+        }
+    }
+}
+
 pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
     use super::super::{equipsets, equipwin, event, items, magic, target, treasure};
     match a {
@@ -263,12 +279,7 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                 }
             }
         }
-        Action::Choose(k) => {
-            if event::choice(w).is_some_and(|c| k < c.options.len()) {
-                event::set_choice(w, k);
-                event::key(w, egui::Key::Enter);
-            }
-        }
+        Action::Choose(k) => w.lua.choose = Some((k, std::time::Instant::now())),
         Action::Talk(id) => {
             event::talk(w, id);
         }

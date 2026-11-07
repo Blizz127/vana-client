@@ -366,6 +366,18 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (game.job_data's `blue_slots`), `//blu <name>` changes only the slots that differ, one a second, and names any spell
   not learned; list and delete. Seen live as BLU 75: a three-spell set saved, two slots changed, the set put back in
   three changes.
+- **Warp Helper** (assets/mods/warp-helper; SuperWarp, MyHome, Dimmer, Uberwarp, cudgel): `//warp [hp | sg | wp]
+  <zone> [number or place]` at a Home Point, Survival Guide or Waypoint (the nearest, run up to when it is a few steps
+  away) answers its menus as the player would: the region row from a table read off the menus with every point
+  registered, then the zone, the point and the fare (Survival Guides: gil or tabs, a setting). A name that fits
+  several zones lists them; a point not registered leaves the menu open to the player. `//warp home` casts Warp when
+  it can, else wears a Warp Ring or Warp Cudgel (worn only when the character can wear it: `game.can_wear`), waits
+  out its equip delay from the item's times, uses it and puts back what that slot held after the warp; `//warp dim
+  <holla | dem | mea>` the same with a Dimensional Ring. Seen live (all points unlocked for the test): Home Point to
+  Lower Jeuno #2, Survival Guides to Valkurm Dunes and back to Northern San d'Oria, a Waypoint across Adoulin, the
+  Warp Ring and "ready in 4:26" while it recharges. A Rust test walks the Home Point and Survival Guide menus.
+  `game.event` now gives menu text as the window reads it (the game's curly quotes as characters), and
+  `actions.choose` waits for a menu that shows before it takes input (a Survival Guide's region list did).
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

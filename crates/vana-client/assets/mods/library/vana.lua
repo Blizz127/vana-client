@@ -911,6 +911,11 @@ function game.items(bag) end
 ---@return integer?
 function game.bag_size(bag) end
 
+--- Whether our character can wear the item now, by the client's rule (the shops' yellow): its race, main job and level, superior level and no encumbrance on its slots.
+---@param item integer item id
+---@return boolean
+function game.can_wear(item) end
+
 --- Held items whose name or long log name is `name` (any case), in the bags given (ids, as game.items) or all: {bag, slot, id, count, extdata, locked} each, bag by bag.
 ---@param name string 
 ---@param bags? integer[] 
@@ -953,7 +958,7 @@ function game.key_items() end
 ---@return table[]
 function game.treasure() end
 
---- The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (cursor from 1); text = {waiting, open} while it shows a message (waiting: it waits for a key; open: seconds its page has been up).
+--- The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (the text as the window reads it; cursor from 1); text = {waiting, open} while it shows a message (waiting: it waits for a key; open: seconds its page has been up).
 ---@return table?
 function game.event() end
 
@@ -1166,7 +1171,7 @@ function actions.pass(slot) end
 ---@param status integer status id
 function actions.cancel(status) end
 
---- Picks an option of the event menu showing (game.event().menu), as the cursor and Enter would.
+--- Picks an option of the event menu showing (game.event().menu), as the cursor and Enter would, once the menu takes input (a menu can show a moment before; 5 s at most).
 ---@param option integer from 1
 function actions.choose(option) end
 
