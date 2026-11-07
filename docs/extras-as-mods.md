@@ -349,6 +349,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   pad, a press taken until it comes up; input.capture) and `input.pad` (buttons, sticks, triggers), filtered inside the
   gamepad poll so a taken button never reaches the game. Seen live with the virtual Xbox pad: LT+A used Berserk (its
   recast on the slot), LT+X and RT+Y ran their lines. Not yet: double-trigger sets (LT then RT).
+- **Job Gauges** (assets/mods/job-gauges; strats, maneuver, ninhelper, NinjaTool): an edge window with the charges of
+  Stratagems, Ready and Quick Draw (LandSandBoat's charge table: charges left and the next one's wait from the running
+  recast), Ninja shadows and tool counts, Puppetmaster maneuvers, for the main and sub jobs. A Rust test covers the
+  charge math (SCH 99, 100 s left: 2 / 5, the next in 4 s); not seen live (no SCH, NIN or PUP on the test character).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.

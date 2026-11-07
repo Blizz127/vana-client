@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2095,6 +2095,40 @@ mod tests {
             H.battle_message(5, 77, 6, 0, 0)
             H.frame()
             assert(count() == 0)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Job Gauges: SCH 99 with 100 s of the stratagem recast left has 2 of 5 charges, the next in 4 s; a NIN sub sees
+    /// its shadows and tools.
+    #[test]
+    fn job_gauges_counts() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "job-gauges").unwrap().2;
+        let vm = Vm::new(bundled_manifest("job-gauges").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local T, shown = nil, nil
+            settings = { get = function() return true end }
+            timer = { every = function(_, f) T = f end }
+            game = {
+              player = function() return { main_job = 20, main_level = 99, sub_job = 13, sub_level = 49 } end,
+              recasts = function() return { abilities = { [231] = 100 }, spells = {}, totals = { abilities = {}, spells = {} } } end,
+              buffs = function() return { { id = 445 } } end,
+              find_items = function(n) return n == "Shihei" and { { count = 30 } } or {} end,
+            }
+            ui = { window = function(_, spec) shown = spec.elements end, open = function() end, close = function() end }
+            load(INIT)()
+            T()
+            local by = {}
+            for _, e in ipairs(shown) do by[e.label] = e.text end
+            assert(by["Stratagems"] == "2 / 5  +1 in 4s", by["Stratagems"])
+            assert(by["Shadows"] == "3", by["Shadows"])
+            assert(by["Shihei"] == "30")
+            assert(by["Ready"] == nil)
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
