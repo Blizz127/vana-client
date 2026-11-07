@@ -292,6 +292,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Screen Capture** (assets/mods/screen-capture; SSOrganizer, DashCam, video capture): `//shot` saves a screenshot as
   `<character>/<zone>/<date time>.png` under the game's screenshots folder; `//record` and `//record stop` record a
   video. Seen live: a screenshot filed (then removed); recording not tried (it needs ffmpeg).
+- **Quick Play** (assets/mods/quick-play; autologin, autoenterkey): a lobby mod that plays the chosen character once
+  the character list shows, once per start (the password stays the login screen's Remember password). Bundled mods
+  with `lobby = true` now start in the lobby too (only folder mods did). Seen live: Lnxtest played from the title.
+- Not ported: Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
+  picker is the game's Emotes list.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

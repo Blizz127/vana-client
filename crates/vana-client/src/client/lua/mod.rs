@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -705,11 +705,21 @@ impl Host {
         self.events.push(("lobby_screen", vec!["world".into(), old.into()]));
     }
 
-    /// Before login: the enabled mods whose manifest asks for the lobby (`lobby = true`).
+    /// Before login: the enabled mods whose manifest asks for the lobby (`lobby = true`), bundled ones too.
     fn start_lobby(&mut self) {
         self.lobby_started = true;
         let cfg = crate::config::Config::load();
         let root = mods_dir();
+        for (id, ..) in BUNDLED {
+            let off = cfg.mods.iter().any(|r| r.name == *id && !r.enabled);
+            let folder = cfg.mods.iter().any(|r| r.name == *id && r.enabled) && root.join(id).join("mod.toml").is_file();
+            if off || folder || !bundled_manifest(id).is_some_and(|m| m.lobby) {
+                continue;
+            }
+            if let Err(e) = self.load_bundled(None, id) {
+                log::warn!("lua mod {id}: {e}");
+            }
+        }
         for r in cfg.mods.iter().filter(|r| r.enabled) {
             let dir = root.join(&r.name);
             let Ok(m) = manifest::read(&dir) else { continue };
