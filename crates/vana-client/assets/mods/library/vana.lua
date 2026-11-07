@@ -410,7 +410,7 @@ function ui.on(id, handler) end
 ---@param spec table 
 function hud.text(id, spec) end
 
---- Creates or replaces a filled rectangle: x, y, w, h (window pixels; hud.screen().ui_scale converts UI units), colour, line (a width: only its outline).
+--- Creates or replaces a filled rectangle: x, y, w, h (window pixels; hud.screen().ui_scale converts UI units), colour, line (a width: only its outline), round (corner radius; the modern UI draws it).
 ---@param id string 
 ---@param spec table 
 function hud.rect(id, spec) end
@@ -456,7 +456,7 @@ function hud.on(id, handler) end
 ---@param id string 
 function hud.off(id) end
 
---- The window in pixels, and ui_scale: pixels per UI unit (sizes given in UI units look the same at any resolution).
+--- The window in pixels, and ui_scale: pixels per UI unit (the modern UI's point while it is on, else the classic layout's unit; sizes given in UI units look the same at any resolution and UI size).
 ---@return {width: number, height: number, ui_scale: number}
 function hud.screen() end
 

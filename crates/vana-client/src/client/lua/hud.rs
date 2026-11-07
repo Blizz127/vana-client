@@ -6,11 +6,11 @@ use super::super::game_ui::HudFace;
 use mlua::{Lua, Table, Value};
 
 #[derive(Clone)]
-pub(super) enum Kind {
+pub(in crate::client) enum Kind {
     /// `font` None follows the UI; an outline (its colour and width) or a drop shadow under the text.
     Text { text: String, size: f32, colour: Option<[u8; 4]>, bg: Option<[u8; 4]>, align: u8, pad: f32, font: Option<HudFace>, outline: Option<[u8; 4]>, outline_w: f32, shadow: bool },
-    /// Filled, or outlined `line` wide.
-    Rect { w: f32, h: f32, colour: [u8; 4], line: Option<f32> },
+    /// Filled, or outlined `line` wide; corners rounded `round` (the modern UI's).
+    Rect { w: f32, h: f32, colour: [u8; 4], line: Option<f32>, round: f32 },
     Bar { w: f32, h: f32, value: f32, colour: Option<[u8; 4]>, kind: String },
     Icon { icon: super::window::Icon, size: f32 },
     /// A PNG from the mod's folder: its texture key, pixels (w, h, RGBA), drawn size and tint.
@@ -21,7 +21,7 @@ pub(super) enum Kind {
 }
 
 #[derive(Clone)]
-pub(super) struct Elem {
+pub(in crate::client) struct Elem {
     pub id: String,
     pub x: f32,
     pub y: f32,
@@ -135,7 +135,10 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
                 *shadow = v;
             }
         }
-        Kind::Rect { w, h, colour: c, line } => {
+        Kind::Rect { w, h, colour: c, line, round } => {
+            if let Some(v) = t.get::<Option<f32>>("round")? {
+                *round = v.max(0.0);
+            }
             if let Some(v) = t.get::<Option<f32>>("w")? {
                 *w = v;
             }
@@ -291,7 +294,7 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
         })?,
     )?;
     t.set("text", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Text { text: String::new(), size: 1.0, colour: None, bg: None, align: 0, pad: 4.0, font: None, outline: None, outline_w: 1.0, shadow: false }, spec))?)?;
-    t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None }, spec))?)?;
+    t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None, round: 0.0 }, spec))?)?;
     t.set("bar", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Bar { w: 120.0, h: 8.0, value: 0.0, colour: None, kind: "hp".into() }, spec))?)?;
     t.set("icon", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Icon { icon: super::window::Icon::Item(0), size: 32.0 }, spec))?)?;
     t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: 1.0, me: false }, spec))?)?;
@@ -366,7 +369,8 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             let out = lua.create_table()?;
             out.set("width", f.window[0] as i64)?;
             out.set("height", f.window[1] as i64)?;
-            out.set("ui_scale", if f.k.0 > 0.0 { 1.0 / f.k.0 } else { 1.0 })?;
+            // The modern UI's point, else the classic layout's unit.
+            out.set("ui_scale", f.modern_ppp.unwrap_or(if f.k.0 > 0.0 { 1.0 / f.k.0 } else { 1.0 }))?;
             Ok(out)
         })?,
     )?;
@@ -415,6 +419,36 @@ fn bar_colour(kind: &str) -> [u8; 4] {
 
 /// Every running mod's visible elements, by layer then load order, at UI units (window pixels times `k`). Their window
 /// pixel rects go to the frame info for clicks and hud.bounds.
+/// Every running mod's visible elements by layer, then load order: (mod, element).
+pub(in crate::client) fn elements(host: &super::Host) -> Vec<(String, Elem)> {
+    let mut all: Vec<(String, Elem)> = Vec::new();
+    for vm in host.vms.iter().filter(|v| v.suspended.is_none()) {
+        for e in vm.st.borrow().hud.iter().filter(|e| e.visible) {
+            all.push((vm.manifest.id.clone(), e.clone()));
+        }
+    }
+    all.sort_by_key(|(_, e)| e.layer);
+    all
+}
+
+/// An element's place in window pixels. Anchored: signed offsets from a corner of the panel (as last drawn, so where a
+/// hidden panel was; none before a panel ever was). Else negative places count from the window's right or bottom edge.
+pub(in crate::client) fn place(e: &Elem, panels: &std::collections::BTreeMap<String, ([f32; 4], bool)>, win: [f32; 2]) -> Option<(f32, f32)> {
+    Some(match &e.anchor {
+        Some(a) => {
+            let (r, _) = panels.get(a)?;
+            (r[0] + if e.corner & 1 != 0 { r[2] } else { 0.0 } + e.x, r[1] + if e.corner & 2 != 0 { r[3] } else { 0.0 } + e.y)
+        }
+        None => (if e.x < 0.0 { win[0] + e.x } else { e.x }, if e.y < 0.0 { win[1] + e.y } else { e.y }),
+    })
+}
+
+/// Whether the game UI draws an element in the modern UI: only text in the game's font (the modern UI's painter has
+/// it not); the rest is the modern layer's (modern/hudmods.rs), drawn as its panels are.
+fn game_drawn(e: &Elem) -> bool {
+    matches!(e.kind, Kind::Text { font: Some(HudFace::Game), .. })
+}
+
 pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
     let host = &w.lua;
     let info = host.info.clone();
@@ -425,26 +459,11 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
     if k.0 <= 0.0 || k.1 <= 0.0 {
         return;
     }
-    let mut all: Vec<(String, Elem)> = Vec::new();
-    for vm in host.vms.iter().filter(|v| v.suspended.is_none()) {
-        for e in vm.st.borrow().hud.iter().filter(|e| e.visible) {
-            all.push((vm.manifest.id.clone(), e.clone()));
-        }
-    }
-    all.sort_by_key(|(_, e)| e.layer);
     let mut rects = Vec::new();
     // Panels are the modern UI's: in the classic UI anchored elements wait.
     let panels = if w.modern { info.borrow().native_rects.clone() } else { Default::default() };
-    for (mod_id, e) in all {
-        // Anchored: signed offsets from a corner of the panel (as last drawn, so where a hidden panel was; not drawn
-        // before a panel ever was). Else negative places count from the window's right or bottom edge.
-        let (px, py) = match &e.anchor {
-            Some(a) => {
-                let Some((r, _)) = panels.get(a) else { continue };
-                (r[0] + if e.corner & 1 != 0 { r[2] } else { 0.0 } + e.x, r[1] + if e.corner & 2 != 0 { r[3] } else { 0.0 } + e.y)
-            }
-            None => (if e.x < 0.0 { win[0] + e.x } else { e.x }, if e.y < 0.0 { win[1] + e.y } else { e.y }),
-        };
+    for (mod_id, e) in elements(host).into_iter().filter(|(_, e)| !w.modern || game_drawn(e)) {
+        let Some((px, py)) = place(&e, &panels, win) else { continue };
         let (x, y) = (px * k.0, py * k.1);
         let r = match &e.kind {
             Kind::Text { text, size, colour, bg, align, pad, font, outline, outline_w, shadow } => {
@@ -479,7 +498,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 let p = if bg.is_some() { *pad } else { 0.0 };
                 [left - p, y - p / 2.0, lw + p * 2.0, th + p]
             }
-            Kind::Rect { w: rw, h: rh, colour, line } => {
+            Kind::Rect { w: rw, h: rh, colour, line, .. } => {
                 let (rw, rh) = (rw * k.0, rh * k.1);
                 match line {
                     Some(l) => {
@@ -510,7 +529,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 }
                 if let Some(o) = m.as_mut() {
                     let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));
-                    let marker = me.then_some(((w.pos.x, w.pos.z), facing, w.modern));
+                    let marker = me.then_some(((w.pos.x, w.pos.z), facing));
                     o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, *alpha, marker);
                 }
                 [x, y, mw, mh]

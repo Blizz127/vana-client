@@ -4,7 +4,9 @@ The `hud` namespace draws things over the game: texts, filled rectangles, bars, 
 spell or ability icons. Each element has an id you choose. You create it once (`hud.text`, `hud.rect`, ...), change it with `hud.set`
 as things happen, and it stays on screen until you remove it; you do not redraw it every frame. HUD elements draw over
 the game world and the name plates and under every window, in the game world only, and they hide while the player has
-the interface hidden. None of these functions needs a permission. Clicks, drags and the pointer coming and going on an
+the interface hidden. Each interface draws them as it draws its own: the classic UI with the game's art and fonts, the
+modern UI with its own painter (its faces, smooth shapes, the pack's gauges), so an element looks as a built-in one
+does. None of these functions needs a permission. Clicks, drags and the pointer coming and going on an
 element can be handled with `hud.on`, and any element can carry a tooltip.
 
 ```lua
@@ -147,7 +149,8 @@ Creates or replaces a filled rectangle. Use it as a panel behind other elements,
 | `w` | `number` | `100` | Its width in window pixels. |
 | `h` | `number` | `20` | Its height in window pixels. |
 | `colour` | `{r, g, b, a}` | `{0, 0, 0, 160}` | Its colour (a translucent black by default). |
-| `line` | `number` | none | Draws only its outline, this many window pixels wide (0.5 to 32), instead of filling it. `false` in `hud.set` fills it again. |
+| `line` | `number` | none | Draws only its outline, this many window pixels wide (0.5 to 32), inside the rectangle, instead of filling it. `false` in `hud.set` fills it again. |
+| `round` | `number` | `0` | Rounds its corners this many window pixels (the outer edge's radius), as the modern UI's frames are. The classic UI draws square corners. |
 
 **Returns** nothing.
 

@@ -888,7 +888,7 @@ fn group(ui: &mut Ui, m: &super::Modern, g: &Group, icon: &dyn Fn(&egui::Painter
 }
 
 /// The map image as an egui texture, made once per image.
-fn map_texture(m: &super::Modern, ctx: &egui::Context, img: &MapImage) -> egui::TextureId {
+pub(super) fn map_texture(m: &super::Modern, ctx: &egui::Context, img: &MapImage) -> egui::TextureId {
     let mut images = m.images.borrow_mut();
     let t = images.entry(img.name.clone()).or_insert_with(|| Some(ctx.load_texture(img.name.clone(), egui::ColorImage::from_rgba_unmultiplied(img.size, &img.rgba), egui::TextureOptions::LINEAR)));
     t.as_ref().map_or(egui::TextureId::default(), |t| t.id())
@@ -900,9 +900,9 @@ fn arrow(painter: &egui::Painter, c: Pos2, facing: f32, size: f32, m: &super::Mo
 }
 
 /// Our own arrow on the minimap and the map overlay: reddish orange, to stand out on the parchment (user, 2026-10-26).
-const ME: Color32 = Color32::from_rgb(0xf2, 0x55, 0x22);
+pub(super) const ME: Color32 = Color32::from_rgb(0xf2, 0x55, 0x22);
 
-fn arrow_in(painter: &egui::Painter, c: Pos2, facing: f32, size: f32, colour: Color32) {
+pub(super) fn arrow_in(painter: &egui::Painter, c: Pos2, facing: f32, size: f32, colour: Color32) {
     let d = vec2(facing.cos(), facing.sin());
     let n = vec2(-d.y, d.x);
     let pts = vec![c + d * size, c - d * size * 0.55 + n * size * 0.65, c - d * size * 0.25, c - d * size * 0.55 - n * size * 0.65];

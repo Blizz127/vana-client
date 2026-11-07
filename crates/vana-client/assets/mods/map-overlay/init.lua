@@ -56,23 +56,26 @@ local function show()
       show()
     end
   end)
-  -- The modern UI's bronze edge.
+  -- The modern UI's bronze edge: 2 points outside the box, its corners rounded 6 points inside.
   if game.info().modern_ui then
-    hud.rect("overlay_edge", { x = x - 2, y = y - 2, w = side + 4, h = side + 4, line = 2, colour = { 184, 139, 73, 204 } })
+    local u = hud.screen().ui_scale
+    hud.rect("overlay_edge", { x = x - 2 * u, y = y - 2 * u, w = side + 4 * u, h = side + 4 * u, line = 2 * u, round = 8 * u, colour = { 184, 139, 73, 204 } })
   else
     hud.remove("overlay_edge")
   end
 end
 
+-- With no map here (yet) the error sound plays, and it opens all the same: the map shows once there is one.
 local function toggle()
   if open then
     close()
-  elseif not game.map() then
-    audio.play_ui(4)
-  else
-    open = true
-    show()
+    return
   end
+  if not game.map() then
+    audio.play_ui(4)
+  end
+  open = true
+  show()
 end
 
 -- The keys while the overlay is switched on in Extras.

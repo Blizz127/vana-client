@@ -25,6 +25,7 @@ mod extras;
 mod favs;
 mod gametext;
 mod hud;
+mod hudmods;
 mod inspect;
 mod items;
 mod journal;
@@ -303,6 +304,8 @@ impl Modern {
         *self.retail.borrow_mut() = w.retail_frames.iter().map(|r| Rect::from_min_size(pos2(r[0], r[1]), vec2(r[2], r[3]))).collect();
         topbar::draw(self, ctx, &w.hud_top.view);
         pointers(self, ctx, w);
+        // The Lua mods' HUD elements, under every panel, as the modern layer draws its own.
+        hudmods::draw(self, ctx, gu, w);
         let focus = focus_panel(w);
         let mode = modes::current(w, &self.engaged_at, focus);
         let vis = modes::visibility(ctx, &cfg.modern_modes, mode);

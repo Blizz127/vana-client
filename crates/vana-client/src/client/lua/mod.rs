@@ -12,7 +12,7 @@ mod ipc;
 pub(super) mod lobby;
 mod process;
 mod net;
-mod hud;
+pub(super) mod hud;
 pub(super) mod input;
 mod manifest;
 mod native;
@@ -1446,6 +1446,9 @@ pub(super) fn world_shapes(w: &World) -> [Vec<crate::render::LineVertex>; 2] {
 
 /// The mods' HUD elements, under the windows (world_hud).
 pub(super) fn draw_hud(gu: &mut super::game_ui::GameUi, w: &World) {
+    if !w.modern {
+        w.lua.set_modern_scale(None);
+    }
     if w.lua.started && !w.lua.all_hidden {
         draw::draw_overlay(gu, w);
         hud::draw(gu, w);
@@ -1458,6 +1461,53 @@ impl Host {
     /// This frame's view-projection (world_hud), for draw.to_screen.
     pub(in crate::client) fn set_view_proj(&self, m: glam::Mat4) {
         self.info.borrow_mut().view_proj = m;
+    }
+
+    /// Whether the mods' HUD draws: they run and `/lua hide` is off.
+    pub(in crate::client) fn hud_shown(&self) -> bool {
+        self.started && !self.all_hidden
+    }
+
+    /// The mods' visible HUD elements by layer, then load order: (mod, element).
+    pub(in crate::client) fn hud_elements(&self) -> Vec<(String, hud::Elem)> {
+        hud::elements(self)
+    }
+
+    /// What HUD places count from: the panels as last drawn and the window, in pixels.
+    pub(in crate::client) fn hud_frame(&self) -> (std::collections::BTreeMap<String, ([f32; 4], bool)>, [f32; 2]) {
+        let f = self.info.borrow();
+        (f.native_rects.clone(), f.window)
+    }
+
+    /// HUD elements drawn this frame by the modern layer, after the game UI's: (mod, element, window pixel rect).
+    pub(in crate::client) fn add_hud_rects(&self, rects: Vec<(String, String, [f32; 4])>) {
+        self.info.borrow_mut().hud_rects.extend(rects);
+    }
+
+    /// The modern UI's pixels per point while it draws (hud.screen's ui_scale there), else none.
+    pub(in crate::client) fn set_modern_scale(&self, ppp: Option<f32>) {
+        self.info.borrow_mut().modern_ppp = ppp;
+    }
+
+    /// The map HUD maps show (the one the client shows here), as the modern layer draws it.
+    pub(in crate::client) fn hud_map_image(&self, w: &World, regions: &[super::map::Region]) -> Option<super::map::MapImage> {
+        let mut m = self.map.borrow_mut();
+        match m.as_mut() {
+            Some(o) if o.zone == w.pos_zone => o.follow(w, regions),
+            _ => *m = Some(super::map::Overlay::open(w, regions)),
+        }
+        m.as_mut()?.modern_image()
+    }
+
+    /// A mod's setting: the running mod's, else its settings file's, else a bundled mod's default (our own features
+    /// reading each other's, as the minimap's marker the map overlay's opacity).
+    pub(in crate::client) fn setting(&self, id: &str, key: &str) -> Option<serde_json::Value> {
+        if let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) {
+            let st = vm.st.borrow();
+            return st.settings.get(key).cloned().or_else(|| vm.manifest.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()));
+        }
+        let saved = read_json(&data_dir().join(id).join("settings.json"));
+        saved.get(key).cloned().or_else(|| bundled_manifest(id)?.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
     }
 
     /// The tooltip of the mod HUD element under the pointer: (title, text, seconds there).

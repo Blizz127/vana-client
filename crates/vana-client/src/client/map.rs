@@ -2257,11 +2257,9 @@ impl Overlay {
         self.region
     }
 
-    /// A window onto the image (a Lua HUD map): `rect`, centred on world (x, z), `span` map pixels across, at
-    /// `alpha`; clipped to the rect. `me`: our marker at world (x, z) facing, as the overlay draws it in each UI
-    /// (`modern`: the orange arrow).
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32, me: Option<((f32, f32), f32, bool)>) {
+    /// A window onto the image (a Lua HUD map in the classic UI): `rect`, centred on world (x, z), `span` map pixels
+    /// across, at `alpha`; clipped to the rect. `me`: our marker at world (x, z) facing, as the classic map draws it.
+    pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32, me: Option<((f32, f32), f32)>) {
         self.poll(gu);
         let (Some(region), Some(t)) = (self.region, self.texture.clone()) else { return };
         let (z, s) = (rect[2] / span.max(1.0), super::minimap::px_per_unit(&region));
@@ -2269,14 +2267,9 @@ impl Overlay {
         let (px, py) = (centre.0 * s, -centre.1 * s);
         gu.clip(Some(rect));
         gu.image_rect(&t, cx + (region.ox as f32 - px) * z, cy + (region.oy as f32 - py) * z, 512.0 * z, 512.0 * z, [1.0, 1.0, 1.0, alpha]);
-        if let Some(((x, wz), facing, modern)) = me {
+        if let Some(((x, wz), facing)) = me {
             let (mx, my) = (x * s, -wz * s);
-            let (sx, sy) = (cx + (mx - px) * z, cy + (my - py) * z);
-            if modern {
-                modern_marker(gu, sx, sy, facing);
-            } else {
-                marker(gu, sx, sy, facing, self.shade_at(&region, mx, my) * alpha);
-            }
+            marker(gu, cx + (mx - px) * z, cy + (my - py) * z, facing, self.shade_at(&region, mx, my) * alpha);
         }
         gu.clip(None);
     }
@@ -2325,17 +2318,6 @@ fn marker(gu: &mut GameUi, x: f32, y: f32, facing: f32, shade: f32) {
     let a = (0x80 as f32 * t) as u32;
     if a > 0 {
         gu.sprite_affine_blend("menu    keytops3", MARKER, x, y, m, a << 24 | 0x60_0800, 0x44);
-    }
-}
-
-/// The modern overlay's arrow (modern/extras.rs `arrow_in`, our orange) drawn by the game UI: a dark edge under it.
-fn modern_marker(gu: &mut GameUi, x: f32, y: f32, facing: f32) {
-    let (d, n) = ((facing.cos(), facing.sin()), (-facing.sin(), facing.cos()));
-    let at = |a: f32, b: f32, size: f32| [x + (d.0 * a + n.0 * b) * size, y + (d.1 * a + n.1 * b) * size];
-    for (size, c) in [(13.5, [0.0, 0.0, 0.0, 0.86]), (11.0, [0xf2 as f32 / 255.0, 0x55 as f32 / 255.0, 0x22 as f32 / 255.0, 1.0])] {
-        let (tip, left, notch, right) = (at(1.0, 0.0, size), at(-0.55, 0.65, size), at(-0.25, 0.0, size), at(-0.55, -0.65, size));
-        gu.quad([tip, left, notch, notch], [c; 4]);
-        gu.quad([tip, notch, right, right], [c; 4]);
     }
 }
 

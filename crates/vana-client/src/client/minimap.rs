@@ -74,7 +74,7 @@ pub fn prepare(gu: &GameUi, w: &mut World, sw: f32) {
         .filter_map(|(&id, e)| Some(((e.pos.x, e.pos.z, radar::colour(radar::kind_bits(w, id, e), e.monstrosity, e.motion.status, true)? | 0x8000_0000, w.target == Some(id)), id)))
         .unzip();
     w.minimap_rect = Some(rect);
-    w.minimap_frame = Some(Frame { rect, pos: (w.pos.x, w.pos.z), facing, span: w.minimap_span.clamp(SPAN.0, SPAN.1), dots, ids, mix: 1.0 });
+    w.minimap_frame = Some(Frame { rect, pos: (w.pos.x, w.pos.z), facing, span: w.minimap_span.clamp(SPAN.0, SPAN.1), dots, ids, mix: overlay_opacity(w) });
 }
 
 /// Draws what `prepare` set up (after the HUD's clear, under the party / target windows and the menus).
@@ -121,4 +121,10 @@ mod tests {
         let ((x, y), s) = (r.px(-200.0, -1050.0), px_per_unit(&r));
         assert!((x as f32 + 200.0 * s).abs() <= 1.0 && (y as f32 - 1050.0 * s).abs() <= 1.0, "{x} {y}");
     }
+}
+
+/// The map overlay's opacity (its bundled mod's setting): the minimap's marker shades as the overlay's (user,
+/// 2026-10-25: the two markers alike).
+fn overlay_opacity(w: &World) -> f32 {
+    w.lua.setting("map-overlay", "opacity").and_then(|v| v.as_f64()).unwrap_or(0.6) as f32
 }

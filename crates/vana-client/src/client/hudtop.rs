@@ -651,7 +651,7 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         let side = (sw.min(sh) * 0.7).round();
         let s = super::minimap::px_per_unit(&region);
         let centre = ((region.ox as f32 + 256.0) / s, -(region.oy as f32 + 256.0) / s);
-        let me = Some(((num(1), num(2)), std::f32::consts::FRAC_PI_2, false));
+        let me = Some(((num(1), num(2)), std::f32::consts::FRAC_PI_2));
         o.draw_window(&mut gu, [(sw - side) / 2.0, (sh - side) / 2.0, side, side], centre, 512.0, 0.6, me);
         gu.save_png(width, height, [0.1, 0.2, 0.3], out)?;
         println!("wrote {} (map overlay)", out.display());
@@ -670,7 +670,7 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         let mut o = super::map::Overlay::new(zone, region, Some(std::sync::Arc::new(index)));
         o.wait_image(&mut gu);
         let dots = [(x + 5.0, z + 3.0, 0x8000_b040, false), (x - 8.0, z + 6.0, 0x8000_40f0, false), (x - 4.0, z - 12.0, 0x8030_60e0, false), (x + 10.0, z - 10.0, 0x8080_8080, true)];
-        o.draw_mini(&mut gu, rect, (x, z), std::f32::consts::FRAC_PI_2, num(6, 160.0), &dots, 1.0);
+        o.draw_mini(&mut gu, rect, (x, z), std::f32::consts::FRAC_PI_2, num(6, 160.0), &dots, 0.6);
         mini = Some(rect);
     }
     // --map ZONE,X,Z[,owned]: the map window as the main menu's Map opens it, the player facing north.

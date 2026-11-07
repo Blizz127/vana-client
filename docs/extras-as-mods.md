@@ -47,9 +47,13 @@ Done so far (checked live, Lnxcsfix):
 - **Map Overlay** (assets/mods/map-overlay): binds for Ctrl / Alt + O, `hud.map` with our marker (`me`, drawn as each
   UI draws it), a `hud.rect` outline (`line`) for the modern edge, `hud.on` drags to pan, the wheel through
   `input.on_mouse` to zoom at the pointer, Escape through `input.on_key` after the game's windows. Seen live: opened
-  with Ctrl+O and Alt+O at the 80 % carried over, zoomed, panned, closed by Escape and by Alt+O. The modern UI's name
-  plates now draw over it (the HUD stands under them). The minimap's marker no longer takes the overlay's opacity
-  (its map is opaque). A script's `act:wheel` now passes the mods' mouse filters, as the window's wheel does.
+  with Ctrl+O and Alt+O at the 80 % carried over, zoomed, panned, closed by Escape and by Alt+O. Compared shot for
+  shot with the built-in overlay (master) in both UIs: the same box, image, edge (rounded corners), marker and name
+  plates, and the minimap's marker shaded by the overlay's opacity (the minimap reads the mod's setting). To get
+  there the modern UI draws mods' HUD elements with its own painter (modern/hudmods.rs), as its own panels draw:
+  a mod's element looks as a built-in one does (user, 2026-11-06). Opened with no map yet, it plays the error sound
+  and stays open, the map showing once there is one, as the built-in did. A script's `act:wheel` now passes the mods'
+  mouse filters, as the window's wheel does.
 
 ## Order
 
