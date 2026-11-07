@@ -433,6 +433,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   window casts the -na spell for the party's worst ailment it can remove, Erase for the rest), and tells relayed into
   the other windows' logs (a setting). A Rust test routes each through ipc; seen live in one window (`//send all`
   running here, `//stna` with nothing to remove). Not tried with two windows (one account signs in one character).
+- **Gear Stats** (assets/mods/gear-stats; checkparam, GearInfo): `//gearstats` opens a window with the totals of the
+  stats on everything worn, read from each item's description and augments as the item window shows them; conditional
+  lines (pet, set, latent, weather, day...) are left out and DMG / Delay are not summed. A Rust test sums a set; seen
+  live with a Bronze Cap and a Copper Ring lent to Lnxcsfix (taken back). Not done: a /checked player's gear (the
+  inspect data does not reach mods), totals for Gearshift's rules.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
