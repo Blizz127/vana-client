@@ -21,6 +21,7 @@ end)
 | [`game.entities(filter?)`](#gameentities) | Every entity in the zone, optionally filtered by distance and kind. |
 | [`game.target()`](#gametarget) | Your current target. |
 | [`game.party()`](#gameparty) | Your party and alliance members. |
+| [`game.find_items(name, bags?)`](#gamefind_items) | Held items by name, in any bag or the ones given. |
 | [`game.items(bag)`](#gameitems) | The items in one bag. |
 | [`game.bag_size(bag)`](#gamebag_size) | How many slots a bag has. |
 | [`game.equipment()`](#gameequipment) | What you have equipped, by equipment slot. |
@@ -239,6 +240,34 @@ end
 ```
 
 Slots count from 1. Slot 0, where the server keeps your gil, is never in the list: use `game.gil()` for the gil.
+
+## `game.find_items`
+
+```lua
+game.find_items(name, bags?) -> table[]
+```
+
+The held items whose name or long log name is `name` (any case), bag by bag: what a gear set names, wherever it is.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | yes | The item's name or its log name (`"Hachi. Domaru +1"` or `"Hachiman Domaru +1"`). |
+| `bags` | `integer[]` | no | Only these bags (0 the inventory, 8 and 10..16 the wardrobes, as `game.items` numbers them); all when left out. |
+
+**Returns** a list of `{bag, slot, id, count, extdata, locked}`, as [`game.items`](#gameitems) gives them; empty when
+none is held.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
+  print(it.bag, it.slot)
+end
+```
 
 ## `game.bag_size`
 

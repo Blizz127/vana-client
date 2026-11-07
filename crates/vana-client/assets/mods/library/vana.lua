@@ -888,6 +888,12 @@ function game.items(bag) end
 ---@return integer?
 function game.bag_size(bag) end
 
+--- Held items whose name or long log name is `name` (any case), in the bags given (ids, as game.items) or all: {bag, slot, id, count, extdata, locked} each, bag by bag.
+---@param name string 
+---@param bags? integer[] 
+---@return table[]
+function game.find_items(name, bags) end
+
 --- What is equipped, by equipment slot (0 main .. 15 back): {bag, slot, id} (id nil when the slot is empty).
 ---@return table<integer, {bag: integer, slot: integer, id: integer?}>
 function game.equipment() end
@@ -1263,7 +1269,7 @@ function res.zone_text(zone, id) end
 ---@return integer?
 function res.zone_text_find(zone, prefix) end
 
---- An item's record (65535 gil): name, description, kind (general, usable, automaton, armor, weapon, maze, instinct, objective, instinct_catalogue, monster, roe_category, teleport_point, primer_category, primer_topic, currency), flags, stack, type, targets, level, slots, races, jobs (bits), superior_level, damage, delay, skill, max_charges, cast_time, use_delay, reuse_delay.
+--- An item's record (65535 gil): name, log_name (the long name the log uses), description, kind (general, usable, automaton, armor, weapon, maze, instinct, objective, instinct_catalogue, monster, roe_category, teleport_point, primer_category, primer_topic, currency), flags, stack, type, targets, level, slots, races, jobs (bits), superior_level, damage, delay, skill, max_charges, cast_time, use_delay, reuse_delay.
 ---@param id integer 
 ---@return table?
 function res.item(id) end

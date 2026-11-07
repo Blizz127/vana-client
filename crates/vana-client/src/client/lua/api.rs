@@ -771,6 +771,32 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // Held items by name (the short name or the long log name, any case), in the bags given or all, bag by bag.
+    game.set(
+        "find_items",
+        lua.create_function(|lua, (name, bags): (String, Option<Vec<u8>>)| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            let Some(info) = w.item_info.as_ref() else { return Ok(out) };
+            let named = |id: u16| info.item(id).is_some_and(|it| it.name.eq_ignore_ascii_case(&name) || it.singular.eq_ignore_ascii_case(&name));
+            for (&(bag, slot), &(id, count)) in w.inv.slots.iter().filter(|((b, s), _)| *s != 0 && bags.as_ref().is_none_or(|bs| bs.contains(b))) {
+                if !named(id) {
+                    continue;
+                }
+                let t = lua.create_table()?;
+                t.set("bag", bag)?;
+                t.set("slot", slot)?;
+                t.set("id", id)?;
+                t.set("count", count)?;
+                if let Some(x) = w.inv.ext.get(&(bag, slot)) {
+                    t.set("extdata", lua.create_string(x)?)?;
+                }
+                t.set("locked", w.inv.locks.get(&(bag, slot)).copied().unwrap_or(0))?;
+                out.push(t)?;
+            }
+            Ok(out)
+        })?,
+    )?;
     game.set(
         "bag_size",
         lua.create_function(|lua, bag: u8| {
@@ -946,6 +972,8 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let t = lua.create_table()?;
             t.set("id", id)?;
             t.set("name", it.name.as_str())?;
+            // The long name the log uses ("Hachiman Domaru +1" for "Hachi. Domaru +1").
+            t.set("log_name", it.singular.as_str())?;
             t.set("description", it.description.as_str())?;
             t.set("kind", it.kind.map(item_kind))?;
             t.set("flags", it.flags)?;

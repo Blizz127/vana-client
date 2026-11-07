@@ -68,6 +68,7 @@ loaded yet. A field the record's kind does not have is `0`.
 | --- | --- | --- |
 | `id` | `integer` | The item id. |
 | `name` | `string` | The item's name. |
+| `log_name` | `string` | The long name the chat log uses ("Hachiman Domaru +1" for "Hachi. Domaru +1"). |
 | `description` | `string` | Its description text (may be empty). |
 | `kind` | `string` | Which layout the record has, set by the id range: `"general"` (0x0000-0x0FFF, 0x2200-0x27FF, 0x7800-0x7BFF), `"usable"` (0x1000-0x1FFF), `"automaton"` (0x2000-0x21FF, automaton heads, frames and attachments), `"armor"` (0x2800-0x3FFF, 0x5A00-0x6FFF), `"weapon"` (0x4000-0x59FF), `"maze"` (0x7000-0x73FF, Maze Monger tabulae, vouchers and runes), `"instinct"` (0x7400-0x77FF, Monstrosity instincts), `"objective"` (0xE000-0xEFF7, Records of Eminence objectives), `"instinct_catalogue"` (0xEFF8-0xEFFF), `"monster"` (0xF000-0xF1FF, Monstrosity species), `"roe_category"` (0xF200-0xF5FF, Records of Eminence categories), `"teleport_point"` (0xF600-0xF613), `"primer_category"` (0xF620-0xF62F) and `"primer_topic"` (0xF630-0xF71F) for the Adventuring Primer, `"currency"` (0xFFFF, gil). |
 | `flags` | `integer` | Flag bits: 0x8000 Rare, 0x4000 Ex. |
