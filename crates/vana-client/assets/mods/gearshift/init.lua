@@ -82,6 +82,13 @@ events.on("frame", function()
 end)
 timer.every(0.4, lac.tick)
 
+-- For other mods (Bag Manager): the item names the loaded file's sets hold, and which file.
+mods.provide("gear_names", function()
+  if gs.loaded() then return { file = gs.file, names = gs.gear_names() } end
+  if lac.loaded() then return { file = lac.file, names = lac.gear_names() } end
+  return nil
+end)
+
 commands.register("gs", function(...) gs.command({ ... }) end)
 commands.register("lac", function(...) lac.command({ ... }) end)
 commands.register("gearshift", function(cmd)

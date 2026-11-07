@@ -467,6 +467,14 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   left out of the magic, ability and mount lists as they are shown and searched (the skillchain helper and the
   suggestions still see them; commands and macros still use them). Seen live (the user): the Mounts list with Raptor
   left out.
+- **Bag Manager** (assets/mods/bag-manager; organizer, itemizer, porter, Bellhop and kin): `//stow get <item> [count |
+  all]` fetches from any bag within reach into the inventory (the safe, storage and locker only in a Mog House), `//stow
+  put <item> [to <bag>] [all]` stows to the case, sack or satchel (or the bag named), `//stow gear` gathers the gear the
+  loaded Gearshift file names into the wardrobes (Gearshift now provides `gear_names`, from GearSwap and LuAshitacast
+  sets alike) and lists what is not within reach, `//stow tidy` sends the inventory's gear it does not name to the
+  case, sack or satchel. One move a moment apart. Seen live: a Wind Crystal stowed and fetched, a Lizard Helm gathered
+  from the case into the wardrobe, a Bronze Cap tidied away (both lent and taken back). `//bags` stays Inventory HUD's.
+  Not done: Porter Moogle slips, obis by day and weather.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
 

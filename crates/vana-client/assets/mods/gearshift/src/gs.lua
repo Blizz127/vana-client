@@ -483,6 +483,9 @@ end
 
 function M.loaded() return env ~= nil end
 
+-- The item names the loaded file's sets hold.
+function M.gear_names() return env and core.set_names(rawget(env, "sets"), slot_of) or {} end
+
 -- ---- The command path: lines that start actions ----
 
 local PREFIX = { ["/ma"] = "magic", ["/magic"] = "magic", ["/so"] = "magic", ["/song"] = "magic", ["/nin"] = "magic",

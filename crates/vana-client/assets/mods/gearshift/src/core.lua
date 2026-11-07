@@ -262,4 +262,29 @@ function M.res_id(act)
   return act.param
 end
 
+-- Every item name a profile's sets hold: tables walked for slot keys (`slot_of`), each value a name or a table with
+-- `name` / `Name`; nested sets followed once each.
+function M.set_names(root, slot_of)
+  local out, seen, found = {}, {}, {}
+  local function walk(t)
+    if type(t) ~= "table" or seen[t] then return end
+    seen[t] = true
+    for k, v in pairs(t) do
+      if slot_of(k) then
+        local n = type(v) == "string" and v or (type(v) == "table" and (rawget(v, "name") or rawget(v, "Name")))
+        local l = type(n) == "string" and n:lower() or ""
+        if l ~= "" and l ~= "empty" and l ~= "remove" and l ~= "ignore" and l ~= "displaced" and not found[l] then
+          found[l] = true
+          out[#out + 1] = n
+        end
+      elseif type(v) == "table" then
+        walk(v)
+      end
+    end
+  end
+  walk(root)
+  table.sort(out)
+  return out
+end
+
 return M

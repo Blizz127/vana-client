@@ -471,6 +471,9 @@ end
 
 function M.loaded() return profile ~= nil end
 
+-- The item names the loaded profile's sets hold.
+function M.gear_names() return type(profile) == "table" and core.set_names(profile.Sets, slot_of) or {} end
+
 -- ---- The action packet ----
 
 local PRE = { [3] = { "HandlePrecast", "set" }, [7] = { "HandleWeaponskill", "auto" }, [9] = { "HandleAbility", "auto" },
