@@ -62,15 +62,18 @@ function M.make(env, register, console)
       day = t.weekday, moon = t.moon_phase, moon_pct = t.moon, time = t.hour * 60 + t.minute, weather = game.weather(),
       language = "English", server = i.server }
   end
+  -- Every recast id has its entry, 0 when ready, as Windower's tables have them (files compare them unchecked).
   function ffxi.get_ability_recasts()
     local r = game.recasts() or {}
     local t = {}
+    for id = 0, 1023 do t[id] = 0 end
     for id, left in pairs(r.abilities or {}) do t[id] = left end
     return t
   end
   function ffxi.get_spell_recasts()
     local r = game.recasts() or {}
     local t = {}
+    for id = 0, 1023 do t[id] = 0 end
     for id, left in pairs(r.spells or {}) do t[id] = math.floor(left * 60) end
     return t
   end
@@ -126,7 +129,7 @@ function M.res()
     return t
   end
   return {
-    spells = lazy(function(id) local s = res.spell(id) return s and named(s.name, { id = id, mp_cost = s.mp, cast_time = s.cast_time, recast = s.recast, skill = s.skill, element = s.element, type = s.kind }) end),
+    spells = lazy(function(id) local s = res.spell(id) return s and named(s.name, { id = id, recast_id = id, mp_cost = s.mp, cast_time = s.cast_time, recast = s.recast, skill = s.skill, element = s.element, type = s.kind }) end),
     job_abilities = lazy(function(id) local a = res.ability(id + 0x200) return a and named(a.name, { id = id, recast_id = a.recast_id }) end),
     weapon_skills = lazy(function(id) local a = res.ability(id) return a and named(a.name, { id = id }) end),
     items = lazy(function(id) local i = res.item(id) return i and named(i.name, { id = id, enl = i.log_name, english_log = i.log_name }) end),

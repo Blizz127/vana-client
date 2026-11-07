@@ -83,8 +83,10 @@ events.on("zone_change", function(zone, previous) gs.user_event("zone change", z
 events.on("target_change", function(id) gs.user_event("target change", id) end)
 events.on("settings_changed", start)
 -- The first frame our main job is known loads its file (the mod can start before the server has said).
+local texts = require("src.texts")
 events.on("frame", function()
   core.decode_augments()
+  texts.frame()
   if not started and main_job() and main_job() ~= 0 then
     gs.sub = game.player().sub_job
     start()

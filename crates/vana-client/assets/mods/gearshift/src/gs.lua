@@ -202,7 +202,8 @@ local function spell_of(act, raw)
     s = { id = act.param, en = r.name, name = r.name, english = r.name, prefix = "/magic",
       type = GS.SPELL_TYPES[r.kind or 0] or "Unknown", skill = GS.SKILLS[r.skill or 0], skill_id = r.skill,
       element = GS.ELEMENTS[r.element or 15], element_id = r.element, mp_cost = r.mp or 0, cast_time = r.cast_time,
-      recast = r.recast, range = r.range, targets = targets_set(r.targets), action_type = "Magic", tp_cost = 0 }
+      recast = r.recast, recast_id = act.param, range = r.range, targets = targets_set(r.targets), action_type = "Magic",
+      tp_cost = 0 }
   elseif act.category == 16 then
     s = { id = 0, en = "Ranged", name = "Ranged", english = "Ranged", prefix = "/range", type = "Misc",
       element = "None", range = 25, targets = { Enemy = true }, action_type = "Ranged Attack" }
@@ -353,6 +354,12 @@ local function include(name, into)
   end
   if not lname:match("%.lua$") then lname = lname .. ".lua" end
   local path = search(lname)
+  -- GearSwap's own libraries where the player has no copy: modes (ours), the Organizer hook (nothing to do here).
+  if not path and lname == "modes.lua" then
+    env.M = env.M or require("src.modes")
+    return
+  end
+  if not path and lname == "organizer-lib.lua" then return end
   if not path then error("Cannot find the include file (" .. name .. ").", 2) end
   return run_file(path, into)
 end
@@ -431,7 +438,7 @@ local function make_env()
   e.windower = require("src.windower").make(e, function(name, f) user_events[#user_events + 1] = { name = name, f = f } return #user_events end, function(cmd) console(cmd) end)
   e.gearswap = { res = require("src.windower").res(), default_slot_map = core.SLOTS, encumbrance_table = {},
     gearswap_disabled = false, pathsearch = function(list) for _, n in ipairs(list) do local f = search(n:lower()) if f then return f end end end }
-  e.texts = { new = function() return setmetatable({}, { __index = function() return function() end end }) end }
+  e.texts = require("src.texts")
   e.coroutine = setmetatable({
     schedule = function(f, delay) timer.after(delay or 0, f) end,
     sleep = function(s) sleep(s) end,
@@ -462,6 +469,7 @@ end
 
 function M.unload()
   if env and M.file then run("file_unload", M.file) end
+  require("src.texts").clear_all()
   env, M.file, registry, user_events, unhandled, equips = nil, nil, {}, {}, {}, {}
 end
 
@@ -469,6 +477,8 @@ function M.load(path)
   M.unload()
   env = make_env()
   M.file = path
+  -- player, world, buffactive are there while the file's own body runs, as GearSwap has them.
+  refresh()
   local ok, err = pcall(run_file, path)
   if not ok then
     say("could not load " .. path .. ": " .. tostring(err))

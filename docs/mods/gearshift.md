@@ -26,7 +26,10 @@ Files a GearSwap file `include`s are looked for in the same GearSwap folders.
   `status_change`, `buff_change`, `sub_job_change` and `self_command`. `equip`, `set_combine`, `sets`, `empty`,
   `player`, `world`, `buffactive`, `pet`, `party`, `cancel_spell`, `change_target`, `disable` / `enable`,
   `midaction`, `send_command` (`input`, `wait`, `gs`, `bind` / `unbind`), `add_to_chat`, `include`, and the
-  `windower.ffxi` getters most files use.
+  `windower.ffxi` getters most files use. Two of GearSwap's own libraries are built in, used when you have no copy
+  of your own: `Modes.lua` (`M(...)` modes: `value`, `current`, `cycle`, `toggle`, `set`, `reset` and the rest) and
+  `organizer-lib` (nothing to do here). The `texts` library draws on the HUD: boxes with `${name}` fields, `\cs(r,g,b)`
+  colours, background, outline, position, size, show and hide.
 - **LuAshitacast profiles:** `OnLoad` / `OnUnload`, `HandleDefault` on every send tick while no action is under way,
   `HandlePrecast` / `HandleMidcast`, `HandlePreshot` / `HandleMidshot`, `HandleAbility`, `HandleWeaponskill`,
   `HandleItem` around every action (menus too), `HandleCommand` from `/lac fwd`. `gFunc.Equip`, `EquipSet`,
@@ -61,9 +64,9 @@ order in one batch.
 ## Not there yet
 
 - GearSwap: `filtered_action`, `cast_delay`, `move_spell_target`, pet hooks, `pet_change`, `buff_refresh`,
-  `party_buff_change`, `indi_change`; `export` and `validate`; on-screen texts from `windower.text` and the `texts`
-  library draw nothing. Mote's libraries are not shipped (they carry no licence): put your own copies beside your
-  files.
+  `party_buff_change`, `indi_change`; `export` and `validate`; `windower.text` draws nothing (the `texts` library
+  does), and a `texts` box can't be dragged. Mote's other libraries (`Mote-Include` and its family) are not shipped
+  (they carry no licence): put your own copies beside your files.
 - LuAshitacast: `ChangeActionId`, `LockStyle`, `AddSet`, `CompareItem`, pet actions; augments are compared loosely
   (as GearSwap compares them), not with LuAshitacast's own wording; only the parts of `AshitaCore` most profiles use
   (chat commands, the player's jobs and levels).

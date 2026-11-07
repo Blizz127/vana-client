@@ -107,8 +107,9 @@ end
 
 local STATUS = { [0] = "idle", "engaged", "dead", "dead", "zoning", [33] = "resting" }
 local ELEMENT = { [0] = "fire", "ice", "wind", "earth", "thunder", "water", "light", "dark", [15] = "nonelemental" }
-local SKILL = { [32] = "divinemagic", "healingmagic", "enhancingmagic", "enfeeblingmagic", "elementalmagic", "darkmagic",
-  "summoning", "ninjutsu", "singing", [43] = "bluemagic", "geomancy" }
+local SKILL = { [32] = "divinemagic", [33] = "healingmagic", [34] = "enhancingmagic", [35] = "enfeeblingmagic",
+  [36] = "elementalmagic", [37] = "darkmagic", [38] = "summoning", [39] = "ninjutsu", [40] = "singing", [43] = "bluemagic",
+  [44] = "geomancy" }
 local SPELL_TYPE = { "whitemagic", "blackmagic", "summoning", "ninjutsu", "bardsong", "bluemagic" }
 local ABILITY_TYPE = { [10] = "runeenchantment", [102] = "ready", [173] = "bloodpactrage", [174] = "bloodpactward",
   [193] = "corsairroll", [195] = "quickdraw", [217] = "waltz" }
