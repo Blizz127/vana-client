@@ -35,7 +35,7 @@ local args          -- a <commands> match's arguments: {text, [0] = word, ...}
 local warned = {}
 local last_pos, moving = nil, false
 local depth = 0     -- commands run from commands
-local bypass = 0    -- lines sent "not seen by Ashita" (mode >= 0)
+local through = {}  -- lines sent "not seen by Ashita" (mode >= 0): let through once
 
 local function say(text) chat.add("Gearshift: " .. text) end
 local function warn(text)
@@ -777,11 +777,10 @@ local crawl
 
 local function run_line(text, mode, delay)
   local function go()
-    if mode >= 0 then bypass = bypass + 1 end
+    if mode >= 0 and text:sub(1, 2) ~= "//" then through[text] = (through[text] or 0) + 1 end
     depth = depth + 1
     if depth <= 8 then commands.run(text) else warn("commands calling commands too deep: " .. text) end
     depth = depth - 1
-    if mode >= 0 then bypass = bypass - 1 end
   end
   if delay then timer.after(math.max(delay, 1) / 1000, go) else go() end
 end
@@ -1174,6 +1173,8 @@ function M.find()
   local short = res.job(p.main_job or 0)
   if not short then return nil end
   return find_file("ashitacast/" .. p.name .. "_" .. p.id .. "/", short .. ".xml") or find_file("ashitacast/", p.name .. "_" .. short .. ".xml")
+    -- LegacyAC (Ashitacast v3) keeps its files in a folder of its own.
+    or find_file("legacyac/", p.name .. "_" .. short .. ".xml")
 end
 
 local function strip_comments(s)
@@ -1437,7 +1438,11 @@ end
 
 -- A typed line a <commands> child takes (the shortest matching input wins): false when taken.
 function M.typed(line)
-  if not prof or bypass > 0 then return nil end
+  if not prof then return nil end
+  if through[line] then
+    through[line] = through[line] > 1 and through[line] - 1 or nil
+    return nil
+  end
   local cmds = prof.sec.commands
   if not cmds then return nil end
   local best, best_input
