@@ -276,6 +276,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   arrival, faded in and out. Seen live: Northern and Southern San d'Oria.
 - **Item Use Queue** (assets/mods/use-all; Pouches, nomorecrap): `//useall <item>` uses each copy in the inventory in
   turn, the next once the last use finished (or was refused); `//useall stop`. Seen live: two bolt quivers opened.
+- **Hide Rules** (assets/mods/hide-rules; hideparty, minimapmon, minimapcontrol, HXIUIBegone and kin): HUD pieces
+  (party, target, buffs, compass, minimap, cast, timers, regime, log, plates) hidden in the Mog House, in zones named,
+  while engaged or in events, each by its own setting, through ui.native.hide. Seen live: party and minimap hidden in
+  Southern San d'Oria.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

@@ -1,0 +1,40 @@
+name = "Hide Rules"
+version = "1.0.0"
+description = "Hides chosen parts of the interface in the Mog House, in town zones you name, while fighting or in cutscenes (the hide-the-HUD add-ons)."
+permissions = ["ui.native"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Hide Rules"
+help = "Hides the parts named below where the rule says. Parts: party, target, buffs, compass, minimap, cast, timers, regime, log."
+
+[settings.moghouse]
+type = "string"
+default = ""
+label = "In the Mog House"
+help = "Parts to hide in the Mog House, separated by commas."
+
+[settings.zones]
+type = "string"
+default = ""
+label = "Zones"
+help = "Zones for the rule below, separated by commas (e.g. Port Jeuno, Bastok Markets)."
+
+[settings.in_zones]
+type = "string"
+default = ""
+label = "In Those Zones"
+help = "Parts to hide in the zones above."
+
+[settings.fighting]
+type = "string"
+default = ""
+label = "While Fighting"
+help = "Parts to hide while you are engaged."
+
+[settings.events]
+type = "string"
+default = ""
+label = "In Cutscenes"
+help = "Parts to hide during cutscenes and other events."
