@@ -310,6 +310,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   total for the skill (`(+0.5 this session)`, through filters.battle); `//skills` lists combat and magic skills with
   level, cap and gain. Seen live: hand-to-hand rises in two hare fights. Not yet: craft skills, the synthesis result
   shown at the start.
+- **Swing Timer** (assets/mods/swing-timer; nextauto): while engaged, a small bar over the middle fills toward the
+  next auto-attack, from our last melee round and the main weapon's delay (unarmed 480 added for hand-to-hand; haste
+  and dual wield not counted). Seen live in a hare fight.
 - Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
