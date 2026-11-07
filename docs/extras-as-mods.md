@@ -477,6 +477,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   sets alike) and lists what is not within reach, `//stow tidy` sends the inventory's gear it does not name to the
   case, sack or satchel. One move a moment apart. Seen live: a Wind Crystal stowed and fetched, a Lizard Helm gathered
   from the case into the wardrobe, a Bronze Cap tidied away (both lent and taken back). `//bags` stays Inventory HUD's.
+- **Steady Cast** (assets/mods/steady-cast; Stubborn's other half, castdelay): a spell (and by setting an item or a
+  ranged shot) started while we move is held, with every packet sent after it, until we have stood still 0.15 s, or
+  3 s at most; then all of it goes in order. It loads after Gearshift, so Gearshift's gear before the action goes at
+  once and its midcast gear waits behind the held action. The call-for-help block of the same row is the client's own
+  (/blockhelp).
   Not done: Porter Moogle slips, obis by day and weather.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
