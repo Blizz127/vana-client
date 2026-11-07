@@ -250,7 +250,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     };
     super::topbar::draw(m, ctx, &top);
     let (mut changed, mut chat_font) = (false, opts.chat_font);
-    let mut p = Panels { m, ctx, gu: None, layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), retail: Default::default(), focus: Some("target"), hidden: Vec::new(), placed: Default::default(), opacity: Default::default() };
+    let mut p = Panels { m, ctx, gu: None, layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), rooms: Default::default(), retail: Default::default(), focus: Some("target"), hidden: Vec::new(), placed: Default::default(), opacity: Default::default() };
     // The chat window first, as the layer draws it: the location panel sits on it.
     let wh = [0x80, 0x80, 0x80, 0x80];
     let lines = vec![
@@ -266,7 +266,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         // The game's own glyphs and an event item name (1e 02 .. 1e 01).
         (String::new(), "Kupipi : A pre\u{FF5E}sent? Take this \u{100402}Fire Crystal\u{100401} to the \u{F87B2}Mog House\u{F87B3}.", wh, NO_MODE),
     ];
-    let shown = chat::Shown { rows: 8.0, draw_n: 8, pending: 0, slide: 0 };
+    let shown = chat::Shown { rows: 8.0, full: 8.0, draw_n: 8, pending: 0, slide: 0 };
     // A selection from the second line's middle into the fourth (chatsel.rs).
     *m.log_sel.borrow_mut() = Some(super::chatsel::LogSel { anchor: (1, 14), head: (3, 22) });
     let mut unread = [0; 11];

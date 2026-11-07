@@ -155,3 +155,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   hooks follow the command lines (filters.typed); LuAshitacast's every action. A Rust test runs both kinds of file
   against a fake game; seen live (Lnxcsfix, Berserk): a GearSwap file's precast, midcast and aftercast swaps, and a
   profile's HandleAbility and HandleDefault, the gear on the server as sent. What is left is in its doc.
+- **Hotbars** (assets/mods/hotbar, docs/mods/hotbars.md): Arusia's VCHotbar (PR #88), taken in and finished: bars of
+  multi-line macros by main job and sub job, each slot its action's icon (the first /ma, /ja, /pet, /ws or /item
+  line) with its recast shade and time, its macro in a tip; click, right-click menu, drag onto another slot to swap,
+  hotkeys per bar, the manager window. The bars stand over the chat window at its full height (ui.native.rect's
+  `room`; the classic log too), so they stay put while it grows and folds. Seen live in both UIs.

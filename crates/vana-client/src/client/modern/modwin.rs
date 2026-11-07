@@ -227,7 +227,7 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
                         }
                     }
                 }
-                let out = kit::list(ui, m, ("mod list", &win.id, id), rows.len(), Some(*at), here, here, h, (h + 2.0) * *height as f32, |_| false, |ui, row| {
+                let out = kit::list(ui, m, ("mod list", &win.id, id), rows.len(), Some(*at), here, here, h, kit::list_height(ui, h, *height), |_| false, |ui, row| {
                     let r = &rows[row.index];
                     let ink = r.colour.map_or_else(|| kit::ink(m, row), rgba);
                     let cy = row.rect.center().y;

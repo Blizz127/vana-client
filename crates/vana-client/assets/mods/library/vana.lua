@@ -466,7 +466,7 @@ function hud.remove(id) end
 --- Removes every element of the mod.
 function hud.clear() end
 
---- An element's handler: a left or right press on it is the mod's (not the game's). handler(id, e), e = {kind, id, button, x, y, dx, dy} in window pixels: 'click' at the release; a press that moves 4 pixels is a drag instead: 'drag_start' (where it went down), 'drag' (at most once a frame; dx, dy from the start) and 'drag_end' with over = the mod's element under the release, whose handler gets 'drop' {from = the dragged element}; 'mouse_enter' and 'mouse_leave' {x, y} as the pointer comes and goes. It is the player's input: actions may act here (not on mouse_enter / mouse_leave). Removed with its element (hud.remove, hud.clear) or by hud.off.
+--- An element's handler: a left or right press on it is the mod's (not the game's). handler(id, e), e = {kind, id, button, x, y, dx, dy} in window pixels: 'click' at the release; a press that moves 4 pixels is a drag instead: 'drag_start' (where it went down), 'drag' (at most once a frame; dx, dy from the start) and 'drag_end' with over = the mod's topmost other element with a handler under the release, which gets 'drop' {from = the dragged element}; 'mouse_enter' and 'mouse_leave' {x, y} as the pointer comes and goes. It is the player's input: actions may act here (not on mouse_enter / mouse_leave). Removed with its element (hud.remove, hud.clear) or by hud.off.
 ---@param id string 
 ---@param handler fun(id: string, e: table) 
 function hud.on(id, handler) end
@@ -528,9 +528,9 @@ function ui.native.slot(slot, value) end
 ---@param place? {x: number?, y: number?, scale: number?, origin: string?, alpha: number?} nil gives it back
 function ui.native.place(panel, place) end
 
---- Where a modern panel was drawn, in window pixels: {name, x, y, w, h, shown}; shown is false while it is not drawn (hidden, or closed), and the rect is where it last was; one a mod hides is where it would stand now (its last size). nil before it was ever drawn or hidden, and in the classic UI.
+--- Where a modern panel was drawn, in window pixels: {name, x, y, w, h, shown}; shown is false while it is not drawn (hidden, or closed), and the rect is where it last was; one a mod hides is where it would stand now (its last size). The chat window, which grows with its lines and folds into its bottom edge when idle, also has room {x, y, w, h}: where it stands at its full height. nil before it was ever drawn or hidden; in the classic UI nil but for chat: the log window (log window 2 with it when that stands over or beside it), its room at the most lines it opens to.
 ---@param panel string 
----@return {name: string, x: integer, y: integer, w: integer, h: integer, shown: boolean}?
+---@return {name: string, x: integer, y: integer, w: integer, h: integer, shown: boolean, room: {x: integer, y: integer, w: integer, h: integer}?}?
 function ui.native.rect(panel) end
 
 --- Every modern panel a mod may name: {name, about, hideable, movable, shown, placed_by (the mod placing it)} with x, y, w, h once it was drawn.

@@ -377,11 +377,11 @@ pub(super) fn hud_release(host: &mut super::Host, button: MouseButton) {
         host.hud_events.push((m, id, hud_event("click", button, at, at)));
         return;
     }
-    let over = super::hud::top_of(host, &m, at.0, at.1);
+    let over = super::hud::drop_target(host, &m, &id, at.0, at.1);
     let mut e = hud_event("drag_end", button, at, start);
     e["over"] = over.clone().into();
     host.hud_events.push((m.clone(), id.clone(), e));
-    if let Some(o) = over.filter(|o| *o != id) {
+    if let Some(o) = over {
         let mut d = hud_event("drop", button, at, start);
         d["from"] = id.into();
         host.hud_events.push((m, o, d));

@@ -324,7 +324,7 @@ impl Modern {
         let had_own = own.is_some();
         let mut layout = own.or_else(|| cfg.modern_places.get(&w.name).cloned()).unwrap_or_default();
         let mut changed = false;
-        let mut p = Panels { m: self, ctx, gu: Some(gu), layout: &mut layout, vis, changed: &mut changed, chat_font: &mut cfg.modern_chat_font, battle_in_all: &mut cfg.modern_battle_in_all, condense: &mut cfg.modern_condense, chat_hidden: &mut cfg.modern_chat_hidden, folded: &mut cfg.modern_folded, scan_kinds: &mut cfg.modern_scan_kinds, this: HashMap::new(), retail: HashMap::new(), focus, hidden: modern_hidden(w), placed: w.lua.placed(), opacity: w.lua.window_opacities(&w.window_opacity) };
+        let mut p = Panels { m: self, ctx, gu: Some(gu), layout: &mut layout, vis, changed: &mut changed, chat_font: &mut cfg.modern_chat_font, battle_in_all: &mut cfg.modern_battle_in_all, condense: &mut cfg.modern_condense, chat_hidden: &mut cfg.modern_chat_hidden, folded: &mut cfg.modern_folded, scan_kinds: &mut cfg.modern_scan_kinds, this: HashMap::new(), rooms: HashMap::new(), retail: HashMap::new(), focus, hidden: modern_hidden(w), placed: w.lua.placed(), opacity: w.lua.window_opacities(&w.window_opacity) };
         // The chat window first: what sits on it places by this frame's height.
         self.chat_edge.set(None);
         chat::panel(&mut p, w);
@@ -392,7 +392,9 @@ impl Modern {
         let ppp = ctx.pixels_per_point();
         let px = |r: &Rect| [r.min.x * ppp, r.min.y * ppp, r.width() * ppp, r.height() * ppp];
         let ghosts = std::mem::take(&mut *self.ghosts.borrow_mut());
+        let rooms = std::mem::take(&mut p.rooms);
         w.lua.set_native_rects(this.iter().map(|(k, r)| (k.clone(), px(r))).collect(), ghosts.iter().map(|(k, r)| (k.clone(), px(r))).collect());
+        w.lua.set_native_rooms(rooms.iter().map(|(k, r)| (k.clone(), px(r))).collect());
         *self.rects.borrow_mut() = this;
         if changed {
             cfg.modern_places.insert(w.name.clone(), layout.clone());
@@ -533,6 +535,8 @@ struct Panels<'a> {
     scan_kinds: &'a mut u8,
     /// The panels drawn this frame, as others dock on them (the chat window while it fades: its bottom edge).
     this: HashMap<String, Rect>,
+    /// The whole room of the panels drawn folded or growing this frame (Show::full).
+    rooms: HashMap<String, Rect>,
     /// Places retail works out this frame (the minimap left of the windows at the edge): the default until moved.
     retail: HashMap<String, Place>,
     /// The panel with the keys (focus_panel): drawn in the focused frame.
@@ -893,11 +897,13 @@ struct Show<'s> {
     alpha: f32,
     fold: f32,
     cap: f32,
+    /// The height it grows back to, when it folds or grows (the chat window): its whole room for ui.native.rect.
+    full: Option<f32>,
 }
 
 impl Default for Show<'_> {
     fn default() -> Self {
-        Self { title: None, size: Vec2::ZERO, resizable: false, at: None, frame: "window_normal", height: None, alpha: 1.0, fold: 1.0, cap: 0.0 }
+        Self { title: None, size: Vec2::ZERO, resizable: false, at: None, frame: "window_normal", height: None, alpha: 1.0, fold: 1.0, cap: 0.0, full: None }
     }
 }
 
@@ -1203,6 +1209,9 @@ impl<'a> Panels<'a> {
             log::debug!("panel {id}: pos {pos:?} h {h} rect {r:?} showing {showing:?} dock {:?}", place.dock);
         }
         self.this.insert(id.to_string(), showing);
+        if let Some(fh) = o.full {
+            self.rooms.insert(id.to_string(), zoom * Rect::from_min_max(pos2(r.min.x, r.max.y - fh), r.max));
+        }
         if at.is_some() {
             return Some(showing);
         }
@@ -1558,7 +1567,7 @@ mod panel_tests {
             let mut o = ctx.run_ui(raw, |ui| {
                 let ctx = ui.ctx();
                 let (mut changed, mut chat_font) = (false, 14.0);
-                let mut p = Panels { m: &m, ctx, gu: None, layout: &mut layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), retail: Default::default(), focus: None, hidden: Vec::new(), placed: Default::default(), opacity: Default::default() };
+                let mut p = Panels { m: &m, ctx, gu: None, layout: &mut layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), rooms: Default::default(), retail: Default::default(), focus: None, hidden: Vec::new(), placed: Default::default(), opacity: Default::default() };
                 let combat = p.panel("combat", None, 200.0, |ui| {
                     ui.label("Attack");
                 });
@@ -1601,7 +1610,7 @@ mod panel_tests {
                 let ctx = ui.ctx();
                 let (mut changed, mut chat_font) = (false, 14.0);
                 let placed = placed.map(|p| HashMap::from([("focus".to_string(), p)])).unwrap_or_default();
-                let mut p = Panels { m: &m, ctx, gu: None, layout: &mut layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), retail: Default::default(), focus: None, hidden: Vec::new(), placed, opacity: Default::default() };
+                let mut p = Panels { m: &m, ctx, gu: None, layout: &mut layout, vis: Default::default(), changed: &mut changed, chat_font: &mut chat_font, battle_in_all: &mut true, condense: &mut true, chat_hidden: &mut Vec::new(), folded: &mut Default::default(), scan_kinds: &mut 7, this: Default::default(), rooms: Default::default(), retail: Default::default(), focus: None, hidden: Vec::new(), placed, opacity: Default::default() };
                 seen.push(p.panel("focus", None, 200.0, |ui| {
                     ui.label("Focus");
                 }));

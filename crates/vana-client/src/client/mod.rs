@@ -3454,6 +3454,21 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
     gu.log_top = Some(region[1]);
     gu.log_bottom = Some(region[1] + region[3]);
     gu.log_faded = region_faded;
+    // For mods (ui.native.rect "chat"): the log region and both windows at their full height.
+    if !world.modern {
+        let h1 = world.log.full_h();
+        let mut room = [log.rect[0], sh - 16.0 - h1, log.rect[2], h1];
+        if let Some(f) = &log2 {
+            let h2 = world.log2.full_h();
+            room = if second_mode == 2 {
+                let h = h1.max(h2);
+                [room[0], sh - 16.0 - h, f.rect[0] + f.rect[2] - room[0], h]
+            } else {
+                [room[0], room[1] - h2, room[2].max(f.rect[2]), h1 + h2]
+            };
+        }
+        world.lua.set_classic_chat(region, !region_faded, room);
+    }
     // The modern chat window stands for the log: stacked windows 2 px above the part of it showing (as it fades it
     // folds into its bottom edge).
     if world.modern

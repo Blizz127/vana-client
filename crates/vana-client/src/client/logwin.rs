@@ -1109,6 +1109,11 @@ impl LogWin {
         LogFrame { rect: second_rect(mode, w1, w, h), lines: self.lines(), alpha: self.anim.alpha() }
     }
 
+    /// The frame's height at its max lines (the step's target with every line open).
+    pub fn full_h(&self) -> f32 {
+        (134 + (self.cfg.max as i32 - 8) * 16) as f32
+    }
+
     /// The frame's rect (x 16, bottom H - 16, the height the step eased), its lines and the fade's alpha.
     pub fn frame(&mut self, sw: f32, sh: f32) -> LogFrame {
         let w = text_width(sw, self.cfg.pct) + 14.0;

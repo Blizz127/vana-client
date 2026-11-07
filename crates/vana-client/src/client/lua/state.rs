@@ -24,6 +24,8 @@ pub(super) struct FrameInfo {
     pub placed: std::collections::BTreeMap<String, (String, Placed)>,
     /// The modern panels as last drawn, in window pixels, and whether drawn last frame (ui.native.rect).
     pub native_rects: std::collections::BTreeMap<String, ([f32; 4], bool)>,
+    /// The whole room of the modern panels that fold or grow (the chat window), as last drawn.
+    pub native_rooms: std::collections::BTreeMap<String, [f32; 4]>,
     /// The modern UI's look mods changed (ui.skin).
     pub skin: super::skin::Skin,
     /// The modern UI's pixels per point while it is on (the HUD's UI unit there).

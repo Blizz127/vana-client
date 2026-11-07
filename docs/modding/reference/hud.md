@@ -433,8 +433,8 @@ it away.
 - **Drag:** a press that moves 4 pixels or more is a drag. The handler gets `"drag_start"` (at the place the button
   went down), `"drag"` as the pointer moves (at most once a frame), and `"drag_end"` at the release, wherever the
   pointer is by then. `dx` and `dy` are the pointer's offset from where the button went down. `drag_end` names your
-  topmost element under the pointer in `over`; when it is another element with a handler, that one gets `"drop"`
-  with the dragged element in `from`. That is enough to drag one slot onto another, or to move a bar: set its `x` and
+  topmost other element with a handler under the pointer in `over` (an icon or a label over a slot is passed by), and
+  that one gets `"drop"` with the dragged element in `from`. That is enough to drag one slot onto another, or to move a bar: set its `x` and
   `y` from `dx` and `dy` while it drags.
 - **Pointer:** `"mouse_enter"` and `"mouse_leave"` come as the pointer comes onto the element and leaves it (with
   `x` and `y` only). Elements with a `tip` show it on their own; use these for anything more (a slot showing its
@@ -456,7 +456,7 @@ it away.
 | `button` | `string` | `"left"` or `"right"` (not on `"mouse_enter"` / `"mouse_leave"`). |
 | `x`, `y` | `integer` | The pointer, in window pixels. |
 | `dx`, `dy` | `integer` | The pointer's offset from where the button went down (0 for a click). |
-| `over` | `string` or `nil` | `"drag_end"` only: your topmost element under the pointer at the release. |
+| `over` | `string` or `nil` | `"drag_end"` only: your topmost other element with a handler under the pointer at the release. |
 | `from` | `string` | `"drop"` only: the element that was dragged. |
 
 **Returns** nothing.

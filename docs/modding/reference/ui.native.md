@@ -111,7 +111,8 @@ end)
 In the modern UI the HUD and the menus are panels, each with a name. `ui.native.hide` takes the names marked
 "hides" (none of them takes the keys), `ui.native.place` those marked "moves" (the edge windows stay on their edge),
 and `ui.native.rect`, `ui.native.panels` and a HUD element's `anchor` take every name. In the classic UI only the
-[HUD pieces](#hud-pieces) hide; the rest of this works in the modern UI.
+[HUD pieces](#hud-pieces) hide, and `ui.native.rect` knows only `"chat"` (the log window); the rest of this works in
+the modern UI.
 
 | Panel | Hides | Moves | What it is |
 | --- | --- | --- | --- |
@@ -496,14 +497,21 @@ had, with `shown = false`. A panel a mod hides has the place it would stand at n
 sit on another move with it), with no height if it has never been drawn: anchor to such a panel by the corner its place
 keeps (the location panel stands on the chat window, so its bottom).
 
+The chat window grows with its lines and folds into its bottom edge when idle, and what stands on it moves with it.
+Its rect also has `room`, `{x, y, w, h}`: where it stands at its full height. Place something over `room.y` to keep it
+still while the chat window grows and folds (the Hotbars mod does).
+
+In the classic UI only `"chat"` has a rect: the log window, with log window 2 when that stands over or beside it, and
+its `room` at the most lines the windows open to.
+
 **Parameters**
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `panel` | `string` | yes | A name from the [Modern panels](#modern-panels) table. |
 
-**Returns** `table?`: `{name, x, y, w, h, shown}`, or `nil` when the panel has been neither drawn nor hidden since
-login, and in the classic UI.
+**Returns** `table?`: `{name, x, y, w, h, shown}` (and `room` for the chat window), or `nil` when the panel has been neither drawn nor hidden since
+login, and in the classic UI for every panel but `"chat"`.
 
 **Errors** An unknown name: `no panel "..."`, with the list.
 

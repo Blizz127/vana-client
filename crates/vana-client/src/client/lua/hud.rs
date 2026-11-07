@@ -617,10 +617,14 @@ pub(super) fn hit(host: &super::Host, x: f64, y: f64) -> Option<(String, String)
     under(host, x, y, false)
 }
 
-/// Mod `m`'s topmost element under a window pixel (where a drag ends).
-pub(super) fn top_of(host: &super::Host, m: &str, x: f64, y: f64) -> Option<String> {
+/// Mod `m`'s topmost element with a handler under a window pixel, other than `dragged` (where a drag ends).
+pub(super) fn drop_target(host: &super::Host, m: &str, dragged: &str, x: f64, y: f64) -> Option<String> {
     let f = host.info.borrow();
-    f.hud_rects.iter().rev().find(|(mm, _, r)| mm == m && inside(r, x as f32, y as f32)).map(|(_, id, _)| id.clone())
+    let vm = host.vms.iter().find(|v| v.manifest.id == m)?;
+    let st = vm.st.borrow();
+    f.hud_rects.iter().rev()
+        .find(|(mm, id, r)| mm == m && id != dragged && inside(r, x as f32, y as f32) && st.hud_handlers.iter().any(|h| h.0 == *id))
+        .map(|(_, id, _)| id.clone())
 }
 
 /// The element under the pointer (one with a handler or a tooltip): mouse_leave and mouse_enter as it changes.

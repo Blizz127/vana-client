@@ -217,14 +217,21 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             Ok(())
         })?,
     )?;
-    let rect = |lua: &Lua, name: &str, r: [f32; 4], shown: bool| -> mlua::Result<Table> {
-        let t = lua.create_table()?;
+    let rect = |lua: &Lua, name: &str, r: [f32; 4], shown: bool, room: Option<&[f32; 4]>| -> mlua::Result<Table> {
+        let xywh = |r: &[f32; 4]| -> mlua::Result<Table> {
+            let t = lua.create_table()?;
+            t.set("x", r[0].round() as i64)?;
+            t.set("y", r[1].round() as i64)?;
+            t.set("w", r[2].round() as i64)?;
+            t.set("h", r[3].round() as i64)?;
+            Ok(t)
+        };
+        let t = xywh(&r)?;
         t.set("name", name)?;
-        t.set("x", r[0].round() as i64)?;
-        t.set("y", r[1].round() as i64)?;
-        t.set("w", r[2].round() as i64)?;
-        t.set("h", r[3].round() as i64)?;
         t.set("shown", shown)?;
+        if let Some(room) = room {
+            t.set("room", xywh(room)?)?;
+        }
         Ok(t)
     };
     t.set(
@@ -233,7 +240,7 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             find_panel(&name)?;
             let info = info(lua);
             let f = info.borrow();
-            f.native_rects.get(&name).map(|(r, shown)| rect(lua, &name, *r, *shown)).transpose()
+            f.native_rects.get(&name).map(|(r, shown)| rect(lua, &name, *r, *shown, f.native_rooms.get(&name))).transpose()
         })?,
     )?;
     t.set(
@@ -244,7 +251,7 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             let out = lua.create_table()?;
             for p in PANELS {
                 let t = match f.native_rects.get(p.name) {
-                    Some((r, shown)) => rect(lua, p.name, *r, *shown)?,
+                    Some((r, shown)) => rect(lua, p.name, *r, *shown, f.native_rooms.get(p.name))?,
                     None => {
                         let t = lua.create_table()?;
                         t.set("name", p.name)?;

@@ -502,6 +502,8 @@ pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timer
 
 const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
+    "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
+        "src/stock.lua"],
 ];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
@@ -1627,6 +1629,23 @@ impl Host {
         }
     }
 
+    /// The classic log region (ui.native.rect's "chat" there), in layout units: as drawn, and at its full height.
+    pub(in crate::client) fn set_classic_chat(&self, drawn: [f32; 4], shown: bool, room: [f32; 4]) {
+        let mut f = self.info.borrow_mut();
+        let (kx, ky) = f.k;
+        if kx <= 0.0 || ky <= 0.0 {
+            return;
+        }
+        let px = |r: [f32; 4]| [r[0] / kx, r[1] / ky, r[2] / kx, r[3] / ky];
+        f.native_rects.insert("chat".into(), (px(drawn), shown));
+        f.native_rooms.insert("chat".into(), px(room));
+    }
+
+    /// The whole room of the modern panels drawn folded or growing this frame; others keep their last.
+    pub(in crate::client) fn set_native_rooms(&self, rooms: Vec<(String, [f32; 4])>) {
+        self.info.borrow_mut().native_rooms.extend(rooms);
+    }
+
     /// The mods' look for the modern UI, when it changed since version `seen`.
     pub(in crate::client) fn skin_since(&self, seen: u64) -> Option<skin::Skin> {
         let f = self.info.borrow();
@@ -1938,6 +1957,55 @@ mod tests {
         assert_eq!(gs, "050 050 01A 050");
         // LuAshitacast: its precast is one equipset, its midcast single equips.
         assert_eq!(lac, "051 01A 050");
+    }
+
+    /// Hotbars: a macro's first action names its icon and recast; a drag swaps two slots, in the sub job's set when
+    /// either slot comes from it.
+    #[test]
+    fn hotbar_actions_and_swap() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "hotbar").unwrap().2;
+        let vm = Vm::new(bundled_manifest("hotbar").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            res = setmetatable({
+              spell = function(id) if id == 1 then return { name = "Cure" } end end,
+              ability = function(id)
+                if id == 0x20 then return { name = "Raging Axe" } end
+                if id == 0x210 then return { name = "Provoke", recast_id = 5 } end
+              end,
+            }, { __index = function() return function() return nil end end })
+            game.find_items = function(name) if name == "potion" then return { { id = 4112 } } end return {} end
+            local a = require("src.actions")
+            local p = a.of({ lines = { "/echo go", '/ja "Provoke" <t>' } })
+            assert(p.kind == "ability" and p.id == 0x210 and p.recast_id == 5)
+            assert(a.of({ lines = { "/ma Cure <me>" } }).id == 1)
+            assert(a.of({ lines = { '/ws "Raging Axe" <t>' } }).id == 0x20)
+            assert(a.of({ lines = { '/item "Potion" <me>' } }).id == 4112)
+            assert(a.of({ lines = { "/echo nothing" } }) == false)
+            local r = { spells = {}, abilities = { [5] = 15 }, totals = { spells = {}, abilities = { [5] = 30 } } }
+            local left, frac = a.recast(p, r)
+            assert(left == 15 and frac == 0.5)
+
+            local saved
+            local data = require("src.data")
+            data.init({ read = function() return nil end, write = function(_, t) saved = t end, decode = json.decode,
+              encode = json.encode })
+            local m = function(n) return { name = n, lines = { "/echo " .. n } } end
+            data.set_macro("WAR", nil, 1, 1, m("one"))
+            data.set_macro("WAR", nil, 1, 2, m("two"))
+            data.set_macro("WAR", "NIN", 1, 3, m("sub"))
+            data.swap("WAR", nil, 1, 1, 1, 2)
+            assert(data.resolve("WAR", nil, 1, 1).name == "two" and data.resolve("WAR", nil, 1, 2).name == "one")
+            -- Into the sub set: the main set keeps its macro under the sub set's.
+            data.swap("WAR", "NIN", 1, 3, 1, 4)
+            local four, from = data.resolve("WAR", "NIN", 1, 4)
+            assert(four.name == "sub" and from == "sub")
+            assert(data.resolve("WAR", "NIN", 1, 3) == nil)
+            assert(saved ~= nil)
+        "#;
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
     }
 
     /// ui.native.place / rect / panels and ui.skin: names checked, the permission asked, each change its mod's (another

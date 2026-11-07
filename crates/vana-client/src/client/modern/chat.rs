@@ -500,6 +500,8 @@ pub(super) fn candidates(ui: &mut Ui, m: &Modern, cands: &[String], sel: usize, 
 #[derive(Clone, Copy, Debug)]
 pub struct Shown {
     pub rows: f32,
+    /// The most rows it grows to (its room).
+    pub full: f32,
     pub draw_n: usize,
     pub pending: usize,
     pub slide: i32,
@@ -590,7 +592,7 @@ pub fn panel(p: &mut Panels, w: &mut World) {
     }
     ml.shown = Some(h.max(floor));
     let a = &ml.anim;
-    let shown = Shown { rows: h.max(floor), draw_n: a.draw_n(), pending: a.pending(), slide: a.off() + if rule.line_open { 16 } else { 0 } };
+    let shown = Shown { rows: h.max(floor), full: rule.cfg.max, draw_n: a.draw_n(), pending: a.pending(), slide: a.off() + if rule.line_open { 16 } else { 0 } };
     let mut v = view(w);
     v.unread = unread(m, w, *p.battle_in_all);
     draw(p, &v, shown, rule.line_open);
@@ -790,11 +792,13 @@ pub fn draw(p: &mut Panels, v: &ChatView, s: Shown, lift: bool) {
     let font = FontId::proportional(size);
     let row = p.ctx.fonts_mut(|f| f.row_height(&font));
     let total = chrome() + s.rows * row;
+    let full = chrome() + s.full * row;
     if total < 0.5 {
         // Gone: what sits on it sits on its bottom.
         let at = p.resolve("chat", &p.place("chat"), 0.0);
         let r = Rect::from_min_size(at, vec2(p.room("chat", default_room(p.ctx)).x, 0.0));
         p.this.insert("chat".into(), r);
+        p.rooms.insert("chat".into(), Rect::from_min_max(pos2(r.min.x, r.max.y - full), r.max));
         m.chat_edge.set(Some((r, true)));
         return;
     }
@@ -814,7 +818,7 @@ pub fn draw(p: &mut Panels, v: &ChatView, s: Shown, lift: bool) {
     // Below its chrome it folds into its bottom edge, what rides on it going down with it.
     // The hidden tabs out of `p` for the frame (the window's closure can't borrow it), back after.
     let hidden = std::mem::take(p.chat_hidden);
-    let r = p.show("chat", Show { size: default_room(p.ctx), resizable: true, height: Some(height), fold: total / height, ..Default::default() }, |ui, room| {
+    let r = p.show("chat", Show { size: default_room(p.ctx), resizable: true, height: Some(height), fold: total / height, full: Some(full), ..Default::default() }, |ui, room| {
         ui.spacing_mut().item_spacing.y = 0.0;
         button = tabs(ui, m, 1.0, &v.unread, &hidden);
         ui.add_space(GAP);

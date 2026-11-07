@@ -449,6 +449,11 @@ pub fn list(ui: &mut Ui, m: &Modern, id: impl std::hash::Hash + std::fmt::Debug,
     out
 }
 
+/// The height `list` takes for `rows` rows `h` tall (each row's spacing in).
+pub fn list_height(ui: &Ui, h: f32, rows: usize) -> f32 {
+    (h + 2.0 + ui.spacing().item_spacing.y) * rows as f32
+}
+
 /// A row's label colour (gold on the cursor in the row styles that do it, grey when off).
 pub fn ink(m: &Modern, row: Row) -> Color32 {
     rows::label_colour(m, row.cursor, row.off)
