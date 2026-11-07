@@ -199,9 +199,6 @@ pub struct Config {
     pub map_overlay_opacity: f32,
     /// Extra: Synthesize asks how many and repeats.
     pub synth_amount: bool,
-    /// Extra (the timestamp add-on): retail's chat timestamps (config 0xb5) on every log line; seconds while 0xb5 is
-    /// off.
-    pub stamp_all_lines: bool,
     /// Not retail (Settings' Lamp Lights): real point lights at the zones' lamps in place of their baked lamplight
     /// (client/lamps.rs).
     pub lamp_lights: bool,
@@ -447,7 +444,6 @@ impl Default for Config {
             window_opacity: Default::default(),
             map_overlay_opacity: 0.6,
             synth_amount: false,
-            stamp_all_lines: false,
             gm_window: false,
             notes_seen: env!("CARGO_PKG_VERSION").into(),
             lamp_lights: true,

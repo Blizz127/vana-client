@@ -169,6 +169,7 @@ drawn. A switch stays set while your mod is loaded: when the mod that set it las
 | `send_interval` | `number` | 50..1000 | `400` | Milliseconds between the packets the client sends to the game server. |
 | `wireframe` | `boolean` | | `false` | `true`: the scenery is drawn as lines, where the graphics card can draw them. |
 | `ttf_text` | `boolean` | | `false` | `true`: in the classic interface too, the game font's text (the log, the windows' text) is drawn in the interface's TrueType face; sprite numbers and captions stay as they are. |
+| `stamp_all_lines` | `boolean` | | `false` | `true`: the game's chat timestamps (its Config's) go on every log line, not only chat lines; with the game's timestamps off, every line gets hours, minutes and seconds. The bundled Timestamps mod sets it. |
 
 Numbers outside a range are clamped to it. A colour is `{r = ..., g = ..., b = ...}` or `{r, g, b}`.
 

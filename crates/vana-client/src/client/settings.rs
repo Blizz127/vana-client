@@ -23,7 +23,6 @@ pub struct Settings {
     pub party_tp: bool,
     pub map_opacity: u32,
     pub synth_amount: bool,
-    pub stamp_all_lines: bool,
     pub lamp_lights: bool,
     pub actor_shadows: u32,
     pub shadow_map: u32,
@@ -70,7 +69,6 @@ impl Settings {
             party_tp: c.party_tp,
             map_opacity: pct(c.map_overlay_opacity),
             synth_amount: c.synth_amount,
-            stamp_all_lines: c.stamp_all_lines,
             lamp_lights: c.lamp_lights,
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
@@ -114,7 +112,6 @@ impl Settings {
         c.party_tp = self.party_tp;
         c.map_overlay_opacity = self.map_opacity as f32 / 100.0;
         c.synth_amount = self.synth_amount;
-        c.stamp_all_lines = self.stamp_all_lines;
         c.lamp_lights = self.lamp_lights;
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
@@ -168,7 +165,6 @@ enum Val {
     SendRate,
     PartyTp,
     SynthAmount,
-    StampAll,
     LampLights,
     ActorShadows,
     ShadowMap,
@@ -359,7 +355,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[
         row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
-        row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
     ];
     match kind {
         Kind::Extras if modern => [&MAPS[..2], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
@@ -558,7 +553,6 @@ impl SettingsUi {
             Val::PadDeadZone => self.s.gamepad_dead,
             Val::MouseCamSpeed => self.s.mouse_camera_speed,
             Val::SynthAmount => self.s.synth_amount as u32,
-            Val::StampAll => self.s.stamp_all_lines as u32,
             Val::LampLights => self.s.lamp_lights as u32,
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
@@ -597,7 +591,6 @@ impl SettingsUi {
             Val::PadDeadZone => self.s.gamepad_dead = x,
             Val::MouseCamSpeed => self.s.mouse_camera_speed = x,
             Val::SynthAmount => self.s.synth_amount = x != 0,
-            Val::StampAll => self.s.stamp_all_lines = x != 0,
             Val::LampLights => self.s.lamp_lights = x != 0,
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
@@ -1750,11 +1743,11 @@ mod tests {
         ui.key(egui::Key::ArrowLeft);
         ui.key(egui::Key::Enter);
         assert!(ui.s.timers);
-        // Misc.: Timestamps on All Lines.
-        ui.goto(3, 2);
+        // Misc.: Synthesis Amount.
+        ui.goto(3, 1);
         ui.key(egui::Key::ArrowLeft);
         ui.key(egui::Key::Enter);
-        assert!(ui.s.stamp_all_lines);
+        assert!(ui.s.synth_amount);
     }
 
     /// Settings: Left / Right turn the page on a slider row, move between buttons on a buttons row, and always turn

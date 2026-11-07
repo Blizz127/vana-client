@@ -72,6 +72,10 @@ Done so far (checked live, Lnxcsfix):
   as they were (the old Rust test runs against the mod). Compared live against master in the modern UI: the same
   lines, colour codes, modes and colours, the same look in the log. Ready Lines seen live with a trust (Kupipi): her
   cures print, her "starts casting" lines do not; ours still print.
+- **Timestamps on All Lines** (assets/mods/timestamps): the client option `stamp_all_lines` (the log's stamp switch),
+  set while the mod's setting is on. The classic log rewraps its lines when the switch changes (the modern chat
+  stamps as it draws), so the lines that came before the mods started are stamped too. Compared with master in both
+  UIs.
 
 ## Order
 

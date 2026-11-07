@@ -6449,7 +6449,7 @@ struct World {
     /// Per-window opacity the player set (config `window_opacity`).
     window_opacity: std::collections::BTreeMap<String, f32>,
     synth_amount: bool,
-    /// Config `stamp_all_lines` (extra).
+    /// Retail's chat timestamps on every log line (client option stamp_all_lines; the bundled Timestamps mod).
     stamp_all_lines: bool,
     /// The skillchain helper's resonances and seen skills (client/skillchain.rs).
     skillchain: skillchain::Tracker,
@@ -7536,7 +7536,6 @@ impl App {
             w.synth_amount = self.cfg.synth_amount;
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
-            w.stamp_all_lines = self.cfg.stamp_all_lines;
             w.extra_timers = self.cfg.timers;
             w.extra_regime = self.cfg.regime;
             w.extra_skillchain = self.cfg.skillchain_helper;
@@ -8401,7 +8400,7 @@ impl App {
                             map_opacity: self.cfg.map_overlay_opacity,
                             window_opacity: self.cfg.window_opacity.clone(),
                             synth_amount: self.cfg.synth_amount,
-                            stamp_all_lines: self.cfg.stamp_all_lines,
+                            stamp_all_lines: false,
                             skillchain: Default::default(),
                             lamps: Default::default(),
                             shadow_slots: Default::default(),
