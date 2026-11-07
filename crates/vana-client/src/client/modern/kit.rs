@@ -286,12 +286,31 @@ fn setting_noted<R>(ui: &mut Ui, m: &Modern, heading: &str, note: &str, focus: b
 /// the controls out), ringed while the cursor is on it and scrolled into view when it has just come there. What
 /// `right` gave and the line's rect.
 pub fn line<R>(ui: &mut Ui, m: &Modern, label: &str, focus: bool, follow: bool, right: impl FnOnce(&mut Ui) -> R) -> (R, Rect) {
+    line_with(ui, m, label, focus, follow, false, right)
+}
+
+/// As `line`, the label on one line with its middle cut out to fit (the whole of it on hover): long file names.
+pub fn line_elided<R>(ui: &mut Ui, m: &Modern, label: &str, focus: bool, follow: bool, right: impl FnOnce(&mut Ui) -> R) -> (R, Rect) {
+    line_with(ui, m, label, focus, follow, true, right)
+}
+
+fn line_with<R>(ui: &mut Ui, m: &Modern, label: &str, focus: bool, follow: bool, one_line: bool, right: impl FnOnce(&mut Ui) -> R) -> (R, Rect) {
     let inner = ui.horizontal(|ui| {
         ui.set_min_height(34.0);
         let c = if focus { m.theme.color("gold") } else { m.theme.color("text") };
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let out = right(ui);
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| ui.add(egui::Label::new(egui::RichText::new(label).size(m.theme.small).color(c)).wrap()));
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                if one_line {
+                    let shown = elide_middle(ui, label, &FontId::proportional(m.theme.small), ui.available_width() - 8.0);
+                    let r = ui.add(egui::Label::new(egui::RichText::new(&shown).size(m.theme.small).color(c)).truncate());
+                    if shown != label {
+                        r.on_hover_text(label);
+                    }
+                } else {
+                    ui.add(egui::Label::new(egui::RichText::new(label).size(m.theme.small).color(c)).wrap());
+                }
+            });
             out
         })
         .inner
@@ -320,6 +339,30 @@ pub fn elide(ui: &Ui, s: &str, font: &FontId, w: f32) -> String {
         if width(format!("{}…", chars[..mid].iter().collect::<String>().trim_end())) <= w { lo = mid } else { hi = mid - 1 }
     }
     format!("{}…", chars[..lo].iter().collect::<String>().trim_end())
+}
+
+/// A click of the left button inside a row's rect this frame: the row is to take the cursor.
+pub fn row_clicked(ui: &Ui, r: Rect) -> bool {
+    ui.rect_contains_pointer(r) && ui.input(|i| i.pointer.primary_clicked())
+}
+
+/// `s` as it fits `w` in `font`: whole, or with its middle cut out for an ellipsis (as much of each end as fits).
+pub fn elide_middle(ui: &Ui, s: &str, font: &FontId, w: f32) -> String {
+    let width = |t: &str| ui.fonts_mut(|f| f.layout_no_wrap(t.to_string(), font.clone(), Color32::WHITE).size().x);
+    if width(s) <= w {
+        return s.to_string();
+    }
+    let chars: Vec<char> = s.chars().collect();
+    let cut = |k: usize| {
+        let (a, b) = (k.div_ceil(2), k / 2);
+        format!("{}\u{2026}{}", chars[..a].iter().collect::<String>(), chars[chars.len() - b..].iter().collect::<String>())
+    };
+    let (mut lo, mut hi) = (0, chars.len());
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        if width(&cut(mid)) <= w { lo = mid } else { hi = mid - 1 }
+    }
+    cut(lo)
 }
 
 /// A value's options as buttons, wrapping, the one held lit (`off` a bit each); the option clicked.

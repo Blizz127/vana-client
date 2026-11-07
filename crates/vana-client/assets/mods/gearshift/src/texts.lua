@@ -75,7 +75,7 @@ local function filled(s)
   end))
 end
 
--- Lines of runs {text, colour}: \cs(r,g,b) starts a colour, \cr goes back to the box's own.
+-- Lines of runs {text, colour}: \cs(r,g,b) starts a colour, \cr goes back to the box's colour.
 local function runs(text, base)
   local lines = {}
   for line in (text .. "\n"):gmatch("(.-)\r?\n") do

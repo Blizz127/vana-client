@@ -499,7 +499,7 @@ pub struct ZoneRenderer {
     zone_areas: usize,
     area_lights: Vec<Option<crate::dat::weather::Lighting>>,
     areas: wgpu::Buffer,
-    /// The sway deltas (globals binding 4), and each portrait's own uniforms and globals (render_portrait).
+    /// The sway deltas (globals binding 4), and each portrait's uniforms and globals (render_portrait).
     deltas_gpu: wgpu::Buffer,
     portrait_globals: Vec<(wgpu::Buffer, wgpu::BindGroup)>,
     /// Door parts: slots by door id, their base matrices, their animations (CPU copy of the GPU table) and the tick

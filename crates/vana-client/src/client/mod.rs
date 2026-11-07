@@ -13458,7 +13458,7 @@ impl App {
                     s.monitors = self.monitors.clone();
                     s.gpus = self.gpus.clone();
                     s.in_game = true;
-                    // The mods' settings: their pages (Extras) and bundled mods' rows in our pages' places.
+                    // The installed mods' settings pages.
                     s.set_mod_pages(world.lua.settings_pages());
                     if kind == settings::Kind::Extras
                         && let Some(id) = world.lua.open_page.take()
@@ -13473,11 +13473,23 @@ impl App {
                 // The Lua mods' settings changed on their Extras pages.
                 let changes = world.settings.as_mut().map(|s| std::mem::take(&mut s.mod_changes)).unwrap_or_default();
                 if !changes.is_empty() {
+                    let toggled = changes.iter().any(|c| c.1 == lua::ENABLED);
+                    // A setting that is a sound (manifest preview_sound): the sound its new value picks.
+                    for (id, key, value) in &changes {
+                        let base = world.settings.as_ref().and_then(|s| s.mod_pages.iter().find(|p| &p.id == id)).and_then(|p| p.rows.iter().find(|r| &r.key == key)).and_then(|r| r.preview);
+                        if let (Some(base), Some(v)) = (base, value.as_u64()) {
+                            world.sounds.push(base + v as u32);
+                        }
+                    }
                     let mut mods = std::mem::take(&mut world.lua);
                     for (id, key, value) in changes {
                         mods.apply_setting(world, &id, &key, value);
                     }
                     world.lua = mods;
+                    // A mod turned on, off or installed: the pages follow.
+                    if toggled && let Some(s) = world.settings.as_mut() {
+                        s.set_mod_pages(world.lua.settings_pages());
+                    }
                 }
                 if let Some(s) = world.settings.as_mut().filter(|s| s.dirty) {
                     s.dirty = false;

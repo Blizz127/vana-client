@@ -489,6 +489,7 @@ fn changes(a: &Snap, b: &Snap) -> Vec<(&'static str, Vec<serde_json::Value>)> {
 /// Mods built into the client (assets/mods): our own features on the mod API (docs/lua-mods.md 7.4). Each is (id,
 /// mod.toml, files).
 /// Our own features on the mod API (docs/extras-as-mods.md): id, mod.toml, files.
+#[cfg(test)]
 macro_rules! bundled {
     ($($id:literal $([$($file:literal),*])?),* $(,)?) => {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[
@@ -507,6 +508,9 @@ pub(in crate::client) const STAND_IN_PANELS: [&str; 2] = ["focus", "pending"];
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
+/// The mods kept in this repository (assets/mods), for the tests: the client loads only installed mods (the mods
+/// folder); these reach players from GitHub (Settings > Mods, Download Standard Mods).
+#[cfg(test)]
 const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log", "casket-solver",
     "blue-sets" ["src/learn.lua"],
     "warp-helper" ["src/places.lua"],
@@ -548,6 +552,9 @@ fn data_dir() -> PathBuf {
 /// The mods' folders; a test run's own (`mods` beside its FFXI_CONFIG copy) when it has one, so test mods never sit
 /// among the user's.
 fn mods_dir() -> PathBuf {
+    if std::env::var_os("VANA_MODS_DIR").is_some() {
+        return crate::config::mods_dir();
+    }
     match std::env::var_os("FFXI_CONFIG").map(|p| PathBuf::from(p).with_file_name("mods")) {
         Some(d) if d.is_dir() => d,
         _ => crate::config::mods_dir(),
@@ -597,7 +604,8 @@ impl Host {
         self.load_with(w, m, dir.clone(), vm::Source::Dir(dir))
     }
 
-    /// A bundled mod (assets/mods) by id.
+    /// A bundled mod (assets/mods) by id (tests).
+    #[cfg(test)]
     fn load_bundled(&mut self, w: Option<&World>, id: &str) -> Result<(), String> {
         let (_, text, files) = BUNDLED.iter().find(|b| b.0 == id).ok_or_else(|| format!("no bundled mod {id}"))?;
         let m = manifest::parse(text, id).map_err(|e| format!("{e:#}"))?;
@@ -617,7 +625,8 @@ impl Host {
         }
         let storage = (read_json(&data.join("account.json")), char_file.as_ref().map_or(serde_json::Value::Null, |f| read_json(&data.join(f))));
         migrate_settings(&m, &data, char_file.as_deref());
-        let settings = load_settings(&m, &data, char_file.as_deref());
+        let mut settings = load_settings(&m, &data, char_file.as_deref());
+        force_on(&m, &mut settings);
         let given: Vec<String> = grants().get(&m.id).and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
         // A bundled mod is the client's own code: it has what it asks for.
         let bundled = matches!(src, vm::Source::Bundled(_));
@@ -694,19 +703,6 @@ impl Host {
         let cfg = crate::config::Config::load();
         let root = mods_dir();
         install_stubs(root.clone());
-        let loaded = |h: &Self, id: &str| h.vms.iter().any(|v| v.manifest.id == id);
-        // Bundled mods (our own features on the mod API) run unless turned off in `mods` or replaced by a folder.
-        for (id, ..) in BUNDLED {
-            let off = cfg.mods.iter().any(|r| r.name == *id && !r.enabled);
-            let folder = cfg.mods.iter().any(|r| r.name == *id && r.enabled) && root.join(id).join("mod.toml").is_file();
-            if off || folder || loaded(self, id) {
-                continue;
-            }
-            if let Err(e) = self.load_bundled(Some(w), id) {
-                log::warn!("lua mod {id}: {e}");
-                w.chat.push_colour(format!("Mod {id}: {e}"), ERROR);
-            }
-        }
         for r in cfg.mods.iter().filter(|r| r.enabled) {
             let dir = root.join(&r.name);
             if !dir.join("mod.toml").is_file() || self.vms.iter().any(|v| v.dir == dir) {
@@ -722,6 +718,7 @@ impl Host {
             let file = Self::char_file(Some(w));
             vm.st.borrow_mut().char_file = file.clone();
             vm.st.borrow_mut().settings = load_settings(&vm.manifest, &data, file.as_deref());
+            force_on(&vm.manifest, &mut vm.st.borrow_mut().settings);
             let stored = file.map_or(serde_json::Value::Null, |f| read_json(&data.join(f)));
             if let Ok(t) = vm.lua.globals().get::<mlua::Table>("storage")
                 && let Ok(c) = api::json_table(&vm.lua, &stored)
@@ -741,21 +738,11 @@ impl Host {
         self.events.push(("lobby_screen", vec!["world".into(), old.into()]));
     }
 
-    /// Before login: the enabled mods whose manifest asks for the lobby (`lobby = true`), bundled ones too.
+    /// Before login: the enabled mods whose manifest asks for the lobby (`lobby = true`).
     fn start_lobby(&mut self) {
         self.lobby_started = true;
         let cfg = crate::config::Config::load();
         let root = mods_dir();
-        for (id, ..) in BUNDLED {
-            let off = cfg.mods.iter().any(|r| r.name == *id && !r.enabled);
-            let folder = cfg.mods.iter().any(|r| r.name == *id && r.enabled) && root.join(id).join("mod.toml").is_file();
-            if off || folder || !bundled_manifest(id).is_some_and(|m| m.lobby) {
-                continue;
-            }
-            if let Err(e) = self.load_bundled(None, id) {
-                log::warn!("lua mod {id}: {e}");
-            }
-        }
         for r in cfg.mods.iter().filter(|r| r.enabled) {
             let dir = root.join(&r.name);
             let Ok(m) = manifest::read(&dir) else { continue };
@@ -782,19 +769,23 @@ impl Host {
         }
     }
 
-    /// A mod by id: its folder, else the bundled one.
+    /// A mod by id: its folder in the mods folder.
     fn load_named(&mut self, w: Option<&World>, id: &str) -> Result<(), String> {
-        let dir = mods_dir().join(id);
-        if !dir.join("mod.toml").is_file() && BUNDLED.iter().any(|b| b.0 == id) { self.load_bundled(w, id) } else { self.load(w, dir) }
+        self.load(w, mods_dir().join(id))
     }
 
     /// Reloads the mod at `k` from its files, in the same place in the load order; its id.
     fn reload(&mut self, w: Option<&World>, k: usize) -> Result<String, String> {
         let dir = self.vms[k].dir.clone();
         let id = self.vms[k].manifest.id.clone();
+        #[cfg(test)]
         let bundled = matches!(self.vms[k].src, vm::Source::Bundled(_));
         self.unload(w, k);
-        if bundled { self.load_bundled(w, &id) } else { self.load(w, dir) }.map_err(|e| format!("{id}: {e}"))?;
+        #[cfg(test)]
+        let r = if bundled { self.load_bundled(w, &id) } else { self.load(w, dir) };
+        #[cfg(not(test))]
+        let r = self.load(w, dir);
+        r.map_err(|e| format!("{id}: {e}"))?;
         let vm = self.vms.pop().expect("just loaded");
         self.vms.insert(k.min(self.vms.len()), vm);
         Ok(id)
@@ -4113,6 +4104,70 @@ fn migrations(m: &manifest::Manifest, config: &serde_json::Value, saved: impl Fn
 }
 
 /// A mod's settings: the account file's keys, then the character file's for character-scoped ones.
+/// A mod's settings page: its settings as rows (the "on" switch left out: it is the Mods page's toggle) and its
+/// permissions, each allowed or not; none when it has neither.
+fn mod_page(m: &manifest::Manifest, settings: &serde_json::Map<String, serde_json::Value>, granted: &[String], bundled: bool) -> Option<super::settings::ModPage> {
+    use super::settings::{ModPage, ModRow};
+    let mut rows = Vec::new();
+    for (key, d) in &m.settings {
+        if key == "on" && d.kind == "bool" {
+            continue;
+        }
+        let current = settings.get(key).cloned().or_else(|| d.default.as_ref().and_then(|v| serde_json::to_value(v).ok())).unwrap_or(serde_json::Value::Null);
+        let choices: Vec<(String, serde_json::Value)> = match d.kind.as_str() {
+            // Labelled values (any type).
+            _ if !d.values.is_empty() => d.options.iter().cloned().zip(d.values.iter().map(|v| serde_json::to_value(v).unwrap_or_default())).collect(),
+            "bool" => vec![("ON".into(), true.into()), ("OFF".into(), false.into())],
+            "enum" => d.options.iter().map(|o| (o.clone(), o.as_str().into())).collect(),
+            "int" | "number" => {
+                let (min, max) = (d.min.unwrap_or(0.0), d.max.unwrap_or(100.0));
+                let step = d.step.unwrap_or(if d.kind == "int" { 1.0 } else { (max - min) / 20.0 }).max(f64::EPSILON);
+                let n = (((max - min) / step).floor() as usize).min(200);
+                (0..=n)
+                    .map(|i| {
+                        let v = min + step * i as f64;
+                        if d.kind == "int" { (format!("{}", v.round() as i64), (v.round() as i64).into()) } else { (format!("{v}"), v.into()) }
+                    })
+                    .collect()
+            }
+            _ => continue,
+        };
+        let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-6)).unwrap_or(0);
+        let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
+        rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: String::new(), place: None, place_modern: None, preview: d.preview_sound });
+    }
+    // The permissions it asks for (docs/lua-mods.md 3.5); a bundled mod's are given.
+    for p in m.permissions.iter().filter(|_| !bundled) {
+        let (label, help) = permission_text(p);
+        let on = granted.contains(p);
+        let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
+        rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 }, tab: String::new(), place: None, place_modern: None, preview: None });
+    }
+    (!rows.is_empty()).then(|| ModPage { id: m.id.clone(), name: m.name.clone(), rows })
+}
+
+/// Gives an installed mod every permission its manifest asks for (a standard mod installed from our list).
+pub(in crate::client) fn grant_manifest(dir: &std::path::Path) {
+    let Ok(m) = manifest::read(dir) else { return };
+    if m.permissions.is_empty() {
+        return;
+    }
+    let mut g = grants();
+    let list: Vec<serde_json::Value> = m.permissions.iter().filter(|p| manifest::PERMISSIONS.contains(&p.as_str())).map(|p| p.as_str().into()).collect();
+    g.insert(m.id.clone(), list.into());
+    save_grants(&g);
+}
+
+/// The Mods page's toggle as a setting change's key: its value turns the mod on (loads it) or off (unloads it).
+pub(in crate::client) const ENABLED: &str = "@enabled";
+
+/// A mod's "on" switch is its enable toggle on the Mods page: a loaded mod is on.
+fn force_on(m: &manifest::Manifest, settings: &mut serde_json::Map<String, serde_json::Value>) {
+    if m.settings.get("on").is_some_and(|d| d.kind == "bool") {
+        settings.insert("on".into(), true.into());
+    }
+}
+
 fn load_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Option<&str>) -> serde_json::Map<String, serde_json::Value> {
     let mut out = serde_json::Map::new();
     let account = read_json(&data.join("settings.json"));
@@ -4135,60 +4190,74 @@ fn load_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Opti
 impl Host {
     /// The Extras pages of the running mods: their declared settings that buttons and sliders can show (bool, enum,
     /// int and number).
+    /// Every installed mod's settings page (Settings > Mods, its Settings button): its settings but the "on" switch (the
+    /// page's toggle), and the permissions it asks for. A mod that is off reads its settings from its files.
     pub(super) fn settings_pages(&self) -> Vec<super::settings::ModPage> {
-        use super::settings::{ModPage, ModRow};
         let mut pages = Vec::new();
         for vm in &self.vms {
             let st = vm.st.borrow();
-            let mut rows = Vec::new();
-            for (key, d) in &vm.manifest.settings {
-                let current = st.settings.get(key).cloned().or_else(|| d.default.as_ref().and_then(|v| serde_json::to_value(v).ok())).unwrap_or(serde_json::Value::Null);
-                let choices: Vec<(String, serde_json::Value)> = match d.kind.as_str() {
-                    // Labelled values (any type).
-                    _ if !d.values.is_empty() => d.options.iter().cloned().zip(d.values.iter().map(|v| serde_json::to_value(v).unwrap_or_default())).collect(),
-                    "bool" => vec![("ON".into(), true.into()), ("OFF".into(), false.into())],
-                    "enum" => d.options.iter().map(|o| (o.clone(), o.as_str().into())).collect(),
-                    "int" | "number" => {
-                        let (min, max) = (d.min.unwrap_or(0.0), d.max.unwrap_or(100.0));
-                        let step = d.step.unwrap_or(if d.kind == "int" { 1.0 } else { (max - min) / 20.0 }).max(f64::EPSILON);
-                        let n = (((max - min) / step).floor() as usize).min(200);
-                        (0..=n)
-                            .map(|i| {
-                                let v = min + step * i as f64;
-                                if d.kind == "int" { (format!("{}", v.round() as i64), (v.round() as i64).into()) } else { (format!("{v}"), v.into()) }
-                            })
-                            .collect()
-                    }
-                    _ => continue,
-                };
-                let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-6)).unwrap_or(0);
-                let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
-                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: d.tab.clone(), place: d.place, place_modern: d.place_modern });
-            }
-            // The permissions it asks for, each allowed or not (docs/lua-mods.md 3.5); a bundled mod's are given.
             let bundled = matches!(vm.src, vm::Source::Bundled(_));
-            for p in vm.manifest.permissions.iter().filter(|_| !bundled) {
-                let (label, help) = permission_text(p);
-                let on = st.granted.contains(p);
-                let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
-                rows.push(ModRow { key: format!("{PERM}{p}"), label: label.into(), help: help.into(), choices, at: if on { 0 } else { 1 }, tab: String::new(), place: None, place_modern: None });
+            pages.extend(mod_page(&vm.manifest, &st.settings, &st.granted, bundled));
+        }
+        let char_file = self.vms.first().and_then(|v| v.st.borrow().char_file.clone());
+        let g = grants();
+        for e in std::fs::read_dir(mods_dir()).into_iter().flatten().flatten() {
+            let Ok(m) = manifest::read(&e.path()) else { continue };
+            if self.vms.iter().any(|v| v.manifest.id == m.id) {
+                continue;
             }
-            if !rows.is_empty() {
-                pages.push(ModPage { id: vm.manifest.id.clone(), name: vm.manifest.name.clone(), rows });
-            }
+            let settings = load_settings(&m, &data_dir().join(&m.id), char_file.as_deref());
+            let given: Vec<String> = g.get(&m.id).and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            pages.extend(mod_page(&m, &settings, &given, false));
         }
         pages
     }
 
     /// A setting changed on its Extras page: kept, written to its scope's file, and `settings_changed` sent.
     pub(super) fn apply_setting(&mut self, w: &World, id: &str, key: &str, value: serde_json::Value) {
-        if let Some(p) = key.strip_prefix(PERM) {
-            if let Some(k) = self.vms.iter().position(|v| v.manifest.id == id) {
-                self.set_grant(k, p, value.as_bool() == Some(true));
+        if key == ENABLED {
+            let k = self.vms.iter().position(|v| v.manifest.id == id);
+            match (value.as_bool() == Some(true), k) {
+                (true, None) => {
+                    if let Err(e) = self.load_named(Some(w), id) {
+                        log::warn!("lua mod {id}: {e}");
+                    }
+                }
+                (false, Some(k)) => self.unload(Some(w), k),
+                _ => {}
             }
             return;
         }
-        let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) else { return };
+        if let Some(p) = key.strip_prefix(PERM) {
+            match self.vms.iter().position(|v| v.manifest.id == id) {
+                Some(k) => self.set_grant(k, p, value.as_bool() == Some(true)),
+                None => {
+                    grant_one(id, p, value.as_bool() == Some(true));
+                }
+            }
+            return;
+        }
+        let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) else {
+            // A mod that is off: its settings file only.
+            if let Ok(m) = manifest::read(&mods_dir().join(id)) {
+                let scope = m.settings.get(key).map_or("account", |d| d.scope.as_str());
+                let dir = data_dir().join(id);
+                let file = match Self::char_file(Some(w)) {
+                    Some(c) if scope == "character" => dir.join(format!("settings-{c}")),
+                    _ => dir.join("settings.json"),
+                };
+                let mut v = read_json(&file);
+                if !v.is_object() {
+                    v = serde_json::json!({});
+                }
+                v[key] = value;
+                let _ = std::fs::create_dir_all(&dir);
+                if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+                    log::warn!("lua mod {id}: saving {}: {e}", file.display());
+                }
+            }
+            return;
+        };
         vm.st.borrow_mut().settings.insert(key.to_string(), value.clone());
         let scope = vm.manifest.settings.get(key).map_or("account", |d| d.scope.as_str());
         let dir = data_dir().join(id);
@@ -4516,16 +4585,13 @@ mod stub_tests {
 
 /// The bundled mods' settings on our Extras tabs: (label, tab, place).
 #[cfg(test)]
-pub(in crate::client) fn bundled_tab_rows() -> Vec<(String, String, Option<usize>, Option<usize>)> {
-    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| (d.label, d.tab, d.place, d.place_modern))).collect()
-}
-
-/// A bundled mod's manifest.
+/// A bundled mod's manifest (tests).
+#[cfg(test)]
 fn bundled_manifest(id: &str) -> Option<manifest::Manifest> {
     BUNDLED.iter().find(|b| b.0 == id).and_then(|b| manifest::parse(b.1, id).ok())
 }
 
-/// Every mod on disk and bundled: (id, name, version, enabled in the config, bundled).
+/// Every mod installed (the mods folder): (id, name, version, enabled in the config, bundled: always false now).
 pub(super) fn installed() -> Vec<(String, String, String, bool, bool)> {
     let cfg = crate::config::Config::load();
     let enabled = |id: &str, bundled: bool| cfg.mods.iter().find(|r| r.name == id).map_or(bundled, |r| r.enabled);
@@ -4535,12 +4601,6 @@ pub(super) fn installed() -> Vec<(String, String, String, bool, bool)> {
         if let Ok(m) = manifest::read(&dir) {
             let id = m.id.clone();
             out.push((id.clone(), m.name, m.version, enabled(&id, false), false));
-        }
-    }
-    for (id, ..) in BUNDLED {
-        if !out.iter().any(|o| o.0 == *id) {
-            let m = bundled_manifest(id);
-            out.push((id.to_string(), m.as_ref().map_or_else(|| id.to_string(), |m| m.name.clone()), m.map_or_else(String::new, |m| m.version), enabled(id, true), true));
         }
     }
     out.sort();
@@ -4583,17 +4643,23 @@ impl Host {
     /// Allows or withdraws permission `p` (one the mod asks for) for the mod at `k`; kept in grants.json.
     fn set_grant(&mut self, k: usize, p: &str, on: bool) {
         let id = self.vms[k].manifest.id.clone();
-        let mut g = grants();
-        let mut list: Vec<String> = g.get(&id).and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
-        list.retain(|x| x != p);
-        if on && manifest::PERMISSIONS.contains(&p) {
-            list.push(p.to_string());
-        }
-        g.insert(id, list.clone().into());
-        save_grants(&g);
+        let list = grant_one(&id, p, on);
         let asked = self.vms[k].manifest.permissions.clone();
         self.vms[k].st.borrow_mut().granted = asked.into_iter().filter(|p| list.contains(p)).collect();
     }
+}
+
+/// Mod `id`'s permission `p` allowed or not in grants.json; its list of grants after.
+fn grant_one(id: &str, p: &str, on: bool) -> Vec<String> {
+    let mut g = grants();
+    let mut list: Vec<String> = g.get(id).and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+    list.retain(|x| x != p);
+    if on && manifest::PERMISSIONS.contains(&p) {
+        list.push(p.to_string());
+    }
+    g.insert(id.to_string(), list.clone().into());
+    save_grants(&g);
+    list
 }
 
 fn save_grants(g: &serde_json::Map<String, serde_json::Value>) {

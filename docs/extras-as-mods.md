@@ -154,7 +154,7 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   bag and augments, the wear check, 0x050 / 0x051 built and sent, what was sent counted as worn until the server
   agrees) under four front ends (src/gs.lua with a Windower shim, src/lac.lua with gFunc / gData / a little of
   AshitaCore, src/acxml.lua with src/xml.lua: Ashitacast's sections, rules and variables, v3 files through its import
-  rules; src/spellcast.lua with src/regex.lua: Spellcast's rules, read from the action's command line, on its own
+  rules; src/spellcast.lua with src/regex.lua: Spellcast's rules, read from the action's command line, on its
   timers; Rust tests run the rules, a profile of each and the cast below). Our outgoing
   action packet (0x01A categories 3 / 7 / 9 / 16, 0x037) is held by a packets.on_out hook and sent again with the gear
   around it: the precast gear, the action, the midcast gear, in one batch, as both add-ons send them. GearSwap's
@@ -385,7 +385,7 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `actions.choose` waits for a menu that shows before it takes input (a Survival Guide's region list did).
 - **Dialogue Bubbles** (assets/mods/dialogue-bubbles; Balloon, ffxi-balloon): the page of NPC talk being read in a speech
   bubble (`hud.bubble`: rounded, outlined, its tail pointing at the speaker's head wherever the bubble is), with the
-  speaker's face (`hud.portrait`: the speaker's own model drawn live from in front, in an oval with a frame), their
+  speaker's face (`hud.portrait`: the speaker's model drawn live from in front, in an oval with a frame), their
   name (from the page's "Name : ") and the text inside, and a mark that blinks while the page waits for a key; over the
   speaker's head (clear of the name plate) or at the bottom of the screen, above other mods' HUD. A new page's texts
   are measured unseen for a frame first, so the bubble never jumps. The log keeps its copy and the keys stay the
@@ -499,7 +499,7 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Steady Cast** (assets/mods/steady-cast; Stubborn's other half, castdelay): a spell (and by setting an item or a
   ranged shot) started while we move is held, with every packet sent after it, until we have stood still 0.15 s, or
   3 s at most; then all of it goes in order. It loads after Gearshift, so Gearshift's gear before the action goes at
-  once and its midcast gear waits behind the held action. The call-for-help block of the same row is the client's own
+  once and its midcast gear waits behind the held action. The call-for-help block of the same row is the client's
   (/blockhelp).
   Not done: Porter Moogle slips, obis by day and weather.
 

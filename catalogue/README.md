@@ -1,8 +1,12 @@
-# The mod catalogue
+# The catalogues
 
-`mods.json` lists the Lua mods and DAT packs the client offers in Settings: Lua mods on the **Mods** page, DAT
-packs on the **DAT Packs** page, each with Install (or Update when a newer version is listed). The client reads this
-file from the `master` branch whenever one of those pages opens, and keeps the last copy for when it is offline.
+Two lists the client reads from the `master` branch, keeping the last copy of each for when it is offline:
+
+- `dats.json`: the DAT packs offered on the **DATs** page (its Available tab, "From the catalogue"), as archives.
+- `mods.json`: the standard Lua mods offered by **Mods > Download Standard Mods**, each as its files in this repository
+  (`crates/vana-client/assets/mods/<id>/`), every file pinned by its SHA-256. No mod comes with the client. This list is
+  generated: after changing a mod, run `VANA_WRITE_CATALOGUE=1 cargo test standard_mods_listed` (the same test fails
+  while the list is out of date).
 
 To list a mod, open a pull request that adds an entry. Each entry pins one version: to publish a new version, change
 its `version` and `files`.
@@ -39,7 +43,7 @@ its `version` and `files`.
 | `version` | Compared with the installed copy's: a newer one is offered as Update. For a Lua mod, keep it the same as `mod.toml`'s. |
 | `authors`, `description` | Shown in the help line. |
 | `homepage` | Where to read more (for people reading the list; the client does not show it). |
-| `files` | The archives (zip, 7z or rar), downloaded and unpacked in order into the one folder; a later archive's files replace an earlier one's. Each needs its `url` (on github.com), its `sha256` and its `size` in bytes. |
+| `files` | The archives (zip, 7z or rar), downloaded and unpacked in order into the one folder; a later archive's files replace an earlier one's. Each needs its `url` (on github.com), its `sha256` and its `size` in bytes. A standard mod lists its files instead, each with a `path` in its folder. |
 
 The client refuses an archive whose SHA-256 differs from the listed one, so a file changed after it was listed is
 never installed. GitHub shows each release asset's SHA-256 (`gh api repos/OWNER/REPO/releases/tags/TAG --jq

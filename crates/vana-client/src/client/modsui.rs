@@ -1,9 +1,10 @@
-//! Settings' DAT Packs and Mods pages (not retail; the mod manager, XIPivot's job built in). DAT Packs: the installed
-//! game-file packs in priority order, each ON / OFF and movable (Move, then Up / Down, Enter to place, Escape to put it
-//! back, as the item list's Manual sort). Mods: the installed Lua mods, each ON / OFF. Then each page's offers: the
-//! archives of its kind found, and the catalogue's entries of its kind (client/catalogue.rs), with Install (or
-//! Update). Archives and the catalogue are read, downloaded and unpacked off the UI thread (crate::modpack). The modern
-//! pages also install an archive or a Lua mod's folder picked by hand (`Browse`) and remove a folder.
+//! Settings' DATs and Mods pages (not retail; the mod manager, XIPivot's job built in). DATs: the installed game-file
+//! packs in priority order, each ON / OFF and movable (Move, then Up / Down, Enter to place, Escape to put it back, as
+//! the item list's Manual sort), and what is available: the archives found and the catalogue's packs, with Install (or
+//! Update). Mods: the installed Lua mods, each ON / OFF, the Lua mod archives found, and the standard mods from GitHub
+//! (client/catalogue.rs) each with Install, Update or Installed. Archives and the catalogue are read, downloaded and
+//! unpacked off the UI thread (crate::modpack). The modern pages also install an archive or a Lua mod's folder picked
+//! by hand (`Browse`) and remove a folder.
 
 use super::catalogue::{self, Entry};
 use crate::config::ModRef;
@@ -16,11 +17,14 @@ use std::sync::mpsc::{Receiver, channel};
 pub struct Mods {
     pub packs: Vec<Pack>,
     scan: Option<Receiver<Vec<Pack>>>,
-    /// The catalogue's mods not installed or older here (true: an update).
-    pub entries: Vec<(Entry, bool)>,
-    list: Option<Receiver<anyhow::Result<Vec<(Entry, bool)>>>>,
-    /// Why the catalogue could not be read.
+    /// The catalogues' entries (DAT packs, then the standard mods), each to install (Some(false)), to update
+    /// (Some(true)) or installed as it is (None).
+    pub entries: Vec<(Entry, Option<bool>)>,
+    list: Option<Receiver<anyhow::Result<Vec<(Entry, Option<bool>)>>>>,
+    dat_list: Option<Receiver<anyhow::Result<Vec<(Entry, Option<bool>)>>>>,
+    /// Why the standard mods' list, or the DAT packs', could not be read.
     pub list_error: Option<String>,
+    pub dat_error: Option<String>,
     /// What is being installed, its progress (per mille) and the result (the folder's name).
     installing: Option<(String, Arc<AtomicU32>, Receiver<anyhow::Result<String>>)>,
     /// A mod being moved: its order before the move.
@@ -48,10 +52,16 @@ pub struct Offer {
     at: usize,
 }
 
-/// The catalogue's entries this install lacks or has older.
-fn wanted(list: Vec<Entry>) -> Vec<(Entry, bool)> {
+/// The catalogue's entries, each with what it is here: to install, to update or installed.
+fn statuses(list: Vec<Entry>) -> Vec<(Entry, Option<bool>)> {
     let root = crate::config::mods_dir();
-    list.into_iter().filter_map(|e| catalogue::offer(&e, catalogue::installed(&root, &e.id).as_deref()).map(|u| (e, u))).collect()
+    list.into_iter()
+        .map(|e| {
+            let have = catalogue::installed(&root, &e.id);
+            let st = catalogue::offer(&e, have.as_deref());
+            (e, st)
+        })
+        .collect()
 }
 
 /// "1.2 GB", "340 KB".
@@ -72,15 +82,19 @@ impl Mods {
         });
         let (ltx, lrx) = channel();
         std::thread::spawn(move || {
-            let _ = ltx.send(catalogue::fetch().map(wanted));
+            let _ = ltx.send(catalogue::fetch(catalogue::List::Mods).map(statuses));
         });
-        Self { packs: Vec::new(), scan: Some(rx), entries: Vec::new(), list: Some(lrx), list_error: None, installing: None, held: None, error: None, top: 0, browse: None }
+        let (dtx, drx) = channel();
+        std::thread::spawn(move || {
+            let _ = dtx.send(catalogue::fetch(catalogue::List::Dats).map(statuses));
+        });
+        Self { packs: Vec::new(), scan: Some(rx), entries: Vec::new(), list: Some(lrx), dat_list: Some(drx), list_error: None, dat_error: None, installing: None, held: None, error: None, top: 0, browse: None }
     }
 
     /// No archives and no scan (tests).
     #[cfg(test)]
     pub fn empty() -> Self {
-        Self { packs: Vec::new(), scan: None, entries: Vec::new(), list: None, list_error: None, installing: None, held: None, error: None, top: 0, browse: None }
+        Self { packs: Vec::new(), scan: None, entries: Vec::new(), list: None, dat_list: None, list_error: None, dat_error: None, installing: None, held: None, error: None, top: 0, browse: None }
     }
 
     /// Waits for the scan and the catalogue (offscreen shots).
@@ -89,21 +103,30 @@ impl Mods {
             self.packs = p;
         }
         if let Some(l) = self.list.take().and_then(|r| r.recv().ok()) {
-            self.take_list(l);
+            self.take_list(l, false);
+        }
+        if let Some(l) = self.dat_list.take().and_then(|r| r.recv().ok()) {
+            self.take_list(l, true);
         }
     }
 
-    fn take_list(&mut self, l: anyhow::Result<Vec<(Entry, bool)>>) {
+    /// A list come in: its entries kept (the DAT packs' first), or why it could not be read.
+    fn take_list(&mut self, l: anyhow::Result<Vec<(Entry, Option<bool>)>>, dats: bool) {
         match l {
-            Ok(e) => self.entries = e,
+            Ok(e) if dats => {
+                let rest = std::mem::take(&mut self.entries);
+                self.entries = e.into_iter().chain(rest).collect();
+            }
+            Ok(e) => self.entries.extend(e),
             Err(e) => {
-                log::warn!("mod catalogue: {e:#}");
-                self.list_error = Some(format!("{e:#}"));
+                log::warn!("{} catalogue: {e:#}", if dats { "DAT" } else { "mod" });
+                *(if dats { &mut self.dat_error } else { &mut self.list_error }) = Some(format!("{e:#}"));
             }
         }
     }
 
-    /// The archives found, then the catalogue's entries: Lua mods (`lua`) or DAT packs.
+    /// The archives found of Lua mods (`lua`) or DAT packs, then (DAT packs) the catalogue's packs not installed as they
+    /// are; the standard Lua mods are listed apart (`standard`).
     pub fn offers(&self, lua: bool) -> Vec<Offer> {
         let pct = |slug: &str, name: String| self.progress(slug).map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
         let archives = self.packs.iter().enumerate().filter(|p| p.1.lua.is_some() == lua).map(|(at, p)| {
@@ -119,15 +142,34 @@ impl Mods {
             Offer { label: pct(&p.slug, name), button: "Install", help, catalogue: false, at }
         });
         let n = self.packs.len();
-        let listed = self.entries.iter().enumerate().filter(|e| (e.1.0.kind == "lua") == lua).map(|(k, (e, update))| {
+        let listed = self.entries.iter().enumerate().filter(|e| !lua && e.1.0.kind != "lua").filter_map(|(k, (e, st))| st.map(|u| (k, e, u))).map(|(k, e, update)| {
             let by = if e.authors.is_empty() { String::new() } else { format!(" By {}.", e.authors.join(", ")) };
             let size = if e.size() > 0 { format!(" {}.", bytes(e.size())) } else { String::new() };
             let what = if e.kind == "lua" { "It starts at the next login." } else { "Takes effect on restart." };
-            let verb = if *update { "Update" } else { "Install" };
+            let verb = if update { "Update" } else { "Install" };
             let help = format!("{}{by}{size} {verb} downloads version {} from GitHub into the mods folder. {what}", e.description.trim(), e.version);
             Offer { label: pct(&e.id, format!("{} {}", e.name, e.version)), button: verb, help: help.trim().to_string(), catalogue: true, at: n + k }
         });
         archives.chain(listed).collect()
+    }
+
+    /// The standard Lua mods by name: each entry's place in `entries`.
+    fn standard_at(&self) -> Vec<usize> {
+        let mut at: Vec<usize> = (0..self.entries.len()).filter(|&k| self.entries[k].0.kind == "lua").collect();
+        at.sort_by_key(|&k| self.entries[k].0.name.to_lowercase());
+        at
+    }
+
+    /// The standard Lua mods by name: each entry and what it is here (to install, to update, installed).
+    pub fn standard(&self) -> Vec<(&Entry, Option<bool>)> {
+        self.standard_at().into_iter().map(|k| (&self.entries[k].0, self.entries[k].1)).collect()
+    }
+
+    /// Standard mod `k` (of `standard`) installed or updated off the UI thread; false when it is installed as it is or
+    /// another install runs.
+    pub fn install_standard(&mut self, k: usize) -> bool {
+        let Some(at) = self.standard_at().get(k).copied().filter(|&at| self.entries[at].1.is_some()) else { return false };
+        self.install_entry(at)
     }
 
     /// Offer `k` of the Lua mods' (`lua`) or the DAT packs' installed off the UI thread; false while another install
@@ -137,7 +179,12 @@ impl Mods {
         if at < self.packs.len() {
             return self.install(at);
         }
-        let Some((e, _)) = self.entries.get(at - self.packs.len()).cloned() else { return false };
+        self.install_entry(at - self.packs.len())
+    }
+
+    /// Catalogue entry `at` installed off the UI thread; false while another install runs.
+    fn install_entry(&mut self, at: usize) -> bool {
+        let Some((e, _)) = self.entries.get(at).cloned() else { return false };
         if self.installing.is_some() {
             return false;
         }
@@ -161,7 +208,11 @@ impl Mods {
         }
         if let Some(Ok(l)) = self.list.as_ref().map(|r| r.try_recv()) {
             self.list = None;
-            self.take_list(l);
+            self.take_list(l, false);
+        }
+        if let Some(Ok(l)) = self.dat_list.as_ref().map(|r| r.try_recv()) {
+            self.dat_list = None;
+            self.take_list(l, true);
         }
         let Some((_, _, rx)) = &self.installing else { return false };
         let Ok(res) = rx.try_recv() else { return false };
@@ -169,7 +220,9 @@ impl Mods {
         match res {
             Ok(slug) => {
                 self.packs.retain(|p| p.slug != slug);
-                self.entries.retain(|e| e.0.id != slug);
+                for e in self.entries.iter_mut().filter(|e| e.0.id == slug) {
+                    e.1 = None;
+                }
                 if !mods.iter().any(|m| m.name == slug) {
                     mods.insert(0, ModRef { name: slug, enabled: true });
                 }
@@ -221,6 +274,11 @@ impl Mods {
         });
         self.installing = Some((slug, progress, rx));
         true
+    }
+
+    /// The catalogue is still being read.
+    pub fn loading(&self) -> bool {
+        self.list.is_some()
     }
 
     /// The pack being installed and its per mille done.

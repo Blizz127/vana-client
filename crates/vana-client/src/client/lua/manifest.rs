@@ -62,7 +62,7 @@ pub struct Setting {
     /// An enum's labels; with `values`, any type's labels for those values.
     pub options: Vec<String>,
     pub values: Vec<toml::Value>,
-    /// Shown on one of the client's own Extras tabs (Maps, Timers, Battle, Misc.) at row `place`, not on the mod's page:
+    /// Shown on one of the client's Extras tabs (Maps, Timers, Battle, Misc.) at row `place`, not on the mod's page:
     /// a bundled mod's settings where the extra it replaces had its rows.
     pub tab: String,
     pub place: Option<usize>,
@@ -70,9 +70,12 @@ pub struct Setting {
     pub place_modern: Option<usize>,
     /// The client config field its first value comes from (the extra it replaces kept it there).
     pub from: String,
+    /// An int whose value picks interface sound `preview_sound` + value: the settings page plays it whenever the value
+    /// changes.
+    pub preview_sound: Option<u32>,
 }
 
-/// The client's own Extras tabs a setting may name.
+/// The client's Extras tabs a setting may name.
 pub const EXTRA_TABS: [&str; 4] = ["Maps", "Timers", "Battle", "Misc."];
 
 /// Every permission a mod may ask for.

@@ -354,7 +354,7 @@ local function include(name, into)
   end
   if not lname:match("%.lua$") then lname = lname .. ".lua" end
   local path = search(lname)
-  -- GearSwap's own libraries where the player has no copy: modes (ours), the Organizer hook (nothing to do here).
+  -- GearSwap's libraries where the player has no copy: modes (ours), the Organizer hook (nothing to do here).
   if not path and lname == "modes.lua" then
     env.M = env.M or require("src.modes")
     return
@@ -477,7 +477,7 @@ function M.load(path)
   M.unload()
   env = make_env()
   M.file = path
-  -- player, world, buffactive are there while the file's own body runs, as GearSwap has them.
+  -- player, world, buffactive are there while the file's body runs, as GearSwap has them.
   refresh()
   local ok, err = pcall(run_file, path)
   if not ok then

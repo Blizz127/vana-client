@@ -1,5 +1,5 @@
 -- The Empyrean and other NMs' pops (the pop trackers' trees): each pop's id (key item or item), the monster that
--- drops it and how it appears (forced at a ??? or on a timer, map squares), its own pops below it; the NM's
+-- drops it and how it appears (forced at a ??? or on a timer, map squares), the pops of that monster below it; the NM's
 -- weapon item and how many count. Names come from the game's resources.
 
 return {

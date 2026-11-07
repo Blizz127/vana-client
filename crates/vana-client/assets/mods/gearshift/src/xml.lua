@@ -1,4 +1,4 @@
--- A lenient XML reader for players' rule files, accepting what the add-ons' own parsers accept: raw < > & in
+-- A lenient XML reader for players' rule files, accepting what the add-ons' parsers accept: raw < > & in
 -- attribute values, any closing tag closing the open element, element names with = and quotes in them (a known bad
 -- export), unquoted attribute values. Comments, processing instructions and the doctype are skipped; CDATA and the
 -- five entities plus &#n; / &#xn; decoded, unknown entities kept as written.

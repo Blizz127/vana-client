@@ -368,7 +368,7 @@ hud.image("logo", {x = -74, y = -74, path = "img/logo.png", w = 64, h = 64, colo
 hud.portrait(id, spec)
 ```
 
-Creates or replaces a portrait: the actor's head and shoulders drawn live every frame from its own model, from straight
+Creates or replaces a portrait: the actor's head and shoulders drawn live every frame from its model, from straight
 in front of its face, lit as the scene around it. It moves as the actor does (talking, turning its head, a changed
 look). An oval by default, or square; a backing and a frame ring are drawn into it, both following its shape. It shows
 only while the actor is drawn in the world: nothing while it is out of view, too far, hidden or not loaded, and nothing

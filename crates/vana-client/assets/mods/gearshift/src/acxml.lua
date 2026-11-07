@@ -1,6 +1,6 @@
 -- Ashitacast's XML profiles, run as Ashitacast runs them: sections walked as flow (if / elseif / else / return),
 -- rules on its variables, equips collected per section and sent around the actions we send, its <commands> and /ac.
--- v3 files are read through Ashitacast's own import rules. Odd behaviour a working file can rely on is kept; what
+-- v3 files are read through Ashitacast's import rules. Odd behaviour a working file can rely on is kept; what
 -- only hangs, crashes or does nothing in the original does what was meant.
 
 local core = require("src.core")
@@ -546,7 +546,7 @@ local function pass(s, set, calc)
       end
     end
     if not i then return s end
-    -- The left operand back to the operator before it (a sign in front of it is its own).
+    -- The left operand back to the operator before it (a sign in front of it goes with it).
     local a = i - 1
     while a >= 1 and not is_op(s:sub(a, a)) do a = a - 1 end
     if a >= 1 and (s:sub(a, a) == "-" or s:sub(a, a) == "+") then
@@ -1173,7 +1173,7 @@ function M.find()
   local short = res.job(p.main_job or 0)
   if not short then return nil end
   return find_file("ashitacast/" .. p.name .. "_" .. p.id .. "/", short .. ".xml") or find_file("ashitacast/", p.name .. "_" .. short .. ".xml")
-    -- LegacyAC (Ashitacast v3) keeps its files in a folder of its own.
+    -- LegacyAC (Ashitacast v3) keeps its files in a separate folder.
     or find_file("legacyac/", p.name .. "_" .. short .. ".xml")
 end
 

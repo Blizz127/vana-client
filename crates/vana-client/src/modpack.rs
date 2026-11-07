@@ -49,6 +49,32 @@ fn folders_in(root: &Path) -> Vec<String> {
     v
 }
 
+/// An installed Lua mod as its mod.toml tells it.
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+pub struct LuaInfo {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub version: String,
+}
+
+/// The installed Lua mods by folder: name (the folder's when it gives none), description, version.
+pub fn lua_info() -> std::collections::HashMap<String, LuaInfo> {
+    let root = crate::config::mods_dir();
+    lua_folders()
+        .into_iter()
+        .map(|f| {
+            let mut i = std::fs::read_to_string(root.join(&f).join("mod.toml")).ok().and_then(|t| toml::from_str::<LuaInfo>(&t).ok()).unwrap_or_default();
+            if i.name.is_empty() {
+                i.name = f.clone();
+            }
+            (f, i)
+        })
+        .collect()
+}
+
 /// The mod folders that hold a Lua mod (a mod.toml).
 pub fn lua_folders() -> std::collections::HashSet<String> {
     let root = crate::config::mods_dir();

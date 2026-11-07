@@ -98,10 +98,15 @@ local function frame()
     hud.remove("name")
   end
   hud.text("body", { x = bx + text_x, y = ty + name_h, text = body, size = size, colour = BODY, layer = LAYER + 1 })
-  -- blinking while the page waits for a key
-  local a = t.waiting and math.floor(140 + 115 * math.abs(math.sin(os.clock() * 4))) or 90
-  hud.text("more", { x = bx + bw - pad, y = by + bh - pad - 12 * size * u, text = "▼", size = size * 0.8,
-    font = "game", align = "right", colour = { NAME[1], NAME[2], NAME[3], a }, layer = LAYER + 1 })
+  -- The arrow, a small triangle, blinking while the page waits for a key (none when it closes by itself).
+  if t.waiting then
+    local a = math.floor(64 + 191 * math.abs(math.sin(os.clock() * 4)))
+    local aw, ax, ay = 12 * u, bx + bw - pad - 6 * u, by + bh - pad - 8 * u
+    hud.bubble("more", { x = ax - aw / 2, y = ay, w = aw, h = 1, round = 0, colour = { NAME[1], NAME[2], NAME[3], a },
+      tail = { x = ax, y = ay + 100 }, tail_w = aw, tail_len = 7 * u, layer = LAYER + 1 })
+  else
+    hud.remove("more")
+  end
   shown = true
 end
 

@@ -231,6 +231,8 @@ pub struct ModRow {
     pub tab: String,
     pub place: Option<usize>,
     pub place_modern: Option<usize>,
+    /// The interface sound its value is an offset from, played as the value changes (manifest `preview_sound`).
+    pub preview: Option<u32>,
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
@@ -390,6 +392,10 @@ pub struct SettingsUi {
     pub mods_ui: Option<super::modsui::Mods>,
     /// The folders in the mods folder that hold a Lua mod (the Mods page's; the rest are DAT packs).
     pub lua_names: std::collections::HashSet<String>,
+    /// The modern DATs page's tab: 0 Installed, 1 Available.
+    pub m_dat_tab: usize,
+    /// The installed Lua mods' names by folder.
+    pub lua_info: std::collections::HashMap<String, crate::modpack::LuaInfo>,
     /// The modern Mods page's cursor (stop, button) and a removal being asked (pack, Yes on the cursor).
     pub m_mods: (usize, usize),
     pub m_remove: Option<(usize, bool)>,
@@ -412,7 +418,7 @@ impl SettingsUi {
     }
 
     pub fn open_kind(c: &Config, window: [u32; 2], kind: Kind) -> Self {
-        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new(), tab_rows: Vec::new(), lua_names: crate::modpack::lua_folders() };
+        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new(), tab_rows: Vec::new(), lua_names: crate::modpack::lua_folders(), m_dat_tab: 0, lua_info: crate::modpack::lua_info() };
         s.col = s.marked_col();
         s
     }
@@ -1096,8 +1102,7 @@ impl SettingsUi {
     #[cfg(test)]
     pub fn all_labels(in_game: bool, modern: bool) -> Vec<&'static str> {
         let pages = (0..PACKS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        let bundled = super::lua::bundled_tab_rows().into_iter().map(|r| &*Box::leak(r.0.into_boxed_str()));
-        pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).chain(bundled).collect()
+        pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).collect()
     }
 }
 
@@ -1261,7 +1266,15 @@ impl SettingsUi {
             && m.tick(&mut self.s.mods)
         {
             self.dirty = true;
-            self.lua_names = crate::modpack::lua_folders();
+            // A Lua mod just installed starts at once (in game).
+            let now = crate::modpack::lua_folders();
+            for id in now.iter().filter(|id| !self.lua_names.contains(*id)) {
+                if self.s.mods.iter().any(|m| &m.name == id && m.enabled) {
+                    self.mod_changes.push((id.clone(), super::lua::ENABLED.into(), true.into()));
+                }
+            }
+            self.lua_names = now;
+            self.lua_info = crate::modpack::lua_info();
         }
     }
 
@@ -1420,23 +1433,41 @@ impl SettingsUi {
         }
     }
 
+    /// The DATs page (`lua` false) or the Mods page turned to.
+    pub fn goto_page(&mut self, lua: bool) {
+        self.goto(if lua { MODS } else { PACKS }, 0);
+        self.m_mods = (0, 0);
+    }
+
     /// The modern DAT Packs or Mods page is the one open.
     pub fn on_mods_page(&self) -> bool {
         self.on_mods()
     }
 
     /// The page's installed packs or mods (name, on) in order, then its offers: archives found and catalogue entries.
+    /// A Lua mod goes by its mod.toml's name.
     pub fn mods_rows(&self) -> (Vec<(String, bool)>, Vec<super::modsui::Offer>) {
-        let packs = self.on_page().into_iter().map(|k| (self.s.mods[k].name.clone(), self.s.mods[k].enabled)).collect();
+        let name = |n: &String| self.lua_info.get(n).map_or_else(|| n.clone(), |i| i.name.clone());
+        let packs = self.on_page().into_iter().map(|k| (name(&self.s.mods[k].name), self.s.mods[k].enabled)).collect();
         (packs, self.offers())
+    }
+
+    /// The page's installed pack or mod `i`'s folder (a Lua mod's id).
+    pub fn mod_id(&self, i: usize) -> Option<String> {
+        self.on_page().get(i).map(|&k| self.s.mods[k].name.clone())
     }
 
     /// The page's pack or mod `i` on or off.
     pub fn mod_enable(&mut self, i: usize, on: bool) {
         if let Some(&k) = self.on_page().get(i) {
+            let lua = self.lua_page();
             let m = &mut self.s.mods[k];
             self.dirty |= m.enabled != on;
             m.enabled = on;
+            // A Lua mod starts or stops at once (in game).
+            if lua {
+                self.mod_changes.push((m.name.clone(), super::lua::ENABLED.into(), on.into()));
+            }
             self.sounds.push(Se::Select);
         }
     }
@@ -1458,6 +1489,9 @@ impl SettingsUi {
     /// The page's pack or mod `i` removed: its folder deleted and its entry dropped.
     pub fn mod_remove(&mut self, i: usize) {
         let Some(&k) = self.on_page().get(i) else { return };
+        if self.lua_page() {
+            self.mod_changes.push((self.s.mods[k].name.clone(), super::lua::ENABLED.into(), false.into()));
+        }
         if super::modsui::remove_folder(&self.s.mods[k].name) {
             let m = self.s.mods.remove(k);
             self.lua_names.remove(&m.name);
@@ -1586,7 +1620,7 @@ mod tests {
     #[test]
     fn mod_rows_on_our_tabs() {
         let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
-        let row = |key: &str, tab: &str, place| ModRow { key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place, place_modern: None };
+        let row = |key: &str, tab: &str, place| ModRow { preview: None, key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place, place_modern: None };
         ui.set_mod_pages(vec![ModPage { id: "m".into(), name: "M".into(), rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)] }]);
         assert_eq!((ui.mod_pages.len(), ui.mod_pages[0].rows.len()), (1, 1));
         ui.tab = 3;
@@ -1596,29 +1630,6 @@ mod tests {
         ui.set(shown[0].val, 1);
         assert_eq!(ui.mod_changes, [("m".to_string(), "first".to_string(), serde_json::Value::from(3))]);
         assert_eq!(ui.get(shown[0].val), 1);
-    }
-
-    /// The Extras tabs with the bundled mods' rows read as they did before those Extras became mods.
-    #[test]
-    fn extras_rows_keep_their_order() {
-        let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
-        let rows = crate::client::lua::bundled_tab_rows()
-            .into_iter()
-            .map(|(label, tab, place, place_modern)| ModRow { key: label.clone(), label, help: String::new(), choices: vec![("ON".into(), true.into()), ("OFF".into(), false.into())], at: 0, tab, place, place_modern })
-            .collect();
-        ui.set_mod_pages(vec![ModPage { id: "bundled".into(), name: "Bundled".into(), rows }]);
-        let tab = |ui: &mut SettingsUi, t: usize| {
-            ui.tab = t;
-            ui.rows().iter().map(|r| r.label.clone()).collect::<Vec<_>>()
-        };
-        assert_eq!(tab(&mut ui, 0), ["Map Overlay", "Map Overlay Opacity", "Minimap", "Minimap Position", "Minimap Size"]);
-        assert_eq!(tab(&mut ui, 2), ["Target Distance", "Target HP %", "Trust Speech", "Ready Lines", "Battle Text", "Battle Names"]);
-        assert_eq!(tab(&mut ui, 3), ["Synthesis Amount", "Timestamps on All Lines", "Clock", "Text Auto-Advance"]);
-        // The Timers tab differs by UI (Timers Position is the classic one's).
-        ui.s.modern_ui = false;
-        assert_eq!(tab(&mut ui, 1), ["Timers", "Timers Position", "Training Regime", "Skillchain Helper"]);
-        ui.s.modern_ui = true;
-        assert_eq!(tab(&mut ui, 1), ["Timers", "Training Regime", "Skillchain Helper"]);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 local hold = require("src.hold")
 
 local function on_out(p)
-  -- A packet another mod dropped (Gearshift sends its own copy) is not ours to hold.
+  -- A packet another mod dropped (Gearshift sends a copy of it) is not ours to hold.
   if p.blocked or not settings.get("on") then return nil end
   hold.holds.items, hold.holds.shots = settings.get("items"), settings.get("shots")
   return hold.out(p.id, p.data, clock())

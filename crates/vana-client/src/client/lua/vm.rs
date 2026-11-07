@@ -41,6 +41,7 @@ end
 #[derive(Clone)]
 pub(super) enum Source {
     Dir(PathBuf),
+    #[cfg_attr(not(test), allow(dead_code))]
     Bundled(&'static [(&'static str, &'static str)]),
 }
 

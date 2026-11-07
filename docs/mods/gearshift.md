@@ -28,8 +28,8 @@ Files a GearSwap file `include`s are looked for in the same GearSwap folders.
   `status_change`, `buff_change`, `sub_job_change` and `self_command`. `equip`, `set_combine`, `sets`, `empty`,
   `player`, `world`, `buffactive`, `pet`, `party`, `cancel_spell`, `change_target`, `disable` / `enable`,
   `midaction`, `send_command` (`input`, `wait`, `gs`, `bind` / `unbind`), `add_to_chat`, `include`, and the
-  `windower.ffxi` getters most files use. Two of GearSwap's own libraries are built in, used when you have no copy
-  of your own: `Modes.lua` (`M(...)` modes: `value`, `current`, `cycle`, `toggle`, `set`, `reset` and the rest) and
+  `windower.ffxi` getters most files use. Two of GearSwap's libraries are built in, used when you have no copy
+  of them: `Modes.lua` (`M(...)` modes: `value`, `current`, `cycle`, `toggle`, `set`, `reset` and the rest) and
   `organizer-lib` (nothing to do here). The `texts` library draws on the HUD: boxes with `${name}` fields, `\cs(r,g,b)`
   colours, background, outline, position, size, show and hide.
 - **LuAshitacast profiles:** `OnLoad` / `OnUnload`, `HandleDefault` on every send tick while no action is under way,
@@ -47,7 +47,7 @@ Files a GearSwap file `include`s are looked for in the same GearSwap folders.
   Ashitacast's do, odd cases included (string `!=` in a rule never matches, `*` in an advanced rule multiplies);
   what only hangs or crashes Ashitacast (a negative number, a division by zero, a set that is its own baseset) does
   what was meant, and `fastcast` / `snapshot` shorten the wait after an action as documented. A v3 file
-  (`idlegear`, `premagic`, `buffactive` and so on) is read through Ashitacast's own v3 import rules.
+  (`idlegear`, `premagic`, `buffactive` and so on) is read through Ashitacast's v3 import rules.
 - **Spellcast files:** an action's command line (`/ma`, `/ja`, `/ws`, `/pet`, `/nin`, `/so`, `/ra` and their long
   forms; typed, a macro or a menu's line) is read against the rules once: the precast set goes on, the line goes to
   the game (as Spellcast wrote it: names in any case, numerals for roman, a missing target filled in), the midcast
@@ -72,7 +72,7 @@ order in one batch.
 - `/ac load [file]`, `/ac reload`, `/ac unload`, `/ac set <set> [ms]`, `/ac enable|disable [slot]`, `/ac naked`,
   `/ac setvar <name> <value>`, `/ac clearvar <name>`, `/ac clearvars`, `/ac eval <text>`, `/ac print vars|uvars`,
   `/ac debug`. A profile's `<commands>` take the lines they match first.
-- `/sc` (while a Spellcast file is loaded; otherwise the game's own) or `//spellcast`: `file`, `reload`, `info`,
+- `/sc` (while a Spellcast file is loaded; otherwise the game's) or `//spellcast`: `file`, `reload`, `info`,
   `group`, `set`, `naked`, `disable`, `enable`, `debug`, `var set|rem|inc|dec|list|clear`.
 - `//gearshift` says which file is loaded; `//gearshift reload` loads it again.
 
@@ -81,9 +81,9 @@ order in one batch.
 - GearSwap: `filtered_action`, `cast_delay`, `move_spell_target`, pet hooks, `pet_change`, `buff_refresh`,
   `party_buff_change`, `indi_change`; `export` and `validate`; `windower.text` draws nothing (the `texts` library
   does), and a `texts` box can't be dragged. Mote's other libraries (`Mote-Include` and its family) are not shipped
-  (they carry no licence): put your own copies beside your files.
+  (they carry no licence): put copies of them beside your files.
 - LuAshitacast: `ChangeActionId`, `LockStyle`, `AddSet`, `CompareItem`, pet actions; augments are compared loosely
-  (as GearSwap compares them), not with LuAshitacast's own wording; only the parts of `AshitaCore` most profiles use
+  (as GearSwap compares them), not with LuAshitacast's wording; only the parts of `AshitaCore` most profiles use
   (chat commands, the player's jobs and levels).
 - Ashitacast XML: `/ac addset`, `newxml`, `import` (v3 files are read directly instead), `gear`, `validate`, the
   packer commands; slots the server marks encumbered are not skipped; augments are compared loosely, as above.

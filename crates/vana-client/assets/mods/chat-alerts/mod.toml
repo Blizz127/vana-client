@@ -17,6 +17,7 @@ max = 21
 step = 1
 label = "Sound"
 help = "Which of the game's call sounds (<call0> to <call21>) plays."
+preview_sound = 17
 
 [settings.tells]
 type = "bool"

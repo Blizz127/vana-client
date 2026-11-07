@@ -2,7 +2,7 @@
 -- names them), a LuAshitacast profile (ashitacast/<Name>_<Id>/<JOB>.lua or ashitacast/<Name>_<JOB>.lua) or an
 -- Ashitacast XML profile (the same names, .xml), loaded for the main job, all run around the action packets we send:
 -- the gear before an action, the action, the gear after it, in one batch. Or a Spellcast XML file (spellcast/), run
--- from the action's command line on Spellcast's own clock.
+-- from the action's command line on Spellcast's clock.
 
 local core = require("src.core")
 local gs = require("src.gs")
@@ -121,7 +121,7 @@ end)
 commands.register("gs", function(...) gs.command({ ... }) end)
 commands.register("lac", function(...) lac.command({ ... }) end)
 commands.register("ac", function(...) acxml.command({ ... }) end)
--- /sc is the game's own (search comment) until a Spellcast file is loaded; then the typed filter takes it.
+-- /sc is the game's (search comment) until a Spellcast file is loaded; then the typed filter takes it.
 commands.register("spellcast", function(...) spellcast.command({ ... }) end)
 commands.register("gearshift", function(cmd)
   cmd = (cmd or ""):lower()

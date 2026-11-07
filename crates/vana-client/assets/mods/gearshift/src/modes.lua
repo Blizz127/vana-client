@@ -1,6 +1,6 @@
 -- Modes for GearSwap files, as `include('Modes.lua')` gives them: M('a', 'b'), M{['description'] = 'X', 'a', 'b'},
 -- M(false, 'X') and M{['string'] = 'x'}, a list, boolean or string mode with a current value. Ours, written to the
--- calls files make; a player's own Modes.lua beside the files is used instead.
+-- calls files make; a player's Modes.lua beside the files is used instead.
 
 local methods = {}
 local meta = {}

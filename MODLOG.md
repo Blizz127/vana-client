@@ -23052,7 +23052,7 @@ until it was up.
 
 Ours, not retail (retail has neither). client/portrait.rs, render/portrait.rs, ZoneRenderer::render_portrait,
 lua/hud.rs (Kind::Portrait, Kind::Bubble, bubble_tris).
-- `hud.portrait`: an actor posed this frame drawn again, alone, after the scene pass: the skinned pipeline with its own
+- `hud.portrait`: an actor posed this frame drawn again, alone, after the scene pass: the skinned pipeline with separate
   uniforms (frame_uniforms: this frame's lighting, fog and areas from the portrait camera) and globals bind group per
   slot, into a target twice the shown size (steps of 16; bilinear down to the shown size smooths it), cleared to the
   element's backing (premultiplied). Then render/portrait.rs cuts it to the inscribed oval (blend ZERO / SRCALPHA) and
@@ -23086,9 +23086,9 @@ those are tested with fed lines only. Facts from the zone dialogue DATs of our i
   stages, "A dreadful energy emanates ..." / "The oppressive energy passes." (inferred: the fracture's progress and its
   boss); the Delve I time lines 7332..7337 of 264 / 271. Kills are estimated as plasmon does (a gain that is a multiple
   of 50 but not of 500, 750 or 10000 is gain / 50 kills, else one).
-- Odyssey and Sortie lines are not in their zones' own dialogue files but in files numbered as zones 2019..2026 (Sheol
+- Odyssey and Sortie lines are not in their zones' dialogue files but in files numbered as zones 2019..2026 (Sheol
   A, B, C, Gaol) and 2030..2032 (Sortie); 298 / 279 and 275 / 133 / 189 hold only the common block. Inferred, not
-  traced: our zone_text always loads the zone's own file, so retail's ids there would print the wrong entries.
+  traced: our zone_text always loads the zone's file, so retail's ids there would print the wrong entries.
   Sheol: 7239 izzat, 7248 Moogle Mastery, 7249 "You receive N moogle segments for a total of M.", 7252 translocators,
   7230 extensions; Gaol 7253 RP. Rabao 12109 "Entering Sheol B: Difficult." names the area and difficulty; 298 / 279
   also host Selbina's fights, so a run counts only from Rabao. The moglophone is key item 3212 (3234..3236 the II);

@@ -49,7 +49,7 @@ local SLOT = { main = 0, sub = 1, range = 2, ammo = 3, head = 4, body = 5, hands
   waist = 10, lear = 11, rear = 12, lring = 13, rring = 14, back = 15 }
 local SLOT_NAME = {}
 for k, v in pairs(SLOT) do SLOT_NAME[v] = k end
--- The names `sc disable` / `enable` and those actions take, as Spellcast's own table has them.
+-- The names `sc disable` / `enable` and those actions take, as Spellcast's table has them.
 local SLOT_ALIASES = { { 1, "sub|off*|shield|grip" }, { 2, "range*|bow|gun" }, { 3, "ammo|throw*" }, { 9, "neck*" },
   { 11, "l*ear*|ear*1" }, { 12, "r*ear*|ear*2" }, { 13, "lring|l.ring|ring*1" }, { 14, "rring|r.ring|ring*2" },
   { 15, "back|cape" }, { 10, "waist|belt" }, { 7, "legs|pants" }, { 8, "feet|boot*|foot" }, { 4, "head|hat" },
@@ -1044,7 +1044,7 @@ local function send_line(line)
   commands.run(line)
 end
 
--- Windower's console: `;` between commands, `wait N`, `input <line>`, and Spellcast's own `sc ...`.
+-- Windower's console: `;` between commands, `wait N`, `input <line>`, and Spellcast's `sc ...`.
 console = function(text)
   local delay = 0
   for part in (text .. ";"):gmatch("(.-);") do
