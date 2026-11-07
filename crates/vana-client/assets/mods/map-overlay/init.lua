@@ -1,6 +1,7 @@
--- The zone map over the game (the map add-ons). Ctrl or Alt + O opens and closes it: the map we stand on (one we have
--- and own) in a box in the middle of the screen at the set opacity, our marker on it. A left drag pans it, the wheel
--- zooms at the pointer (the whole map up to 8x), Escape closes it. It follows us across zones and map pages.
+-- The zone map over the game (the map add-ons). Ctrl or Alt + O opens and closes it: in a box in the middle of the
+-- screen at the set opacity, what the map window shows where we stand (the map with our marker; retail's NO MAP while
+-- the map is not ours, or not ours yet), the error sound where no map exists. A left drag pans it, the wheel zooms at
+-- the pointer (the whole map up to 8x), Escape closes it. It follows us across zones and map pages.
 
 local BOX, MAX_ZOOM = 0.7, 8
 local open = false
@@ -26,7 +27,6 @@ end
 local function close()
   open, view, drag = false, nil, nil
   hud.remove("overlay")
-  hud.remove("overlay_empty")
   hud.remove("overlay_edge")
 end
 
@@ -47,14 +47,12 @@ local function show()
   end
   local m = game.map()
   local x, y, side = box()
-  -- No map here (none, not ours, or not in yet): the box, empty, until there is one.
+  -- Open where no map exists (it zoned there): nothing shows until there is a map again.
   if not m then
     hud.remove("overlay")
-    hud.rect("overlay_empty", { x = x, y = y, w = side, h = side, colour = { 0, 0, 0, math.floor(160 * settings.get("opacity")) } })
-    edge(x, y, side)
+    hud.remove("overlay_edge")
     return
   end
-  hud.remove("overlay_empty")
   -- A new zone, map page or window size: the whole map again.
   local key = table.concat({ m.zone, m.number, side }, ":")
   if not view or seen ~= key then
@@ -77,17 +75,16 @@ local function show()
   edge(x, y, side)
 end
 
--- With no map here (yet) the error sound plays, and it opens empty: the map shows once there is one.
+-- Where no map exists the error sound plays and it stays shut.
 local function toggle()
   if open then
     close()
-    return
-  end
-  if not game.map() then
+  elseif not game.map() then
     audio.play_ui(4)
+  else
+    open = true
+    show()
   end
-  open = true
-  show()
 end
 
 -- The keys while the overlay is switched on in Extras.

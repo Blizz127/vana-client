@@ -1494,7 +1494,7 @@ impl Host {
         let mut m = self.map.borrow_mut();
         match m.as_mut() {
             Some(o) if o.zone == w.pos_zone => o.follow(w, regions),
-            _ => *m = Some(super::map::Overlay::open(w, regions)),
+            _ => *m = Some(super::map::Overlay::open_hud(w, regions)),
         }
         m.as_mut()?.modern_image()
     }

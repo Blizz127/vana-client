@@ -2146,9 +2146,11 @@ pub fn grid_text(w: &World, regions: &[Region]) -> String {
     }
 }
 
-/// The map shown for where we stand (one the client would show: a map it needs and we own), for Lua mods.
-pub(super) fn current(w: &World, regions: &[Region]) -> Option<Region> {
-    Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r))
+/// The map record for where we stand and how the map window shows it (FUN_101f8360); none where no map exists
+/// ("There is no map for this area.").
+pub(super) fn record(w: &World, regions: &[Region]) -> Option<(Region, Show)> {
+    let r = Region::here(regions, w)?;
+    Some((r, if r.need() == Need::Nothing { Show::NoMapNeeded } else if owned(w, &r) { Show::Map } else { Show::NotOwned }))
 }
 
 fn owned(w: &World, region: &Region) -> bool {
@@ -2164,6 +2166,10 @@ fn owned(w: &World, region: &Region) -> bool {
 pub struct Overlay {
     pub zone: u16,
     region: Option<Region>,
+    /// What it shows of the record (HUD maps; the minimap shows only an owned map): the map, retail's NO MAP image
+    /// over the map's place while we don't own it, or a record needing no map's image (no marker).
+    show: Show,
+    hud: bool,
     texture: Option<String>,
     shade: Option<Shade>,
     rx: Option<Receiver<ShadedLoaded>>,
@@ -2171,27 +2177,55 @@ pub struct Overlay {
     image: Option<([usize; 2], Arc<Vec<u8>>)>,
 }
 
-/// What the modern layer draws a map from: the image's name, size and pixels and the map's region.
+/// What the modern layer draws a map from: the image's name, size and pixels, the map's region, and whether our
+/// marker goes on it.
 pub struct MapImage {
     pub name: String,
     pub size: [usize; 2],
     pub rgba: Arc<Vec<u8>>,
     pub region: Region,
+    pub marker: bool,
+}
+
+/// A record's showing, as the map window shows it (FUN_101f8360): the map; NO MAP while not owned, the markers where
+/// they would be on the map; or a record needing no map (0x180): its image, no marker.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Show {
+    Map,
+    NotOwned,
+    NoMapNeeded,
 }
 
 impl Overlay {
+    /// The minimap's: an owned map only.
     pub fn open(w: &World, regions: &[Region]) -> Self {
         let region = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
         Self::new(w.pos_zone, region, w.index.clone())
     }
 
-    pub fn new(zone: u16, region: Option<Region>, index: Option<Arc<DatIndex>>) -> Self {
-        let rx = region.zip(index).map(|(r, index)| load_shaded(index, r.file_id()));
-        Self { zone, region, texture: None, shade: None, rx, image: None }
+    /// A HUD map's: whatever the map window shows for where we stand (`record`).
+    pub fn open_hud(w: &World, regions: &[Region]) -> Self {
+        let rec = record(w, regions);
+        let file = rec.map(|(r, show)| if show == Show::NotOwned { NO_MAP } else { r.file_id() });
+        let rx = file.zip(w.index.clone()).map(|(f, index)| load_shaded(index, f));
+        Self { zone: w.pos_zone, region: rec.map(|r| r.0), show: rec.map_or(Show::Map, |r| r.1), hud: true, texture: None, shade: None, rx, image: None }
     }
 
-    /// The player crossed onto another page of the zone (Windurst Waters' north and south): that map.
+    pub fn new(zone: u16, region: Option<Region>, index: Option<Arc<DatIndex>>) -> Self {
+        let rx = region.zip(index).map(|(r, index)| load_shaded(index, r.file_id()));
+        Self { zone, region, show: Show::Map, hud: false, texture: None, shade: None, rx, image: None }
+    }
+
+    /// The player crossed onto another page of the zone (Windurst Waters' north and south), or now owns the map (its
+    /// key item came in): that map.
     pub fn follow(&mut self, w: &World, regions: &[Region]) {
+        if self.hud {
+            let rec = record(w, regions);
+            if rec.map(|r| r.0) != self.region || rec.map(|r| r.1) != Some(self.show).filter(|_| self.region.is_some()) {
+                *self = Self::open_hud(w, regions);
+            }
+            return;
+        }
         let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
         if here != self.region {
             *self = Self::new(w.pos_zone, here, w.index.clone());
@@ -2234,7 +2268,7 @@ impl Overlay {
     pub fn modern_image(&mut self) -> Option<MapImage> {
         self.receive();
         let (Some(name), Some((size, rgba)), Some(region)) = (&self.texture, &self.image, self.region) else { return None };
-        Some(MapImage { name: name.clone(), size: *size, rgba: rgba.clone(), region })
+        Some(MapImage { name: name.clone(), size: *size, rgba: rgba.clone(), region, marker: self.show != Show::NoMapNeeded })
     }
 
     /// The image once it is decoded, in the game UI's textures.
@@ -2267,7 +2301,7 @@ impl Overlay {
         let (px, py) = (centre.0 * s, -centre.1 * s);
         gu.clip(Some(rect));
         gu.image_rect(&t, cx + (region.ox as f32 - px) * z, cy + (region.oy as f32 - py) * z, 512.0 * z, 512.0 * z, [1.0, 1.0, 1.0, alpha]);
-        if let Some(((x, wz), facing)) = me {
+        if let Some(((x, wz), facing)) = me.filter(|_| self.show != Show::NoMapNeeded) {
             let (mx, my) = (x * s, -wz * s);
             marker(gu, cx + (mx - px) * z, cy + (my - py) * z, facing, self.shade_at(&region, mx, my) * alpha);
         }

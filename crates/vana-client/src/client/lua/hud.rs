@@ -525,7 +525,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 let mut m = w.lua.map.borrow_mut();
                 match m.as_mut() {
                     Some(o) if o.zone == w.pos_zone => o.follow(w, &regions),
-                    _ => *m = Some(super::super::map::Overlay::open(w, &regions)),
+                    _ => *m = Some(super::super::map::Overlay::open_hud(w, &regions)),
                 }
                 if let Some(o) = m.as_mut() {
                     let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));

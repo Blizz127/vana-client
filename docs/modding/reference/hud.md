@@ -210,9 +210,10 @@ end)
 hud.map(id, spec)
 ```
 
-Creates or replaces a window onto the map of the place the player is in: the same map the client shows there (see
-`game.map`). By default it is centred on the player and follows them. Where the client has no map for the place,
-nothing is drawn.
+Creates or replaces a window onto the map of the place the player is in, showing what the map window shows there
+(see `game.map`): the map; the game's NO MAP image over the map's place while the map is not yours (or not known to be
+yet), the marker still where you are; or a record's own image where the place needs no map, without a marker. By
+default it is centred on the player and follows them. Where no map exists, nothing is drawn.
 
 **Parameters**
 

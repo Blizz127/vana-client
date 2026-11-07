@@ -936,11 +936,11 @@ function game.job_data() end
 ---@return table?
 function game.macros() end
 
---- The map the client shows where we stand (a map it has and we own): {zone, number (the map's page), file (its DAT id), scale, origin {x, y} (the image's top left in map pixels), size (512), px_per_unit (map pixels per world unit)}; nil with none.
+--- The map record where we stand, as the map window shows it: {kind ('map'; 'not_owned': retail's NO MAP shows while we don't have the map, markers where they would be; 'no_map_needed': the record's image, no marker), owned, zone, number (the map's page), file (its DAT id), scale, origin {x, y} (the image's top left in map pixels), size (512), px_per_unit (map pixels per world unit)}; nil where no map exists.
 ---@return table?
 function game.map() end
 
---- A world position (x, z) as a pixel on the current map's 512 x 512 image; nil without a map.
+--- A world position (x, z) as a pixel on the current map's 512 x 512 image (also while the map is not ours); nil where no map exists or the record needs none.
 ---@param x number 
 ---@param z number 
 ---@return integer?, integer?

@@ -288,8 +288,16 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, ()| {
             let w = world(lua)?;
             let gu = super::api::gu(lua)?;
-            let Some(r) = super::super::map::current(w, gu.map_regions()) else { return Ok(None) };
+            use super::super::map::Show;
+            let Some((r, show)) = super::super::map::record(w, gu.map_regions()) else { return Ok(None) };
             let t = lua.create_table()?;
+            // As the map window shows it: the map, NO MAP while not ours, or a record that needs no map.
+            t.set("kind", match show {
+                Show::Map => "map",
+                Show::NotOwned => "not_owned",
+                Show::NoMapNeeded => "no_map_needed",
+            })?;
+            t.set("owned", show == Show::Map)?;
             t.set("zone", r.zone)?;
             t.set("number", r.num)?;
             t.set("file", r.file_id())?;
@@ -307,7 +315,8 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, (x, z): (f32, f32)| {
             let w = world(lua)?;
             let gu = super::api::gu(lua)?;
-            let Some(r) = super::super::map::current(w, gu.map_regions()) else { return Ok((None, None)) };
+            // Also while the map is not ours: the map window puts markers there on NO MAP.
+            let Some((r, _)) = super::super::map::record(w, gu.map_regions()).filter(|r| r.1 != super::super::map::Show::NoMapNeeded) else { return Ok((None, None)) };
             // The pixel on the map's 512 x 512 image (its top left at the map pixel `origin`).
             let (px, py) = r.px(x, z);
             Ok((Some(px - r.ox as i32), Some(py - r.oy as i32)))

@@ -829,12 +829,14 @@ Run one with `actions.macro("ctrl", i)`; switch with `actions.macro_set(book, se
 game.map() -> table?
 ```
 
-The map the client shows for where you stand (a map the zone has and you own). Use it with `game.map_pos` and `hud.map` to draw on the map.
+The map record for where you stand, and how the map window shows it. Use it with `game.map_pos` and `hud.map` to draw on the map.
 
-**Returns** `table?`: nil when there is no such map. Otherwise:
+**Returns** `table?`: nil where no map exists (the map window says "There is no map for this area."). Otherwise:
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `kind` | `string` | `"map"`: the map, which you own. `"not_owned"`: the map exists but you don't have it (or the client doesn't know you do yet, just after zoning): the map window, and `hud.map`, show the game's NO MAP image over the map's place, markers where they would be. `"no_map_needed"`: a record whose place needs no map: its own image, no markers. |
+| `owned` | `boolean` | `kind == "map"`. |
 | `zone` | `integer` | The zone the map belongs to. |
 | `number` | `integer` | The map's number within the zone. |
 | `file` | `integer` | The map image's game file id (`res.dat(file)` reads it). |
@@ -860,7 +862,8 @@ end
 game.map_pos(x, z) -> integer?, integer?
 ```
 
-Where a world position falls on the current map's 512 x 512 image.
+Where a world position falls on the current map's 512 x 512 image. It answers while the map is not yours too (the map
+window puts its markers there over NO MAP); nil where no map exists or the record needs none.
 
 **Parameters**
 

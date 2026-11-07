@@ -139,7 +139,7 @@ fn element(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World, painter: &eg
             let clipped = painter.with_clip_rect(r);
             let img_r = Rect::from_min_size(r.center() + vec2((img.region.ox as f32 - mx) * z, (img.region.oy as f32 - my) * z), vec2(512.0 * z, 512.0 * z));
             clipped.image(tex, img_r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::from_white_alpha((255.0 * alpha.clamp(0.0, 1.0)) as u8));
-            if *me {
+            if *me && img.marker {
                 let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));
                 let p = r.center() + vec2((w.pos.x * s - mx) * z, (-w.pos.z * s - my) * z);
                 super::extras::arrow_in(&clipped, p, facing, 11.0, super::extras::ME);
