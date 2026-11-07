@@ -377,6 +377,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Mining or Excavation Point (the point's event start, s2c 0x032 / 0x034: LandSandBoat's HELM puts what was found and
   whether the tool broke in its first params) counted by kind with the success rate, broken tools and the items found
   (`//gather reset`). Seen live in Ghelsba Outpost: two logging tries, one Elm Log. Not yet: chocobo digging, fishing.
+- **Casket Solver** (assets/mods/casket-solver; boxdestroyer, BoxHelper): treasure casket combinations 10..99 narrowed
+  by the hint lines (LandSandBoat's caskets: greater / less, even / odd digits, one digit is N, a digit is one of
+  three) and wrong guesses; after each, how many are left (listed when 12 or fewer) and the middle one to try. A Rust
+  test walks a casket to its answer; not seen live (it needs a casket drop).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.

@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log", "casket-solver",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2273,6 +2273,39 @@ mod tests {
             assert(texts.l1 == "Forest Hare readies Foot Kick.", texts.l1)
             assert(texts.l2 == "Forest Hare starts casting Fire on Lnxcsfix.", texts.l2)
             assert(texts.l3 == nil and calls == 1)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Casket Solver: hint lines narrow 10..99; the answer comes when one is left.
+    #[test]
+    fn casket_solver_narrows() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "casket-solver").unwrap().2;
+        let vm = Vm::new(bundled_manifest("casket-solver").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local F, T, said = nil, nil, {}
+            settings = { get = function() return true end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function(_, f) T = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            text = { strip = function(t) return t end }
+            load(INIT)()
+            F("The monster was concealing a treasure chest!")
+            F("You have a hunch that the combination is greater than 40 and less than 60.")
+            T()
+            assert(said[#said] == "Casket Solver: 19 left. Try 50.", said[#said])
+            F("You have a hunch that the first digit is odd.")
+            F("You have a hunch that the second digit is 2, 7, or 9.")
+            T()
+            assert(said[#said] == "Casket Solver: 3 left: 52, 57, 59. Try 57.", said[#said])
+            F("You have a hunch that the lock's combination is greater than 57.")
+            T()
+            assert(said[#said] == "Casket Solver: the combination is 59.", said[#said])
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
