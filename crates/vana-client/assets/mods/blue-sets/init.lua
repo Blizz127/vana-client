@@ -1,7 +1,28 @@
 -- Named blue magic sets (the blue magic set add-ons): //blu save | <name> | list | delete. Slots 1..20 as
--- actions.blue_set numbers them; the server refuses spells over the job's points or level.
+-- actions.blue_set numbers them; the server refuses spells over the job's points or level. //blu codex: every blue
+-- spell, learned or not, and the monster moves that teach it; a line and a call when a monster readies a move that
+-- teaches one we lack (BLUAlert), and a call when one is learned.
 
+local LEARN = require("src.learn")
 local BLU = 16
+local CODEX = "blucodex"
+
+-- The blue spells each monster move teaches.
+local TAUGHT = {}
+for sp, e in pairs(LEARN) do
+  for _, m in ipairs(e[2]) do
+    TAUGHT[m] = TAUGHT[m] or {}
+    table.insert(TAUGHT[m], sp)
+  end
+end
+
+local function known()
+  local t = {}
+  for _, id in ipairs(game.spells() or {}) do t[id] = true end
+  return t
+end
+
+local function blu_level(r) return r.levels and r.levels[BLU] end
 
 local function setup()
   local d = game.job_data()
@@ -61,6 +82,108 @@ local function put_on(name, spells)
     or ("Blue Magic Sets: %s is set, but not: %s (the server refused them)."):format(name, table.concat(missing, ", ")))
 end
 
+-- ---- The codex ----
+
+local FILTERS = { "Missing", "Learned", "All" }
+local view = 1
+
+local function codex_rows()
+  local k = known()
+  local list, have = {}, 0
+  for sp, e in pairs(LEARN) do
+    local r = res.spell(sp)
+    if r and r.name then
+      local learned = k[sp] == true
+      if learned then have = have + 1 end
+      if view == 3 or (view == 1 and not learned) or (view == 2 and learned) then
+        local moves = {}
+        for _, m in ipairs(e[2]) do moves[#moves + 1] = res.mob_skill(m) or ("move " .. m) end
+        list[#list + 1] = { id = sp, level = blu_level(r) or 999, name = r.name, learned = learned, points = e[1],
+          moves = table.concat(moves, ", ") }
+      end
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.level ~= b.level then return a.level < b.level end
+    return a.name < b.name
+  end)
+  local rows = {}
+  for _, x in ipairs(list) do
+    rows[#rows + 1] = { x.name, x.level == 999 and "" or tostring(x.level), tostring(x.points), x.moves,
+      icon = { kind = "spell", id = x.id }, colour = x.learned and nil or { 200, 200, 200 } }
+  end
+  return rows, have
+end
+
+local function codex()
+  local rows, have = codex_rows()
+  local total = 0
+  for _ in pairs(LEARN) do total = total + 1 end
+  ui.window(CODEX, {
+    title = "Blue Magic Codex", width = 640,
+    elements = {
+      { type = "text", id = "count", text = ("%d of %d learned"):format(have, total) },
+      { type = "tabs", id = "filter", items = FILTERS, at = view },
+      { type = "list", id = "spells", rows = rows, height = 14,
+        columns = { { title = "Spell", width = 200 }, { title = "Lvl", width = 40, align = "right" },
+          { title = "Pts", width = 40, align = "right" }, { title = "Learned from", width = 320 } } },
+    },
+  })
+end
+
+ui.on(CODEX, function(_, e)
+  if e.kind == "set" and e.id == "filter" then
+    view = e.index
+    local rows = codex_rows()
+    ui.update(CODEX, "spells", { rows = rows, at = 1 })
+  end
+end)
+
+-- ---- Learnable moves and new spells ----
+
+local function call() if settings.get("alert_sound") then audio.play_ui(18) end end
+
+events.on("action", function(a)
+  if not settings.get("on") or not settings.get("alert") or a.category ~= 7 or a.param == 28787 then return end
+  local p = game.player()
+  if not p or p.main_job ~= BLU then return end
+  local mob = game.entity(a.actor)
+  local t = a.targets and a.targets[1]
+  local r = t and t.results and t.results[1]
+  local teaches = r and TAUGHT[r.value]
+  if not mob or mob.kind ~= "mob" or not teaches then return end
+  local k, out = known(), {}
+  for _, id in ipairs(teaches) do
+    local s = res.spell(id)
+    if s and not k[id] then
+      local lvl = blu_level(s)
+      out[#out + 1] = s.name .. ((lvl and lvl > (p.main_level or 0)) and (" at level " .. lvl) or "")
+    end
+  end
+  if #out == 0 then return end
+  chat.add(("Blue Magic: %s readies %s, which teaches %s."):format(mob.name, res.mob_skill(r.value) or "a move", table.concat(out, ", ")))
+  call()
+end)
+
+-- A spell learned since the last look: a call (the game prints the line).
+local had
+timer.every(2, function()
+  if not settings.get("on") then return end
+  local k = known()
+  local now = {}
+  for sp in pairs(LEARN) do now[sp] = k[sp] end
+  if had then
+    for sp in pairs(LEARN) do
+      if now[sp] and not had[sp] then
+        call()
+        if ui.is_open(CODEX) then codex() end
+        break
+      end
+    end
+  end
+  had = now
+end)
+
 commands.register("blu", function(cmd, ...)
   if not settings.get("on") then return end
   local name = table.concat({ cmd or "", ... }, " "):match("^%s*(.-)%s*$"):lower()
@@ -88,9 +211,13 @@ commands.register("blu", function(cmd, ...)
     end
     table.sort(out)
     chat.add("Blue Magic Sets: " .. (#out > 0 and table.concat(out, ", ") or "none saved"))
+  elseif cmd == "codex" then
+    if ui.is_open(CODEX) then ui.close(CODEX) return end
+    codex()
+    ui.open(CODEX)
   elseif s[name] then
     put_on(name, s[name])
   else
-    chat.add("Blue Magic Sets: //blu save <name>, //blu <name>, //blu list, //blu delete <name>")
+    chat.add("Blue Magic Sets: //blu save <name>, //blu <name>, //blu list, //blu delete <name>, //blu codex")
   end
 end)

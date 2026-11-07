@@ -368,7 +368,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Blue Magic Sets** (assets/mods/blue-sets; azuresets, BlueMagic sets): `//blu save <name>` keeps the 20 slots
   (game.job_data's `blue_slots`), `//blu <name>` changes only the slots that differ, one a second, and names any spell
   not learned; list and delete. Seen live as BLU 75: a three-spell set saved, two slots changed, the set put back in
-  three changes.
+  three changes. `//blu codex` (bludex, blucheck): every blue spell by level, learned or missing, its set points and
+  the monster moves that teach it (LandSandBoat's blue_spell_list, bundled as src/learn.lua). As a Blue Mage a monster
+  readying a move that teaches a spell we lack gives a line and a call (BLUAlert); a spell learned gives the call.
 - **Warp Helper** (assets/mods/warp-helper; SuperWarp, MyHome, Dimmer, Uberwarp, cudgel): `//warp [hp | sg | wp]
   <zone> [number or place]` at a Home Point, Survival Guide or Waypoint (the nearest, run up to when it is a few steps
   away) answers its menus as the player would: the region row from a table read off the menus with every point
