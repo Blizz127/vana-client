@@ -411,6 +411,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   through three rows to the talk's end, Rolandienne's lines passed and "the talk ended before Spark", `//job` refused
   outside a Mog House. Not done: shop-by-item-name searches (Sparks needs Records of Eminence progress to test), the
   Gavlan wheel, Oseem and Ambuscade (not on LandSandBoat); the job change by command not seen in a Mog House.
+- **Completion Log** (assets/mods/completion-log; SpellBook, SpellCheck, XIchecklist, FFXIQuestList and kin): `//left`
+  opens a window with two tabs: Spells (a job's spells not yet learned, by level, dim above the job's level) and Quests
+  (an area's quests, done, under way or not started); `//left spells [job]` and `//left quests` print summaries. New
+  `game.quests` (the Quests window's own data and names). Seen live: BLM's unlearned spells, Windurst's quests, the
+  summaries. Not done: titles, missions, key items, quest markers over NPCs.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

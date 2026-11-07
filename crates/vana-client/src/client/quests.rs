@@ -118,7 +118,7 @@ pub fn busy(w: &World) -> bool {
 
 /// FUN_102333f0: bit `n` of the area's current or completed record; numbers above 1000 are the Mog Garden quests,
 /// 1039..1045 and 1047..1049 at bits 39..45 / 47..49 of area 9.
-fn has(s: &super::journal::Store, area: usize, n: u32, done: bool) -> bool {
+pub(super) fn has(s: &super::journal::Store, area: usize, n: u32, done: bool) -> bool {
     let (area, n) = match n {
         0..=255 => (area, n as usize),
         1039..=1045 | 1047..=1049 => (9, n as usize - 1000),
@@ -126,6 +126,16 @@ fn has(s: &super::journal::Store, area: usize, n: u32, done: bool) -> bool {
     };
     let words = if done { &s.completed[area] } else { &s.current[area] };
     words[n / 32] >> (n % 32) & 1 != 0
+}
+
+/// The journal's names for mods (game.quests): the window's once it opened, else read once for them.
+pub(super) fn names(w: &World) -> Option<std::sync::Arc<crate::dat::journal::Logs>> {
+    static OWN: std::sync::OnceLock<std::sync::Arc<crate::dat::journal::Logs>> = std::sync::OnceLock::new();
+    if let Some(l) = w.logs.clone() {
+        return Some(l);
+    }
+    let index = w.index.clone()?;
+    Some(OWN.get_or_init(|| std::sync::Arc::new(crate::dat::journal::Logs::load(&index))).clone())
 }
 
 /// FUN_10231ec0 / FUN_10231f50: current (and repeatable '+' or not completed) / completed, in file order.

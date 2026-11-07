@@ -269,6 +269,41 @@ for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
 end
 ```
 
+## `game.quests`
+
+```lua
+game.quests() -> table
+```
+
+Every quest area's quests in the journal's order, and where we stand in each, as the server sent it (the Quests
+window's own data).
+
+**Returns** a table keyed by area: 0 San d'Oria, 1 Bastok, 2 Windurst, 3 Jeuno, 4 Other Areas, 5 Outlands, 6 Aht
+Urhgan, 7 Crystal War, 8 Abyssea, 9 Adoulin, 10 Coalition. Each is a list of:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `number` | `integer` | The quest's number in its area. |
+| `name` | `string` | Its name, as the Quests window shows it. |
+| `repeatable` | `boolean` | It can be taken again (the journal marks it). |
+| `current` | `boolean` | It is under way. |
+| `completed` | `boolean` | It has been completed (a repeatable one can be both). |
+
+Areas index from 0, so walk them with `for area = 0, 10` rather than `ipairs`.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local q = game.quests()
+local done = 0
+for _, quest in ipairs(q[0] or {}) do
+  if quest.completed then done = done + 1 end
+end
+print(("San d'Oria: %d of %d done"):format(done, #(q[0] or {})))
+```
+
 ## `game.auction`
 
 ```lua

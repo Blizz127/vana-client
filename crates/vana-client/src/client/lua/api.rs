@@ -805,6 +805,30 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // Every quest area's quests in the journal's order, with ours current or completed (s2c 0x056).
+    game.set(
+        "quests",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            let Some(logs) = super::super::quests::names(w) else { return Ok(out) };
+            for (area, file) in logs.quests.iter().enumerate().take(11) {
+                let list = lua.create_table()?;
+                for e in &file.entries {
+                    let t = lua.create_table()?;
+                    let repeatable = e.name.starts_with('+');
+                    t.set("number", e.number)?;
+                    t.set("name", crate::dat::font::plain(e.name.trim_start_matches('+')))?;
+                    t.set("repeatable", repeatable)?;
+                    t.set("current", super::super::quests::has(&w.journal, area, e.number, false))?;
+                    t.set("completed", super::super::quests::has(&w.journal, area, e.number, true))?;
+                    list.push(t)?;
+                }
+                out.set(area, list)?;
+            }
+            Ok(out)
+        })?,
+    )?;
     // Our auction slots while the auction house is open.
     game.set(
         "auction",

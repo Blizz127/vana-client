@@ -916,6 +916,10 @@ function game.items(bag) end
 ---@return integer?
 function game.bag_size(bag) end
 
+--- The quests of each area (0 San d'Oria, 1 Bastok, 2 Windurst, 3 Jeuno, 4 Other Areas, 5 Outlands, 6 Aht Urhgan, 7 Crystal War, 8 Abyssea, 9 Adoulin, 10 Coalition) in the journal's order: {number, name, repeatable, current, completed} each, ours as the server sent them.
+---@return table<integer, {number: integer, name: string, repeatable: boolean, current: boolean, completed: boolean}[]>
+function game.quests() end
+
 --- While the auction house is open: {slots}, our listings, each {slot, item, count, price, state} (state: listed, sold, returned, sold, collected, returned, collected, being returned, selling); nil when it is closed.
 ---@return {slots: {slot: integer, item: integer, count: integer, price: integer, state: string}[]}?
 function game.auction() end
