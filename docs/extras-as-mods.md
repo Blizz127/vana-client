@@ -210,6 +210,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (game.player gained `away`, `anonymous`, `seeking` from our 0x037 flags) tells are kept and each sender may get one
   Away Reply; back `/online`, they are counted and shown; `//tells` shows them again; `//r <message>` answers the last
   tell. Seen live: /away and /online followed (no tell came in from the bot); a Rust test covers keeping and replies.
+- **Link Catcher** (assets/mods/link-catcher; ChatLink, links): web links in chat get a number (`[1]`); `//links`
+  lists the last 30 to open in the browser or copy, `//links <n>` opens one. Seen live: the server's welcome link
+  numbered and listed (not opened in the test).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
