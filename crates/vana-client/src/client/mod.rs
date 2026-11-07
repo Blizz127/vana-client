@@ -14068,7 +14068,12 @@ impl App {
         };
         let keyboard = matches!(&self.phase, Phase::World(w) if w.swkbd.is_some());
         let ctx = gamepad::Ctx { menu, palette, tabs, field, keyboard };
-        let pad = self.gamepad.poll(&self.cfg, gfx.window.has_focus(), ctx, dt);
+        let phase = &mut self.phase;
+        let mut to_mods = |b: &[u8], a: [f32; 6], on: bool| match phase {
+            Phase::World(w) => lua::input::pad_filter(w, b, a, on),
+            _ => Vec::new(),
+        };
+        let pad = self.gamepad.poll(&self.cfg, gfx.window.has_focus(), ctx, dt, &mut to_mods);
         self.input.set_pad(pad.pad);
         self.input.set_stick(pad.stick);
         if pad.pressed && !self.dragging && !self.left_down {

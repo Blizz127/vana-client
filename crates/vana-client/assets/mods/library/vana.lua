@@ -806,8 +806,17 @@ function input.on_key(handler) end
 ---@return integer
 function input.on_mouse(handler) end
 
---- Removes a key or mouse filter.
----@param id integer what on_key / on_mouse returned
+--- Sees every game controller button press and release before the game does: {button (a, b, x, y, up, down, left, right, lb, rb, lt, rt, l3, r3, start, back), down, blocked}. Return true on a press to take the button from the game until it comes up (needs input.capture); filters chain across mods as on_key's. It is the player's input: actions may act here.
+---@param handler fun(e: {button: string, down: boolean, blocked: boolean}): boolean? 
+---@return integer
+function input.on_pad(handler) end
+
+--- The game controller now: connected (one plays: Settings' gamepad on, the window focused or gamepad_background), buttons {a = true, ...} (held, taken ones too), lx, ly, rx, ry (sticks, -1..1, up positive), lt, rt (triggers, 0..1).
+---@return {connected: boolean, buttons: table<string, boolean>, lx: number, ly: number, rx: number, ry: number, lt: number, rt: number}
+function input.pad() end
+
+--- Removes a key, mouse or pad filter.
+---@param id integer what on_key / on_mouse / on_pad returned
 function input.off(id) end
 
 --- Whether a key is held (a name as on_key gives it, or shift / ctrl / alt / win for either side).

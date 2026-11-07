@@ -147,6 +147,7 @@ pub(super) struct ModState {
     /// Key and mouse filters (docs/lua-mods.md 4.5), and key binds.
     pub key_filters: Vec<(u64, RegistryKey)>,
     pub mouse_filters: Vec<(u64, RegistryKey)>,
+    pub pad_filters: Vec<(u64, RegistryKey)>,
     pub binds: Vec<super::input::Bind>,
     /// Functions other mods may call (mods.provide).
     pub provided: Vec<(String, RegistryKey)>,

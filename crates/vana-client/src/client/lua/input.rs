@@ -184,7 +184,16 @@ pub(super) struct State {
     hud_press: Option<HudPress>,
     /// The HUD element under the pointer (one with a handler or a tip) and since when.
     pub hud_hover: Option<(String, String, std::time::Instant)>,
+    /// The game controller: buttons held (bits by PAD_BUTTONS' order), those a mod took, sticks and triggers
+    /// (lx, ly, rx, ry -1..1 up positive, lt, rt 0..1), and whether one plays.
+    pad: u32,
+    pad_taken: u32,
+    pad_axes: [f32; 6],
+    pad_on: bool,
 }
+
+/// The pad's buttons by the gamepad module's numbers (client/gamepad.rs VIRTUAL): the names mods see.
+const PAD_BUTTONS: [&str; 16] = ["b", "x", "y", "a", "right", "left", "up", "down", "lb", "lt", "l3", "rb", "rt", "r3", "start", "back"];
 
 /// A press on a mod's HUD element: its mod, element, button, where it went down, and whether it is a drag yet.
 type HudPress = (String, String, MouseButton, (f64, f64), bool);
@@ -428,9 +437,28 @@ fn filter(w: &mut World, mouse: bool, e: serde_json::Value) -> bool {
 }
 
 /// As `filter`, the event already taken (`blocked` from the first filter on) when `taken`.
-fn filter_from(w: &mut World, mouse: bool, mut e: serde_json::Value, taken: bool) -> bool {
-    let list = |st: &super::vm::ModState| if mouse { st.mouse_filters.len() } else { st.key_filters.len() };
-    if w.lua.vms.iter().all(|v| list(&v.st.borrow()) == 0) {
+fn filter_from(w: &mut World, mouse: bool, e: serde_json::Value, taken: bool) -> bool {
+    filter_list(w, if mouse { Filters::Mouse } else { Filters::Key }, e, taken)
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Filters {
+    Key,
+    Mouse,
+    Pad,
+}
+
+fn filters_of(st: &super::vm::ModState, kind: Filters) -> &Vec<(u64, RegistryKey)> {
+    match kind {
+        Filters::Key => &st.key_filters,
+        Filters::Mouse => &st.mouse_filters,
+        Filters::Pad => &st.pad_filters,
+    }
+}
+
+/// Runs a kind of filter over every mod in load order: true when one took the event (or it was taken already).
+fn filter_list(w: &mut World, kind: Filters, mut e: serde_json::Value, taken: bool) -> bool {
+    if w.lua.vms.iter().all(|v| filters_of(&v.st.borrow(), kind).is_empty()) {
         return taken;
     }
     let host = std::mem::take(&mut w.lua);
@@ -438,7 +466,7 @@ fn filter_from(w: &mut World, mouse: bool, mut e: serde_json::Value, taken: bool
     for vm in host.vms.iter().filter(|v| v.suspended.is_none()) {
         let funcs: Vec<Function> = {
             let st = vm.st.borrow();
-            let keys = if mouse { &st.mouse_filters } else { &st.key_filters };
+            let keys = filters_of(&st, kind);
             keys.iter().filter_map(|(_, k)| vm.lua.registry_value(k).ok()).collect()
         };
         if funcs.is_empty() {
@@ -456,7 +484,7 @@ fn filter_from(w: &mut World, mouse: bool, mut e: serde_json::Value, taken: bool
                     if capture {
                         blocked = true;
                     } else {
-                        vm.error(&mlua::Error::runtime("taking a key or the mouse needs input.capture"));
+                        vm.error(&mlua::Error::runtime("taking a key, the mouse or a pad button needs input.capture"));
                     }
                 }
             }
@@ -464,6 +492,42 @@ fn filter_from(w: &mut World, mouse: bool, mut e: serde_json::Value, taken: bool
     }
     w.lua = host;
     blocked
+}
+
+/// The game controller this frame, before the game reads it (client/gamepad.rs): `buttons` held (its numbers), the
+/// sticks and triggers. Each button's press and release goes through the mods' pad filters; the buttons a mod took
+/// on their press are returned, for the game not to see until they come up.
+pub(in crate::client) fn pad_filter(w: &mut World, buttons: &[u8], axes: [f32; 6], on: bool) -> Vec<u8> {
+    let st = w.lua.input.clone();
+    let now = buttons.iter().filter(|&&b| (b as usize) < PAD_BUTTONS.len()).fold(0u32, |m, &b| m | 1 << b);
+    let (prev, mut taken) = {
+        let mut s = st.borrow_mut();
+        let prev = s.pad;
+        (s.pad, s.pad_axes, s.pad_on) = (now, axes, on);
+        (prev, s.pad_taken)
+    };
+    let changed = now ^ prev;
+    if changed != 0 && w.lua.started {
+        for (k, name) in PAD_BUTTONS.iter().enumerate() {
+            let bit = 1u32 << k;
+            if changed & bit == 0 {
+                continue;
+            }
+            let down = now & bit != 0;
+            let e = serde_json::json!({"button": name, "down": down});
+            let was = taken & bit != 0;
+            let took = filter_list(w, Filters::Pad, e, was && !down);
+            if down && took {
+                taken |= bit;
+            }
+            if !down {
+                taken &= !bit;
+            }
+        }
+    }
+    taken &= now;
+    st.borrow_mut().pad_taken = taken;
+    (0..PAD_BUTTONS.len() as u8).filter(|&b| taken & 1 << b != 0).collect()
 }
 
 /// The first running mod's bind for this key edge (load order): queued for the mod phase.
@@ -543,7 +607,7 @@ fn combo_arg(s: &str) -> mlua::Result<Combo> {
 pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
     use super::api::{need, next_id, state};
     let t = lua.create_table()?;
-    for (name, mouse) in [("on_key", false), ("on_mouse", true)] {
+    for (name, kind) in [("on_key", Filters::Key), ("on_mouse", Filters::Mouse), ("on_pad", Filters::Pad)] {
         t.set(
             name,
             lua.create_function(move |lua, func: Function| {
@@ -551,11 +615,33 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
                 let id = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if mouse { s.mouse_filters.push((id, key)) } else { s.key_filters.push((id, key)) }
+                match kind {
+                    Filters::Key => s.key_filters.push((id, key)),
+                    Filters::Mouse => s.mouse_filters.push((id, key)),
+                    Filters::Pad => s.pad_filters.push((id, key)),
+                }
                 Ok(id)
             })?,
         )?;
     }
+    t.set(
+        "pad",
+        lua.create_function(|lua, ()| {
+            let s = shared(lua);
+            let s = s.borrow();
+            let out = lua.create_table()?;
+            out.set("connected", s.pad_on)?;
+            let held = lua.create_table()?;
+            for (k, name) in PAD_BUTTONS.iter().enumerate() {
+                held.set(*name, s.pad & 1 << k != 0)?;
+            }
+            out.set("buttons", held)?;
+            for (k, name) in ["lx", "ly", "rx", "ry", "lt", "rt"].iter().enumerate() {
+                out.set(*name, s.pad_axes[k])?;
+            }
+            Ok(out)
+        })?,
+    )?;
     t.set(
         "off",
         lua.create_function(|lua, id: u64| {
@@ -564,7 +650,7 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
                 let mut guard = st.borrow_mut();
                 let s: &mut super::vm::ModState = &mut guard;
                 let mut gone = Vec::new();
-                for list in [&mut s.key_filters, &mut s.mouse_filters] {
+                for list in [&mut s.key_filters, &mut s.mouse_filters, &mut s.pad_filters] {
                     let (g, keep): (Vec<_>, Vec<_>) = std::mem::take(list).into_iter().partition(|(i, _)| *i == id);
                     *list = keep;
                     gone.extend(g.into_iter().map(|(_, k)| k));

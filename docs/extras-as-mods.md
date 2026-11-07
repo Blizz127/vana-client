@@ -341,6 +341,14 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   TP, what it fights (entity.pet_target, new: s2c 0x068's target) and the recasts of the pet commands and the job
   abilities that act through it. Seen live: Carbuncle on a SMN, the Blood Pact recasts. With it the modern party
   panel gained retail's pet and fellow rows (the classic UI had them): name, HP gauge and percent, the pet's TP.
+- **Pad Bars** (assets/mods/pad-bars; XIVCrossbar, Crossbar, tCrossBar, cBind): controller crossbars: an LT side and
+  an RT side of two diamonds each (the d-pad's four slots, the face buttons' four); holding a trigger, the d-pad and
+  face buttons use that side's slots (the side lit, the other dimmed) and the game never sees them; LT and RT belong
+  to the bars while it is on. Multi-line macros per main job with icons and recast shades (Hotbars' helpers),
+  `//padbars` edits them. It needed pad input for mods: `input.on_pad` (presses and releases before the game reads the
+  pad, a press taken until it comes up; input.capture) and `input.pad` (buttons, sticks, triggers), filtered inside the
+  gamepad poll so a taken button never reaches the game. Seen live with the virtual Xbox pad: LT+A used Berserk (its
+  recast on the slot), LT+X and RT+Y ran their lines. Not yet: double-trigger sets (LT then RT).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
