@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2055,6 +2055,45 @@ mod tests {
             assert(#storage.character.inbox == 2)
             C.r("see", "you")
             assert(ran[#ran] == "/tell Other see you", ran[#ran])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Target Debuffs: an effect landing on the target shows its icon; it goes when it wears off, and all go when the
+    /// target is defeated.
+    #[test]
+    fn target_debuffs_track() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "target-debuffs").unwrap().2;
+        let vm = Vm::new(bundled_manifest("target-debuffs").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, icons = {}, {}
+            settings = { get = function() return true end }
+            events = { on = function(n, f) H[n] = f end }
+            game = { target = function() return { id = 77 } end }
+            res = { status = function(id) return "Effect " .. id end }
+            ui = { native = { rect = function() return nil end } }
+            hud = { screen = function() return { width = 1920, height = 1080, ui_scale = 1 } end,
+              clear = function() icons = {} end, icon = function(k, s) icons[k] = s.id end }
+            load(INIT)()
+            local function count() local n = 0 for _ in pairs(icons) do n = n + 1 end return n end
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 236, value = 4 } } } } })
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 2, value = 30 } } } } })
+            H.frame()
+            assert(icons.d4 == 4 and count() == 1)
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 237, value = 13 } } } } })
+            H.frame()
+            assert(count() == 2)
+            H.battle_message(5, 77, 206, 4, 0)
+            H.frame()
+            assert(icons.d4 == nil and icons.d13 == 13)
+            H.battle_message(5, 77, 6, 0, 0)
+            H.frame()
+            assert(count() == 0)
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

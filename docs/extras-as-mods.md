@@ -301,6 +301,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   party list (above the chat window's full height in the modern UI), a row per party member with their name and a
   button per chosen spell; a click casts it on them (`<me>` for us), unlearned or recasting spells dimmed. The rest of
   the party HUD add-ons (HP / MP / TP, buffs) is the client's own party window. Seen live: the grid, a click casting.
+- **Target Debuffs** (assets/mods/target-debuffs; Debuffed, debuff-tracker): the effects anyone put on the target as
+  status icons over the target window (name and time since it landed in the tip), from the action results that name
+  their effect (the messages the Timers read), gone when they wear off, are removed or the target is defeated. A Rust
+  test drives it; live the bot's Dia showed it cannot see effects whose message is plain damage (Dia, Bio), which needs
+  a spell -> effect table. Not seen live with an effect landing (the hares died first).
 - Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
