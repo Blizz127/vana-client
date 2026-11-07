@@ -1,0 +1,56 @@
+# Extras as mods (experimental branch `exp/extras-as-mods`)
+
+The plan (user, 2026-11-06; docs/lua-mods.md decision 4): every feature that is or was on Config > Extras becomes a
+bundled Lua mod, so our own features prove the API, as WoW's default UI is built from its add-on API. `/dps` is the
+first, already done (assets/mods/dps). After this come the Windower and Ashita ports and a mod catalogue (the
+roadmap, below).
+
+## What each extra needs
+
+Today's code is listed under client/ unless a path says otherwise.
+
+| Extra | Code today | Converts with | API to add first |
+| --- | --- | --- | --- |
+| Text Auto-Advance | event.rs (a few lines) | `game.event`, `actions.advance` | bundled mods trusted (below) |
+| Trust Speech | combat.rs (message 711) | `packets.on_in(0x02D)` or a chat filter | bundled mods trusted |
+| `/find` | textcmd.rs (~25 lines) | `commands.register`, `game.items`, `res.item` | none |
+| Map Overlay | map.rs (~225), modern/extras.rs | `hud.map`, binds, `hud.on` drags | drawing under the windows (it is) |
+| Minimap | minimap.rs, modern/extras.rs (~150) | `hud.map`, `game.entities` | edge windows in `ui.window` |
+| Skillchain Helper | skillchain.rs, dat/skillchains.rs, data | the `action` event, data as mod files | edge windows; classic docking under Timers / Regime |
+| Clock | clock.rs, hudtop.rs, modern/hud.rs | `game.time`, `os.date` | slots in native panels (the location panel's line, beside the classic compass) |
+| Target Distance, Target HP % | mod.rs, modern/hud.rs | `game.target` | slots in native panels (the target window's note and gauge, both UIs) |
+| Timestamps on All Lines | logwin.rs, modern/chat.rs | | the log's line stamp as a switch a mod sets |
+| Trust Speech, Ready Lines, Battle Text (Short), Battle Names (Coloured) | combat.rs, battlemod.rs | a battle-line filter | battle messages to filters with their actor, target, message id and values, before they are expanded into lines |
+| Synthesis Amount | synth.rs (~100) | | a step in the synthesis window, or `actions.synth` with a repeat |
+| Training Regime | regime.rs (696) | | event params, the options we send, and the zone dialogue's regime block |
+| Timers | timers.rs (1308), durations.rs (874), data/timers | three windows: recasts, buffs, debuffs, so `/uimodes` shows and hides each (user, 2026-11-06); durations as mod data; `game.recasts().totals` | edge windows; the `timers.add` rows move to a service the Timers mod provides (`mods.provide`); party buffs (0x076) and wear-offs as events |
+| Battle menu suggestions (not a row: modern UI) | suggest.rs (1034), dat/resists.rs, data | | rows in the modern battle menu, and the magic list and target prompt driven from them |
+
+## The framework, first
+
+1. **Bundled mods are ours**: granted what their manifest asks, without the player's grant (a bundled mod is the
+   client's code).
+2. **Settings carry over**: an extra's config field (`timers`, `earth_clock` ...) becomes the bundled mod's enabled
+   flag or one of its settings at first start, so nobody's choice is lost; its Extras rows stay where they are (the
+   mod's settings page under the Extras tab it came from).
+3. **The Extras page lists bundled mods' settings in the old rows' places**, so the page looks the same.
+
+## Order
+
+1. The framework above.
+2. Those that convert as they are: Text Auto-Advance, Trust Speech, `/find`, Map Overlay.
+3. Edge windows in `ui.window` (both UIs), then Minimap and Skillchain Helper.
+4. Slots in native panels, then Clock, Target Distance, Target HP %.
+5. Battle messages to filters with their data, then Battle Text, Battle Names, Ready Lines; the log's stamp switch,
+   then Timestamps.
+6. Timers as three windows and the `timers.add` service.
+7. The event API, then Training Regime; Synthesis Amount; the battle menu's rows, then the suggestions.
+
+Each conversion removes the Rust it replaces, keeps the extra's look in both UIs, and is checked live.
+
+## The roadmap after it
+
+- Port Windower and Ashita add-ons and plugins (docs/lua-coverage.md lists them). Add-ons with players' scripts
+  (GearSwap job files, AshitaCast profiles, and any others) read and run those scripts unchanged.
+- Our mods on GitHub: the client lists them and offers download and install in Settings, and installs from a file:
+  an archive (as many formats as we can read) or a folder with a manifest and a mod.
