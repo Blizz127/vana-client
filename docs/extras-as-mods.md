@@ -237,6 +237,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   account's storage (every minute, on zoning and at logout) and `/find` lists the account's other characters' holdings
   after ours (`Lnxcsfix's Inventory 1`). Seen live: Lnxcsfix's Wind Crystal found while playing Lnxtest. Not yet: key
   items, and characters of other accounts (that needs files.shared).
+- **Damage Meter** went into **DPS** (scoreboard, Parse, Deeps, Metrics): its Damage Meter setting shows the party's
+  damage live in an edge window, a row per member with damage a second, total and share (its bar), the fight's span and
+  total in the heading; `/dps` and `/dps reset` as before. Seen live: a hare fight, 62 damage at 6.9/s. Not yet:
+  accuracy, the parse's details and export.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
