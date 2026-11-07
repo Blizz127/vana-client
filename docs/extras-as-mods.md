@@ -174,3 +174,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   list are lotted, on the Pass list (or all others, with Pass Everything Else) passed; Drop list items are dropped as
   they reach the inventory; Stack Loot sorts the inventory after loot. Seen live in a party with a bot: a rabbit hide
   passed by a `*Hide` rule, hare meat dropped by the Drop list; a lot not seen (no lot-listed drop came).
+- **Client Tweaks** (assets/mods/client-tweaks; DelayMeNot, instantah, instantchat, macrofix, quicksets, paranormal,
+  TrueFont and kin): one setting per client switch: Instant Macro Palette, Instant Auction Results, No Equip Set Wait,
+  Instant Log Lines, Commands While K.O., TrueType Text, Animation Speed. Seen live: Instant Log Lines and Animation
+  Speed 2 reaching their switches. Not in it yet: instaLS's linkshell chat right after zoning, `//config`-style
+  game settings by command.
