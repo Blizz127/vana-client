@@ -1,0 +1,16 @@
+name = "Inventory HUD"
+version = "1.0.0"
+description = "Bag space, gil and the items and key items you choose, in a window on a screen edge (the inventory and gil tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Inventory HUD"
+help = "Shows how full your bags are, your gil, and the items and key items you add with //bags add <name>."
+
+[settings.all_bags]
+type = "bool"
+default = false
+label = "Every Bag"
+help = "Lists the satchel, sack, case and wardrobes too, not only the inventory."

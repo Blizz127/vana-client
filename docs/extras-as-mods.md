@@ -182,6 +182,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Equipment Grid** (assets/mods/equipment-grid; equipviewer, equipmon, EquipViewer): the worn gear as the equipment
   menu's 4 x 4 grid of item icons (a canvas in an edge window) with the ammunition's count. Seen live: a sword, a cap
   and pebbles in their cells.
+- **Inventory HUD** (assets/mods/inventory-hud; invtracker, giltracker, invmon, itemwatch, Packrat and kin): gil in
+  the heading, the inventory's space (every bag with Every Bag), and the items and key items added with `//bags add`
+  / `//bags addkey`, an item's bar how full its stack is. Seen live: 3/30, a Wind Crystal, a key item not held.
 
 Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
 regime's windows and under the mods' drawn before them, so two never open on one place.
