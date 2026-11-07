@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2234,6 +2234,45 @@ mod tests {
             assert(shown[1].label == "Treasure Hunter: Forest Hare" and shown[1].text == "3", shown[1].text)
             assert(shown[2].label == "Hare Meat" and shown[2].text == "5:00", shown[2].text)
             assert(shown[3].text == "Forest Hare: 1 killed \u{2014} Hare Meat x1", shown[3].text)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Monster Alerts: a monster's readied move and started spell make lines in the box; a watched move calls; a
+    /// player's action makes none.
+    #[test]
+    fn monster_alerts_lines() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "monster-alerts").unwrap().2;
+        let vm = Vm::new(bundled_manifest("monster-alerts").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, texts, calls = {}, {}, 0
+            local S = { on = true, moves = "Foot Kick", monsters = "" }
+            settings = { get = function(k) return S[k] end }
+            events = { on = function(n, f) H[n] = f end }
+            timer = { every = function() end }
+            local E = { [9] = { id = 9, name = "Forest Hare", kind = "mob" }, [5] = { id = 5, name = "Lnxcsfix", kind = "player" } }
+            game = { entity = function(id) return E[id] end, entities = function() return {} end }
+            res = { mob_skill = function(id) return id == 257 and "Foot Kick" or nil end, ability = function() return nil end,
+              spell = function(id) return id == 144 and { name = "Fire" } or nil end }
+            audio = { play_ui = function() calls = calls + 1 end }
+            hud = { screen = function() return { width = 1920, height = 1080, ui_scale = 1 } end, clear = function() texts = {} end,
+              text = function(k, s) texts[k] = s.text end }
+            load(INIT)()
+            local function act(actor, cat, value)
+              H.action({ actor = actor, category = cat, param = 24931, targets = { { id = 5, results = { { message = 43, value = value } } } } })
+            end
+            act(9, 7, 257)
+            act(9, 8, 144)
+            act(5, 7, 257)
+            H.frame()
+            assert(texts.l1 == "Forest Hare readies Foot Kick.", texts.l1)
+            assert(texts.l2 == "Forest Hare starts casting Fire on Lnxcsfix.", texts.l2)
+            assert(texts.l3 == nil and calls == 1)
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

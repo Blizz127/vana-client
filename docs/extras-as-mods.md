@@ -367,6 +367,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
   (`//lootlog reset`). Seen live: hare kills counted; a Rust test covers TH and the pool (no Thief or party drops in
   the test).
+- **Monster Alerts** (assets/mods/monster-alerts; ohShi, skillwatch, Warn, watcher, HorizonScout's alerts): a box near
+  the top of the screen with what monsters ready (0x028 category 7) or start casting (8), the move or spell named
+  from the first result's value, for 8 seconds each; a call for the Watched Moves; a line and a call when a Watched
+  Monster comes within 50 yalms. Seen live: the box on a hare's move and the watched-monster alert; a Rust test covers
+  the lines (`res.message` left the move's name out of "readies", so the mod builds the line itself).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
