@@ -333,6 +333,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Range Rings** (assets/mods/range-rings; DistancePlus's rings, magiccircle, songcast): ground rings around us at
   chosen radii (default 6, 10, 20 yalms), optionally around the target at the first; bands of three rings so they
   read. Seen live in Southern San d'Oria. Not yet: geomancy bubbles, avatar Favor, hitboxes.
+- **Tracking Tools** (assets/mods/tracking; widescan, filterscan, watchdog): `//track <name>` tracks the nearest NPC
+  or monster of that name with Wide Scan (its index from the server id), `//track stop`; `//seek <name>` counts the
+  zone's matches and the nearest's distance. Seen live: //seek; //track sent but not seen (a WAR has no Wide Scan).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
