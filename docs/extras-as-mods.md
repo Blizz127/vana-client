@@ -438,6 +438,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   lines (pet, set, latent, weather, day...) are left out and DMG / Delay are not summed. A Rust test sums a set; seen
   live with a Bronze Cap and a Copper Ring lent to Lnxcsfix (taken back). Not done: a /checked player's gear (the
   inspect data does not reach mods), totals for Gearshift's rules.
+- **Item Details** (assets/mods/item-details; latentchecker, trials): a trial weapon highlighted in a game list shows
+  its weapon skill points toward unlocking (the extdata's first two bytes, against the points LandSandBoat's weapon
+  list gives each of its 50 such weapons); `//trials` lists every one held. Seen live with a Sword of Trials lent to
+  Lnxcsfix (0 / 300, taken back). Not done: soul plates and reflectors (LandSandBoat's layout is its own).
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
