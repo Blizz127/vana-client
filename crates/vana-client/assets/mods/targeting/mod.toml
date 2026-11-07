@@ -1,0 +1,16 @@
+name = "Targeting Helpers"
+version = "1.0.0"
+description = "Targets by name or id, turns you toward or away from your target, and can check each monster you target (the targeting add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Targeting Helpers"
+help = "//face turns you toward your target, //face away away from it; //tgt <name or id> targets the nearest match."
+
+[settings.check]
+type = "bool"
+default = false
+label = "Check New Targets"
+help = "Checks (/check) each monster you target, once."

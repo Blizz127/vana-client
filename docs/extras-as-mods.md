@@ -316,6 +316,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Weather Watch** (assets/mods/weather-watch; WeatherMon, weatherhelper, Meteorologist; the time and moon of
   gametime are the Clock mod's): a line and a call sound when a watched weather starts or ends in the zone (optionally
   in party chat); `//weather` says the weather, zone and day. Seen live with `!setweather` rain and clear.
+- **Targeting Helpers** (assets/mods/targeting; SetTarget, TurnAround, autochecker, MobCompass's facing): `//tgt
+  <name | id>` targets the nearest match, `//face` / `//face away` turn toward or away from the target, Check New
+  Targets /checks each monster once. Seen live on an NPC. (`/target` is a game command, hence `//tgt`.)
 - Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
