@@ -222,6 +222,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   most). Seen live: 12 pebbles sold to Carautia from a Hotbars slot running `//sell pebble all`; //trade not seen.
   It showed that a mod's command run by another mod on the player's input (a hotbar click) was not the player's
   input: `commands.run` now carries it (From::Mod's `input`).
+- **Web Search** (assets/mods/web-search; Lookup, linker, wiki, PriceCheck and kin): `//wiki [words]` and `//ah
+  [words]` open the wiki's or the auction site's search in the browser: the words, else the item, spell, ability or
+  key item under a list's cursor, else the target. A Rust test checks the three sources and the encoding (the test
+  runs open no browser).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

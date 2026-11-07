@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2045,6 +2045,38 @@ mod tests {
             assert(#storage.character.inbox == 2)
             C.r("see", "you")
             assert(ran[#ran] == "/tell Other see you", ran[#ran])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Web Search: the words given, else the item under a list's cursor, else the target, go to the site, encoded.
+    #[test]
+    fn web_search_urls() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "web-search").unwrap().2;
+        let vm = Vm::new(bundled_manifest("web-search").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, opened, high, target = {}, {}, nil, nil
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            net = { open_url = function(u) opened[#opened + 1] = u end }
+            chat = { add = function() end }
+            ui = { native = { highlighted = function() return high end } }
+            game = { target = function() return target end }
+            res = { item = function(id) return id == 4096 and { name = "Fire Crystal" } or nil end }
+            load(INIT)()
+            C.wiki("Kupipi's", "Trust")
+            assert(opened[1] == "https://www.bg-wiki.com/index.php?search=Kupipi%27s%20Trust", opened[1])
+            high = { kind = "item", id = 4096 }
+            C.ah()
+            assert(opened[2] == "https://www.ffxiah.com/search/item?q=Fire%20Crystal", opened[2])
+            high, target = nil, { name = "Forest Hare" }
+            C.wiki()
+            assert(opened[3] == "https://www.bg-wiki.com/index.php?search=Forest%20Hare", opened[3])
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
