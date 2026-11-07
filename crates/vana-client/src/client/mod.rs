@@ -12748,8 +12748,9 @@ impl App {
             let f = world.my_face.filter(|f| f.0 == dir).map_or_else(|| forward_from_dir(dir), |f| f.1);
             crate::motion::strafe_dir(f, step)
         } else if world.mouse_look && !tank {
-            // The right drag faces the camera's forward this frame (see `to` below), so the quarter is about that.
-            crate::motion::strafe_dir(face, step)
+            // The right drag faces the camera's forward this frame (see `to` below), so the quarter is about that. Held
+            // across the 45 degree edge a diagonal sits on: the drag turns face and step together every frame.
+            crate::motion::strafe_dir_held(face, step, world.my_strafe)
         } else {
             0
         };
@@ -12905,6 +12906,9 @@ impl App {
             // First person never writes +0x598 (walk / run forward, back and sideways alike).
             let facing_held = (face_cam || world.mouse_look) && pin.is_none() && lock_target.is_none() && !tank;
             world.my_strafe = if lock_target.is_some() && pin.is_none() {
+                lock_dir
+            } else if facing_held && stepping && world.mouse_look && !face_cam {
+                // The right drag's quarter, held at the edge as the step was (lock_dir above).
                 lock_dir
             } else if facing_held && stepping {
                 let f = world.my_face.filter(|f| f.0 == me.dir).map_or_else(|| forward_from_dir(me.dir), |f| f.1);

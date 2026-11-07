@@ -126,6 +126,28 @@ pub fn strafe_dir(f: glam::Vec3, step: glam::Vec3) -> u8 {
     }
 }
 
+/// Ours, for the right drag's facing (not retail's strafe lock): [`strafe_dir`], but a step within about a degree of a
+/// sector edge keeps last frame's quarter `old` when that is one of the two sides. W + A and the like lie on the edge,
+/// and the drag turns heading and step together every frame, so float noise alone picked a side each frame and the
+/// motion and speed flipped between run and strafe (lenonk/vana-client#95).
+pub fn strafe_dir_held(f: glam::Vec3, step: glam::Vec3, old: u8) -> u8 {
+    let new = strafe_dir(f, step);
+    if new == 0 || old == 0 || new == old || (new + old) % 2 == 0 {
+        return new;
+    }
+    let r = f.cross(glam::Vec3::NEG_Y);
+    let (ahead, side) = (step.dot(f), step.dot(r));
+    // Which side of the edge is old's: forward / back hold while |ahead| >= |side|, else right / left.
+    let edge = (ahead.abs() - side.abs()).abs() <= 0.025 * step.length();
+    let same_half = match old {
+        1 => ahead > 0.0,
+        3 => ahead < 0.0,
+        2 => side > 0.0,
+        _ => side < 0.0,
+    };
+    if edge && same_half { old } else { new }
+}
+
 /// FUN_100a7b80's guard (0x100a7ef6..0x100a7f2d): a locked-on quarter that flips straight from 2 to 4 or back (`old`
 /// is last frame's, after any forcing) sets the signed byte +0x5b1 to 2; while it is above 0 it drops by one a call and
 /// the quarter is 1 (forward), so retail holds forward for two frames, then the real quarter goes on. Ours counts those
@@ -217,6 +239,17 @@ mod tests {
         // Diagonals forward of 45 degrees stay forward.
         assert_eq!(strafe_dir(f, f + r * 0.9), 1);
         assert_eq!(strafe_dir(f, Vec3::ZERO), 0);
+        // On the 45 degree edge the held quarter stays whichever side float noise picks; off it, the sector wins.
+        let wa = f - r;
+        for old in [1, 4] {
+            assert_eq!(strafe_dir_held(f, wa + r * 0.01, old), old);
+            assert_eq!(strafe_dir_held(f, wa - f * 0.01, old), old);
+        }
+        assert_eq!(strafe_dir_held(f, f - r * 0.5, 4), 1);
+        assert_eq!(strafe_dir_held(f, f * 0.5 - r, 1), 4);
+        // Only the two quarters beside the edge hold, and not from a stop.
+        assert_eq!(strafe_dir_held(f, wa, 2), strafe_dir(f, wa));
+        assert_eq!(strafe_dir_held(f, wa, 0), strafe_dir(f, wa));
         assert_eq!(
             (strafe(2, false), strafe(3, true), strafe(4, true), strafe(1, false)),
             (Some("mvr"), Some("mvb"), Some("wlk"), None)
