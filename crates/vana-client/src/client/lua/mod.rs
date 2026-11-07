@@ -507,6 +507,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "warp-helper" ["src/places.lua"],
     "dialogue-bubbles",
     "look-changer" ["src/models.lua"],
+    "content-trackers",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2380,6 +2381,74 @@ mod tests {
             }
             C.warp("wajaom")
             assert(table.concat(picks, " ") == "2 5 4 2 2", table.concat(picks, " "))
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Content Trackers: each content's lines become its window's rows; a new content starts afresh.
+    #[test]
+    fn content_trackers_read() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "content-trackers").unwrap().2;
+        let vm = Vm::new(bundled_manifest("content-trackers").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local F, T, W, zone = nil, nil, nil, "Dynamis - San d'Oria"
+            settings = { get = function() return true end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function(_, f) T = f end }
+            text = { strip = function(t) return t end }
+            ui = { window = function(_, spec) W = spec end, open = function() end, close = function() W = nil end }
+            res = { zone = function() return zone end }
+            local bag = { { id = 1452, count = 30 }, { id = 1453, count = 2 } }
+            game = { player = function() return { zone = 1 } end, items = function(b) return b == 0 and bag or {} end,
+              key_items = function() return { 1546, 9 } end }
+            load(INIT)()
+            local function texts()
+              local out = {}
+              for _, e in ipairs(W.elements) do out[#out + 1] = e.text end
+              return table.concat(out, "|")
+            end
+            T()
+            F("The sands of the hourglass have begun to fall.\nYou have 60 minutes (Earth time) remaining in Dynamis.")
+            F("Your stay in Dynamis has been extended by 10 minutes.")
+            T()
+            assert(W.title == "Dynamis")
+            assert(texts() == "69:59|Bronzepiece: 30|Silverpiece: 2|Currency worth 230 singles|Granules: Azure"
+              or texts() == "70:00|Bronzepiece: 30|Silverpiece: 2|Currency worth 230 singles|Granules: Azure", texts())
+            zone = "Abyssea - Konschtat"
+            T()
+            F("Visitant Light Intensity")
+            F("Pearlescent: 12 / Ebon: 3")
+            F("Golden: 40 / Silvery: 5")
+            F("Azure: 100 / Ruby: 0 / Amber: 255")
+            F("Lnxcsfix's body emits a strong golden light!")
+            F("Obtained 120 cruor. (Total: 4410)")
+            F("Exiting in 5 minutes.")
+            T()
+            assert(W.elements[1].text == "4:59" or W.elements[1].text == "5:00", W.elements[1].text)
+            F("Your visitant status will wear off in 30 minutes.")
+            T()
+            assert(texts():find("Pearlescent: 12|Ebon: 3|Golden: 40 %+|Silvery: 5|Azure: 100|Ruby: 0|Amber: 255|Cruor: 4410"), texts())
+            zone = "Zhayolm Remnants"
+            bag = { { id = 5365, count = 1 }, { id = 5376, count = 2 } }
+            T()
+            F("Main Weapon/Sub-Weapon restriction removed.")
+            F("STR Down removed.")
+            T()
+            local t = texts()
+            assert(not t:find("Main Weapon") and not t:find("STR Down") and t:find("Head/Neck|Body"), t)
+            zone = "Nyzul Isle"
+            T()
+            F("Transfer complete. Welcome to Floor 21.")
+            F("Objective: Eliminate all enemies.")
+            F("You obtain 160 tokens!")
+            F("Floor 21 objective complete. Rune of Transfer activated.")
+            T()
+            assert(texts() == "Floor 21 \u{2014} cleared|Eliminate all enemies|Tokens this run: 160", texts())
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

@@ -390,6 +390,13 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   draws a player-style look with other parts (the rest follow the character's own changes); `game.entity` now gives
   our own look too. Seen live: Lnxcsfix as a Galka (kept across a relog), a Chainmail body, Daggao's look copied,
   face 4b, reset. Not done: holding looks still through gear swaps (BlinkMeNot); whether our swaps blink is unchecked.
+- **Content Trackers** (assets/mods/content-trackers; dynamishelper, Omen, NyzulHelper, salvage2, cellhelp and kin): an
+  edge window for the content you are in, read from its messages, with the time left counting down: Dynamis (the
+  currency held and what it is worth in singles, the granules of time held), Abyssea (the seven lights from the
+  readout, a + when a light rose since, cruor), Salvage (the restrictions still on, with the cells held for each) and
+  Nyzul Isle (floor, objective, cleared, tokens this run). A Rust test feeds each content's lines; seen live in
+  Abyssea - Konschtat (the window and its lights). Not done: the contents LandSandBoat lacks (Omen, Delve, Odyssey,
+  Sortie), Reives, the pop item lists, cellhelp's lotting.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

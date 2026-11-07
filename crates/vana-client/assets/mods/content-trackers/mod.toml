@@ -1,0 +1,10 @@
+name = "Content Trackers"
+version = "1.0.0"
+description = "A window for the content you are in: Dynamis, Abyssea, Salvage or Nyzul Isle, with the time left and what the content's messages tell (the content tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Content Trackers"
+help = "In Dynamis, Abyssea, Salvage and Nyzul Isle: a window with the time left, and the currency and granules, lights and cruor, restrictions and cells, or floor, objective and tokens."
