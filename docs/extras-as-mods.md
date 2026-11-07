@@ -268,6 +268,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `//music <track>` holds a track until `//music off`; Battle Music the game's, the zone's own day / night track, or
   silence; Mount Music the game's or silence. The zone's tracks come from the new `audio.music_slots()`. Seen live:
   Southern San d'Oria's slots read, track 108 held and released (the log's music lines; test runs have no sound).
+- **Typing Helpers** (assets/mods/typing-helpers; translate, chars, autotrans): in typed lines `[[words]]` becomes
+  the auto-translate phrase with that text and `<star>`, `<note>`, `<heart>`, `<arrow>` and others the game's symbols;
+  the game's `<me>`-style tags are left alone. Seen live in an /echo. Not yet: InfoReplacer's %tokens, translating
+  received Japanese.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
