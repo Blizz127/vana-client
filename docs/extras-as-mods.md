@@ -313,6 +313,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Swing Timer** (assets/mods/swing-timer; nextauto): while engaged, a small bar over the middle fills toward the
   next auto-attack, from our last melee round and the main weapon's delay (unarmed 480 added for hand-to-hand; haste
   and dual wield not counted). Seen live in a hare fight.
+- **Weather Watch** (assets/mods/weather-watch; WeatherMon, weatherhelper, Meteorologist; the time and moon of
+  gametime are the Clock mod's): a line and a call sound when a watched weather starts or ends in the zone (optionally
+  in party chat); `//weather` says the weather, zone and day. Seen live with `!setweather` rain and clear.
 - Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
