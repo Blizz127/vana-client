@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2129,6 +2129,43 @@ mod tests {
             assert(by["Shadows"] == "3", by["Shadows"])
             assert(by["Shihei"] == "30")
             assert(by["Ready"] == nil)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Roll Helper: a Chaos Roll of 4 is lucky (+25), a Double-Up typed then is held back; at 9 it goes through; a
+    /// bust ends the roll.
+    #[test]
+    fn roll_helper_lucky() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "roll-helper").unwrap().2;
+        let vm = Vm::new(bundled_manifest("roll-helper").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, F, said = {}, nil, {}
+            settings = { get = function() return true end }
+            events = { on = function(n, f) H[n] = f end }
+            filters = { typed = function(f) F = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            game = { player = function() return { id = 5 } end }
+            res = { ability = function(id) return ({ [0x200 + 98] = { name = "Chaos Roll" }, [0x200 + 123] = { name = "Double-Up" } })[id] end,
+              status = function() return nil end }
+            load(INIT)()
+            local function act(param, msg, value)
+              H.action({ actor = 5, category = 6, param = param, targets = { { id = 5, results = { { message = msg, value = value } } } } })
+            end
+            act(98, 420, 4)
+            assert(said[#said] == "Chaos Roll 4 (Lucky!): Attack % +25  (lucky 4, unlucky 8)", said[#said])
+            assert(F('/ja "Double-Up" <me>') == false)
+            act(123, 424, 9)
+            assert(said[#said]:find("^Chaos Roll 9: Attack %% %+17"), said[#said])
+            assert(F('/ja "Double-Up" <me>') == nil)
+            act(123, 426, 0)
+            assert(said[#said] == "Chaos Roll: Bust!")
+            assert(F('/ja "Double-Up" <me>') == nil)
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

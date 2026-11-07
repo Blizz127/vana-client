@@ -353,6 +353,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Stratagems, Ready and Quick Draw (LandSandBoat's charge table: charges left and the next one's wait from the running
   recast), Ninja shadows and tool counts, Puppetmaster maneuvers, for the main and sub jobs. A Rust test covers the
   charge math (SCH 99, 100 s left: 2 / 5, the next in 4 s); not seen live (no SCH, NIN or PUP on the test character).
+- **Roll Helper** (assets/mods/roll-helper; rolltracker, RollTracker): after each Phantom Roll and Double-Up (messages
+  420 / 422 / 424 / 425, 426 the bust) a line with the roll's number, lucky / unlucky and its power, from
+  LandSandBoat's roll table (31 rolls; the lucky number its spike, the unlucky its dip); Guard Lucky Rolls holds back
+  a Double-Up typed at a lucky number or 11. A Rust test covers it; not seen live (no Corsair on the test character).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
