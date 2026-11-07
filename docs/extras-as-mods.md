@@ -442,6 +442,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   its weapon skill points toward unlocking (the extdata's first two bytes, against the points LandSandBoat's weapon
   list gives each of its 50 such weapons); `//trials` lists every one held. Seen live with a Sword of Trials lent to
   Lnxcsfix (0 / 300, taken back). Not done: soul plates and reflectors (LandSandBoat's layout is its own).
+- **Objective Sets** (assets/mods/objective-sets; roe): `//roeset save <name>` keeps the Records of Eminence objectives
+  set now, `//roeset <name>` removes the others and sets those a second apart (removing loses an objective's
+  progress), list and delete; `//roeshow` lists what is set. New `game.roe`, `actions.roe_set` and
+  `actions.roe_remove` (one change a second, as the list's). Seen live: First Step Forward set, saved, removed and put
+  back by its set.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

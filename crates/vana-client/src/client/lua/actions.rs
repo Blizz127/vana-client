@@ -40,6 +40,8 @@ pub(in crate::client) enum Action {
     BlueSlot(usize, u16),
     /// main, sub
     ChangeJob(u8, u8),
+    /// objective n, set (else remove)
+    Roe(u16, bool),
     /// item, price, single
     AhBid(u16, u32, bool),
     /// inventory slot, price, single
@@ -295,6 +297,11 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                 w.chat.push_colour(format!("actions.{}: {e}", if spell == 0 { "blue_remove" } else { "blue_set" }), super::ERROR);
             }
         }
+        Action::Roe(n, set) => {
+            if let Err(e) = super::super::roe::mod_change(w, n, set) {
+                w.chat.push_colour(format!("actions.{}: {e}", if set { "roe_set" } else { "roe_remove" }), super::ERROR);
+            }
+        }
         Action::ChangeJob(main, sub) => {
             if let Err(e) = super::super::moogle::mod_change(w, main, sub) {
                 w.chat.push_colour(format!("actions.change_job: {e}"), super::ERROR);
@@ -530,6 +537,8 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
             queue(lua, Action::BlueSlot(blue(slot)?, spell))
         })?,
     )?;
+    t.set("roe_set", lua.create_function(|lua, n: u16| queue(lua, Action::Roe(n, true)))?)?;
+    t.set("roe_remove", lua.create_function(|lua, n: u16| queue(lua, Action::Roe(n, false)))?)?;
     t.set(
         "change_job",
         lua.create_function(|lua, (main, sub): (u8, Option<u8>)| {

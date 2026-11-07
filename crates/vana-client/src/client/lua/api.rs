@@ -829,6 +829,25 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // Records of Eminence: the sparks and the objectives set, with their progress (s2c 0x110 / 0x111).
+    game.set(
+        "roe",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let t = lua.create_table()?;
+            t.set("sparks", w.roe.sparks)?;
+            let list = lua.create_table()?;
+            for (slot, n, progress) in super::super::roe::mod_active(w) {
+                let r = lua.create_table()?;
+                r.set("slot", slot)?;
+                r.set("id", n)?;
+                r.set("progress", progress)?;
+                list.push(r)?;
+            }
+            t.set("active", list)?;
+            Ok(t)
+        })?,
+    )?;
     // Our auction slots while the auction house is open.
     game.set(
         "auction",

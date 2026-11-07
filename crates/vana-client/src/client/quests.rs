@@ -30,11 +30,13 @@ pub struct Roe {
     pub log: [u8; 512],
     /// Bit 0 a 0x110, 1 a 0x111, 2 the log complete (Offset 3; Offset 0 clears it).
     pub flags: u8,
+    /// A mod's last set or remove (actions.roe_set / roe_remove): one a second, as the window's.
+    pub mod_sent: Option<std::time::Instant>,
 }
 
 impl Default for Roe {
     fn default() -> Self {
-        Roe { sparks: 0, deeds: 0, plaudits: 0, rot: [0; 8], active: [0; 64], log: [0; 512], flags: 0 }
+        Roe { sparks: 0, deeds: 0, plaudits: 0, rot: [0; 8], active: [0; 64], log: [0; 512], flags: 0, mod_sent: None }
     }
 }
 

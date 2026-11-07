@@ -920,6 +920,10 @@ function game.bag_size(bag) end
 ---@return table<integer, {number: integer, name: string, repeatable: boolean, current: boolean, completed: boolean}[]>
 function game.quests() end
 
+--- Records of Eminence: sparks, and active (the objectives set, each {slot, id, progress}; id n is res.item(0xE000 + n)'s objective).
+---@return {sparks: integer, active: {slot: integer, id: integer, progress: integer}[]}
+function game.roe() end
+
 --- While the auction house is open: {slots}, our listings, each {slot, item, count, price, state} (state: listed, sold, returned, sold, collected, returned, collected, being returned, selling); nil when it is closed.
 ---@return {slots: {slot: integer, item: integer, count: integer, price: integer, state: string}[]}?
 function game.auction() end
@@ -1221,6 +1225,14 @@ function actions.sell(slot, count) end
 ---@param slot integer 
 ---@param spell integer 
 function actions.blue_set(slot, spell) end
+
+--- Sets a Records of Eminence objective as its list's Yes does (c2s 0x10C); one change a second. Needs actions.
+---@param id integer objective n (res.item(0xE000 + n))
+function actions.roe_set(id) end
+
+--- Removes a set objective as its list's Yes does (c2s 0x10D); its progress goes; one change a second. Needs actions.
+---@param id integer objective n
+function actions.roe_remove(id) end
 
 --- Changes jobs as the moogle's Change Jobs window does (the moogle dances), in a Mog House or where a moogle menu is allowed. Needs actions.
 ---@param main integer job id (1 WAR .. 22 RUN)

@@ -1062,6 +1062,66 @@ end)
 
 Whether the shop takes the item is the server's to decide.
 
+## `actions.roe_set`
+
+```lua
+actions.roe_set(id) -> nil
+```
+
+Sets a Records of Eminence objective, as Yes on its row in the list does (c2s 0x10C). The server takes one change a
+second.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `integer` | yes | The objective's number n (`res.item(0xE000 + n)`). |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+commands.register("roeone", function(n) actions.roe_set(tonumber(n)) end)
+```
+
+Problems are printed in the log in red: `actions.roe_set: the objectives have not come yet`, `objectives are 1..4095`, `one change a second: wait and call again`, `that objective is set already`, `every objective slot is taken`.
+
+## `actions.roe_remove`
+
+```lua
+actions.roe_remove(id) -> nil
+```
+
+Removes a set objective, as Yes on its row does (c2s 0x10D); its progress is lost. One change a second, as
+`actions.roe_set`.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `integer` | yes | The objective's number n. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- Remove every objective set, a second apart.
+commands.register("roeclear", function()
+  for _, o in ipairs(game.roe().active) do
+    actions.roe_remove(o.id)
+    sleep(1.1)
+  end
+end)
+```
+
+Problems are printed in the log in red: as `actions.roe_set`'s, and `that objective is not set`.
+
 ## `actions.change_job`
 
 ```lua

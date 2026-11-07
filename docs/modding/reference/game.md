@@ -304,6 +304,32 @@ end
 print(("San d'Oria: %d of %d done"):format(done, #(q[0] or {})))
 ```
 
+## `game.roe`
+
+```lua
+game.roe() -> table
+```
+
+Our Records of Eminence: the sparks and the objectives set now, as the server sent them (s2c 0x110 / 0x111).
+
+**Returns** `{sparks, active}`; `active` lists the objectives set (empty before the server has sent them):
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `slot` | `integer` | Its slot, 1..30. |
+| `id` | `integer` | The objective's number n; `res.item(0xE000 + n)` is its record (name, description). |
+| `progress` | `integer` | Its count so far. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for _, o in ipairs(game.roe().active) do
+  print(o.slot, (res.item(0xE000 + o.id) or {}).name, o.progress)
+end
+```
+
 ## `game.auction`
 
 ```lua
