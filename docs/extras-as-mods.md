@@ -167,3 +167,5 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   and limit points, job points and capacity points as rows of an edge window, each with what came in per hour
   (`//xp reset` starts again). Gains are read from game.stats and game.job_points once a second, a level, merit or
   job point taken in counting what rolled over. Seen live (two `!givexp` gains: 33.8k/h over a minute).
+- **Cutscene Speed** (assets/mods/cutscene-speed; FastCS and its kin): events play 1 to 4 times faster through the
+  client's `cutscene_speed` switch, back to the game's speed when off. Seen live: the switch at 3.0, then 1.0.
