@@ -280,6 +280,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (party, target, buffs, compass, minimap, cast, timers, regime, log, plates) hidden in the Mog House, in zones named,
   while engaged or in events, each by its own setting, through ui.native.hide. Seen live: party and minimap hidden in
   Southern San d'Oria.
+- **Screen Notes** (assets/mods/screen-notes; Text): `//note <name> <text>` puts a note on the screen, dragged to its
+  place and kept per character; `//note <name>` removes it, `//notes` lists them. Seen live: a note added and dragged.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
