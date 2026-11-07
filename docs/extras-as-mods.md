@@ -452,6 +452,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Skills and Pet (`game.abilities`), each row with its icon, cost and recast (dim while it runs, counting down); a
   click or Enter runs its text command as a macro line would (`<me>` for self-only actions, else `<st>`, the rule the
   favourites use). Seen live: Berserk used from it, its 4:59 recast in the row.
+- **Map Notes** (assets/mods/map-notes; boussole): on the Map Overlay while it is open, notes pinned where you stood
+  (`//mapnote add <text>`, list, del; per zone and map page, for every character), party members in sight, and the
+  names `//mapnote track` follows, each a dot with its label. The Map Overlay mod provides its box and view
+  (`mods.provide("view")`); its own look is unchanged. Seen live in Southern San d'Oria: a note at our marker and the
+  tracked Rumoie beside it.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
 
