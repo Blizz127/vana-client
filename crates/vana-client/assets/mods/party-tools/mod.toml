@@ -1,0 +1,34 @@
+name = "Party Tools"
+version = "1.0.0"
+description = "Accepts party invites from the players you list and invites players who send you a chosen word in a tell (the auto-invite and auto-join add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Party Tools"
+help = "Answers invites and invite requests as the settings below say."
+
+[settings.join]
+type = "string"
+default = ""
+label = "Join From"
+help = "Accept party invites from these players, separated by commas (* for anyone)."
+
+[settings.decline]
+type = "bool"
+default = false
+label = "Decline Others"
+help = "Declines invites from players not on the list above."
+
+[settings.word]
+type = "string"
+default = ""
+label = "Invite Word"
+help = "A tell holding this word gets its sender an invite (empty: none)."
+
+[settings.invite]
+type = "string"
+default = ""
+label = "Invite Only"
+help = "Only these players get an invite for the word, separated by commas (empty: anyone)."

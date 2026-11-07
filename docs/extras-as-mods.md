@@ -253,6 +253,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Countdowns** (assets/mods/countdowns; stopwatch, Tickle, ctimers, Ticker and kin): `//timer <time> <name>` (90,
   5m, 1h30m, 2:30) counts down as a Timers row and says when it is up; cancel and clear. The resting tick is the
   client's own (its "Next tick" over the party list). Seen live: a 20 s countdown ending with its line.
+- **Party Tools** (assets/mods/party-tools; autojoin, autoinvite, invite): invites accepted from the players listed
+  (`*` anyone), others optionally declined; a tell holding the Invite Word gets its sender an invite (optionally only
+  listed players). Seen live: a bot's invite accepted in Southern San d'Oria; the invite word not tried. Not yet:
+  AnnounceTarget's call-outs, ready checks.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
