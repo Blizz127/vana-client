@@ -226,6 +226,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   [words]` open the wiki's or the auction site's search in the browser: the words, else the item, spell, ability or
   key item under a list's cursor, else the target. A Rust test checks the three sources and the encoding (the test
   runs open no browser).
+- **Camera Range** (assets/mods/camera-range; XICamera, zoom, xicamera): the camera's distance, its battle distance and
+  the pan speed through render.set_camera, the game's back when off or unloaded. Seen live: distance 2.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
