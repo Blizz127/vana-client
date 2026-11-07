@@ -222,9 +222,8 @@ pub struct Config {
     pub timers_folded: u8,
     /// The training regime window's drawer out (client/regime.rs; the bundled Training Regime mod's window).
     pub regime_out: bool,
-    /// Extra (the minimap add-ons): the minimap, its place (0 top right, 1 top left), size (0..2) and the map pixels
-    /// across (the wheel's zoom).
-    pub minimap: bool,
+    /// The minimap (the bundled Minimap mod's window): its classic place (0 top right, 1 top left), size (0..2) and
+    /// the map pixels across (the wheel's zoom).
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub minimap_span: f32,
@@ -458,7 +457,6 @@ impl Default for Config {
             timers_out: true,
             timers_folded: 0,
             regime_out: true,
-            minimap: false,
             minimap_dock: 0,
             minimap_size: 1,
             minimap_span: 160.0,

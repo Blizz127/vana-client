@@ -45,7 +45,8 @@ pub struct Frame {
 pub fn prepare(gu: &GameUi, w: &mut World, sw: f32) {
     w.minimap_rect = None;
     w.minimap_frame = None;
-    if !w.extra_minimap {
+    // The bundled Minimap mod's window (panel minimap) asks for it.
+    if w.lua.edge_panel("minimap").is_none() {
         w.minimap = None;
         return;
     }

@@ -6750,8 +6750,8 @@ struct World {
     /// Each 0x119 timer's Calc1 / Calc2 (the charge shares' adjustments).
     ability_calc: HashMap<u16, (u8, i16)>,
     recasts_seen: bool,
-    /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
-    extra_minimap: bool,
+    /// The minimap (client/minimap.rs; the bundled Minimap mod's window): its map, its rect this frame, its config and
+    /// an unsaved zoom.
     minimap: Option<map::Overlay>,
     minimap_rect: Option<[f32; 4]>,
     minimap_frame: Option<minimap::Frame>,
@@ -7533,7 +7533,7 @@ impl App {
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
             w.timers_dock = self.cfg.timers_dock;
-            (w.extra_minimap, w.minimap_dock, w.minimap_size) = (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
+            (w.minimap_dock, w.minimap_size) = (self.cfg.minimap_dock, self.cfg.minimap_size);
         }
         // Applied at the next frame start: during the UI pass the window is out of self.gfx.
         self.window_dirty = true;
@@ -8760,7 +8760,6 @@ impl App {
                             spell_total: HashMap::new(),
                             ability_total: HashMap::new(),
                             ability_calc: HashMap::new(),
-                            extra_minimap: self.cfg.minimap,
                             minimap: None,
                             minimap_rect: None,
                             minimap_frame: None,

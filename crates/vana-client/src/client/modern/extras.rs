@@ -126,13 +126,13 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
         return;
     }
     // A built-in panel's layer held while no mod's window is in it (the timers' panels hold theirs in timers_panel).
-    for name in super::super::lua::EDGE_PANELS.iter().filter(|n| !n.starts_with("timers_") && **n != "skillchains") {
+    for name in super::super::lua::EDGE_PANELS.iter().filter(|n| !n.starts_with("timers_") && !["skillchains", "minimap"].contains(*n)) {
         if w.lua.edge_panel(name).is_none() || w.lua.hides(name) {
             hold_layer(p.ctx, name);
         }
     }
     // The timers' and skillchains' panels draw their client views (timers_panel, skillchain_panel).
-    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge && !x.panel.as_deref().is_some_and(|n| n.starts_with("timers_") || n == "skillchains")) {
+    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge && !x.panel.as_deref().is_some_and(|n| n.starts_with("timers_") || n == "skillchains" || n == "minimap")) {
         if win.panel.as_deref().is_some_and(|n| w.lua.hides(n)) {
             continue;
         }
@@ -961,11 +961,11 @@ pub(super) fn arrow_in(painter: &egui::Painter, c: Pos2, facing: f32, size: f32,
 /// keeps clear of the command menu and the windows at its edge (retail's minimap does); folded, a tab under them.
 /// The wheel zooms.
 fn minimap_panel(p: &mut Panels, w: &mut World) {
-    let Some(f) = w.minimap_frame.as_ref() else { return };
-    if !w.extra_minimap || hidden(w) {
-        return;
-    }
-    let Some(img) = w.minimap.as_mut().and_then(|o| o.modern_image()) else { return };
+    let win = w.lua.edge_panel("minimap").filter(|_| w.minimap_frame.is_some() && !hidden(w));
+    let img = if win.is_some() { w.minimap.as_mut().and_then(|o| o.modern_image()) } else { None };
+    // Its layer is made when it first draws (once its map is in), as the built-in's was: over Wide Scan's.
+    let (Some(win), Some(img), Some(f)) = (win, img, w.minimap_frame.as_ref()) else { return };
+    let title = if win.title.is_empty() { "Map".to_string() } else { win.title.clone() };
     let (m, ctx) = (p.m, p.ctx);
     let tex = map_texture(m, ctx, &img);
     // Its own size once resized (the place's w), else Small / Medium / Large as big on screen as the retail-drawn one:
@@ -985,7 +985,7 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
     let label = p.gu.map(|gu| format!("{}  {}", crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(w.pos_zone))), m.grid(w, gu))).unwrap_or_default();
     let folded = p.folded.get("minimap").copied().unwrap_or(false);
     let mut wheel = 0.0f32;
-    let toggle = edge_window(p, "minimap", d + 30.0, false, folded, "Map", |ui, side, _| {
+    let toggle = edge_window(p, "minimap", d + 30.0, false, folded, &title, |ui, side, _| {
         // The heading: the zone and grid, the fold chevron; dragged it moves the window.
         let hresp = flyout_heading(ui, m, &label, FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())), side);
         ui.add_space(4.0);
@@ -1113,7 +1113,11 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
 /// on the tracked one asks to stop. Retail asks for a list only as its map opens; open, this asks every 10 s while
 /// nothing is tracked, and shows the last complete list until the next one is all in.
 fn widescan_panel(p: &mut Panels, w: &mut World) {
-    if !w.extra_minimap || hidden(w) {
+    // Its layer held from the first frame while the minimap mod's window is not in yet, as the built-in tab had it.
+    if w.lua.edge_panel("minimap").is_none() && !hidden(w) {
+        hold_layer(p.ctx, "widescan");
+    }
+    if w.lua.edge_panel("minimap").is_none() || hidden(w) {
         w.scan_typing = false;
         return;
     }

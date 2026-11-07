@@ -101,6 +101,10 @@ Done so far (checked live, Lnxcsfix):
   (skillchain.rs, its party skills, resonances and LSB's properties stay the client's) whatever the window's elements;
   in the classic UI under the Timers and the regime as before. Not seen live: with a trust in the party (Kupipi, Nanaa
   Mihgo) neither master nor the mod shows it (it needs party members' known weapon skills).
+- **Minimap** (assets/mods/minimap): the edge window panel `minimap`, in which the client draws its minimap (the map,
+  the radar's dots, the wheel's zoom) and, in the modern UI, Wide Scan under it; Minimap Position and Size stay the
+  client's rows for the classic place. Its layer is made when its map first draws, Wide Scan's held from the first
+  frame, as the built-in ones were (the map over Wide Scan's tab). Compared with master in both UIs.
 
 ### Edge windows
 

@@ -27,7 +27,6 @@ pub struct Settings {
     pub shadow_map: u32,
     pub ssao: bool,
     pub timers_dock: u32,
-    pub minimap: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub music: u32,
@@ -69,7 +68,6 @@ impl Settings {
             shadow_map: c.shadow_map,
             ssao: c.ssao,
             timers_dock: c.timers_dock,
-            minimap: c.minimap,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
             // The game's own volumes (Gameplay page, config 10 / 9; the lobby's 0xa8): set by the opener.
@@ -108,7 +106,6 @@ impl Settings {
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
         c.timers_dock = self.timers_dock;
-        c.minimap = self.minimap;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
         c.retail_aspect = self.retail_aspect;
@@ -157,7 +154,6 @@ enum Val {
     ShadowMap,
     Ssao,
     TimersDock,
-    Minimap,
     MinimapDock,
     MinimapSize,
     Music,
@@ -322,7 +318,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const MAPS: &[SRow] = &[
         row("Map Overlay Opacity", "How see-through the map overlay is.", MapOpacity, &[], Now),
-        row("Minimap", "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom.", Minimap, OFF_ON, Now),
         row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
@@ -334,7 +329,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[];
     match kind {
-        Kind::Extras if modern => [&MAPS[..2], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
+        Kind::Extras if modern => [&MAPS[..1], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
@@ -534,7 +529,6 @@ impl SettingsUi {
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
             Val::TimersDock => self.s.timers_dock,
-            Val::Minimap => self.s.minimap as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
             Val::Music => self.s.music,
@@ -568,7 +562,6 @@ impl SettingsUi {
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
-            Val::Minimap => self.s.minimap = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
             Val::RetailAspect => self.s.retail_aspect = x != 0,
@@ -1688,19 +1681,13 @@ mod tests {
         ui.key(egui::Key::ArrowLeft);
         assert_eq!(ui.tab, 3);
         ui.key(egui::Key::ArrowRight);
-        // The first row is Map Overlay Opacity (a slider); the minimap's under it, on OFF.
+        // The first row is Map Overlay Opacity (a slider); Up from it to the page name, and Up again wraps to the last
+        // row, Minimap Size (Small / Medium / Large): Large; then its place, top left.
         ui.key(egui::Key::ArrowDown);
         assert_eq!(ui.row, 1);
-        ui.key(egui::Key::ArrowDown);
-        assert_eq!((ui.row, ui.col), (2, 1));
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.minimap && ui.dirty);
-        // The last row, Minimap Size (Small / Medium / Large): Large; then its place, top left.
         ui.key(egui::Key::ArrowUp);
         ui.key(egui::Key::ArrowUp);
-        ui.key(egui::Key::ArrowUp);
-        assert_eq!(ui.row, 4);
+        assert_eq!(ui.row, 3);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.minimap_size, 2);

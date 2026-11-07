@@ -390,7 +390,7 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `edge` | `boolean` | `false` | An edge window, drawn as the Timers and the training regime windows are: on a screen edge (in the modern UI the player drags it along the edges), folding to a tab that shows `title`, with `heading` as a line over the elements; a click on that line folds it. It is a HUD window: it never takes the keys. |
 | `heading` | `string` | the title | An edge window's line over its elements. |
 | `resize` | `boolean` | `false` | An edge window the player can make wider (modern UI). |
-| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"`, `"timers_debuffs"` or `"skillchains"` (the client's skillchain helper view, drawn whatever the window's elements are): the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows. |
+| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"`, `"timers_debuffs"`, `"skillchains"` (the client's skillchain helper view, drawn whatever the window's elements are) or `"minimap"` (the client's minimap, with Wide Scan under it in the modern UI): the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows. |
 
 **Returns** nothing.
 
