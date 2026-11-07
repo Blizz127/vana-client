@@ -260,6 +260,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Key Commands** (assets/mods/key-commands; Windower's binds and aliases, Binder, GBinder and kin): `//bind <key>
   <line>`, `//unbind`, `//binds`; `//alias <name> <line>` (with $1.. and $*) makes /name run the line, `//unalias`,
   `//aliases`; kept per character and bound again at login. Seen live: F9 bound to an /echo, an alias with $1 and $*.
+- **Event Rules** (assets/mods/event-rules; autoex, AutoExec, onevent, logincmd): `rules.txt` in its data folder, one
+  `event | match | line` a line (login, zone, job, gain, lose, hp_below, mp_below, chat, day, weather); an example file
+  is written on first start; `//rules` lists, `//rules reload` reads it again. Seen live: login, Sneak gained and lost.
+  Not yet: autoex's XML rule files (no XML helper yet).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
