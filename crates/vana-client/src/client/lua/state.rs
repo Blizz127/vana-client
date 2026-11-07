@@ -28,6 +28,8 @@ pub(super) struct FrameInfo {
     pub skin: super::skin::Skin,
     /// The modern UI's pixels per point while it is on (the HUD's UI unit there).
     pub modern_ppp: Option<f32>,
+    /// Mods' opacity for their own windows ("mod:<mod>:<window>", "hud:<mod>:<window>"): window -> (mod, opacity).
+    pub opacity: std::collections::BTreeMap<String, (String, f32)>,
     /// This frame's view-projection, for draw.to_screen.
     pub view_proj: glam::Mat4,
     /// Entity looks mods set (render.entity): server id -> (mod, look).

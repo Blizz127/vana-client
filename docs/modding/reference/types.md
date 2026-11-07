@@ -188,6 +188,7 @@ The definition of a mod window, the second argument of `ui.window(id, spec)`. Th
 | `y` | `number?` | The window's top edge in the classic UI. Used only together with `x`. |
 | `modal` | `boolean?` | true: the window keeps the keys and the pointer while it is open; centred unless placed with `x` and `y`. Default false. |
 | `popup` | `boolean?` | true: a modal window opened at the pointer and closed by a click outside it. Default false. |
+| `opacity` | `number?` | The whole window's opacity, 0..1 (per-window opacity). Default 1. |
 | `elements` | `table[]?` | The window's elements in order, each with a `type` field (see [ui.md](ui.md)). |
 
 ```lua

@@ -6445,6 +6445,8 @@ struct World {
     /// Extra: the map overlay's opacity (HUD maps take it unless a mod gives its own; the minimap's marker shades by
     /// it) and the synthesis amount.
     map_opacity: f32,
+    /// Per-window opacity the player set (config `window_opacity`).
+    window_opacity: std::collections::BTreeMap<String, f32>,
     synth_amount: bool,
     /// Config `stamp_all_lines` (extra).
     stamp_all_lines: bool,
@@ -7541,6 +7543,7 @@ impl App {
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.synth_amount = self.cfg.synth_amount;
             w.map_opacity = self.cfg.map_overlay_opacity;
+            w.window_opacity = self.cfg.window_opacity.clone();
             w.stamp_all_lines = self.cfg.stamp_all_lines;
             (w.target_distance, w.target_hpp) = (self.cfg.target_distance, self.cfg.target_hpp);
             (w.earth_clock, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_ready_lines);
@@ -8407,6 +8410,7 @@ impl App {
                             translating: false,
                             last_proposer: String::new(),
                             map_opacity: self.cfg.map_overlay_opacity,
+                            window_opacity: self.cfg.window_opacity.clone(),
                             synth_amount: self.cfg.synth_amount,
                             stamp_all_lines: self.cfg.stamp_all_lines,
                             skillchain: Default::default(),

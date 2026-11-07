@@ -190,6 +190,10 @@ pub struct Config {
     pub send_interval: u32,
     /// Party and alliance rows show TP (retail config 0xae bit 0, default off; ours on, as the add-ons do).
     pub party_tp: bool,
+    /// Per-window opacity the player set (no row for it yet), by window: a modern panel's id, a mod's window
+    /// ("mod:<mod>:<window>") or a mod's HUD window ("hud:<mod>:<window>"). It wins over a mod's own.
+    #[serde(default)]
+    pub window_opacity: std::collections::BTreeMap<String, f32>,
     /// Extra: how opaque the map overlay's map is, 0..1: the drawing code applies it to HUD maps (the Map Overlay
     /// mod's), and the minimap's marker shades by it (the two markers alike).
     pub map_overlay_opacity: f32,
@@ -452,6 +456,7 @@ impl Default for Config {
             draw_distance: 0,
             send_interval: 400,
             party_tp: true,
+            window_opacity: Default::default(),
             map_overlay_opacity: 0.6,
             synth_amount: false,
             stamp_all_lines: false,

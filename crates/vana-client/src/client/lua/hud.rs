@@ -34,6 +34,8 @@ pub(in crate::client) struct Elem {
     /// bottom.
     pub anchor: Option<String>,
     pub corner: u8,
+    /// The HUD window it belongs to (its opacity: hud.opacity); "hud" by default.
+    pub window: String,
 }
 
 pub(super) fn colour(v: Value) -> mlua::Result<Option<[u8; 4]>> {
@@ -74,6 +76,9 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             }
             _ => None,
         };
+    }
+    if let Some(v) = t.get::<Option<String>>("window")? {
+        e.window = v;
     }
     if let Some(c) = t.get::<Option<String>>("corner")? {
         e.corner = match c.as_str() {
@@ -219,7 +224,7 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
 }
 
 fn put(lua: &Lua, id: String, kind: Kind, spec: Table) -> mlua::Result<()> {
-    let mut e = Elem { id: id.clone(), x: 0.0, y: 0.0, visible: true, layer: 0, kind, tip: None, anchor: None, corner: 0 };
+    let mut e = Elem { id: id.clone(), x: 0.0, y: 0.0, visible: true, layer: 0, kind, tip: None, anchor: None, corner: 0, window: "hud".into() };
     apply(&mut e, &spec)?;
     let st = super::api::state(lua);
     let mut s = st.borrow_mut();
@@ -363,6 +368,13 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
         })?,
     )?;
     t.set(
+        "opacity",
+        lua.create_function(|lua, (window, opacity): (String, Option<f32>)| {
+            super::api::set_opacity(lua, &format!("hud:{}:{window}", super::api::mod_id(lua)?), opacity);
+            Ok(())
+        })?,
+    )?;
+    t.set(
         "screen",
         lua.create_function(|lua, ()| {
             let info = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default();
@@ -465,6 +477,9 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
     let panels = if w.modern { info.borrow().native_rects.clone() } else { Default::default() };
     for (mod_id, e) in elements(host).into_iter().filter(|(_, e)| !w.modern || game_drawn(e)) {
         let Some((px, py)) = place(&e, &panels, win) else { continue };
+        // Its HUD window's opacity, over everything it draws.
+        let o = host.window_opacity(&w.window_opacity, &format!("hud:{mod_id}:{}", e.window));
+        gu.opacity((o < 1.0).then_some(o));
         let (x, y) = (px * k.0, py * k.1);
         let r = match &e.kind {
             Kind::Text { text, size, colour, bg, align, pad, font, outline, outline_w, shadow } => {
@@ -551,6 +566,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
         };
         rects.push((mod_id, e.id.clone(), [r[0] / k.0, r[1] / k.1, r[2] / k.0, r[3] / k.1]));
     }
+    gu.opacity(None);
     info.borrow_mut().hud_rects = rects;
     // The classic UI's tooltip (the modern UI's is the kit's, modern/mod.rs), once the pointer rests a moment.
     if !w.modern

@@ -42,6 +42,9 @@ pub(super) fn draw(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World) {
         }
         let Some((px, py)) = super::super::lua::hud::place(&e, &panels, win) else { continue };
         let at = pos2(pt(px), pt(py));
+        // Its HUD window's opacity, over everything it draws.
+        let mut painter = painter.clone();
+        painter.multiply_opacity(host.window_opacity(&w.window_opacity, &format!("hud:{mod_id}:{}", e.window)));
         let Some(r) = element(m, ctx, gu, w, &painter, &e, at, ppp) else { continue };
         rects.push((mod_id, e.id.clone(), [r.min.x * ppp, r.min.y * ppp, r.width() * ppp, r.height() * ppp]));
     }

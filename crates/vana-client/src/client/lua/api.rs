@@ -337,6 +337,12 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             w.modal = w.popup || spec.get::<Option<bool>>("modal")?.unwrap_or(false);
             // A popup opens at the pointer.
             w.anchor = w.popup.then(|| super::input::cursor(lua));
+            // Its opacity (per-window opacity), kept with the window's key.
+            let opacity = spec.get::<Option<f32>>("opacity")?;
+            drop(s);
+            set_opacity(lua, &format!("mod:{}:{id}", mod_id(lua)?), opacity);
+            let mut s = st.borrow_mut();
+            let w = &mut s.windows[k];
             let elems: Option<Table> = spec.get("elements")?;
             let parsed: Vec<(super::window::Elem, super::window::Meta)> = match elems {
                 Some(t) => t.sequence_values::<Table>().map(|e| e.and_then(|e| elem(&e))).collect::<mlua::Result<_>>()?,
@@ -457,6 +463,13 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         })?,
     )?;
     ui.set("is_open", lua.create_function(|lua, id: String| Ok(state(lua).borrow().windows.iter().any(|w| w.id == id && w.open)))?)?;
+    ui.set(
+        "opacity",
+        lua.create_function(|lua, (id, opacity): (String, Option<f32>)| {
+            set_opacity(lua, &format!("mod:{}:{id}", mod_id(lua)?), opacity);
+            Ok(())
+        })?,
+    )?;
     ui.set(
         "on",
         lua.create_function(|lua, (id, func): (String, Function)| {
@@ -1681,4 +1694,26 @@ pub(super) fn build_packet(id: i64, body: &[u8]) -> mlua::Result<Vec<u8>> {
         return Err(mlua::Error::runtime(format!("a packet body is at most {} bytes ({} given)", MAX_PACKET - 4, body.len())));
     }
     Ok(crate::net::map::session::build(id as u16, body))
+}
+
+/// The running mod's id.
+pub(super) fn mod_id(lua: &Lua) -> mlua::Result<String> {
+    lua.globals().get::<Table>("mod")?.get::<String>("id")
+}
+
+/// Sets or (None) clears a window's opacity from this mod (per-window opacity); the key is the mod's own window.
+pub(super) fn set_opacity(lua: &Lua, key: &str, opacity: Option<f32>) {
+    let Some(info) = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()) else { return };
+    let me = mod_id(lua).unwrap_or_default();
+    let mut f = info.borrow_mut();
+    match opacity {
+        Some(o) => {
+            f.opacity.insert(key.to_string(), (me, o.clamp(0.0, 1.0)));
+        }
+        None => {
+            if f.opacity.get(key).is_some_and(|o| o.0 == me) {
+                f.opacity.remove(key);
+            }
+        }
+    }
 }

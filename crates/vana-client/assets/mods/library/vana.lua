@@ -143,6 +143,7 @@
 ---@field elements table[]? see ui.window
 ---@field modal boolean? keeps the keys and the pointer while open
 ---@field popup boolean? modal, opened at the pointer, closed by a click outside it
+---@field opacity number? the whole window's opacity, 0..1 (per-window opacity)
 
 --- A packet as a hook sees it (packets.on_in / on_out).
 ---@class vana.Packet
@@ -355,7 +356,7 @@ function timers.remove(name) end
 --- Removes every row of the mod's.
 function timers.clear() end
 
---- Creates or replaces a window: title, width, help, and elements in order. Element types: text {id, text, dim, colour}; buttons {id, label, items, marked} (marked makes them options); slider {id, label, steps, at, shown}; list {id, rows, columns, at, height} (a row is a string or {cells..., icon = {kind = 'item' | 'status' | 'spell' | 'ability', id}, colour}; columns {title, width, align = 'right'}, a heading click sends 'sort'); gauge {id, label, value 0..1, text, kind hp|mp|tp|cast|experience|recast}; separator; tabs {id, items, at} (pages: an element's page = n shows only on page n of the tabs above it); input {id, label, text, max} (a typed line: Enter starts and ends it, Escape undoes it); choice {id, label, items, at} (Left / Right turn it); colour {id, label, value = {r, g, b, a}, alpha} (Enter edits it a channel at a time); section {id, label, open} (folds what is under it, to the next section or tabs); canvas {id, w, h, draw} (a region the mod draws in, in its own units: draw is a list of {type = 'line', x1, y1, x2, y2, width} | {type = 'rect', x, y, w, h, to (a bottom colour: a gradient), line (outline width)} | {type = 'circle', x, y, r, line} | {type = 'tri', x1, y1, x2, y2, x3, y3} | {type = 'text', x, y, text} | {type = 'icon', x, y, size, kind = 'item' | 'status' | 'spell' | 'ability', id}, each with a colour; ui.update(window, canvas, {draw = ...}) redraws it; a click sends 'click' {x, y}, a drag 'drag_start', 'drag' and 'drag_end' {x, y, dx, dy}, held to the release wherever the pointer goes). Every element may have tip (the help shown while the cursor or pointer is on it) and page. Indexes are 1-based. Window options: hud (never takes the keys), frame = false (no frame), x / y (its place in the classic UI), modal (keeps the keys and the pointer while open; centred unless placed), popup (modal, opened at the pointer, closed by a click outside it). It draws in the active UI's look (classic Config page or modern panel).
+--- Creates or replaces a window: title, width, help, and elements in order. Element types: text {id, text, dim, colour}; buttons {id, label, items, marked} (marked makes them options); slider {id, label, steps, at, shown}; list {id, rows, columns, at, height} (a row is a string or {cells..., icon = {kind = 'item' | 'status' | 'spell' | 'ability', id}, colour}; columns {title, width, align = 'right'}, a heading click sends 'sort'); gauge {id, label, value 0..1, text, kind hp|mp|tp|cast|experience|recast}; separator; tabs {id, items, at} (pages: an element's page = n shows only on page n of the tabs above it); input {id, label, text, max} (a typed line: Enter starts and ends it, Escape undoes it); choice {id, label, items, at} (Left / Right turn it); colour {id, label, value = {r, g, b, a}, alpha} (Enter edits it a channel at a time); section {id, label, open} (folds what is under it, to the next section or tabs); canvas {id, w, h, draw} (a region the mod draws in, in its own units: draw is a list of {type = 'line', x1, y1, x2, y2, width} | {type = 'rect', x, y, w, h, to (a bottom colour: a gradient), line (outline width)} | {type = 'circle', x, y, r, line} | {type = 'tri', x1, y1, x2, y2, x3, y3} | {type = 'text', x, y, text} | {type = 'icon', x, y, size, kind = 'item' | 'status' | 'spell' | 'ability', id}, each with a colour; ui.update(window, canvas, {draw = ...}) redraws it; a click sends 'click' {x, y}, a drag 'drag_start', 'drag' and 'drag_end' {x, y, dx, dy}, held to the release wherever the pointer goes). Every element may have tip (the help shown while the cursor or pointer is on it) and page. Indexes are 1-based. Window options: opacity (0..1, the whole window: per-window opacity; ui.opacity changes it), hud (never takes the keys), frame = false (no frame), x / y (its place in the classic UI), modal (keeps the keys and the pointer while open; centred unless placed), popup (modal, opened at the pointer, closed by a click outside it). It draws in the active UI's look (classic Config page or modern panel).
 ---@param id string 
 ---@param spec vana.WindowSpec 
 function ui.window(id, spec) end
@@ -394,6 +395,11 @@ function ui.show(id) end
 --- Hides a window.
 ---@param id string 
 function ui.close(id) end
+
+--- Sets one of the mod's windows' opacity (per-window opacity: its frame and everything in it), 0..1; nil gives it back (opaque). The player's own setting for the window wins.
+---@param window string the window's id
+---@param opacity number? 
+function ui.opacity(window, opacity) end
 
 --- Whether a window shows.
 ---@param id string 
@@ -435,7 +441,7 @@ function hud.image(id, spec) end
 ---@param spec table 
 function hud.icon(id, spec) end
 
---- Changes an element's fields (only those given); false clears a colour; an image takes a new path. Every element also takes tip: a string or {title, text}, a tooltip shown while the pointer rests on it (false removes it); and anchor: a modern panel's name (ui.native.panels), making x and y signed offsets from one of the panel's corners (corner: top_left (the default), top_right, bottom_left, bottom_right), so the element follows the panel, and stays where a hidden panel last was (false: the window again). HUD elements draw under the panels: place them beside a panel, or where a hidden one was.
+--- Changes an element's fields (only those given); false clears a colour; an image takes a new path. Every element also takes window: the HUD window it belongs to ('hud' by default; hud.opacity sets a window's opacity); tip: a string or {title, text}, a tooltip shown while the pointer rests on it (false removes it); and anchor: a modern panel's name (ui.native.panels), making x and y signed offsets from one of the panel's corners (corner: top_left (the default), top_right, bottom_left, bottom_right), so the element follows the panel, and stays where a hidden panel last was (false: the window again). HUD elements draw under the panels: place them beside a panel, or where a hidden one was.
 ---@param id string 
 ---@param fields table 
 function hud.set(id, fields) end
@@ -455,6 +461,11 @@ function hud.on(id, handler) end
 --- Removes an element's handler (hud.on); the element stays.
 ---@param id string 
 function hud.off(id) end
+
+--- Sets the opacity of one of the mod's HUD windows (the elements whose window field names it; 'hud' by default), over everything they draw, 0..1; nil gives it back (opaque). The player's own setting for the window wins.
+---@param window string 
+---@param opacity number? 
+function hud.opacity(window, opacity) end
 
 --- The window in pixels, and ui_scale: pixels per UI unit (the modern UI's point while it is on, else the classic layout's unit; sizes given in UI units look the same at any resolution and UI size).
 ---@return {width: number, height: number, ui_scale: number}

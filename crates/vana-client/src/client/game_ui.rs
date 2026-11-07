@@ -1479,6 +1479,11 @@ impl GameUi {
         self.batch.set_clip(clip);
     }
 
+    /// What is drawn from now on is drawn at this opacity (its window's: per-window opacity); None = as given.
+    pub fn opacity(&mut self, opacity: Option<f32>) {
+        self.batch.set_opacity(opacity);
+    }
+
     /// Quads drawn from now on are depth-tested against the scene at NDC z `depth` (name plates); None = not.
     pub fn depth(&mut self, depth: Option<f32>) {
         self.batch.set_depth(depth);

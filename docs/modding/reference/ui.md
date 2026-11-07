@@ -31,6 +31,7 @@ commands.register("hello", function() ui.open("hello") end)
 | [`ui.show(id)`](#uishow) | Shows a window without giving it the keys. |
 | [`ui.close(id)`](#uiclose) | Hides a window. |
 | [`ui.is_open(id)`](#uiis_open) | Whether a window is showing. |
+| [`ui.opacity(id, opacity)`](#uiopacity) | Sets a window's opacity. |
 | [`ui.on(id, handler)`](#uion) | Sets the function that gets a window's events. |
 | [`ui.prompt(text, buttons?, handler)`](#uiprompt) | Asks the player a question with buttons (Yes / No by default). |
 | [`ui.menu(items, handler)`](#uimenu) | Opens a small pop-up list at the pointer, like a right-click menu. |
@@ -370,6 +371,7 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `x`, `y` | `number` | none | The window's top left corner in the classic UI, in its own units. Give both, or neither. Without them, windows are placed one below and right of the other from the top left. The modern UI places its windows itself and does not use these. |
 | `modal` | `boolean` | `false` | While a modal window is open it keeps the keys and is the only mod window the pointer reaches; other mod windows cannot take the keys from it. It is centred on the screen (in the classic UI, at `x`, `y` when given). A click outside it does not close it. |
 | `popup` | `boolean` | `false` | A pop-up: a modal window placed with its top left at the pointer, which a click outside it closes (sending `close`). It opens where the pointer is when `ui.open` opens it. |
+| `opacity` | `number` | `1` | The whole window's opacity, 0 to 1: its frame and everything in it (per-window opacity). `ui.opacity` changes it later. A value the player sets for the window wins. |
 
 **Returns** nothing.
 
@@ -583,6 +585,34 @@ ui.on("fruit", function(win, e)
   if e.kind == "press" and e.id == "act" and e.index == 2 then
     ui.close(win)
   end
+end)
+```
+
+## `ui.opacity`
+
+```lua
+ui.opacity(id, opacity)
+```
+
+Sets the opacity of one of your windows, its frame and everything in it, as the client draws every window: each
+window, built in or a mod's, carries its own opacity. The player's own setting for the window, when there is one,
+wins over yours.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The window's id. |
+| `opacity` | `number` | no | 0 (unseen) to 1 (opaque); `nil` gives the window back its opacity (opaque). |
+
+**Returns** nothing.
+
+**Example**
+
+```lua
+-- Fade the window while engaged.
+events.on("status_change", function(status)
+  ui.opacity("tracker", status == 1 and 0.4 or nil)
 end)
 ```
 

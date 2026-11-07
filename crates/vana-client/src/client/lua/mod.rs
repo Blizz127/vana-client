@@ -603,6 +603,7 @@ impl Host {
             mods.remove(&vm.manifest.id);
         }
         info.placed.retain(|_, p| p.0 != vm.manifest.id);
+        info.opacity.retain(|_, p| p.0 != vm.manifest.id);
         info.skin.forget(&vm.manifest.id);
         info.looks.retain(|_, l| l.0 != vm.manifest.id);
         info.item_tints.retain(|_, t| t.0 != vm.manifest.id);
@@ -1463,6 +1464,18 @@ impl Host {
         self.info.borrow_mut().view_proj = m;
     }
 
+    /// A window's opacity (per-window opacity): the player's (config `window_opacity`), else its mod's, else 1.
+    pub(in crate::client) fn window_opacity(&self, player: &std::collections::BTreeMap<String, f32>, key: &str) -> f32 {
+        player.get(key).copied().or_else(|| self.info.borrow().opacity.get(key).map(|o| o.1)).unwrap_or(1.0).clamp(0.0, 1.0)
+    }
+
+    /// Every window's opacity that is not 1 this frame: the player's and the mods'.
+    pub(in crate::client) fn window_opacities(&self, player: &std::collections::BTreeMap<String, f32>) -> std::collections::HashMap<String, f32> {
+        let mut out: std::collections::HashMap<String, f32> = self.info.borrow().opacity.iter().map(|(k, v)| (k.clone(), v.1)).collect();
+        out.extend(player.iter().map(|(k, v)| (k.clone(), *v)));
+        out
+    }
+
     /// Whether the mods' HUD draws: they run and `/lua hide` is off.
     pub(in crate::client) fn hud_shown(&self) -> bool {
         self.started && !self.all_hidden
@@ -1777,6 +1790,30 @@ mod tests {
         // Labelled values need a label each; a tab must be one of ours.
         assert!(manifest::parse("[settings.e]\ntype = \"int\"\noptions = [\"OFF\"]\nvalues = [0, 3]", "t").is_err());
         assert!(manifest::parse("[settings.e]\ntype = \"int\"\ntab = \"Nope\"", "t").is_err());
+    }
+
+    /// Per-window opacity: a mod's for its own windows (ui.window, ui.opacity, hud.opacity), cleared by it alone; the
+    /// player's wins.
+    #[test]
+    fn window_opacity() {
+        let host = Host::default();
+        let new = |id: &str| {
+            let vm = Vm::new(manifest::Manifest { id: id.into(), ..Default::default() }, PathBuf::from("."), vm::Source::Dir(PathBuf::from("."))).unwrap();
+            vm.lua.set_app_data(host.info.clone());
+            api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+            vm
+        };
+        let (a, b) = (new("a"), new("b"));
+        a.lua.load(r#"ui.window("w", {title = "W", opacity = 0.5}); hud.opacity("bars", 0.25); hud.rect("r", {window = "bars"})"#).exec().unwrap();
+        let player = std::collections::BTreeMap::new();
+        assert_eq!((host.window_opacity(&player, "mod:a:w"), host.window_opacity(&player, "hud:a:bars"), host.window_opacity(&player, "hud:a:hud")), (0.5, 0.25, 1.0));
+        assert!(a.st.borrow().hud.iter().any(|e| e.id == "r" && e.window == "bars"));
+        b.lua.load(r#"ui.opacity("w", nil)"#).exec().unwrap();
+        assert_eq!(host.window_opacity(&player, "mod:a:w"), 0.5);
+        let player = std::collections::BTreeMap::from([("mod:a:w".to_string(), 0.75)]);
+        assert_eq!(host.window_opacity(&player, "mod:a:w"), 0.75);
+        a.lua.load(r#"ui.opacity("w", nil)"#).exec().unwrap();
+        assert_eq!(host.window_opacity(&std::collections::BTreeMap::new(), "mod:a:w"), 1.0);
     }
 
     /// A suspended mod's provided functions don't run for other mods either.
@@ -2247,7 +2284,11 @@ pub(super) fn draw_classic(gu: &mut super::game_ui::GameUi, w: &World) -> Vec<[f
     let mut out = Vec::new();
     for (v, id, x, y) in classic_places(w) {
         if let Some(win) = w.lua.vms[v].st.borrow().windows.iter().find(|x| x.id == id) {
+            // Its opacity (per-window opacity), over the whole window.
+            let o = w.lua.window_opacity(&w.window_opacity, &format!("mod:{}:{id}", w.lua.vms[v].manifest.id));
+            gu.opacity((o < 1.0).then_some(o));
             out.push(win.draw_classic(gu, Some(w), x, y));
+            gu.opacity(None);
         }
     }
     out

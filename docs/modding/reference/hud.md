@@ -32,6 +32,7 @@ end)
 | [`hud.clear()`](#hudclear) | Removes every element of the mod. |
 | [`hud.on(id, handler)`](#hudon) | Sets the function called when the player clicks or drags an element, or the pointer comes or goes. |
 | [`hud.off(id)`](#hudoff) | Removes an element's handler. |
+| [`hud.opacity(window, opacity)`](#hudopacity) | Sets the opacity of one of your HUD windows. |
 | [`hud.screen()`](#hudscreen) | The game window's size in pixels, and the UI's scale. |
 | [`hud.bounds(id)`](#hudbounds) | Where an element was drawn last frame. |
 
@@ -63,6 +64,7 @@ hud.text("panel_text", {x = 20 + 8 * s, y = 200 + 10 * s, text = "Scaled with th
 | `layer` | `integer` | `0` | Elements on higher layers draw over those on lower ones. On the same layer, mods draw in their load order, and each mod's elements in the order it created them. |
 | `anchor` | `string` | none | A modern [panel](ui.native.md#modern-panels)'s name: `x` and `y` become offsets from one of the panel's corners (`corner`), negative ones going left or up, so the element follows the panel. A hidden panel keeps its last place; an element anchored to a panel never drawn yet is not drawn either. HUD elements draw under the panels, so put them beside a panel, or where a hidden one was. `false` in `hud.set` goes back to the window. Not in the classic UI. |
 | `corner` | `string` | `"top_left"` | With `anchor`: the panel's corner the offsets count from, `"top_left"`, `"top_right"`, `"bottom_left"` or `"bottom_right"`. `{anchor = "party", y = -24}` stands just above the party window. |
+| `window` | `string` | `"hud"` | The HUD window the element belongs to. A HUD window is a group of your elements the client treats as one window: [`hud.opacity`](#hudopacity) sets its opacity, over everything its elements draw. |
 | `tip` | `string` or `table` | none | A tooltip shown while the pointer rests on the element: a string, or `{title = ..., text = ...}` (the title above the text; `\n` breaks lines). `false` in `hud.set` removes it. The modern UI shows it in its tooltip frame, the classic UI in a dark box by the pointer. |
 
 **Create and set.** Each create call (`hud.text`, `hud.rect`, ...) makes a new element from its spec: fields you leave
@@ -522,6 +524,33 @@ id without a handler is ignored.
 events.on("status_change", function(status)
   if status == 1 then hud.off("heal") end
 end)
+```
+
+## `hud.opacity`
+
+```lua
+hud.opacity(window, opacity)
+```
+
+Sets the opacity of one of your HUD windows: every element whose `window` field names it (`"hud"` for elements that
+name none) draws at it, as the client draws every window, built in or a mod's, at its own opacity. The player's own
+setting for the window, when there is one, wins over yours.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `window` | `string` | yes | The HUD window's name. |
+| `opacity` | `number` | no | 0 (unseen) to 1 (opaque); `nil` gives it back (opaque). |
+
+**Returns** nothing.
+
+**Example**
+
+```lua
+hud.text("dps", {x = 20, y = 300, window = "meter", text = "DPS 0"})
+hud.bar("dps_bar", {x = 20, y = 320, w = 160, h = 8, window = "meter"})
+hud.opacity("meter", 0.7)
 ```
 
 ## `hud.screen`
