@@ -186,7 +186,8 @@ Milestone 1:
 - egui's zoom follows the window height against 1080, times Settings > Client > Interface Size (config modern_scale,
   50 .. 150% in 5% steps, default 60%).
 - Panels: Status, Party, Target, Location (zone, grid, time, day, weather, and the compass: retail's disk turned so
-  the camera's heading is up and tilted by cos 1.0996, N E S W, the radar dots, the tracking / call-for-help arrow),
+  the camera's heading is up and tilted by cos 1.0996, N E S W, the radar dots, the tracking / call-for-help arrow
+  with its target's name beside the grid label),
   the cast bar, Chat (tabs, the log, the chat line, the Enter key cap), the Command Menu (the main menu with
   submenus), the combat window (the action menu's rows).
 - Every panel moves by a drag on its background (contents keep their clicks); places are screen fractions per

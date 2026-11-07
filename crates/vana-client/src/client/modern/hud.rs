@@ -176,6 +176,8 @@ pub struct CompassView {
     pub range: f32,
     /// The arrow toward the tracked target or the call-for-help monster: its local direction and theme colour.
     pub arrow: Option<(f32, f32, &'static str)>,
+    /// Its name (retail's beside the dial at +36, +26; ours beside the grid label over it).
+    pub name: Option<String>,
 }
 
 /// The pack's gauge pair (`kind`_empty, `kind`_full) cut at `f` over `r`.
@@ -637,6 +639,11 @@ pub fn where_panel(p: &mut Panels, v: &WhereView) {
             compass(painter, m, dial, c);
         }
         let g = painter.text(pos2(dial.x, r.min.y + 2.0), Align2::CENTER_CENTER, &v.grid, FontId::proportional(m.theme.small), m.theme.color("muted"));
+        // What the arrow points to, beside the grid (retail's name by the dial; ours has the clock line under it).
+        if let Some((c, name)) = v.compass.as_ref().and_then(|c| Some((c, c.name.as_ref()?))) {
+            let col = m.theme.color(c.arrow.map_or("focus", |a| a.2));
+            painter.text(pos2(g.max.x + 8.0, r.min.y + 2.0), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), col);
+        }
         // The weather fills the room right of the compass, centred in the whole panel (the clock line too; a double
         // weather's art in the same square).
         let room = Rect::from_min_max(pos2(right, r.min.y), pos2(r.max.x, clock_row.map_or(r.max.y, |c| c.max.y)));
@@ -655,7 +662,11 @@ pub fn where_panel(p: &mut Panels, v: &WhereView) {
         m.tip_with(ui, Rect::from_min_max(pos2(r.min.x, low - 14.0), pos2(d.max.x, low + 14.0)), || (v.day.1.clone(), format!("Vana'diel time {}:{:02}.\n{element} is strong today.", v.time.0, v.time.1)));
         m.tip_with(ui, g.expand(4.0), || ("Map position".into(), format!("{} on this area's map.", v.grid)));
         if let Some(c) = &v.compass {
-            let arrow = if c.arrow.is_some() { "\nThe arrow points to what you are tracking." } else { "" };
+            let arrow = match (&c.arrow, &c.name) {
+                (Some(_), Some(n)) => format!("\nThe arrow points to {n}."),
+                (Some(_), None) => "\nThe arrow points to what you are tracking.".to_string(),
+                _ => String::new(),
+            };
             m.tip_with(ui, Rect::from_center_size(dial, vec2(2.0 * DIAL, 2.0 * DIAL * TILT + 8.0)), || ("Compass".into(), format!("The red N is north; the dial turns with the camera. The dots are the people and monsters near you.{arrow}")));
         }
         if let Some(id) = v.weather {
@@ -739,9 +750,9 @@ fn compass(painter: &Painter, m: &Modern, c: Pos2, v: &CompassView) {
         let k = 1.0 + 0.25 * pulse;
         let (tip, base) = (at(lx, ly, DIAL + 8.0 * k), at(lx, ly, DIAL - 6.0 * k));
         let n = (tip - base).normalized().rot90() * 6.0 * k;
-        let c = m.theme.color(col);
-        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], c.gamma_multiply(0.25 * pulse), Stroke::new(4.0 * pulse, c.gamma_multiply(0.35 * pulse))));
-        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], c, Stroke::new(1.0, Color32::from_black_alpha(180))));
+        let colour = m.theme.color(col);
+        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], colour.gamma_multiply(0.25 * pulse), Stroke::new(4.0 * pulse, colour.gamma_multiply(0.35 * pulse))));
+        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], colour, Stroke::new(1.0, Color32::from_black_alpha(180))));
         painter.ctx().request_repaint();
     }
 }
@@ -760,11 +771,15 @@ fn compass_view(w: &World) -> Option<CompassView> {
         Some(t) => Some((t.pos[0], t.pos[2], "focus")),
         None => target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| (e.pos.x, e.pos.z, "hp")),
     };
+    let name = match w.scan.tracking() {
+        Some(t) => w.npc_names.iter().find(|(id, _)| (*id & 0x3ff) as u16 == t.index & 0x3ff).map(|(_, n)| n.clone()),
+        None => target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| e.name.clone()),
+    };
     let arrow = aim.and_then(|(x, z, col)| {
         let d = vec2(w.pos.x - x, z - w.pos.z);
         (d.length() > 1e-3).then(|| (d.normalized().x, d.normalized().y, col))
     });
-    Some(CompassView { heading: f.x.atan2(-f.z), dots, range: rs.range, arrow })
+    Some(CompassView { heading: f.x.atan2(-f.z), dots, range: rs.range, arrow, name: arrow.and(name) })
 }
 
 pub fn cast_panel(p: &mut Panels, id: &str, label: &str, f: f32, text: &str) {
