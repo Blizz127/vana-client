@@ -194,6 +194,7 @@ pub fn export(out: &Path) -> Result<()> {
 
 /// An IMG chunk's payload at the upscaled size: the stock header (name, flags) with the new width and height, DXT1
 /// for a DXT1 original (its 1-bit alpha), else DXT3 with the PS2-style alpha (0x80 opaque) the client doubles.
+#[cfg(test)]
 fn image_chunk(stock: &[u8], w: u32, h: u32, rgba: &[u8]) -> Vec<u8> {
     image_chunk_from(stock, w, h, &encode(is_dxt1(stock), w, h, rgba, None))
 }

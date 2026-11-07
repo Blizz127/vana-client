@@ -504,6 +504,7 @@ pub const CLASSES: &[Class] = &[
         ("pet", "boolean?", "true for our pet, which also has:"),
         ("mpp", "integer?", "our pet's MP %"),
         ("tp", "integer?", "our pet's TP"),
+        ("pet_target", "integer?", "the server id our pet fights (s2c 0x068), when it has one"),
     ] },
     Class { name: "vana.Member", doc: "A party or alliance member (game.party).", fields: &[
         ("slot", "integer", ""),

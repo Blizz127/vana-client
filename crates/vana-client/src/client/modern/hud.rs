@@ -278,6 +278,7 @@ pub fn status_panel(p: &mut Panels, v: &StatusView, small: bool) {
 
 /// Row heights: party rows carry an MP bar under the HP bar, alliance rows not.
 const PARTY_ROW: f32 = 60.0;
+const PET_ROW: f32 = 36.0;
 const ALLY_ROW: f32 = 50.0;
 
 /// The rest tick's strip under the party window's title (ours, client/resttick.rs).
@@ -372,7 +373,25 @@ fn exp_bar(p: &Panels, id: &str, r: Rect, e: &ExpView) {
 /// the job, leader marks, the name over the HP bar with the HP number in its colour, the MP bar and number and TP
 /// (party rows), a member elsewhere greyed with the zone's name, the hand on the party cursor's or our target's row.
 /// Its height is exact, so the party window grows upward with no frame's lag. The slot clicked, if any.
-pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], small: bool, rest: Option<Shown>, exp: Option<&ExpView>) -> Option<usize> {
+/// A row under the party's members for our pet or fellow (retail's rows beside the party window).
+pub struct PetRow {
+    pub id: u32,
+    pub name: String,
+    pub hpp: u8,
+    /// Its HP gauge (retail's needs a model).
+    pub gauge: bool,
+    pub tp: Option<u16>,
+    pub pet: bool,
+    pub marked: bool,
+}
+
+/// What a click on the party panel picked: a member's slot, or a pet or fellow by server id.
+pub enum PartyPick {
+    Slot(usize),
+    Entity(u32),
+}
+
+pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], pets: &[PetRow], small: bool, rest: Option<Shown>, exp: Option<&ExpView>) -> Option<PartyPick> {
     if rows.is_empty() {
         return None;
     }
@@ -384,7 +403,8 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], sma
     let n = rows.len() as f32;
     let strip = if rest.is_some() { REST_H } else { 0.0 };
     let cap = if exp.is_some() { EXP_CAP } else { 0.0 };
-    let height = cap + super::MARGIN.sum().y + 37.0 + strip + n * row_h + (n - 1.0) * 4.0;
+    let pets_h = pets.len() as f32 * (PET_ROW + 4.0);
+    let height = cap + super::MARGIN.sum().y + 37.0 + strip + n * row_h + (n - 1.0) * 4.0 + pets_h;
     let mut clicked = None;
     let show = super::Show { title: Some(Title { icon: None, text: title, note: note.as_deref(), name: false }), size: vec2(340.0, 0.0), height: Some(height), cap, ..Default::default() };
     let shown = p.show(id, show, |ui, _| {
@@ -449,7 +469,7 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], sma
                 painter.text(pos2(x, r.center().y), Align2::LEFT_CENTER, &row.name, font, m.theme.color("muted"));
                 painter.text(pos2(right, r.center().y), Align2::RIGHT_CENTER, format!("({})", row.zone), FontId::proportional(m.theme.small), m.theme.color("muted"));
                 if resp.clicked() {
-                    clicked = Some(row.slot);
+                    clicked = Some(PartyPick::Slot(row.slot));
                 }
                 row_menu(m, &resp, row.slot);
                 continue;
@@ -492,15 +512,56 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], sma
                 }
             }
             if resp.clicked() {
-                clicked = Some(row.slot);
+                clicked = Some(PartyPick::Slot(row.slot));
             }
             row_menu(m, &resp, row.slot);
+        }
+        for pet in pets {
+            ui.add_space(4.0);
+            if pet_row(ui, m, pet) {
+                clicked = Some(PartyPick::Entity(pet.id));
+            }
         }
     });
     if let (Some(e), Some(r)) = (exp, shown) {
         exp_bar(p, id, r, e);
     }
     clicked
+}
+
+/// A pet or fellow row: a slimmer row with the name, the HP gauge and its percent, and the pet's TP (as party TP shows);
+/// the fellow's name in the focus colour, as retail's ncol 4. True when clicked.
+fn pet_row(ui: &mut Ui, m: &Modern, pet: &PetRow) -> bool {
+    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), PET_ROW), Sense::click());
+    let sprite = if pet.marked {
+        "controls/list_row_selected"
+    } else if resp.hovered() {
+        "controls/list_row_hover"
+    } else {
+        "controls/list_row_normal"
+    };
+    let painter = ui.painter();
+    super::rows::face(painter, m, r, sprite, Color32::WHITE);
+    let x = r.min.x + 54.0;
+    let right = r.max.x - 10.0;
+    let name_col = if pet.pet { m.theme.color("text") } else { m.theme.color("focus") };
+    let font = FontId::new(LABEL_SIZE, FontFamily::Name(super::LABEL.into()));
+    let small_font = FontId::new(14.0, FontFamily::Name(super::LABEL.into()));
+    paint::outlined(painter, pos2(x, r.min.y + 10.0), Align2::LEFT_CENTER, &pet.name, font, name_col);
+    let kind = if pet.pet { "Pet" } else { "Fellow" };
+    painter.text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, kind, FontId::proportional(m.theme.small - 1.0), m.theme.color("muted"));
+    if pet.gauge {
+        let pct = format!("{}%", pet.hpp);
+        let pw = painter.layout_no_wrap("100%".into(), small_font.clone(), Color32::WHITE).size().x;
+        let mut bx = x;
+        if let Some(tp) = pet.tp {
+            let col = if tp > 999 { m.theme.color("focus") } else { m.theme.color("muted") };
+            bx = paint::outlined(painter, pos2(x + 2.0, r.min.y + 24.0), Align2::LEFT_CENTER, &tp.to_string(), small_font.clone(), col).max.x + 8.0;
+        }
+        bar(ui, m, "hp", Rect::from_min_max(pos2(bx, r.min.y + 21.0), pos2(right - pw - 6.0, r.min.y + 27.0)), pet.hpp.min(100) as f32 / 100.0);
+        paint::outlined(painter, pos2(right, r.min.y + 24.0), Align2::RIGHT_CENTER, &pct, small_font, m.theme.color("text"));
+    }
+    resp.clicked()
 }
 
 /// A right click on a party row opens its menu (ctxmenu.rs).
@@ -803,7 +864,11 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // ptw0 ("Solo") while our party has no leader.
     let title = if party.len() <= 1 && w.party.slots().leaders[0] == 0 { "Solo" } else { "Party" };
     let exp = exp_view(w, p.gu).filter(|_| !w.lua.hides("experience"));
-    let mut picked = party_panel(p, "party", title, &party, small, super::super::resttick::shown(w), exp.as_ref());
+    let pets: Vec<PetRow> = super::super::petrow::rows(w)
+        .into_iter()
+        .map(|r| PetRow { id: r.id, marked: w.target == Some(r.id), name: r.name, hpp: r.hpp, gauge: r.model, tp: r.pet.then_some(r.tp).flatten(), pet: r.pet })
+        .collect();
+    let mut picked = party_panel(p, "party", title, &party, &pets, small, super::super::resttick::shown(w), exp.as_ref());
     // The frame's top, under the experience bar's strip.
     let frame = p.this.get("party").map(|r| Rect::from_min_max(pos2(r.min.x, r.min.y + if exp.is_some() { EXP_CAP } else { 0.0 }), r.max));
     // FUN_102041d0: while the pool holds items, retail's chest (fontshp 0x7a) on the party window's top edge near its
@@ -824,12 +889,16 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     }
     for (id, rows) in ["alliance1", "alliance2"].into_iter().zip(&allies) {
         if let Some(rows) = rows {
-            picked = picked.or(party_panel(p, id, "Alliance", rows, small, None, None));
+            picked = picked.or(party_panel(p, id, "Alliance", rows, &[], small, None, None));
         }
     }
-    if let Some(k) = picked {
-        let t = target::slot_target(w, k);
-        target::pick(w, t);
+    match picked {
+        Some(PartyPick::Slot(k)) => {
+            let t = target::slot_target(w, k);
+            target::pick(w, t);
+        }
+        Some(PartyPick::Entity(id)) => target::pick(w, Some(id)),
+        None => {}
     }
     // An event takes the target window down unless it keeps it (EventPara2 bit 1, FUN_10085a00), as the retail HUD
     // does (client/mod.rs world_hud); the focus panel goes with it.

@@ -1416,6 +1416,9 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
         t.set("mpp", p.mpp)?;
         t.set("tp", p.tp)?;
         t.set("pet", true)?;
+        if p.target != 0 {
+            t.set("pet_target", p.target)?;
+        }
     }
     Ok(t)
 }

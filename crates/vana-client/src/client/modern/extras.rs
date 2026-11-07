@@ -139,8 +139,8 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
         let key = win.panel.clone().unwrap_or_else(|| format!("mod:{mod_id}:{}", win.id));
         // Its first place, kept as if the player had put it there: it never moves as other windows come and go.
         if win.panel.is_none() && !p.layout.contains_key(&key) {
-            let y = stack_below(p, &key);
-            p.layout.insert(key.clone(), super::Place { x: 0.0, y, ..Default::default() });
+            let place = first_place(p, &key, 44.0 + 28.0 * win.elems.len() as f32);
+            p.layout.insert(key.clone(), place);
             *p.changed = true;
         }
         let regime = win.panel.as_deref() == Some("regime");
@@ -172,16 +172,38 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
     }
 }
 
-/// Where a mod's edge window first shows (a fraction of the screen's height): on the left edge, under the built-in
-/// windows there (last frame's) and the other mods' left-edge windows by their places (their last height, else a
-/// tenth of the screen), so none stand on another.
-fn stack_below(p: &Panels, key: &str) -> f32 {
+/// Where a mod's edge window first shows: on the left edge under the built-in windows there and the other mods' edge
+/// windows, if it fits (about `tall` points) above the left column's panels (the location panel, the chat window);
+/// else on the right edge under the minimap, the skillchains and the mods' windows there, above the party and target
+/// panels; else on the left all the same. Places are fractions of the screen's height (x < 0: the right edge).
+fn first_place(p: &Panels, key: &str, tall: f32) -> super::Place {
     let screen = p.ctx.content_rect();
     let h = screen.height().max(1.0);
     let rects = p.m.rects.borrow();
-    let built = rects.iter().filter(|(k, r)| ["timers_recasts", "timers_buffs", "timers_debuffs", "regime"].contains(&k.as_str()) && r.min.x <= screen.min.x + 4.0).map(|(_, r)| (r.max.y - screen.min.y) / h);
-    let mods = p.layout.iter().filter(|(k, pl)| k.starts_with("mod:") && k.as_str() != key && pl.x <= 0.01 && !pl.float).map(|(k, pl)| pl.y + rects.get(k).map_or(0.1, |r| r.height() / h));
-    (built.chain(mods).fold(0.3, f32::max) + 8.0 / h).min(0.9)
+    let mid = screen.center().x;
+    let frac = |y: f32| (y - screen.min.y) / h;
+    // The left column: the built-in edge windows there and the mods' (their last height, else a tenth of the screen).
+    let built = rects.iter().filter(|(k, r)| ["timers_recasts", "timers_buffs", "timers_debuffs", "regime"].contains(&k.as_str()) && r.min.x <= screen.min.x + 4.0).map(|(_, r)| frac(r.max.y));
+    let mods = |right: bool| {
+        p.layout.iter()
+            .filter(move |(k, pl)| k.starts_with("mod:") && k.as_str() != key && !pl.float && if right { pl.x < 0.0 } else { (0.0..=0.01).contains(&pl.x) })
+            .map(|(k, pl)| pl.y + rects.get(k).map_or(0.1, |r| r.height() / h))
+            .collect::<Vec<_>>()
+    };
+    let left = (built.chain(mods(false)).fold(0.3, f32::max) + 8.0 / h).min(0.9);
+    let floor = |ids: &[&str], right: bool| {
+        rects.iter().filter(|(k, r)| ids.contains(&k.as_str()) && (r.center().x > mid) == right).map(|(_, r)| frac(r.min.y)).fold(1.0, f32::min)
+    };
+    let fits = |y: f32, under: f32| y + tall / h <= under - 8.0 / h;
+    if fits(left, floor(&["where", "chat"], false)) {
+        return super::Place { x: 0.0, y: left, ..Default::default() };
+    }
+    let right_built = rects.iter().filter(|(k, r)| ["minimap", "skillchains"].contains(&k.as_str()) && r.max.x >= screen.max.x - 4.0).map(|(_, r)| frac(r.max.y));
+    let right = (right_built.chain(mods(true)).fold(0.05, f32::max) + 8.0 / h).min(0.9);
+    if fits(right, floor(&["target", "focus", "party"], true)) {
+        return super::Place { x: -0.001, y: right, ..Default::default() };
+    }
+    super::Place { x: 0.0, y: left, ..Default::default() }
 }
 
 /// The skillchain helper (skillchain.rs's view) on a screen edge, in a party: on our target the open resonance (its

@@ -98,6 +98,7 @@
 ---@field pet boolean? true for our pet, which also has:
 ---@field mpp integer? our pet's MP %
 ---@field tp integer? our pet's TP
+---@field pet_target integer? the server id our pet fights (s2c 0x068), when it has one
 
 --- A party or alliance member (game.party).
 ---@class vana.Member

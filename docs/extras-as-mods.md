@@ -337,10 +337,14 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   or monster of that name with Wide Scan (its index from the server id), `//track stop`; `//seek <name>` counts the
   zone's matches and the nearest's distance. Seen live: Rumoie tracked (the compass arrow and her name), //seek.
   The modern compass now names what it tracks beside the grid label, as retail's names it by the dial.
+- **Pet Status** (assets/mods/pet-status; PetTP, petinfo, PetMe, PetsReborn): an edge window with the pet's HP, MP and
+  TP, what it fights (entity.pet_target, new: s2c 0x068's target) and the recasts of the pet commands and the job
+  abilities that act through it. Seen live: Carbuncle on a SMN, the Blood Pact recasts. With it the modern party
+  panel gained retail's pet and fellow rows (the classic UI had them): name, HP gauge and percent, the pet's TP.
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
-A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
-built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
-it does not move as other windows come and go.
+A mod's edge window without a built-in panel takes a place the first time it shows and keeps it, saved as if the
+player had put it there: on the left edge under the built-in windows and the other mods' there if it fits above the
+location panel, else on the right edge under the minimap, else the left all the same.

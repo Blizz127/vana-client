@@ -73,6 +73,7 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `pet` | `boolean?` | true for your own pet; nil for anything else. |
 | `mpp` | `integer?` | Your pet only: its MP percent. |
 | `tp` | `integer?` | Your pet only: its TP. |
+| `pet_target` | `integer?` | Your pet only: the server id of what it fights, when it has a target. |
 
 ```lua
 local t = game.target()

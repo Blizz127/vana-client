@@ -185,6 +185,8 @@ Milestone 1:
   [--backdrop PNG] --out PNG`: the panels with sample values and every frame, offscreen).
 - egui's zoom follows the window height against 1080, times Settings > Client > Interface Size (config modern_scale,
   50 .. 150% in 5% steps, default 60%).
+- Party: the members' rows, then retail's pet and fellow rows (by the classic party window: name, HP gauge, the
+  pet's TP), a click targets them (2026-11-07).
 - Panels: Status, Party, Target, Location (zone, grid, time, day, weather, and the compass: retail's disk turned so
   the camera's heading is up and tilted by cos 1.0996, N E S W, the radar dots, the tracking / call-for-help arrow
   with its target's name beside the grid label),
