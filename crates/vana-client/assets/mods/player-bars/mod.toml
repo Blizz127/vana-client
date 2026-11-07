@@ -1,0 +1,27 @@
+name = "Player Bars"
+version = "1.0.0"
+description = "Your HP, MP and TP as large bars near the middle of the screen (the player bar add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Player Bars"
+help = "Shows your HP, MP and TP as large bars near the middle of the screen."
+
+[settings.width]
+type = "int"
+default = 150
+min = 80
+max = 300
+step = 10
+label = "Bar Width"
+
+[settings.offset_y]
+type = "int"
+default = 0
+min = -400
+max = 400
+step = 10
+label = "Height"
+help = "Moves the bars up (negative) or down from their place over the hotbars' area."

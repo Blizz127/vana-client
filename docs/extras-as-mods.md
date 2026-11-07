@@ -189,6 +189,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (`<call0>`..`<call21>`, interface sounds 17..38) on a tell, our name, chosen words, party or linkshell lines,
   invites, checks and emotes at us, optionally only while the window is in the background; one call a second at most.
   A Rust test drives its handlers; live it ran on real chat without errors (the test runs have no sound).
+- **Player Bars** (assets/mods/player-bars; xivbar, pbar, PlayerInfo and kin): our HP, MP and TP as large HUD gauges
+  (the HUD's hp / mp / tp kinds) over the middle of the screen, MP only for a job with MP; width and height settings.
+  Seen live (WAR: HP and TP).
 
 Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
 regime's windows and under the mods' drawn before them, so two never open on one place.
