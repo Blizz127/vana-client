@@ -91,7 +91,11 @@ impl State {
 
     /// A skinned piece's or a mannequin's place.
     pub fn place_of(&self, id: u32) -> Option<(Vec3, f32)> {
-        self.skinned.iter().find(|s| s.0 == id).map(|s| (s.1, s.2)).or_else(|| self.mannequins.iter().find(|m| m.id == id).map(|m| (m.pos, m.yaw)))
+        self.skinned
+            .iter()
+            .find(|s| s.0 == id)
+            .map(|s| (s.1, s.2))
+            .or_else(|| self.mannequins.iter().find(|m| m.id == id).map(|m| (m.pos, m.yaw)))
     }
 
     /// A mannequin actor's pose: its bank and motion name.
@@ -158,7 +162,19 @@ fn set_ground(w: &mut World) {
 
 /// The matrix of a piece placed at `pos` turned `yaw` (as an MZB placement).
 fn matrix(pos: Vec3, yaw: f32) -> glam::Mat4 {
-    let p = Placement { name: String::new(), translate: pos.to_array(), rotate: [0.0, yaw, 0.0], scale: [1.0; 3], lights: [0; 4], link: 0, area: 0, id: 0, lod: [0.0; 2], world: false, own_dist: None };
+    let p = Placement {
+        name: String::new(),
+        translate: pos.to_array(),
+        rotate: [0.0, yaw, 0.0],
+        scale: [1.0; 3],
+        lights: [0; 4],
+        link: 0,
+        area: 0,
+        id: 0,
+        lod: [0.0; 2],
+        world: false,
+        own_dist: None,
+    };
     glam::Mat4::from_cols_array_2d(&p.matrix())
 }
 
@@ -167,7 +183,11 @@ fn matrix(pos: Vec3, yaw: f32) -> glam::Mat4 {
 fn move_in_place(w: &mut World, want: &[Key]) -> bool {
     let f = &w.furniture;
     let same = |a: &Key, b: &Key| (a.0, a.1, a.2) == (b.0, b.1, b.2) && a.3[..6] == b.3[..6];
-    if f.applied != f.seq || f.ready.is_some() || want.len() != f.want.len() || !want.iter().zip(&f.want).all(|(a, b)| same(a, b)) {
+    if f.applied != f.seq
+        || f.ready.is_some()
+        || want.len() != f.want.len()
+        || !want.iter().zip(&f.want).all(|(a, b)| same(a, b))
+    {
         return false;
     }
     let (map, floor) = f.room;
@@ -213,7 +233,11 @@ pub fn gated_hidden(w: &World) -> Vec<u32> {
     let Some(r) = w.myroom.filter(|_| w.in_scene()) else { return Vec::new() };
     let ty = |id: u16| w.item_info.as_ref().and_then(|i| i.item(id)).map_or(0, |it| it.item_type);
     let installed = w.inv.slots.iter().any(|(&(c, s), &(id, _))| {
-        matches!(c, 1 | 9) && (1..0x51).contains(&s) && GATED_ITEMS.contains(&id) && (TYPES.contains(&ty(id)) || ty(id) == MANNEQUIN) && w.inv.ext.get(&(c, s)).is_some_and(|x| x[1] & 0x40 != 0)
+        matches!(c, 1 | 9)
+            && (1..0x51).contains(&s)
+            && GATED_ITEMS.contains(&id)
+            && (TYPES.contains(&ty(id)) || ty(id) == MANNEQUIN)
+            && w.inv.ext.get(&(c, s)).is_some_and(|x| x[1] & 0x40 != 0)
     });
     if super::myroom::has_floors(&r) && installed {
         return Vec::new();
@@ -225,8 +249,10 @@ pub fn gated_hidden(w: &World) -> Vec<u32> {
 pub const ORIGIN: [[f32; 3]; 2] = [[10.0, 0.0, 12.0], [10.0, 0.0, 13.0]];
 
 /// FUN_101cce90(floor): the wall slots (0x1037d9c8; San d'Oria's house 0x1037da18; 2F 0x1037da68).
-const WALL_1F: [[f32; 3]; 5] = [[6.5, -3.0, 4.55], [6.5, -3.0, -4.8], [-6.5, -3.0, -4.8], [-6.5, -3.0, 0.0], [-6.5, -3.0, 4.55]];
-const WALL_1F_SANDORIA: [[f32; 3]; 5] = [[6.2325, -3.0, 4.55], [6.2325, -3.0, -4.8], [-6.2325, -3.0, -4.8], [-6.2325, -3.0, 0.0], [-6.2325, -3.0, 4.55]];
+const WALL_1F: [[f32; 3]; 5] =
+    [[6.5, -3.0, 4.55], [6.5, -3.0, -4.8], [-6.5, -3.0, -4.8], [-6.5, -3.0, 0.0], [-6.5, -3.0, 4.55]];
+const WALL_1F_SANDORIA: [[f32; 3]; 5] =
+    [[6.2325, -3.0, 4.55], [6.2325, -3.0, -4.8], [-6.2325, -3.0, -4.8], [-6.2325, -3.0, 0.0], [-6.2325, -3.0, 4.55]];
 #[rustfmt::skip]
 const WALL_2F: [[f32; 3]; 92] = [
     [-6.2, -5.6, -6.2], [-6.2, -3.2, -6.2], [-6.2, -2.5, -6.2], [-6.2, -1.8, -6.2], [-6.2, -5.6, -5.15],
@@ -258,7 +284,14 @@ pub fn place(f: &Furn, map: u16, floor: u8, col: i8, level: i8, row: i8, rot: u8
     }
     let o = ORIGIN[(floor != 0) as usize];
     let (w, d) = f.footprint(rot);
-    Some((Vec3::new((col as f32 - o[0]) * 0.6 + w as f32 * 0.3, -(level as f32 - o[1]) * 0.1, (row as f32 - o[2]) * 0.6 + d as f32 * 0.3), yaw))
+    Some((
+        Vec3::new(
+            (col as f32 - o[0]) * 0.6 + w as f32 * 0.3,
+            -(level as f32 - o[1]) * 0.1,
+            (row as f32 - o[2]) * 0.6 + d as f32 * 0.3,
+        ),
+        yaw,
+    ))
 }
 
 /// A wall slot's place (FUN_101cce90).
@@ -294,7 +327,8 @@ pub fn changed(w: &mut World) -> Option<(u64, Vec<Key>, u16, u8)> {
                 .filter(|((c, s), _)| matches!(c, 1 | 9) && (1..0x51).contains(s))
                 .filter_map(|(&(c, s), &(id, _))| {
                     let ext = w.inv.ext.get(&(c, s))?;
-                    ((TYPES.contains(&ty(id)) || ty(id) == MANNEQUIN) && ext[1] & 0x40 != 0 && ext[1] & 3 == r.floor).then(|| (c, s, id, ext[..10].try_into().unwrap()))
+                    ((TYPES.contains(&ty(id)) || ty(id) == MANNEQUIN) && ext[1] & 0x40 != 0 && ext[1] & 3 == r.floor)
+                        .then(|| (c, s, id, ext[..10].try_into().unwrap()))
                 })
                 .collect()
         }
@@ -330,10 +364,23 @@ fn mannequins(w: &mut World, keys: &[Key], map: u16, floor: u8) {
     if let Some(table) = w.furniture.table.clone() {
         for &(c, slot, item, ext) in keys {
             let (Some(f), Some(full)) = (table.entry(item), w.inv.ext.get(&(c, slot))) else { continue };
-            let Some((pos, yaw)) = place(&f, map, floor, ext[6] as i8, ext[7] as i8, ext[8] as i8, ext[9]) else { continue };
+            let Some((pos, yaw)) = place(&f, map, floor, ext[6] as i8, ext[7] as i8, ext[8] as i8, ext[9]) else {
+                continue;
+            };
             let rec = w.mannequin_looks.get(&(c, slot)).copied().unwrap_or([0; 24]);
             let u = |o: usize| u16::from_le_bytes([rec[o], rec[o + 1]]) & 0x0fff;
-            let look = crate::dat::character::Look { race: full[0x12].max(1), face: 30, head: u(8), body: u(10), hands: u(12), legs: u(14), feet: u(16), main: u(18), sub: u(20), range: u(22) };
+            let look = crate::dat::character::Look {
+                race: full[0x12].max(1),
+                face: 30,
+                head: u(8),
+                body: u(10),
+                hands: u(12),
+                legs: u(14),
+                feet: u(16),
+                main: u(18),
+                sub: u(20),
+                range: u(22),
+            };
             // Pose 8's weapon class comes from the record's item (LSB sends 0: bare-handed).
             let (bank, motion) = crate::dat::motionfile::mannequin_pose(full[0x13], None);
             want.push(Mannequin { key: (c, slot), id: 0, look, bank, motion, pos, yaw });
@@ -355,7 +402,8 @@ fn mannequins(w: &mut World, keys: &[Key], map: u16, floor: u8) {
             }
             None => {
                 let used: Vec<u32> = old.iter().chain(&w.furniture.mannequins).map(|o| o.id).collect();
-                m.id = (0..0x200).map(|k| 0x0400_0000 | (0x1ff - k)).find(|id| !used.contains(id)).unwrap_or(0x0400_0000);
+                m.id =
+                    (0..0x200).map(|k| 0x0400_0000 | (0x1ff - k)).find(|id| !used.contains(id)).unwrap_or(0x0400_0000);
                 log::info!("mannequin {:?}: actor {:#x}, look {:?}, bank {} {}", m.key, m.id, m.look, m.bank, m.motion);
                 w.event_looks.push((m.id, super::Source::Pc(m.look)));
             }
@@ -367,8 +415,15 @@ fn mannequins(w: &mut World, keys: &[Key], map: u16, floor: u8) {
 /// A model's triangles (a strip's in order, degenerate ones dropped).
 fn model_tris(m: &crate::dat::zone::Model) -> Vec<[Vec3; 3]> {
     let v = |i: u16| m.vertices.get(i as usize).map(|v| Vec3::from(v.pos));
-    let idx: Vec<[u16; 3]> = if m.strip { m.indices.windows(3).map(|w| [w[0], w[1], w[2]]).collect() } else { m.indices.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect() };
-    idx.into_iter().filter(|[a, b, c]| a != b && b != c && a != c).filter_map(|[a, b, c]| Some([v(a)?, v(b)?, v(c)?])).collect()
+    let idx: Vec<[u16; 3]> = if m.strip {
+        m.indices.windows(3).map(|w| [w[0], w[1], w[2]]).collect()
+    } else {
+        m.indices.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect()
+    };
+    idx.into_iter()
+        .filter(|[a, b, c]| a != b && b != c && a != c)
+        .filter_map(|[a, b, c]| Some([v(a)?, v(b)?, v(c)?]))
+        .collect()
 }
 
 /// The loader thread: each piece's model file (the 'furn' entry, FUN_101cce00) and place, a pot's plant model (kind
@@ -382,7 +437,9 @@ pub fn load(index: &DatIndex, keys: &Keys, seq: u64, want: &[Key], map: u16, flo
     for &(c, slot, item, ext) in want {
         let Some(f) = table.entry(item) else { continue };
         let Some(file) = model_file(f.model) else { continue };
-        let Some((pos, yaw)) = place(&f, map, floor, ext[6] as i8, ext[7] as i8, ext[8] as i8, ext[9]) else { continue };
+        let Some((pos, yaw)) = place(&f, map, floor, ext[6] as i8, ext[7] as i8, ext[8] as i8, ext[9]) else {
+            continue;
+        };
         log::info!("furniture {item:#x}: model {:#x}, file {file}, {pos:?} yaw {yaw:.2}", f.model);
         if (0x108..=0x12b).contains(&f.model) {
             skinned.push(((c, slot), f, file, pos, yaw));
@@ -399,7 +456,9 @@ pub fn load(index: &DatIndex, keys: &Keys, seq: u64, want: &[Key], map: u16, flo
     let mut pieces = Vec::new();
     for (file, places) in by_file {
         let bytes = index.read(file);
-        let init = bytes.as_ref().is_ok_and(|b| crate::dat::chunks(b).is_ok_and(|c| c.iter().any(|c| c.kind == 0x07 && c.name() == "init")));
+        let init = bytes
+            .as_ref()
+            .is_ok_and(|b| crate::dat::chunks(b).is_ok_and(|c| c.iter().any(|c| c.kind == 0x07 && c.name() == "init")));
         let scene = bytes.and_then(|b| crate::dat::zone::load_scene(keys, &b));
         let mut scene = match scene {
             Ok(s) => s,
@@ -412,13 +471,36 @@ pub fn load(index: &DatIndex, keys: &Keys, seq: u64, want: &[Key], map: u16, flo
         let Some(name) = scene.meshes.first().map(|m| m.name.clone()) else { continue };
         scene.placements = places
             .iter()
-            .map(|&(_, _, pos, yaw, _)| Placement { name: name.clone(), translate: pos.to_array(), rotate: [0.0, yaw, 0.0], scale: [1.0; 3], lights: [0; 4], link: 0, area: 0, id: 0, lod: [0.0; 2], world: false, own_dist: None })
+            .map(|&(_, _, pos, yaw, _)| Placement {
+                name: name.clone(),
+                translate: pos.to_array(),
+                rotate: [0.0, yaw, 0.0],
+                scale: [1.0; 3],
+                lights: [0; 4],
+                link: 0,
+                area: 0,
+                id: 0,
+                lod: [0.0; 2],
+                world: false,
+                own_dist: None,
+            })
             .collect();
         let local = Arc::new(scene.meshes[0].models.iter().flat_map(model_tris).collect::<Vec<_>>());
         for (p, &(key, furn, _, _, plant)) in scene.placements.iter().zip(&places) {
-            let size = (!plant).then(|| Vec3::new(furn.size[0] as f32 * 0.6, furn.height as f32 * 0.01, furn.size[1] as f32 * 0.6));
+            let size = (!plant)
+                .then(|| Vec3::new(furn.size[0] as f32 * 0.6, furn.height as f32 * 0.01, furn.size[1] as f32 * 0.6));
             let matrix = glam::Mat4::from_cols_array_2d(&p.matrix());
-            pieces.push(Drawn { key, furn, plant, file_id: file, file: files.len(), matrix, init, size, local: local.clone() });
+            pieces.push(Drawn {
+                key,
+                furn,
+                plant,
+                file_id: file,
+                file: files.len(),
+                matrix,
+                init,
+                size,
+                local: local.clone(),
+            });
         }
         let geo = ZoneGeometry::build(&scene);
         files.push((Arc::new(geo), std::mem::take(&mut scene.textures)));
@@ -437,7 +519,8 @@ mod tests {
     #[allow(clippy::approx_constant, reason = "place()'s 1.570796")]
     fn places() {
         let bed = Furn { flags: 0, model: 2, size: [4, 6], height: 70 };
-        let near = |(p, y): (Vec3, f32), q: [f32; 3], yaw: f32| (p - Vec3::from(q)).length() < 1e-4 && (y - yaw).abs() < 1e-4;
+        let near =
+            |(p, y): (Vec3, f32), q: [f32; 3], yaw: f32| (p - Vec3::from(q)).length() < 1e-4 && (y - yaw).abs() < 1e-4;
         let at = |f: &Furn, map, floor, col, level, row, rot| place(f, map, floor, col, level, row, rot).unwrap();
         assert!(near(at(&bed, 0x122, 0, 0, 0, 0, 0), [-4.8, 0.0, -5.4], 0.0));
         assert!(near(at(&bed, 0x122, 0, 0, 0, 0, 1), [-4.2, 0.0, -6.0], 1.570_796));

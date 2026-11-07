@@ -107,7 +107,8 @@ pub fn pup_key(w: &mut World, gu: &GameUi, key: egui::Key) {
     let sel = p.sel;
     match key {
         egui::Key::ArrowUp | egui::Key::ArrowDown => {
-            let to = gu.menu_links(PUPEQUIP, sel).map_or(sel, |l| l[if key == egui::Key::ArrowUp { 2 } else { 3 }] as u16);
+            let to =
+                gu.menu_links(PUPEQUIP, sel).map_or(sel, |l| l[if key == egui::Key::ArrowUp { 2 } else { 3 }] as u16);
             if to != sel && (1..=2).contains(&to) {
                 if let Some(p) = w.pupequip.as_mut() {
                     p.sel = to;
@@ -180,7 +181,24 @@ pub fn open(w: &mut World) {
     }
     let _ = w.net.commands.send(NetCommand::StatusRequest(1));
     let return_menu = w.menu;
-    w.win = Some(Win::Equip(Box::new(EquipWin { grid: 1, mode: 2, focus: Focus::Grid, container: INVENTORY, mask: 0xffff, scroll: 0, cursor: 0, picked: None, allowed: 0, compare: None, alt: 0, ctrl: None, return_menu, modern: w.modern, list_slot: None, pending: None })));
+    w.win = Some(Win::Equip(Box::new(EquipWin {
+        grid: 1,
+        mode: 2,
+        focus: Focus::Grid,
+        container: INVENTORY,
+        mask: 0xffff,
+        scroll: 0,
+        cursor: 0,
+        picked: None,
+        allowed: 0,
+        compare: None,
+        alt: 0,
+        ctrl: None,
+        return_menu,
+        modern: w.modern,
+        list_slot: None,
+        pending: None,
+    })));
     w.menu = None;
     w.action_menu = None;
 }
@@ -291,7 +309,12 @@ pub(super) fn try_equip(w: &mut World, slot: usize, c: u8, index: u8, id: u16) -
     }
     // FUN_10132050 (can wear now) and FUN_10132180 (one of the item's slots); a closed wardrobe fails.
     if !super::shop::can_wear(w, &it, id) || it.slots & (1 << slot) == 0 || !bag_open(w, c) {
-        log::info!("equip: {id:#x} not into slot {slot}: wearable {}, slot fits {}, bag {c} open {}", super::shop::can_wear(w, &it, id), it.slots & (1 << slot) != 0, bag_open(w, c));
+        log::info!(
+            "equip: {id:#x} not into slot {slot}: wearable {}, slot fits {}, bag {c} open {}",
+            super::shop::can_wear(w, &it, id),
+            it.slots & (1 << slot) != 0,
+            bag_open(w, c)
+        );
         return false;
     }
     log::info!("equip: {:?} into slot {slot} from container {c}", (index, id));
@@ -353,7 +376,9 @@ fn grid_key(w: &mut World, key: egui::Key) {
         }
         K::ArrowLeft | K::ArrowRight => {
             let at = ORDER.iter().position(|&c| c == grid).unwrap_or(0);
-            let next = (1..16).map(|k| if key == K::ArrowRight { ORDER[(at + k) % 16] } else { ORDER[(at + 16 - k) % 16] }).find(|&c| allowed & 1 << slot_of(c) != 0);
+            let next = (1..16)
+                .map(|k| if key == K::ArrowRight { ORDER[(at + k) % 16] } else { ORDER[(at + 16 - k) % 16] })
+                .find(|&c| allowed & 1 << slot_of(c) != 0);
             if let (Some(c), Some(e)) = (next, win_mut(w)) {
                 e.grid = c;
                 w.sounds.push(Ui::Cursor as u32);
@@ -490,7 +515,13 @@ fn store_key(w: &mut World, key: egui::Key, o: u16) {
     let Some(e) = win_mut(w) else { return };
     match key {
         K::ArrowUp | K::ArrowDown => {
-            e.focus = Focus::Storage(if key == K::ArrowDown { o % 9 + 1 } else if o == 1 { 9 } else { o - 1 });
+            e.focus = Focus::Storage(if key == K::ArrowDown {
+                o % 9 + 1
+            } else if o == 1 {
+                9
+            } else {
+                o - 1
+            });
             w.sounds.push(Ui::Cursor as u32);
         }
         K::Enter if off.contains(&o) => w.sounds.push(Ui::Error as u32),
@@ -558,7 +589,8 @@ pub fn compare(w: &World) -> Option<Option<(u16, Option<[u8; 24]>, u8)>> {
         }
         return Some(Some((w.inv.slots.get(&(c, i))?.0, w.inv.ext.get(&(c, i)).copied(), c)));
     }
-    let at = (*e.compare.as_ref()?).and_then(|(c, i)| Some((w.inv.slots.get(&(c, i))?.0, w.inv.ext.get(&(c, i)).copied(), c)));
+    let at = (*e.compare.as_ref()?)
+        .and_then(|(c, i)| Some((w.inv.slots.get(&(c, i))?.0, w.inv.ext.get(&(c, i)).copied(), c)));
     Some(at)
 }
 
@@ -622,7 +654,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     // C.7 (FUN_10132c30 / FUN_101f27a0): the pointer over the other window sends message 8, as Num+: the grid's goes
     // to the list (mode 1), the list's back to the grid when nothing is picked.
     let in_list = p.0 >= x0 && p.0 < x0 + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];
-    let in_grid = gu.window_rect(GRID, sw, sh).is_some_and(|g| p.0 >= g[0] && p.0 < g[0] + g[2] && p.1 >= g[1] && p.1 < g[1] + g[3]);
+    let in_grid = gu
+        .window_rect(GRID, sw, sh)
+        .is_some_and(|g| p.0 >= g[0] && p.0 < g[0] + g[2] && p.1 >= g[1] && p.1 < g[1] + g[3]);
     if (moved || clicked) && ((e.focus == Focus::Grid && in_list) || (e.focus == Focus::List && in_grid)) {
         num_plus(w);
         return;
@@ -632,7 +666,8 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         return;
     }
     let row = ((p.1 - r[1] - 4.0) / crate::inventory::ROW_PITCH).floor();
-    let inside = p.0 >= x0 && p.0 < x0 + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3] && row >= 0.0 && (row as usize) < VISIBLE_ROWS;
+    let inside =
+        p.0 >= x0 && p.0 < x0 + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3] && row >= 0.0 && (row as usize) < VISIBLE_ROWS;
     if inside {
         gu.hover.set(true);
     }
@@ -734,7 +769,15 @@ pub(super) struct View {
 pub(super) fn view(w: &World) -> Option<View> {
     let e = win(w)?;
     let rows = e.list_slot.map_or(Vec::new(), |s| candidates(w, s));
-    Some(View { grid: e.grid, focus: e.focus, list_slot: e.list_slot, scroll: e.scroll, cursor: e.cursor, rows, pending: e.pending.is_some() })
+    Some(View {
+        grid: e.grid,
+        focus: e.focus,
+        list_slot: e.list_slot,
+        scroll: e.scroll,
+        cursor: e.cursor,
+        rows,
+        pending: e.pending.is_some(),
+    })
 }
 
 /// A wardrobe's number (1 Wardrobe, 2..8), 0 for any other container.
@@ -772,7 +815,8 @@ pub(super) fn search_list(w: &World) -> Vec<Candidate> {
 /// A search pick: the cursor onto piece `k` (scrolled into view), then Enter.
 pub(super) fn search_pick(w: &mut World, _: Option<&GameUi>, k: usize) {
     if let Some(e) = win_mut(w) {
-        e.scroll = if k < e.scroll || k >= e.scroll + MODERN_ROWS { (k + 1).saturating_sub(MODERN_ROWS) } else { e.scroll };
+        e.scroll =
+            if k < e.scroll || k >= e.scroll + MODERN_ROWS { (k + 1).saturating_sub(MODERN_ROWS) } else { e.scroll };
         e.cursor = k - e.scroll;
     }
     modern_key(w, egui::Key::Enter);
@@ -826,7 +870,8 @@ pub(super) fn unequip(w: &mut World, slot: usize) {
 pub fn tick(w: &mut World) {
     let Some(p) = win(w).and_then(|e| e.pending.as_ref()) else { return };
     let (slot, id) = (p.slot, p.id);
-    let landed = w.inv.slots_of(INVENTORY).into_iter().find(|s| s.id == id && !p.before.contains(&s.index)).map(|s| s.index);
+    let landed =
+        w.inv.slots_of(INVENTORY).into_iter().find(|s| s.id == id && !p.before.contains(&s.index)).map(|s| s.index);
     if landed.is_none() && p.at.elapsed().as_secs_f32() < 5.0 {
         return;
     }
@@ -868,7 +913,13 @@ fn modern_key(w: &mut World, key: egui::Key) {
                     }
                 }
                 K::ArrowLeft | K::ArrowRight => {
-                    if super::scrollbar::rows(if key == K::ArrowRight { Msg::PageDown } else { Msg::PageUp }, &mut e.scroll, &mut e.cursor, n, MODERN_ROWS) {
+                    if super::scrollbar::rows(
+                        if key == K::ArrowRight { Msg::PageDown } else { Msg::PageUp },
+                        &mut e.scroll,
+                        &mut e.cursor,
+                        n,
+                        MODERN_ROWS,
+                    ) {
                         w.sounds.push(Ui::Cursor as u32);
                     }
                 }
@@ -946,7 +997,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let list = ItemList { rows: list_rows, scroll: e.scroll, cursor: e.cursor };
     super::items::upload_icons(gu, &info, list.visible().iter().map(|r| r.id).filter(|&id| id != 0));
-    let open = [("menu    persona", None), ("menu    money", None), (LIST, Some(LIST_X)), (GRID, None)].map(|(n, x)| gu.gate_layout(n, sw, sh, x));
+    let open = [("menu    persona", None), ("menu    money", None), (LIST, Some(LIST_X)), (GRID, None)]
+        .map(|(n, x)| gu.gate_layout(n, sw, sh, x));
     let mut list_bar = None;
     {
         let (b, ui, style, font) = gu.parts();
@@ -961,7 +1013,21 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             if let Some(el) = m.elements.first_mut() {
                 el.x = LIST_X;
             }
-            list_bar = Some(push_item_list(b, ui, style, font, GameUi::ATLAS, &m, &list, sw, sh, frame, 3.0, e.focus == Focus::List && w.confirm.is_none(), INVENTOR_BAR));
+            list_bar = Some(push_item_list(
+                b,
+                ui,
+                style,
+                font,
+                GameUi::ATLAS,
+                &m,
+                &list,
+                sw,
+                sh,
+                frame,
+                3.0,
+                e.focus == Focus::List && w.confirm.is_none(),
+                INVENTOR_BAR,
+            ));
             // Row 0: framesus 185 ("Storage Options", its text baked in) at the row origin + (0, 2); the wardrobe number
             // right-aligned at (row x + 13, y + 4) (B.4; its badge sprites have alpha 0).
             if e.scroll == 0 {
@@ -971,7 +1037,14 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 }
                 let n = wardrobe(e.container);
                 if n > 0 {
-                    crate::render::screens::push_shape_text_right(b, ui, n.to_string().as_bytes(), wx + 3.0 + 13.0, wy + 4.0 + 4.0, WHITE);
+                    crate::render::screens::push_shape_text_right(
+                        b,
+                        ui,
+                        n.to_string().as_bytes(),
+                        wx + 3.0 + 13.0,
+                        wy + 4.0 + 4.0,
+                        WHITE,
+                    );
                 }
             }
         }
@@ -991,7 +1064,14 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 }
                 let n = w.inv.equip[slot].map_or(0, |(c, _)| wardrobe(c));
                 if n > 0 {
-                    crate::render::screens::push_shape_text_right(b, ui, n.to_string().as_bytes(), cx + 30.0, cy + 2.0, WHITE);
+                    crate::render::screens::push_shape_text_right(
+                        b,
+                        ui,
+                        n.to_string().as_bytes(),
+                        cx + 30.0,
+                        cy + 2.0,
+                        WHITE,
+                    );
                 }
             }
         }

@@ -203,11 +203,23 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
         return;
     }
     let Some(sel) = w.chatctrl.as_ref().map(|c| c.sel) else { return };
-    super::winhits::generic(w, gu, WINDOW, sel, 1..=7, p, moved, clicked, right, |w, id| {
-        if let Some(c) = w.chatctrl.as_mut() {
-            c.sel = id;
-        }
-    }, |w, _, k| key(w, k));
+    super::winhits::generic(
+        w,
+        gu,
+        WINDOW,
+        sel,
+        1..=7,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(c) = w.chatctrl.as_mut() {
+                c.sel = id;
+            }
+        },
+        |w, _, k| key(w, k),
+    );
 }
 
 /// The window's own header strings: help 0xe 0x253 "Set your default chat mode.", title 0xd 0x81 "Chat".
@@ -221,8 +233,24 @@ pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
 /// none is the default chat mode (FUN_101b8c80).
 pub fn line_mode(line: &str, default: u8) -> u8 {
     const PREFIXES: [(&str, u8); 18] = [
-        ("/say ", 2), ("/s ", 2), ("/tell ", 4), ("/t ", 4), ("/party ", 5), ("/p ", 5), ("/shout ", 3), ("/sh ", 3), ("/linkshell ", 6),
-        ("/l ", 6), ("/linkshell2 ", 0xc), ("/l2 ", 0xc), ("/unity ", 0xb), ("/u ", 0xb), ("/assistj ", 0xe), ("/aj ", 0xe), ("/assiste ", 0xf), ("/ae ", 0xf),
+        ("/say ", 2),
+        ("/s ", 2),
+        ("/tell ", 4),
+        ("/t ", 4),
+        ("/party ", 5),
+        ("/p ", 5),
+        ("/shout ", 3),
+        ("/sh ", 3),
+        ("/linkshell ", 6),
+        ("/l ", 6),
+        ("/linkshell2 ", 0xc),
+        ("/l2 ", 0xc),
+        ("/unity ", 0xb),
+        ("/u ", 0xb),
+        ("/assistj ", 0xe),
+        ("/aj ", 0xe),
+        ("/assiste ", 0xf),
+        ("/ae ", 0xf),
     ];
     match PREFIXES.iter().find(|(p, _)| line.starts_with(p)) {
         Some(&(_, m)) => m,

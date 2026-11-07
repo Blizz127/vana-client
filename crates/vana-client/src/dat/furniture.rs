@@ -49,7 +49,11 @@ impl FurnTable {
         let list = chunks(file)?;
         let furn = list.iter().find(|c| c.kind == 0x59).context("no 'furn' chunk")?;
         let u16_at = |b: &[u8], o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
-        let entries = furn.data.chunks_exact(8).map(|e| Furn { flags: u16_at(e, 0), model: u16_at(e, 2), size: [e[4], e[5]], height: u16_at(e, 6) }).collect();
+        let entries = furn
+            .data
+            .chunks_exact(8)
+            .map(|e| Furn { flags: u16_at(e, 0), model: u16_at(e, 2), size: [e[4], e[5]], height: u16_at(e, 6) })
+            .collect();
         let u32_at = |b: &[u8], o: usize| b.get(o..o + 4).map(|s| u32::from_le_bytes(s.try_into().unwrap()));
         let mut plants = Vec::new();
         if let Some(mode) = list.iter().find(|c| c.kind == 0x5b) {
@@ -100,7 +104,10 @@ mod tests {
     /// The checked entries in MODLOG "Mog House furniture".
     #[test]
     fn table_entries() {
-        assert_eq!((model_file(2), model_file(0x108), model_file(0xe9f), model_file(0x200)), (Some(32929), Some(51447), Some(62970), None));
+        assert_eq!(
+            (model_file(2), model_file(0x108), model_file(0xe9f), model_file(0x200)),
+            (Some(32929), Some(51447), Some(62970), None)
+        );
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let t = FurnTable::load(&index).unwrap();
         assert_eq!(t.entry(2), Some(Furn { flags: 0, model: 2, size: [4, 6], height: 70 }));

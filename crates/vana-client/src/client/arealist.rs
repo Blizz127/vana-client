@@ -78,7 +78,8 @@ fn build(w: &World, gu: &GameUi, mode: Mode, expanded: Option<usize>) -> Vec<Row
     if mode == Mode::Unity {
         for i in 0..12 {
             let name = gu.lobby_msg(0xc, if i == 0 { 0x1ba } else { 0x192 + i }, "");
-            let short = words.unity_names.iter().find(|u| u.0 == (i as i32) << 22).map_or(String::new(), |u| u.1.clone());
+            let short =
+                words.unity_names.iter().find(|u| u.0 == (i as i32) << 22).map_or(String::new(), |u| u.1.clone());
             rows.push(Row { value: i as i32, name, cell: Cell::Paren(short), help: 0x37c });
         }
         return rows;
@@ -99,13 +100,17 @@ fn build(w: &World, gu: &GameUi, mode: Mode, expanded: Option<usize>) -> Vec<Row
     let zone_row = |z: u16| {
         // Type 0x34 (FUN_1020e820): byte 0 "Lv%2d~" of the min level (mode 1), byte 1 "~Lv%2d" of the max.
         let cell = match mode {
-            Mode::Monstrosity | Mode::Event { flat: true, .. } => Cell::Level(level(z).map_or(String::new(), |l| format!("~Lv{:2}", l.3))),
+            Mode::Monstrosity | Mode::Event { flat: true, .. } => {
+                Cell::Level(level(z).map_or(String::new(), |l| format!("~Lv{:2}", l.3)))
+            }
             Mode::Event { flat: false, .. } => Cell::Level(level(z).map_or(String::new(), |l| format!("Lv{:2}~", l.2))),
             _ => Cell::Paren(gu.short_area(z).unwrap_or_else(|| gu.item_msg(9, 0x40).unwrap_or_default())),
         };
         Row { value: z as i32, name: place(w, z).unwrap_or_default(), cell, help: 0x14 }
     };
-    let zones = |i: usize| words.regions.get(i).map_or(Vec::new(), |r| r.iter().copied().filter(|&z| pass(z)).collect::<Vec<u16>>());
+    let zones = |i: usize| {
+        words.regions.get(i).map_or(Vec::new(), |r| r.iter().copied().filter(|&z| pass(z)).collect::<Vec<u16>>())
+    };
     if let Some(i) = expanded {
         return zones(i).into_iter().map(zone_row).collect();
     }
@@ -210,7 +215,9 @@ fn pick(w: &mut World, gu: &GameUi) -> bool {
             return true;
         }
         (_, -1) => {
-            let Some(zones) = region_index(w).and_then(|i| w.search_words.as_ref()?.regions.get(i).cloned()) else { return false };
+            let Some(zones) = region_index(w).and_then(|i| w.search_words.as_ref()?.regions.get(i).cloned()) else {
+                return false;
+            };
             let flags = |z: u16| w.search_words.as_ref().map_or(0, |s| s.zone_flags(z));
             c.clear_area();
             for z in zones.into_iter().filter(|&z| flags(z) & 2 != 0) {
@@ -264,7 +271,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
             w.sounds.push(Ui::Cursor as u32);
         }
         egui::Key::ArrowRight | egui::Key::ArrowLeft => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             if super::scrollbar::rows_abs(m, &mut a.top, &mut a.cursor, n, ROWS) {
                 w.sounds.push(Ui::Cursor as u32);
             }
@@ -319,7 +330,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let Some(e) = lay.elements.iter().skip(1).find(|e| {
         let (ex, ey) = (x + e.x as f32, y + e.y as f32);
         p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-    }) else { return };
+    }) else {
+        return;
+    };
     let row = a.top + e.id as usize - 1;
     if row >= a.rows.len() {
         return;

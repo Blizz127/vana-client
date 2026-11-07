@@ -17,7 +17,16 @@ const ROW: f32 = 30.0;
 const ICON: f32 = 24.0;
 /// The crystal list's yellow (FUN_101e2a40, item type 8).
 const CRYSTAL: u32 = 0x8090_9040;
-const ELEMENTS: [&str; 8] = ["icons/fire", "icons/ice", "icons/wind", "icons/earth", "icons/lightning", "icons/water", "icons/light", "icons/dark"];
+const ELEMENTS: [&str; 8] = [
+    "icons/fire",
+    "icons/ice",
+    "icons/wind",
+    "icons/earth",
+    "icons/lightning",
+    "icons/water",
+    "icons/light",
+    "icons/dark",
+];
 
 /// What the mouse did this frame: a tile or a list row clicked, a button's key.
 #[derive(Default)]
@@ -52,7 +61,16 @@ pub(super) fn tint(m: &super::Modern, t: u32) -> Color32 {
 /// A slot tile: its item's icon and count, the cursor's ring (bronze while another part has the focus), a red cross
 /// over a material not held.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn tile(ui: &mut Ui, m: &super::Modern, r: Rect, id: egui::Id, icon: Option<egui::TextureId>, count: u32, cursor: Option<bool>, missing: bool) -> egui::Response {
+pub(super) fn tile(
+    ui: &mut Ui,
+    m: &super::Modern,
+    r: Rect,
+    id: egui::Id,
+    icon: Option<egui::TextureId>,
+    count: u32,
+    cursor: Option<bool>,
+    missing: bool,
+) -> egui::Response {
     let resp = ui.interact(r, id, Sense::click());
     let face = match () {
         _ if missing => "controls/item_slot_invalid",
@@ -71,7 +89,14 @@ pub(super) fn tile(ui: &mut Ui, m: &super::Modern, r: Rect, id: egui::Id, icon: 
         ui.painter().image(t, r.shrink(10.0), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
     }
     if count > 1 {
-        super::paint::outlined(ui.painter(), r.max - vec2(6.0, 4.0), Align2::RIGHT_BOTTOM, &count.to_string(), FontId::proportional(m.theme.small), m.theme.color("text"));
+        super::paint::outlined(
+            ui.painter(),
+            r.max - vec2(6.0, 4.0),
+            Align2::RIGHT_BOTTOM,
+            &count.to_string(),
+            FontId::proportional(m.theme.small),
+            m.theme.color("text"),
+        );
     }
     if missing {
         let c = r.shrink(16.0);
@@ -84,11 +109,23 @@ pub(super) fn tile(ui: &mut Ui, m: &super::Modern, r: Rect, id: egui::Id, icon: 
 
 /// Eight tiles in two rows of four: children 1..8; the tile clicked.
 #[allow(clippy::too_many_arguments)]
-fn grid(ui: &mut Ui, m: &super::Modern, ctx: &egui::Context, info: &ItemCache, salt: &str, slots: &[(u16, u32, bool); 8], cursor: Option<(u16, bool)>, sense: bool) -> Option<u16> {
+fn grid(
+    ui: &mut Ui,
+    m: &super::Modern,
+    ctx: &egui::Context,
+    info: &ItemCache,
+    salt: &str,
+    slots: &[(u16, u32, bool); 8],
+    cursor: Option<(u16, bool)>,
+    sense: bool,
+) -> Option<u16> {
     let (area, _) = ui.allocate_exact_size(vec2(GRID_W, 2.0 * TILE + GAP), Sense::hover());
     let mut out = None;
     for (k, &(id, count, missing)) in slots.iter().enumerate() {
-        let r = Rect::from_min_size(area.min + vec2((k % 4) as f32 * (TILE + GAP), (k / 4) as f32 * (TILE + GAP)), vec2(TILE, TILE));
+        let r = Rect::from_min_size(
+            area.min + vec2((k % 4) as f32 * (TILE + GAP), (k / 4) as f32 * (TILE + GAP)),
+            vec2(TILE, TILE),
+        );
         let child = k as u16 + 1;
         let icon = (id != 0).then(|| m.item_icon(ctx, info, id)).flatten();
         let at = cursor.filter(|c| c.0 == child).map(|c| c.1);
@@ -109,58 +146,103 @@ pub(super) fn button(ui: &mut Ui, m: &super::Modern, label: &str, width: f32, li
 
 /// An item list: every row with its icon, name, count and colour, the cursor's row kept in view The row clicked.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn list(ui: &mut Ui, m: &super::Modern, ctx: &egui::Context, info: &ItemCache, salt: &str, rows: &[Slot], tints: &[u32], cur: usize, focused: bool, stars: &[bool]) -> Option<usize> {
+pub(super) fn list(
+    ui: &mut Ui,
+    m: &super::Modern,
+    ctx: &egui::Context,
+    info: &ItemCache,
+    salt: &str,
+    rows: &[Slot],
+    tints: &[u32],
+    cur: usize,
+    focused: bool,
+    stars: &[bool],
+) -> Option<usize> {
     let mut click = None;
     let seen = egui::Id::unique((salt, "cursor seen"));
     let follow = ui.ctx().data(|d| d.get_temp::<usize>(seen)) != Some(cur);
     ui.ctx().data_mut(|d| d.insert_temp(seen, cur));
     let tall = 12.0 * (ROW + 2.0);
-    egui::ScrollArea::vertical().id_salt(salt).max_height(tall).min_scrolled_height(tall).auto_shrink([false, true]).show(ui, |ui| {
-        for (k, s) in rows.iter().enumerate() {
-            let (r, resp) = ui.allocate_exact_size(vec2(LIST_W - 14.0, ROW), Sense::click());
-            let face = match () {
-                _ if k == cur && focused => "controls/list_row_selected",
-                _ if resp.hovered() => "controls/list_row_hover",
-                _ => "controls/list_row_normal",
-            };
-            super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
-            let t = tints.get(k).copied().unwrap_or(TINT_WHITE);
-            if let Some(tex) = m.item_icon(ctx, info, s.id) {
-                let dim = if t == TINT_DIM { Color32::from_gray(110) } else { Color32::WHITE };
-                ui.painter().image(tex, Rect::from_min_size(pos2(r.min.x + 10.0, r.center().y - ICON / 2.0), vec2(ICON, ICON)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), dim);
+    egui::ScrollArea::vertical()
+        .id_salt(salt)
+        .max_height(tall)
+        .min_scrolled_height(tall)
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            for (k, s) in rows.iter().enumerate() {
+                let (r, resp) = ui.allocate_exact_size(vec2(LIST_W - 14.0, ROW), Sense::click());
+                let face = match () {
+                    _ if k == cur && focused => "controls/list_row_selected",
+                    _ if resp.hovered() => "controls/list_row_hover",
+                    _ => "controls/list_row_normal",
+                };
+                super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
+                let t = tints.get(k).copied().unwrap_or(TINT_WHITE);
+                if let Some(tex) = m.item_icon(ctx, info, s.id) {
+                    let dim = if t == TINT_DIM { Color32::from_gray(110) } else { Color32::WHITE };
+                    ui.painter().image(
+                        tex,
+                        Rect::from_min_size(pos2(r.min.x + 10.0, r.center().y - ICON / 2.0), vec2(ICON, ICON)),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        dim,
+                    );
+                }
+                let name = info.item(s.id).map(|it| it.name.clone()).unwrap_or_default();
+                let clip = Rect::from_min_max(r.min, pos2(r.max.x - 44.0, r.max.y));
+                ui.painter().with_clip_rect(clip).text(
+                    pos2(r.min.x + 42.0, r.center().y),
+                    Align2::LEFT_CENTER,
+                    name,
+                    FontId::proportional(m.theme.ui),
+                    tint(m, t),
+                );
+                if s.count > 1 {
+                    ui.painter().text(
+                        pos2(r.max.x - 12.0, r.center().y),
+                        Align2::RIGHT_CENTER,
+                        s.count.to_string(),
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("text"),
+                    );
+                }
+                if stars.get(k).copied().unwrap_or(false) {
+                    ui.painter().add(paint::star(pos2(r.max.x - 20.0, r.center().y), 7.0, m.theme.color("gold")));
+                }
+                if k == cur && follow {
+                    ui.scroll_to_rect(r, None);
+                }
+                if resp.clicked() {
+                    click = Some(k);
+                }
+                ui.add_space(2.0);
             }
-            let name = info.item(s.id).map(|it| it.name.clone()).unwrap_or_default();
-            let clip = Rect::from_min_max(r.min, pos2(r.max.x - 44.0, r.max.y));
-            ui.painter().with_clip_rect(clip).text(pos2(r.min.x + 42.0, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.ui), tint(m, t));
-            if s.count > 1 {
-                ui.painter().text(pos2(r.max.x - 12.0, r.center().y), Align2::RIGHT_CENTER, s.count.to_string(), FontId::proportional(m.theme.ui), m.theme.color("text"));
+            if rows.is_empty() {
+                ui.label(egui::RichText::new("Empty.").size(m.theme.ui).color(m.theme.color("muted")));
             }
-            if stars.get(k).copied().unwrap_or(false) {
-                ui.painter().add(paint::star(pos2(r.max.x - 20.0, r.center().y), 7.0, m.theme.color("gold")));
-            }
-            if k == cur && follow {
-                ui.scroll_to_rect(r, None);
-            }
-            if resp.clicked() {
-                click = Some(k);
-            }
-            ui.add_space(2.0);
-        }
-        if rows.is_empty() {
-            ui.label(egui::RichText::new("Empty.").size(m.theme.ui).color(m.theme.color("muted")));
-        }
-    });
+        });
     click
 }
 
 /// The count asked (itemctrl's for a stack, or the amount to make): the value of most and its keys as buttons (itemctrl's
 /// own "-", "+", "1", "All"), OK and Cancel.
-pub(super) fn count_row(ui: &mut Ui, m: &super::Modern, gu: &GameUi, label: &str, v: u32, max: u32) -> Option<egui::Key> {
+pub(super) fn count_row(
+    ui: &mut Ui,
+    m: &super::Modern,
+    gu: &GameUi,
+    label: &str,
+    v: u32,
+    max: u32,
+) -> Option<egui::Key> {
     use egui::Key as K;
     let mut key = None;
     ui.label(egui::RichText::new(label).size(m.theme.small).color(m.theme.color("gold")));
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(format!("{v} / {max}")).size(m.theme.ui).family(egui::FontFamily::Monospace).color(m.theme.color("text")));
+        ui.label(
+            egui::RichText::new(format!("{v} / {max}"))
+                .size(m.theme.ui)
+                .family(egui::FontFamily::Monospace)
+                .color(m.theme.color("text")),
+        );
         ui.add_space(6.0);
         for (text, k) in [("-", K::ArrowDown), ("+", K::ArrowUp), ("1", K::ArrowRight), ("All", K::ArrowLeft)] {
             if button(ui, m, text, 32.0, false, false) {
@@ -183,7 +265,13 @@ pub(super) fn count_row(ui: &mut Ui, m: &super::Modern, gu: &GameUi, label: &str
 /// The gil asked (moneyctr): the amount with the digit the arrows step underlined; its keys as buttons ("-" / "+" by
 /// the step, the step x10 / /10), All and 0 outright, OK and Cancel. A key, or an amount to set.
 /// `focus`: the button with the keys (0..5 the value buttons, 6 OK, 7 Cancel), None the value.
-pub(super) fn money_row(ui: &mut Ui, m: &super::Modern, gu: &GameUi, (step, max, v): (u32, u32, u32), focus: Option<u8>) -> (Option<egui::Key>, Option<u32>) {
+pub(super) fn money_row(
+    ui: &mut Ui,
+    m: &super::Modern,
+    gu: &GameUi,
+    (step, max, v): (u32, u32, u32),
+    focus: Option<u8>,
+) -> (Option<egui::Key>, Option<u32>) {
     use egui::Key as K;
     let (mut key, mut set) = (None, None);
     ui.label(egui::RichText::new("Gil").size(m.theme.small).color(m.theme.color("gold")));
@@ -199,10 +287,17 @@ pub(super) fn money_row(ui: &mut Ui, m: &super::Modern, gu: &GameUi, (step, max,
         let x = r.max.x - (k + 1.0) * cw;
         let mark = if focus.is_none() { m.theme.color("focus") } else { m.theme.color("muted") };
         ui.painter().line_segment([pos2(x + 1.0, r.max.y), pos2(x + cw - 1.0, r.max.y)], egui::Stroke::new(2.0, mark));
-        ui.label(egui::RichText::new(format!(" / {}", crate::inventory::gil_text(max as i64))).size(m.theme.small).color(m.theme.color("muted")));
+        ui.label(
+            egui::RichText::new(format!(" / {}", crate::inventory::gil_text(max as i64)))
+                .size(m.theme.small)
+                .color(m.theme.color("muted")),
+        );
     });
     ui.horizontal(|ui| {
-        for (b, (text, k)) in [("-", K::ArrowDown), ("+", K::ArrowUp), ("x10", K::ArrowLeft), ("/10", K::ArrowRight)].into_iter().enumerate() {
+        for (b, (text, k)) in [("-", K::ArrowDown), ("+", K::ArrowUp), ("x10", K::ArrowLeft), ("/10", K::ArrowRight)]
+            .into_iter()
+            .enumerate()
+        {
             if button(ui, m, text, 40.0, focus == Some(b as u8), false) {
                 key = Some(k);
             }
@@ -230,7 +325,12 @@ pub(super) fn caption(gu: &GameUi, menu: &str, child: u16, fallback: &str) -> St
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str, colour: Color32) {
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(egui::FontFamily::Name(super::STRONG.into())).color(colour));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(egui::FontFamily::Name(super::STRONG.into()))
+            .color(colour),
+    );
     ui.add_space(4.0);
 }
 
@@ -261,9 +361,21 @@ pub(super) fn synth_open(w: &World) -> bool {
 pub(super) fn synth_rows(w: &World) -> Vec<Entry> {
     let Some((list, v)) = synth_list(w) else { return Vec::new() };
     match list {
-        SynthList::Crystals => v.crystals.map_or(Vec::new(), |(rows, _)| rows.iter().map(|s| Entry::item(w, s.id).note(count_note(s.count))).collect()),
-        SynthList::History => v.history.map_or(Vec::new(), |(records, ..)| records.iter().map(|r| Entry::item(w, r.item).note(if r.crystal & 0x8000 != 0 { "favorite" } else { "" })).collect()),
-        SynthList::Picker => v.win.and_then(|x| x.picker).map_or(Vec::new(), |(rows, tints, _)| rows.iter().zip(tints).map(|(s, t)| Entry::item(w, s.id).note(count_note(s.count)).dim(t == TINT_DIM)).collect()),
+        SynthList::Crystals => v.crystals.map_or(Vec::new(), |(rows, _)| {
+            rows.iter().map(|s| Entry::item(w, s.id).note(count_note(s.count))).collect()
+        }),
+        SynthList::History => v.history.map_or(Vec::new(), |(records, ..)| {
+            records
+                .iter()
+                .map(|r| Entry::item(w, r.item).note(if r.crystal & 0x8000 != 0 { "favorite" } else { "" }))
+                .collect()
+        }),
+        SynthList::Picker => v.win.and_then(|x| x.picker).map_or(Vec::new(), |(rows, tints, _)| {
+            rows.iter()
+                .zip(tints)
+                .map(|(s, t)| Entry::item(w, s.id).note(count_note(s.count)).dim(t == TINT_DIM))
+                .collect()
+        }),
     }
 }
 
@@ -283,7 +395,14 @@ pub(super) fn trade_open(w: &World) -> bool {
 }
 
 pub(super) fn trade_rows(w: &World) -> Vec<Entry> {
-    trade::view(w).map_or(Vec::new(), |v| v.picker.0.iter().zip(&v.picker.1).map(|(s, &t)| Entry::item(w, s.id).note(count_note(s.count)).dim(t == TINT_DIM)).collect())
+    trade::view(w).map_or(Vec::new(), |v| {
+        v.picker
+            .0
+            .iter()
+            .zip(&v.picker.1)
+            .map(|(s, &t)| Entry::item(w, s.id).note(count_note(s.count)).dim(t == TINT_DIM))
+            .collect()
+    })
 }
 
 pub(super) fn trade_pick(w: &mut World, gu: Option<&GameUi>, k: usize) {
@@ -309,7 +428,14 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
     p.panel("window", Some(title), width, |ui| {
         if let Some((sel, off, focused)) = v.menu {
             ui.horizontal_top(|ui| {
-                let mw = MenuWin { name: synth::CMBMENU, sel, off: if off { vec![1, 2] } else { Vec::new() }, labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
+                let mw = MenuWin {
+                    name: synth::CMBMENU,
+                    sel,
+                    off: if off { vec![1, 2] } else { Vec::new() },
+                    labels: Vec::new(),
+                    marked: Vec::new(),
+                    values: Vec::new(),
+                };
                 menu_got = social::stack(ui, m, gu, std::slice::from_ref(&mw), focused);
                 if let Some((rows, cur)) = &v.crystals {
                     ui.add_space(12.0);
@@ -320,7 +446,8 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
                         if super::lists::rows_or(ui, m, &mut found) {
                             return;
                         }
-                        mouse.row = list(ui, m, ctx, info, "synth crystals", rows, &tints, *cur, w.confirm.is_none(), &[]);
+                        mouse.row =
+                            list(ui, m, ctx, info, "synth crystals", rows, &tints, *cur, w.confirm.is_none(), &[]);
                     });
                 }
             });
@@ -334,14 +461,29 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
                 ui.horizontal(|ui| {
                     let (r, _) = ui.allocate_exact_size(vec2(TILE, TILE), Sense::hover());
                     let icon = (x.crystal != 0).then(|| m.item_icon(ctx, info, x.crystal)).flatten();
-                    tile(ui, m, r, egui::Id::unique("synth crystal"), icon, 0, None, x.history && !x.found && x.crystal != 0);
+                    tile(
+                        ui,
+                        m,
+                        r,
+                        egui::Id::unique("synth crystal"),
+                        icon,
+                        0,
+                        None,
+                        x.history && !x.found && x.crystal != 0,
+                    );
                     ui.vertical(|ui| {
                         ui.add_space(6.0);
                         let name = info.item(x.crystal).map(|it| it.name.clone()).unwrap_or_default();
                         ui.label(egui::RichText::new(name).size(m.theme.ui).color(m.theme.color("text")));
-                        if let Some(s) = x.element.and_then(|e| ELEMENTS.get(e as usize)).and_then(|i| m.art.sprite(i)) {
+                        if let Some(s) = x.element.and_then(|e| ELEMENTS.get(e as usize)).and_then(|i| m.art.sprite(i))
+                        {
                             let (er, _) = ui.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
-                            ui.painter().add(paint::image(&s, er.min, 20.0, if x.history && !x.found { Color32::from_gray(110) } else { Color32::WHITE }));
+                            ui.painter().add(paint::image(
+                                &s,
+                                er.min,
+                                20.0,
+                                if x.history && !x.found { Color32::from_gray(110) } else { Color32::WHITE },
+                            ));
                         }
                     });
                 });
@@ -350,7 +492,8 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
                 mouse.tile = grid(ui, m, ctx, info, "synth slot", &x.slots, cursor, w.confirm.is_none());
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
-                    let (ok, cancel) = (caption(gu, synth::TSKILL1, 9, "OK"), caption(gu, synth::TSKILL1, 10, "Cancel"));
+                    let (ok, cancel) =
+                        (caption(gu, synth::TSKILL1, 9, "OK"), caption(gu, synth::TSKILL1, 10, "Cancel"));
                     if button(ui, m, &ok, 110.0, x.cursor == 9 && x.on_slots, !x.complete) {
                         mouse.tile = Some(9);
                     }
@@ -360,7 +503,8 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
                 });
                 if let Some((n, max, amount)) = x.count {
                     ui.add_space(10.0);
-                    let label = if amount { "How many to make".to_string() } else { gu.title_msg(0x3e).unwrap_or_default() };
+                    let label =
+                        if amount { "How many to make".to_string() } else { gu.title_msg(0x3e).unwrap_or_default() };
                     mouse.key = count_row(ui, m, gu, &label, n, max);
                 }
             });
@@ -370,19 +514,40 @@ fn synthesis(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
                 // Mode 2: the history (newest first, the favourites starred) and cmbhwin under it.
                 if let Some((records, cur, fav, focused)) = &v.history {
                     heading(ui, m, &caption(gu, synth::CMBMENU, 2, "History"), m.theme.color("gold"));
-                    let rows: Vec<Slot> = records.iter().map(|r| Slot { index: 0, id: r.item, count: 0, equipped: false, equipped_ex: false }).collect();
+                    let rows: Vec<Slot> = records
+                        .iter()
+                        .map(|r| Slot { index: 0, id: r.item, count: 0, equipped: false, equipped_ex: false })
+                        .collect();
                     // The favourites starred (retail's keytops3 101).
                     let stars: Vec<bool> = records.iter().map(|r| r.crystal & 0x8000 != 0).collect();
                     if super::lists::rows_or(ui, m, &mut found) {
                         return;
                     }
-                    mouse.row = list(ui, m, ctx, info, "synth history", &rows, &vec![TINT_WHITE; rows.len()], (*cur as usize).saturating_sub(1), *focused && fav.is_none(), &stars);
+                    mouse.row = list(
+                        ui,
+                        m,
+                        ctx,
+                        info,
+                        "synth history",
+                        &rows,
+                        &vec![TINT_WHITE; rows.len()],
+                        (*cur as usize).saturating_sub(1),
+                        *focused && fav.is_none(),
+                        &stars,
+                    );
                     // cmbhwin's two rows as buttons (Num+ gives them the keys).
                     ui.add_space(8.0);
                     fav_open = fav.is_some();
                     ui.horizontal(|ui| {
                         for (c, fallback) in [(1u16, "Favorite"), (2, "Unfavorite")] {
-                            if button(ui, m, &caption(gu, synth::CMBHWIN, c, fallback), 140.0, *focused && *fav == Some(c), records.is_empty()) {
+                            if button(
+                                ui,
+                                m,
+                                &caption(gu, synth::CMBHWIN, c, fallback),
+                                140.0,
+                                *focused && *fav == Some(c),
+                                records.is_empty(),
+                            ) {
                                 fav_got = Some(c);
                             }
                         }
@@ -454,72 +619,77 @@ fn trading(p: &mut Panels, w: &mut World, gu: &GameUi, info: &ItemCache) {
     let free = w.confirm.is_none();
     let mine: [(u16, u32, bool); 8] = std::array::from_fn(|i| (v.mine[i].0, v.mine[i].1, false));
     let mut found = super::lists::found(p, w, "trade");
-    p.panel("window", Some(title), GRID_W * if v.player { 2.0 } else { 1.0 } + LIST_W + if v.player { 96.0 } else { 70.0 }, |ui| {
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(GRID_W);
-                heading(ui, m, &w.name, if v.our_ok { m.theme.color("gold") } else { m.theme.color("text") });
-                let cursor = (1..=8).contains(&v.cursor).then_some((v.cursor, v.on_window));
-                mouse.tile = grid(ui, m, ctx, info, "trade ours", &mine, cursor, free);
-                ui.add_space(8.0);
-                // Child 11: the gil, a click asks the amount.
-                ui.horizontal(|ui| {
-                    if let Some(s) = m.art.sprite("icons/currency") {
-                        let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
-                        ui.painter().add(paint::image(&s, r.min, 22.0, Color32::WHITE));
-                    }
-                    if button(ui, m, &gil_text(v.gil), GRID_W - 30.0, v.cursor == 11 && v.on_window, v.our_ok) {
-                        gil_click = true;
-                    }
-                });
-                ui.add_space(10.0);
-                ui.horizontal(|ui| {
-                    let (ok, cancel) = (caption(gu, name, 9, "OK"), caption(gu, name, 10, "Cancel"));
-                    if button(ui, m, &ok, 110.0, v.cursor == 9 && v.on_window, v.our_ok) {
-                        mouse.tile = Some(9);
-                    }
-                    if button(ui, m, &cancel, 110.0, v.cursor == 10 && v.on_window, false) {
-                        mouse.tile = Some(10);
-                    }
-                });
-                if let Some((n, max)) = v.qty {
-                    ui.add_space(10.0);
-                    mouse.key = count_row(ui, m, gu, &gu.title_msg(0x3e).unwrap_or_default(), n, max);
-                }
-                if let Some(money) = v.money {
-                    ui.add_space(10.0);
-                    (mouse.key, money_set) = money_row(ui, m, gu, money, None);
-                }
-            });
-            // Their offer: their OK lights their name.
-            if let Some((theirs, gil, ok)) = &v.theirs {
-                ui.add_space(16.0);
+    p.panel(
+        "window",
+        Some(title),
+        GRID_W * if v.player { 2.0 } else { 1.0 } + LIST_W + if v.player { 96.0 } else { 70.0 },
+        |ui| {
+            ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
                     ui.set_width(GRID_W);
-                    heading(ui, m, &v.with, if *ok { m.theme.color("gold") } else { m.theme.color("text") });
-                    let slots: [(u16, u32, bool); 8] = std::array::from_fn(|i| (theirs[i].0, theirs[i].1, false));
-                    let cursor = v.gift.map(|g| (g, free));
-                    let got = grid(ui, m, ctx, info, "trade theirs", &slots, cursor, free && !v.our_ok);
-                    mouse.theirs = got;
+                    heading(ui, m, &w.name, if v.our_ok { m.theme.color("gold") } else { m.theme.color("text") });
+                    let cursor = (1..=8).contains(&v.cursor).then_some((v.cursor, v.on_window));
+                    mouse.tile = grid(ui, m, ctx, info, "trade ours", &mine, cursor, free);
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new(gil_text(*gil)).size(m.theme.ui).color(m.theme.color("text")));
-                    if *ok {
-                        ui.label(egui::RichText::new("Ready.").size(m.theme.small).color(m.theme.color("gold")));
+                    // Child 11: the gil, a click asks the amount.
+                    ui.horizontal(|ui| {
+                        if let Some(s) = m.art.sprite("icons/currency") {
+                            let (r, _) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+                            ui.painter().add(paint::image(&s, r.min, 22.0, Color32::WHITE));
+                        }
+                        if button(ui, m, &gil_text(v.gil), GRID_W - 30.0, v.cursor == 11 && v.on_window, v.our_ok) {
+                            gil_click = true;
+                        }
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui| {
+                        let (ok, cancel) = (caption(gu, name, 9, "OK"), caption(gu, name, 10, "Cancel"));
+                        if button(ui, m, &ok, 110.0, v.cursor == 9 && v.on_window, v.our_ok) {
+                            mouse.tile = Some(9);
+                        }
+                        if button(ui, m, &cancel, 110.0, v.cursor == 10 && v.on_window, false) {
+                            mouse.tile = Some(10);
+                        }
+                    });
+                    if let Some((n, max)) = v.qty {
+                        ui.add_space(10.0);
+                        mouse.key = count_row(ui, m, gu, &gu.title_msg(0x3e).unwrap_or_default(), n, max);
+                    }
+                    if let Some(money) = v.money {
+                        ui.add_space(10.0);
+                        (mouse.key, money_set) = money_row(ui, m, gu, money, None);
                     }
                 });
-            }
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                heading(ui, m, "Inventory", m.theme.color("gold"));
-                let (rows, tints, cur) = &v.picker;
-                if super::lists::rows_or(ui, m, &mut found) {
-                    return;
+                // Their offer: their OK lights their name.
+                if let Some((theirs, gil, ok)) = &v.theirs {
+                    ui.add_space(16.0);
+                    ui.vertical(|ui| {
+                        ui.set_width(GRID_W);
+                        heading(ui, m, &v.with, if *ok { m.theme.color("gold") } else { m.theme.color("text") });
+                        let slots: [(u16, u32, bool); 8] = std::array::from_fn(|i| (theirs[i].0, theirs[i].1, false));
+                        let cursor = v.gift.map(|g| (g, free));
+                        let got = grid(ui, m, ctx, info, "trade theirs", &slots, cursor, free && !v.our_ok);
+                        mouse.theirs = got;
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new(gil_text(*gil)).size(m.theme.ui).color(m.theme.color("text")));
+                        if *ok {
+                            ui.label(egui::RichText::new("Ready.").size(m.theme.small).color(m.theme.color("gold")));
+                        }
+                    });
                 }
-                mouse.row = list(ui, m, ctx, info, "trade picker", rows, tints, *cur, v.on_list, &[]);
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    heading(ui, m, "Inventory", m.theme.color("gold"));
+                    let (rows, tints, cur) = &v.picker;
+                    if super::lists::rows_or(ui, m, &mut found) {
+                        return;
+                    }
+                    mouse.row = list(ui, m, ctx, info, "trade picker", rows, tints, *cur, v.on_list, &[]);
+                });
             });
-        });
-    });
+        },
+    );
     if let Some(f) = found {
         f.pick(w, Some(gu));
         return;

@@ -39,7 +39,16 @@ pub struct Transfer {
 
 impl Transfer {
     fn new() -> Self {
-        Transfer { timestamp: 0, total: 0, done: 0, asked: 0, slots: Vec::new(), buf: vec![0; BUFFER], heard: Instant::now(), starts: 0 }
+        Transfer {
+            timestamp: 0,
+            total: 0,
+            done: 0,
+            asked: 0,
+            slots: Vec::new(),
+            buf: vec![0; BUFFER],
+            heard: Instant::now(),
+            starts: 0,
+        }
     }
 }
 
@@ -70,7 +79,12 @@ pub(super) fn start(w: &mut World) {
 /// (twice at most, then it fails silently).
 pub(super) fn frame(w: &mut World) {
     // Ours: also once the message tables are in, which print it.
-    if w.servmes_armed && w.battle.is_some() && super::event::zone_ready(w) && w.event.is_none() && w.event_pending.is_none() {
+    if w.servmes_armed
+        && w.battle.is_some()
+        && super::event::zone_ready(w)
+        && w.event.is_none()
+        && w.event_pending.is_none()
+    {
         w.servmes_armed = false;
         start(w);
     }
@@ -104,7 +118,14 @@ pub(super) fn on_fragment(w: &mut World, p: &[u8]) {
     let i32_at = |o: usize| p.get(o..o + 4).map_or(0, |b| i32::from_le_bytes(b.try_into().unwrap()));
     let (cmd, kind, lang) = (u8_at(4), u8_at(6), u8_at(7));
     let (stamp, total, offset, size) = (i32_at(8), i32_at(0xc), i32_at(0x10), i32_at(0x14));
-    if !matches!(cmd, 1 | 2) || kind != KIND || lang != LANG || stamp <= 0 || total <= 0 || total as usize > BUFFER || size < 0 {
+    if !matches!(cmd, 1 | 2)
+        || kind != KIND
+        || lang != LANG
+        || stamp <= 0
+        || total <= 0
+        || total as usize > BUFFER
+        || size < 0
+    {
         log::info!("server message: piece refused (cmd {cmd}, kind {kind}, total {total})");
         return;
     }
@@ -143,7 +164,9 @@ fn show(w: &mut World, text: &[u8]) {
     let text = &text[..text.iter().position(|&b| b == 0).unwrap_or(text.len())];
     w.chat.push_colour(format!("<<< Welcome to {}! >>>", w.world_name), colour);
     for seg in text.split_inclusive(|&b| matches!(b, 7 | b'\r' | b'\n')) {
-        let line = crate::dat::font::decode_sjis(seg.strip_suffix(&[7]).or(seg.strip_suffix(b"\r")).or(seg.strip_suffix(b"\n")).unwrap_or(seg));
+        let line = crate::dat::font::decode_sjis(
+            seg.strip_suffix(&[7]).or(seg.strip_suffix(b"\r")).or(seg.strip_suffix(b"\n")).unwrap_or(seg),
+        );
         if !line.is_empty() {
             w.chat.push_colour(line, colour);
         }

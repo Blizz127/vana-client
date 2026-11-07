@@ -138,7 +138,8 @@ pub fn key(w: &mut World, key: egui::Key, page_mod: bool) {
             // With 0xa8 the list's page (0x19 / 0x18); plain, the next / previous category with SE 0001 always
             // (FUN_10234280: FUN_10233f90 / FUN_10233fd0, the cursor and top back to 0).
             K::ArrowLeft | K::ArrowRight if page_mod => {
-                let m = if key == K::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+                let m =
+                    if key == K::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
                 let mut row = l.cursor - l.top;
                 if super::scrollbar::paged(m, &mut l.top, &mut row, n, ROWS) {
                     l.cursor = l.top + row;
@@ -157,7 +158,11 @@ pub fn key(w: &mut World, key: egui::Key, page_mod: bool) {
                     w.sounds.push(Ui::Select as u32);
                     l.page = true;
                     p.desk_title = false;
-                    w.map_cmds.push(super::map::Cmd::Primer { first: (t.num as u32 + 0x83b1) * 3, count: t.images, at: 0 });
+                    w.map_cmds.push(super::map::Cmd::Primer {
+                        first: (t.num as u32 + 0x83b1) * 3,
+                        count: t.images,
+                        at: 0,
+                    });
                 }
             }
             // FUN_10234230(1): guide00's hand and bar back, its cursor kept.
@@ -223,20 +228,26 @@ pub(super) struct Look {
 pub(super) fn look(w: &World) -> Option<Look> {
     let p = w.primer.as_ref()?;
     let cats = if ready(p) { p.cats.iter().map(|c| c.name.clone()).collect() } else { Vec::new() };
-    let list = p.list.as_ref().and_then(|l| p.cats.get(l.cat).map(|c| (c.name.clone(), c.topics.iter().map(|t| t.name.clone()).collect(), l.cursor)));
+    let list = p.list.as_ref().and_then(|l| {
+        p.cats.get(l.cat).map(|c| (c.name.clone(), c.topics.iter().map(|t| t.name.clone()).collect(), l.cursor))
+    });
     Some(Look { cats, cursor: p.cursor, list, page: p.list.as_ref().is_some_and(|l| l.page) })
 }
 
 /// The mouse's cursor moves: guide00's row (while guide01 is closed), guide01's row. True when it moved.
 pub(super) fn set_cat(w: &mut World, k: usize) -> bool {
-    let Some(p) = w.primer.as_mut().filter(|p| p.list.is_none() && p.cursor != k && k < p.cats.len()) else { return false };
+    let Some(p) = w.primer.as_mut().filter(|p| p.list.is_none() && p.cursor != k && k < p.cats.len()) else {
+        return false;
+    };
     p.cursor = k;
     true
 }
 
 pub(super) fn set_topic(w: &mut World, k: usize) -> bool {
     let Some(p) = w.primer.as_mut() else { return false };
-    let Some(l) = p.list.as_mut().filter(|l| !l.page && l.cursor != k && k < p.cats[l.cat].topics.len()) else { return false };
+    let Some(l) = p.list.as_mut().filter(|l| !l.page && l.cursor != k && k < p.cats[l.cat].topics.len()) else {
+        return false;
+    };
     l.cursor = k;
     l.top = l.top.min(k).max((k + 1).saturating_sub(ROWS));
     true
@@ -254,7 +265,13 @@ pub fn pointer(w: &mut World, gu: &GameUi, pt: (f32, f32), moved: bool, clicked:
     let keys = |w: &mut World, _: &GameUi, k: egui::Key| key(w, k, false);
     match &p.list {
         Some(l) if l.page => {
-            let k = if clicked { egui::Key::Enter } else if right { egui::Key::Escape } else { return };
+            let k = if clicked {
+                egui::Key::Enter
+            } else if right {
+                egui::Key::Escape
+            } else {
+                return;
+            };
             if let Some(m) = w.map.as_mut().filter(|m| m.primer_page().is_some())
                 && !m.key(k)
             {
@@ -276,18 +293,42 @@ pub fn pointer(w: &mut World, gu: &GameUi, pt: (f32, f32), moved: bool, clicked:
                 return;
             }
             let top = l.top;
-            generic(w, gu, PAGES, (l.cursor - top + 1) as u16, 1..=ROWS as u16, pt, moved, clicked, right, |w, id| {
-                if let Some(l) = w.primer.as_mut().and_then(|p| p.list.as_mut()) {
-                    l.cursor = top + id as usize - 1;
-                }
-            }, keys);
+            generic(
+                w,
+                gu,
+                PAGES,
+                (l.cursor - top + 1) as u16,
+                1..=ROWS as u16,
+                pt,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(l) = w.primer.as_mut().and_then(|p| p.list.as_mut()) {
+                        l.cursor = top + id as usize - 1;
+                    }
+                },
+                keys,
+            );
         }
         None => {
-            generic(w, gu, LIST, p.cursor as u16 + 1, 1..=ROWS as u16, pt, moved, clicked, right, |w, id| {
-                if let Some(p) = w.primer.as_mut() {
-                    p.cursor = id as usize - 1;
-                }
-            }, keys);
+            generic(
+                w,
+                gu,
+                LIST,
+                p.cursor as u16 + 1,
+                1..=ROWS as u16,
+                pt,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(p) = w.primer.as_mut() {
+                        p.cursor = id as usize - 1;
+                    }
+                },
+                keys,
+            );
         }
     }
 }

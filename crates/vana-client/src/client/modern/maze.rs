@@ -32,13 +32,25 @@ fn element_colour(e: u8) -> Color32 {
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     ui.add_space(4.0);
 }
 
 /// The list's rows: the item's icon (none for Type), the name in its tint; the cursor kept in view. (hovered,
 /// clicked).
-fn rows(ui: &mut Ui, m: &super::Modern, w: &World, rows: &[(Row, String, u32)], cursor: usize, focused: bool) -> Option<usize> {
+fn rows(
+    ui: &mut Ui,
+    m: &super::Modern,
+    w: &World,
+    rows: &[(Row, String, u32)],
+    cursor: usize,
+    focused: bool,
+) -> Option<usize> {
     let ctx = ui.ctx().clone();
     let seen = egui::Id::unique("maze cursor seen");
     let follow = ctx.data(|d| d.get_temp::<usize>(seen)) != Some(cursor);
@@ -46,7 +58,8 @@ fn rows(ui: &mut Ui, m: &super::Modern, w: &World, rows: &[(Row, String, u32)], 
     let mut click = None;
     egui::ScrollArea::vertical().id_salt("maze list").max_height(TALL).auto_shrink([false, true]).show(ui, |ui| {
         for (k, (row, text, t)) in rows.iter().enumerate() {
-            let (rect, resp) = ui.allocate_exact_size(vec2(COL_W - 14.0, ROW), if focused { Sense::click() } else { Sense::hover() });
+            let (rect, resp) =
+                ui.allocate_exact_size(vec2(COL_W - 14.0, ROW), if focused { Sense::click() } else { Sense::hover() });
             let face = match () {
                 _ if k == cursor && focused => "controls/list_row_selected",
                 _ if k == cursor || focused && resp.hovered() => "controls/list_row_hover",
@@ -57,10 +70,21 @@ fn rows(ui: &mut Ui, m: &super::Modern, w: &World, rows: &[(Row, String, u32)], 
             if let Row::Item(id) = row
                 && let Some(tex) = w.item_info.as_ref().and_then(|info| m.item_icon(&ctx, info, *id))
             {
-                ui.painter().image(tex, Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                ui.painter().image(
+                    tex,
+                    Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)),
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
             }
             let label = if *row == Row::Type { format!("{text} ▶") } else { text.clone() };
-            ui.painter().text(pos2(x + ICON + 6.0, y), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), tint(m, *t));
+            ui.painter().text(
+                pos2(x + ICON + 6.0, y),
+                Align2::LEFT_CENTER,
+                label,
+                FontId::proportional(m.theme.small),
+                tint(m, *t),
+            );
             if k == cursor && follow {
                 ui.scroll_to_rect(rect, None);
             }
@@ -92,10 +116,22 @@ fn filter_rows(ui: &mut Ui, m: &super::Modern, cursor: u16) -> Option<u16> {
     for (k, name) in SHAPES.iter().enumerate() {
         let child = k as u16 + 1;
         let (rect, resp) = ui.allocate_exact_size(vec2(COL_W - 14.0, ROW), Sense::click());
-        let face = if child == cursor { "controls/list_row_selected" } else if resp.hovered() { "controls/list_row_hover" } else { "controls/list_row_normal" };
+        let face = if child == cursor {
+            "controls/list_row_selected"
+        } else if resp.hovered() {
+            "controls/list_row_hover"
+        } else {
+            "controls/list_row_normal"
+        };
         super::rows::face(ui.painter(), m, rect, face, Color32::WHITE);
         shape_mini(ui, pos2(rect.min.x + 16.0, rect.center().y), k as u8, m.theme.color("text"));
-        ui.painter().text(pos2(rect.min.x + 56.0, rect.center().y), Align2::LEFT_CENTER, *name, FontId::proportional(m.theme.small), m.theme.color("text"));
+        ui.painter().text(
+            pos2(rect.min.x + 56.0, rect.center().y),
+            Align2::LEFT_CENTER,
+            *name,
+            FontId::proportional(m.theme.small),
+            m.theme.color("text"),
+        );
         if resp.clicked() {
             click = Some(child);
         }
@@ -120,7 +156,9 @@ fn grid(ui: &mut Ui, m: &super::Modern, v: &maze::View, carrying: bool) -> GridM
     let side = CELL * 5.0;
     let (r, resp) = ui.allocate_exact_size(vec2(side, side), Sense::click());
     let p = ui.painter();
-    let cell = |c: usize| Rect::from_min_size(r.min + vec2(CELL * (c % 5) as f32, CELL * (c / 5) as f32), vec2(CELL, CELL)).shrink(2.0);
+    let cell = |c: usize| {
+        Rect::from_min_size(r.min + vec2(CELL * (c % 5) as f32, CELL * (c / 5) as f32), vec2(CELL, CELL)).shrink(2.0)
+    };
     let on = |mask: u32, c: usize| mask >> (24 - c) & 1 != 0;
     for c in 0..25 {
         let rc = cell(c);
@@ -133,8 +171,19 @@ fn grid(ui: &mut Ui, m: &super::Modern, v: &maze::View, carrying: bool) -> GridM
             }
             e @ 0..=7 => {
                 p.rect_filled(rc, 4.0, element_colour(e as u8).gamma_multiply(0.18));
-                p.rect_stroke(rc, 4.0, egui::Stroke::new(1.0, element_colour(e as u8).gamma_multiply(0.6)), egui::StrokeKind::Inside);
-                p.text(rc.center(), Align2::CENTER_CENTER, &ELEMENTS[e as usize][..1], FontId::proportional(m.theme.small), element_colour(e as u8).gamma_multiply(0.8));
+                p.rect_stroke(
+                    rc,
+                    4.0,
+                    egui::Stroke::new(1.0, element_colour(e as u8).gamma_multiply(0.6)),
+                    egui::StrokeKind::Inside,
+                );
+                p.text(
+                    rc.center(),
+                    Align2::CENTER_CENTER,
+                    &ELEMENTS[e as usize][..1],
+                    FontId::proportional(m.theme.small),
+                    element_colour(e as u8).gamma_multiply(0.8),
+                );
             }
             _ => {
                 p.rect_filled(rc, 4.0, Color32::from_rgb(34, 38, 48));
@@ -147,13 +196,24 @@ fn grid(ui: &mut Ui, m: &super::Modern, v: &maze::View, carrying: bool) -> GridM
             let fill = element_colour(e).gamma_multiply(if bonus { 0.95 } else { 0.7 });
             p.rect_filled(cell(c).shrink(3.0), 3.0, fill);
             if bonus && v.grid[c] == e as i8 {
-                p.rect_stroke(cell(c).shrink(3.0), 3.0, egui::Stroke::new(2.0, m.theme.color("gold")), egui::StrokeKind::Inside);
+                p.rect_stroke(
+                    cell(c).shrink(3.0),
+                    3.0,
+                    egui::Stroke::new(2.0, m.theme.color("gold")),
+                    egui::StrokeKind::Inside,
+                );
             }
         }
     }
     if let Some((_, e, cells, carried, fits)) = v.held {
         let a = if carried { v.pulse.clamp(0.4, 1.3) / 1.3 } else { 0.6 * v.pulse.clamp(0.4, 1.3) / 1.3 };
-        let edge = if !carried { m.theme.color("gold") } else if fits { Color32::from_rgb(80, 210, 200) } else { Color32::from_rgb(220, 80, 70) };
+        let edge = if !carried {
+            m.theme.color("gold")
+        } else if fits {
+            Color32::from_rgb(80, 210, 200)
+        } else {
+            Color32::from_rgb(220, 80, 70)
+        };
         for c in (0..25).filter(|&c| on(cells, c)) {
             let rc = cell(c).shrink(1.0).translate(if carried { vec2(-3.0, -3.0) } else { vec2(0.0, 0.0) });
             if carried {
@@ -164,14 +224,13 @@ fn grid(ui: &mut Ui, m: &super::Modern, v: &maze::View, carrying: bool) -> GridM
         }
     }
     let mut out = GridMouse::default();
-    if carrying
-        && let Some(at) = resp.hover_pos()
-    {
+    if carrying && let Some(at) = resp.hover_pos() {
         let d = at - r.min;
         out.hover = Some(((d.x / CELL).clamp(0.0, 4.0) as i8, (d.y / CELL).clamp(0.0, 4.0) as i8));
         out.click = resp.clicked();
         out.right = resp.secondary_clicked();
-        let wheel = ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::MouseWheel { delta, .. } if delta.y != 0.0)));
+        let wheel =
+            ui.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::MouseWheel { delta, .. } if delta.y != 0.0)));
         out.turn = resp.middle_clicked() || wheel;
     }
     out

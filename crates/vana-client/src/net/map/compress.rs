@@ -31,9 +31,12 @@ impl Codec {
         let at = if records_at(dll, KNOWN_OFFSET) {
             KNOWN_OFFSET
         } else {
-            (0..dll.len().saturating_sub(RECORDS)).find(|&o| records_at(dll, o)).ok_or_else(|| anyhow::anyhow!("no compression table in FFXiMain.dll"))?
+            (0..dll.len().saturating_sub(RECORDS))
+                .find(|&o| records_at(dll, o))
+                .ok_or_else(|| anyhow::anyhow!("no compression table in FFXiMain.dll"))?
         };
-        let field = |i: usize, o: usize| u32::from_le_bytes(dll[at + i * 9 + o..at + i * 9 + o + 4].try_into().unwrap());
+        let field =
+            |i: usize, o: usize| u32::from_le_bytes(dll[at + i * 9 + o..at + i * 9 + o + 4].try_into().unwrap());
         let mut table = vec![0u8; 2048];
         for i in 0..256 {
             table[i * 4..i * 4 + 4].copy_from_slice(&field(i, 1).to_le_bytes());

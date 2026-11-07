@@ -10,7 +10,9 @@ const BAD: u32 = 0xEFBE_DDBA; // file bytes "baddbeef": slot filled in at load
 const SKEL_MARK: u32 = 0xEDFE_EDFE;
 
 fn u32_at(d: &[u8], o: usize) -> Result<u32> {
-    d.get(o..o + 4).map(|b| u32::from_le_bytes(b.try_into().unwrap())).with_context(|| format!("read past end at {o:#x}"))
+    d.get(o..o + 4)
+        .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+        .with_context(|| format!("read past end at {o:#x}"))
 }
 fn i32_at(d: &[u8], o: usize) -> Result<i32> {
     Ok(u32_at(d, o)? as i32)
@@ -158,7 +160,8 @@ pub fn load_model(dmb: &[u8], dmp: &[u8], tex_prefix: &str) -> Result<Model> {
         p = t0 + 0x24;
         let mut tex = None;
         if i32_at(dmb, t0 + 0x1c)? != -1 {
-            let (w, h, bpp, dm) = (u32_at(dmb, t0 + 0x40)?, u32_at(dmb, t0 + 0x44)?, u32_at(dmb, t0 + 0x48)?, u32_at(dmb, t0 + 0x4c)?);
+            let (w, h, bpp, dm) =
+                (u32_at(dmb, t0 + 0x40)?, u32_at(dmb, t0 + 0x44)?, u32_at(dmb, t0 + 0x48)?, u32_at(dmb, t0 + 0x4c)?);
             p = t0 + 0x60;
             let mut data = None;
             if dm == BAD {
@@ -167,7 +170,8 @@ pub fn load_model(dmb: &[u8], dmp: &[u8], tex_prefix: &str) -> Result<Model> {
                 data = Some(dmb.get(p..p + sz).context("texture data past end")?.to_vec());
                 p += sz;
             }
-            let (esz, cnt, cm) = (u32_at(dmb, t0 + 0x54)? as usize, u32_at(dmb, t0 + 0x58)? as usize, i32_at(dmb, t0 + 0x5c)?);
+            let (esz, cnt, cm) =
+                (u32_at(dmb, t0 + 0x54)? as usize, u32_at(dmb, t0 + 0x58)? as usize, i32_at(dmb, t0 + 0x5c)?);
             let mut clut = None;
             if cm != -1 {
                 p = al16(p);
@@ -214,7 +218,9 @@ pub fn load_model(dmb: &[u8], dmp: &[u8], tex_prefix: &str) -> Result<Model> {
     let tags = strs(ntag)?;
     let files = strs(nfile)?;
     let tag_types: Vec<u32> = (0..ntag).map(|i| u32_at(dmb, tag_types_at + 4 * i)).collect::<Result<_>>()?;
-    let named = |ty: u32| -> Vec<String> { tags.iter().zip(&tag_types).filter(|(_, t)| **t == ty).map(|(n, _)| n.clone()).collect() };
+    let named = |ty: u32| -> Vec<String> {
+        tags.iter().zip(&tag_types).filter(|(_, t)| **t == ty).map(|(n, _)| n.clone()).collect()
+    };
     let (tex_names, materials, shape_names) = (named(0), named(1), named(3));
 
     let mut textures = Vec::new();
@@ -439,7 +445,8 @@ pub fn parse_channels(b: &[u8]) -> Result<Channels> {
         // PlaybackChannel v3 (FUN_1027ace0): time, n, frames, step, packed flag, per-channel delta streams, types.
         0x50003 => {
             ensure!(ver == 3, "PBChannel v{ver}");
-            let (time, width, frames, packed) = (f32_at(b, p)?, u32_at(b, p + 4)? as usize, u32_at(b, p + 8)? as usize, u32_at(b, p + 16)?);
+            let (time, width, frames, packed) =
+                (f32_at(b, p)?, u32_at(b, p + 4)? as usize, u32_at(b, p + 8)? as usize, u32_at(b, p + 16)?);
             p += 20;
             let mut data = vec![0f32; width * frames];
             if packed == 0 {
@@ -447,7 +454,8 @@ pub fn parse_channels(b: &[u8]) -> Result<Channels> {
                 p += 4 * width * frames;
             } else {
                 for c in 0..width {
-                    let (len, bits, step, init) = (u32_at(b, p)? as usize, u32_at(b, p + 4)?, f32_at(b, p + 8)?, f32_at(b, p + 12)?);
+                    let (len, bits, step, init) =
+                        (u32_at(b, p)? as usize, u32_at(b, p + 4)?, f32_at(b, p + 8)?, f32_at(b, p + 12)?);
                     let s = b.get(p + 16..p + 16 + len).context("PB stream past end")?;
                     p += 16 + len;
                     // FUN_102886a0: value(n) = init + sum of deltas 0..n-1 (FUN_10288db0 and siblings).
@@ -621,7 +629,10 @@ pub fn skin_positions(s: &Shape, mats: &[Mat4]) -> Vec<Vec3> {
 }
 
 pub fn skin_prep(m: &Model) -> SkinPrep {
-    SkinPrep { bind_inv: pose(&m.bones, None).iter().map(|x| x.inverse()).collect(), tangents: m.shapes.iter().map(tangents).collect() }
+    SkinPrep {
+        bind_inv: pose(&m.bones, None).iter().map(|x| x.inverse()).collect(),
+        tangents: m.shapes.iter().map(tangents).collect(),
+    }
 }
 
 /// Skins every shape; bind-pose tangents are skinned like normals (inferred).
@@ -638,7 +649,12 @@ pub fn skin_shapes_with(m: &Model, prep: &SkinPrep, frame: Option<&[f32]>) -> Ve
         .map(|(s, (t0, b0))| {
             let n = s.pos.len();
             if s.skin.is_empty() {
-                return Skinned { pos: s.pos.clone(), normal: s.normal.clone(), tangent: t0.clone(), binormal: b0.clone() };
+                return Skinned {
+                    pos: s.pos.clone(),
+                    normal: s.normal.clone(),
+                    tangent: t0.clone(),
+                    binormal: b0.clone(),
+                };
             }
             let z = || vec![Vec3::ZERO; n];
             let mut o = Skinned { pos: z(), normal: z(), tangent: z(), binormal: z() };

@@ -58,7 +58,9 @@ pub fn press_rings(n: f32, c: f32) -> Vec<(f32, u32, u32)> {
     (0..2)
         .filter_map(|k| {
             let e = t - d * k as f32;
-            (0.0..=m).contains(&e).then(|| (1.0 + 0.3 * e / m, (128.0 * (1.0 - e / m)) as u32, if k == 0 { 0 } else { 0x44 }))
+            (0.0..=m)
+                .contains(&e)
+                .then(|| (1.0 + 0.3 * e / m, (128.0 * (1.0 - e / m)) as u32, if k == 0 { 0 } else { 0x44 }))
         })
         .collect()
 }
@@ -103,7 +105,11 @@ pub fn title_screen(lobby: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &Titl
         b.push_sprite(lobby, lib, 0xba, (st.shift * sx).trunc(), 0.0, sx, sy, 0xf080_8080, 0);
         // The Update button gets the same backing: the panel one pitch up, clipped to the button.
         if st.update.is_some()
-            && let (Some(r), Some((_, uy, _, _)), Some((_, y1, _, _))) = (update_button_rect(lobby, w, h, st.shift), update_button_pos(lobby, w, h, st.shift), first_button_pos(lobby, w, h, st.shift))
+            && let (Some(r), Some((_, uy, _, _)), Some((_, y1, _, _))) = (
+                update_button_rect(lobby, w, h, st.shift),
+                update_button_pos(lobby, w, h, st.shift),
+                first_button_pos(lobby, w, h, st.shift),
+            )
         {
             b.set_clip(Some(r));
             b.push_sprite(lobby, lib, 0xba, (st.shift * sx).trunc(), uy - y1, sx, sy, 0xf080_8080, 0);
@@ -154,19 +160,43 @@ pub fn title_screen(lobby: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &Titl
             }
             if i == 0
                 && let Some((upd_sel, upd_on)) = st.update
-                && let (Some(spr), Some((ux, uy, _, _))) = (update_button(lib, "Update", upd_on), update_button_pos(lobby, w, h, st.shift))
+                && let (Some(spr), Some((ux, uy, _, _))) =
+                    (update_button(lib, "Update", upd_on), update_button_pos(lobby, w, h, st.shift))
             {
                 let d = if upd_sel { -1.0 } else { 0.0 };
                 for cell in &spr.cells {
-                    b.push_cell(lobby, cell, ux + d, uy + d, sx, sy, if upd_sel { 0x8080_5020 } else { 0x8080_8080 }, 0);
+                    b.push_cell(
+                        lobby,
+                        cell,
+                        ux + d,
+                        uy + d,
+                        sx,
+                        sy,
+                        if upd_sel { 0x8080_5020 } else { 0x8080_8080 },
+                        0,
+                    );
                 }
                 if upd_sel
                     && st.hand
                     && let Some(anc) = lobby.lib("anc     anc_s")
                 {
-                    let ox = (i16::from_le_bytes([c.head[6], c.head[7]]) + i16::from_le_bytes([m.elements[0].head[6], m.elements[0].head[7]])) as f32;
-                    let oy = (i16::from_le_bytes([c.head[8], c.head[9]]) + i16::from_le_bytes([m.elements[0].head[8], m.elements[0].head[9]])) as f32;
-                    b.push_sprite(lobby, anc, st.cursor_frame % anc.sprites.len().max(1), ux + ox, uy + oy, 1.0, 1.0, 0x8080_8080, 0);
+                    let ox = (i16::from_le_bytes([c.head[6], c.head[7]])
+                        + i16::from_le_bytes([m.elements[0].head[6], m.elements[0].head[7]]))
+                        as f32;
+                    let oy = (i16::from_le_bytes([c.head[8], c.head[9]])
+                        + i16::from_le_bytes([m.elements[0].head[8], m.elements[0].head[9]]))
+                        as f32;
+                    b.push_sprite(
+                        lobby,
+                        anc,
+                        st.cursor_frame % anc.sprites.len().max(1),
+                        ux + ox,
+                        uy + oy,
+                        1.0,
+                        1.0,
+                        0x8080_8080,
+                        0,
+                    );
                 }
             }
             if selected
@@ -174,9 +204,23 @@ pub fn title_screen(lobby: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &Titl
                 && let Some(anc) = lobby.lib("anc     anc_s")
             {
                 // Cursor at child pos + child/window header (+6, +8) (FUN_10116b10), unscaled.
-                let ox = (i16::from_le_bytes([c.head[6], c.head[7]]) + i16::from_le_bytes([m.elements[0].head[6], m.elements[0].head[7]])) as f32;
-                let oy = (i16::from_le_bytes([c.head[8], c.head[9]]) + i16::from_le_bytes([m.elements[0].head[8], m.elements[0].head[9]])) as f32;
-                b.push_sprite(lobby, anc, st.cursor_frame % anc.sprites.len().max(1), cx + ox, cy + oy, 1.0, 1.0, 0x8080_8080, 0);
+                let ox = (i16::from_le_bytes([c.head[6], c.head[7]])
+                    + i16::from_le_bytes([m.elements[0].head[6], m.elements[0].head[7]]))
+                    as f32;
+                let oy = (i16::from_le_bytes([c.head[8], c.head[9]])
+                    + i16::from_le_bytes([m.elements[0].head[8], m.elements[0].head[9]]))
+                    as f32;
+                b.push_sprite(
+                    lobby,
+                    anc,
+                    st.cursor_frame % anc.sprites.len().max(1),
+                    cx + ox,
+                    cy + oy,
+                    1.0,
+                    1.0,
+                    0x8080_8080,
+                    0,
+                );
             }
         }
     }
@@ -199,8 +243,14 @@ pub fn title_screen(lobby: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &Titl
 /// row at y 359 (x-height letters from 364), capitals at 385.
 fn keytop_glyph(c: char) -> Option<[u16; 4]> {
     let lower = "1234567890:-./@abcdefghijklmnopqrst";
-    let lx = [5, 21, 37, 53, 71, 88, 104, 121, 138, 154, 172, 183, 192, 209, 223, 244, 259, 274, 288, 303, 318, 328, 344, 359, 368, 374, 388, 394, 417, 431, 447, 462, 477, 487, 499];
-    let lw = [8, 13, 13, 15, 13, 13, 14, 14, 14, 15, 5, 4, 16, 13, 20, 13, 14, 13, 13, 13, 9, 14, 12, 4, 3, 13, 4, 20, 12, 14, 13, 13, 9, 11, 11];
+    let lx = [
+        5, 21, 37, 53, 71, 88, 104, 121, 138, 154, 172, 183, 192, 209, 223, 244, 259, 274, 288, 303, 318, 328, 344,
+        359, 368, 374, 388, 394, 417, 431, 447, 462, 477, 487, 499,
+    ];
+    let lw = [
+        8, 13, 13, 15, 13, 13, 14, 14, 14, 15, 5, 4, 16, 13, 20, 13, 14, 13, 13, 13, 9, 14, 12, 4, 3, 13, 4, 20, 12,
+        14, 13, 13, 9, 11, 11,
+    ];
     let i = lower.find(c)?;
     let (y, h) = match c {
         'b' | 'd' | 'f' | 'h' | 'k' | 'l' | 'i' | 'j' => (359, 20),
@@ -300,7 +350,9 @@ pub fn update_button_rect(lobby: &UiFile, w: f32, h: f32, shift: f32) -> Option<
 
 /// Screen rects (x, y, w, h) of the five title buttons, for mouse hits.
 pub fn title_button_rects(lobby: &UiFile, w: f32, h: f32, shift: f32) -> Vec<[f32; 4]> {
-    let (Some(lib), Some(m)) = (lobby.lib("menu    lobbywin"), lobby.menu("menu    loby2win")) else { return Vec::new() };
+    let (Some(lib), Some(m)) = (lobby.lib("menu    lobbywin"), lobby.menu("menu    loby2win")) else {
+        return Vec::new();
+    };
     let (sx, sy) = (w / 1024.0, h / 768.0);
     let mut out = Vec::new();
     for (i, &(on, _)) in TITLE_BUTTONS.iter().enumerate() {
@@ -308,7 +360,9 @@ pub fn title_button_rects(lobby: &UiFile, w: f32, h: f32, shift: f32) -> Vec<[f3
         let Some(s) = lib.sprites.get(on as usize - 1) else { continue };
         let (cx, cy) = button_pos(m, c, sx, sy, shift);
         let pts = s.cells.iter().flat_map(|c| c.corners);
-        let (x0, y0, x1, y1) = pts.fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |(a, b, c, d), p| (a.min(p[0] as f32), b.min(p[1] as f32), c.max(p[0] as f32), d.max(p[1] as f32)));
+        let (x0, y0, x1, y1) = pts.fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |(a, b, c, d), p| {
+            (a.min(p[0] as f32), b.min(p[1] as f32), c.max(p[0] as f32), d.max(p[1] as f32))
+        });
         if x0 < x1 {
             out.push([cx + x0 * sx, cy + y0 * sy, (x1 - x0) * sx, (y1 - y0) * sy]);
         }
@@ -344,8 +398,19 @@ pub fn push_help_frame(b: &mut UiBatch, lobby: &UiFile, style: &SpriteLib, w: f3
 /// `press`: the cursor row's press counter (window +0x5e, 9 down to 0): the row sinks to +1, +1 and the tail of the
 /// N = 20 rings shows (FUN_101177d0 -> FUN_10119f80).
 #[allow(clippy::too_many_arguments)]
-pub fn select_list(b: &mut UiBatch, lobby: &UiFile, w: f32, h: f32, cursor: usize, used: &[bool], hand: Option<usize>, press: Option<f32>) -> (Vec<[f32; 4]>, [f32; 4]) {
-    let (Some(lib), Some(m)) = (lobby.lib("menu    lobbywin"), lobby.menu("menu    dbnamese")) else { return (Vec::new(), [0.0; 4]) };
+pub fn select_list(
+    b: &mut UiBatch,
+    lobby: &UiFile,
+    w: f32,
+    h: f32,
+    cursor: usize,
+    used: &[bool],
+    hand: Option<usize>,
+    press: Option<f32>,
+) -> (Vec<[f32; 4]>, [f32; 4]) {
+    let (Some(lib), Some(m)) = (lobby.lib("menu    lobbywin"), lobby.menu("menu    dbnamese")) else {
+        return (Vec::new(), [0.0; 4]);
+    };
     let (ox, oy) = (w - 640.0, h - 480.0);
     b.push_sprite(lobby, lib, 78, ox, oy, 1.0, 1.0, 0x8080_8080, 0);
     let mut rects = vec![[0.0f32; 4]; 16];
@@ -378,7 +443,9 @@ pub fn select_list(b: &mut UiBatch, lobby: &UiFile, w: f32, h: f32, cursor: usiz
     }
     let area = lib.sprites.get(78).map_or([0.0; 4], |s| {
         let pts = s.cells.iter().flat_map(|c| c.corners);
-        let (x0, y0, x1, y1) = pts.fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |(a, b, c, d), p| (a.min(p[0] as f32), b.min(p[1] as f32), c.max(p[0] as f32), d.max(p[1] as f32)));
+        let (x0, y0, x1, y1) = pts.fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |(a, b, c, d), p| {
+            (a.min(p[0] as f32), b.min(p[1] as f32), c.max(p[0] as f32), d.max(p[1] as f32))
+        });
         [ox + x0, oy + y0, x1 - x0, y1 - y0]
     });
     (rects, area)
@@ -433,7 +500,17 @@ fn shape_fit_count(lib: &SpriteLib, s: &[u8], max: f32) -> usize {
 /// gauge): the rest goes on as its own name one line down, 4 in and 4 narrower; else the rest is fitted with the
 /// ellipsis (FUN_101c9d50).
 #[allow(clippy::too_many_arguments)]
-pub fn push_wrapped_name(b: &mut UiBatch, ui: &UiFile, s: &[u8], max: f32, x: f32, y: f32, tint: u32, centre: bool, split: bool) {
+pub fn push_wrapped_name(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    s: &[u8],
+    max: f32,
+    x: f32,
+    y: f32,
+    tint: u32,
+    centre: bool,
+    split: bool,
+) {
     let Some(lib) = ui.lib("font    fontshp") else { return };
     let s = &s[..s.len().min(24)];
     let fit = shape_fit_count(lib, s, max);
@@ -551,14 +628,31 @@ pub fn push_party_hand(b: &mut UiBatch, ui: &UiFile, st: &HudState, w: f32, h: f
 }
 
 /// `push_window` moved down by `dy` (region stacking).
-pub fn push_window_at(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, w: f32, h: f32, dy: f32) -> (f32, f32) {
+pub fn push_window_at(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    w: f32,
+    h: f32,
+    dy: f32,
+) -> (f32, f32) {
     push_window_alpha(b, ui, style, m, w, h, dy, 1.0)
 }
 
 /// `push_window_at` at frame alpha `a` (part +0x0c): colour ftol(a * 128) << 24 | 0x808080, the frame alpha
 /// blended (0x44) while a < 1 (FUN_101144b0 at 0x101147a8).
 #[allow(clippy::too_many_arguments)]
-pub fn push_window_alpha(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, w: f32, h: f32, dy: f32, a: f32) -> (f32, f32) {
+pub fn push_window_alpha(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    w: f32,
+    h: f32,
+    dy: f32,
+    a: f32,
+) -> (f32, f32) {
     let (x, y) = window_pos(m, w, h, 1.0, 1.0);
     let (fx, fy, fw, fh) = frame_rect(m, w, h, 1.0, 1.0);
     let (y, fy) = (y + dy, fy + dy);
@@ -579,7 +673,16 @@ pub fn alpha_tint(a: f32) -> u32 {
 
 /// A gauge (FUN_101c1190): fill sprite at (+4, +1) scaled in x by the fraction, blending off;
 /// then the frame sprite at (x, y), dimmed 0x30505050 when empty.
-pub fn push_gauge(b: &mut UiBatch, ui: &UiFile, lib: &SpriteLib, x: f32, y: f32, frame: usize, fill: usize, fraction: f32) {
+pub fn push_gauge(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    lib: &SpriteLib,
+    x: f32,
+    y: f32,
+    frame: usize,
+    fill: usize,
+    fraction: f32,
+) {
     // FUN_101cad00: outside [0, 1] counts as 0 (not clamped); the fill only when it rounds to 1 % or more. A NaN
     // (0 / 0) is taken as 0 here (retail draws a bright frame and nothing visible).
     let f = if (0.0..=1.0).contains(&fraction) { fraction } else { 0.0 };
@@ -592,13 +695,27 @@ pub fn push_gauge(b: &mut UiBatch, ui: &UiFile, lib: &SpriteLib, x: f32, y: f32,
 /// FUN_101caf00 -> FUN_101cad00: the fill to min(value, eased), a ghost (0x30808080) from there to the max, the frame
 /// dimmed 0x30505050 when the fill is empty.
 #[allow(clippy::too_many_arguments)]
-pub fn push_gauge_eased(b: &mut UiBatch, ui: &UiFile, lib: &SpriteLib, x: f32, y: f32, frame: usize, fill: usize, value: f32, anim: f32) {
+pub fn push_gauge_eased(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    lib: &SpriteLib,
+    x: f32,
+    y: f32,
+    frame: usize,
+    fill: usize,
+    value: f32,
+    anim: f32,
+) {
     let (lo, hi) = (value.min(anim).clamp(0.0, 1.0), value.max(anim).clamp(0.0, 1.0));
     if lo > 0.0 {
         b.push_sprite(ui, lib, fill, x + 4.0, y + 1.0, lo, 1.0, 0x8080_8080, 8);
     }
     if hi > lo {
-        let w = lib.sprites.get(fill).and_then(|s| s.cells.iter().flat_map(|c| c.corners.iter().map(|p| p[0])).max()).unwrap_or(0) as f32;
+        let w = lib
+            .sprites
+            .get(fill)
+            .and_then(|s| s.cells.iter().flat_map(|c| c.corners.iter().map(|p| p[0])).max())
+            .unwrap_or(0) as f32;
         b.push_sprite(ui, lib, fill, x + 4.0 + w * lo, y + 1.0, hi - lo, 1.0, 0x3080_8080, 8);
     }
     b.push_sprite(ui, lib, frame, x, y, 1.0, 1.0, if lo == 0.0 { 0x3050_5050 } else { 0x8080_8080 }, 0);
@@ -676,7 +793,15 @@ fn shape_glyphs(s: &[u8]) -> Vec<usize> {
 /// Sprite-font text left to right from x (FUN_101bfef0): each glyph advances its width - 1. Returns the end x.
 pub fn push_shape_text(b: &mut UiBatch, ui: &UiFile, s: &[u8], x: f32, y: f32, tint: u32) -> f32 {
     if b.modern.is_some() {
-        return b.push_mtext(&crate::dat::font::decode_sjis(s), Face::Bold, SHAPE_EM, x, y + SHAPE_DY, argb(tint), true);
+        return b.push_mtext(
+            &crate::dat::font::decode_sjis(s),
+            Face::Bold,
+            SHAPE_EM,
+            x,
+            y + SHAPE_DY,
+            argb(tint),
+            true,
+        );
     }
     let Some(lib) = ui.lib("font    fontshp") else { return x };
     let mut x = x;
@@ -690,29 +815,98 @@ pub fn push_shape_text(b: &mut UiBatch, ui: &UiFile, s: &[u8], x: f32, y: f32, t
 /// The Config pages' caption glyphs: the bold set at the top of "font    font" (ASCII order), cut as retail cuts
 /// them in its label sprites: (char, u, v, w, h, top within the 13-px line).
 pub(crate) const CAPTION_GLYPHS: [(char, u8, u8, u8, u8, u8); 92] = [
-    ('!', 12, 0, 6, 11, 0), ('"', 21, 0, 8, 5, 0), ('#', 30, 0, 10, 11, 0), ('$', 40, 0, 10, 11, 0),
-    ('%', 50, 0, 10, 11, 0), ('&', 60, 0, 10, 11, 0), ('\'', 73, 1, 4, 6, 1), ('(', 80, 0, 6, 12, 0),
-    (')', 93, 0, 6, 12, 0), ('*', 100, 0, 10, 11, 0), ('+', 111, 1, 8, 10, 1), (',', 2, 17, 5, 7, 4),
-    ('-', 11, 13, 8, 11, 0), ('.', 23, 13, 4, 11, 0), ('/', 30, 16, 9, 8, 3), ('0', 40, 13, 9, 12, 0),
-    ('1', 51, 13, 7, 11, 0), ('2', 61, 13, 8, 11, 0), ('3', 70, 13, 9, 11, 0), ('4', 80, 13, 9, 11, 0),
-    ('5', 91, 13, 8, 11, 0), ('6', 101, 13, 8, 11, 0), ('7', 111, 13, 8, 11, 0), ('8', 0, 26, 9, 11, 0),
-    ('9', 10, 26, 8, 11, 0), (':', 19, 28, 4, 8, 2), (';', 24, 26, 6, 11, 0), ('<', 30, 26, 8, 11, 0),
-    ('=', 39, 26, 8, 10, 0), ('>', 48, 26, 8, 11, 0), ('?', 56, 26, 9, 11, 0), ('@', 66, 26, 9, 11, 0),
-    ('A', 77, 26, 9, 11, 0), ('B', 87, 26, 9, 11, 0), ('C', 97, 26, 9, 12, 0), ('D', 107, 26, 9, 11, 0),
-    ('E', 0, 39, 9, 11, 0), ('F', 10, 39, 9, 11, 0), ('G', 20, 39, 9, 12, 0), ('H', 31, 39, 9, 11, 0),
-    ('I', 42, 39, 6, 11, 0), ('J', 48, 39, 9, 12, 0), ('K', 58, 39, 9, 11, 0), ('L', 69, 39, 9, 11, 0),
-    ('M', 80, 39, 9, 11, 0), ('N', 91, 39, 9, 11, 0), ('O', 102, 39, 9, 12, 0), ('P', 113, 39, 9, 11, 0),
-    ('Q', 0, 52, 9, 12, 0), ('R', 11, 52, 10, 11, 0), ('S', 22, 52, 9, 12, 0), ('T', 31, 52, 9, 11, 0),
-    ('U', 41, 52, 9, 12, 0), ('V', 52, 52, 10, 11, 0), ('W', 63, 52, 9, 11, 0), ('X', 76, 52, 9, 11, 0),
-    ('Y', 88, 52, 9, 11, 0), ('Z', 99, 52, 9, 11, 0), ('[', 114, 52, 7, 11, 0), ('\\', 1, 65, 9, 11, 0),
-    (']', 12, 65, 7, 11, 0), ('^', 21, 65, 8, 7, 0), ('_', 31, 65, 8, 11, 0), ('`', 42, 65, 5, 7, 0),
-    ('a', 49, 67, 8, 9, 2), ('b', 58, 65, 9, 11, 0), ('c', 68, 67, 9, 9, 2), ('d', 78, 65, 9, 11, 0),
-    ('e', 89, 67, 9, 9, 2), ('f', 99, 65, 7, 11, 0), ('g', 107, 67, 9, 12, 2), ('h', 0, 78, 9, 11, 0),
-    ('i', 10, 78, 5, 11, 0), ('j', 16, 78, 8, 14, 0), ('k', 25, 78, 9, 11, 0), ('l', 35, 78, 6, 11, 0),
-    ('m', 42, 80, 9, 9, 2), ('n', 56, 80, 9, 9, 2), ('o', 66, 80, 9, 9, 2), ('p', 76, 80, 9, 12, 2),
-    ('q', 87, 80, 9, 13, 2), ('r', 98, 80, 7, 9, 2), ('s', 106, 80, 9, 9, 2), ('t', 0, 92, 6, 10, 1),
-    ('u', 7, 93, 9, 9, 2), ('v', 17, 93, 9, 9, 2), ('w', 27, 93, 9, 9, 2), ('x', 39, 93, 9, 9, 2),
-    ('y', 50, 93, 9, 12, 2), ('z', 60, 93, 8, 9, 2), ('{', 70, 92, 8, 11, 1), ('}', 91, 92, 8, 11, 1),
+    ('!', 12, 0, 6, 11, 0),
+    ('"', 21, 0, 8, 5, 0),
+    ('#', 30, 0, 10, 11, 0),
+    ('$', 40, 0, 10, 11, 0),
+    ('%', 50, 0, 10, 11, 0),
+    ('&', 60, 0, 10, 11, 0),
+    ('\'', 73, 1, 4, 6, 1),
+    ('(', 80, 0, 6, 12, 0),
+    (')', 93, 0, 6, 12, 0),
+    ('*', 100, 0, 10, 11, 0),
+    ('+', 111, 1, 8, 10, 1),
+    (',', 2, 17, 5, 7, 4),
+    ('-', 11, 13, 8, 11, 0),
+    ('.', 23, 13, 4, 11, 0),
+    ('/', 30, 16, 9, 8, 3),
+    ('0', 40, 13, 9, 12, 0),
+    ('1', 51, 13, 7, 11, 0),
+    ('2', 61, 13, 8, 11, 0),
+    ('3', 70, 13, 9, 11, 0),
+    ('4', 80, 13, 9, 11, 0),
+    ('5', 91, 13, 8, 11, 0),
+    ('6', 101, 13, 8, 11, 0),
+    ('7', 111, 13, 8, 11, 0),
+    ('8', 0, 26, 9, 11, 0),
+    ('9', 10, 26, 8, 11, 0),
+    (':', 19, 28, 4, 8, 2),
+    (';', 24, 26, 6, 11, 0),
+    ('<', 30, 26, 8, 11, 0),
+    ('=', 39, 26, 8, 10, 0),
+    ('>', 48, 26, 8, 11, 0),
+    ('?', 56, 26, 9, 11, 0),
+    ('@', 66, 26, 9, 11, 0),
+    ('A', 77, 26, 9, 11, 0),
+    ('B', 87, 26, 9, 11, 0),
+    ('C', 97, 26, 9, 12, 0),
+    ('D', 107, 26, 9, 11, 0),
+    ('E', 0, 39, 9, 11, 0),
+    ('F', 10, 39, 9, 11, 0),
+    ('G', 20, 39, 9, 12, 0),
+    ('H', 31, 39, 9, 11, 0),
+    ('I', 42, 39, 6, 11, 0),
+    ('J', 48, 39, 9, 12, 0),
+    ('K', 58, 39, 9, 11, 0),
+    ('L', 69, 39, 9, 11, 0),
+    ('M', 80, 39, 9, 11, 0),
+    ('N', 91, 39, 9, 11, 0),
+    ('O', 102, 39, 9, 12, 0),
+    ('P', 113, 39, 9, 11, 0),
+    ('Q', 0, 52, 9, 12, 0),
+    ('R', 11, 52, 10, 11, 0),
+    ('S', 22, 52, 9, 12, 0),
+    ('T', 31, 52, 9, 11, 0),
+    ('U', 41, 52, 9, 12, 0),
+    ('V', 52, 52, 10, 11, 0),
+    ('W', 63, 52, 9, 11, 0),
+    ('X', 76, 52, 9, 11, 0),
+    ('Y', 88, 52, 9, 11, 0),
+    ('Z', 99, 52, 9, 11, 0),
+    ('[', 114, 52, 7, 11, 0),
+    ('\\', 1, 65, 9, 11, 0),
+    (']', 12, 65, 7, 11, 0),
+    ('^', 21, 65, 8, 7, 0),
+    ('_', 31, 65, 8, 11, 0),
+    ('`', 42, 65, 5, 7, 0),
+    ('a', 49, 67, 8, 9, 2),
+    ('b', 58, 65, 9, 11, 0),
+    ('c', 68, 67, 9, 9, 2),
+    ('d', 78, 65, 9, 11, 0),
+    ('e', 89, 67, 9, 9, 2),
+    ('f', 99, 65, 7, 11, 0),
+    ('g', 107, 67, 9, 12, 2),
+    ('h', 0, 78, 9, 11, 0),
+    ('i', 10, 78, 5, 11, 0),
+    ('j', 16, 78, 8, 14, 0),
+    ('k', 25, 78, 9, 11, 0),
+    ('l', 35, 78, 6, 11, 0),
+    ('m', 42, 80, 9, 9, 2),
+    ('n', 56, 80, 9, 9, 2),
+    ('o', 66, 80, 9, 9, 2),
+    ('p', 76, 80, 9, 12, 2),
+    ('q', 87, 80, 9, 13, 2),
+    ('r', 98, 80, 7, 9, 2),
+    ('s', 106, 80, 9, 9, 2),
+    ('t', 0, 92, 6, 10, 1),
+    ('u', 7, 93, 9, 9, 2),
+    ('v', 17, 93, 9, 9, 2),
+    ('w', 27, 93, 9, 9, 2),
+    ('x', 39, 93, 9, 9, 2),
+    ('y', 50, 93, 9, 12, 2),
+    ('z', 60, 93, 8, 9, 2),
+    ('{', 70, 92, 8, 11, 1),
+    ('}', 91, 92, 8, 11, 1),
 ];
 
 /// A space between caption words ("Game Settings" in windowps 465).
@@ -841,7 +1035,18 @@ pub fn sprite_tint(ui: &UiFile, lib: &str, k: usize) -> u32 {
 /// A name plate (FUN_10084b20): fontshp glyphs scaled by (sx, sy), each advancing its full width,
 /// centred on x and hanging down from y (the letters' top edge, min y 0, sits on the anchor), alpha blended
 /// (the pass sets SRCALPHA / INVSRCALPHA).
-pub fn push_name_plate(b: &mut UiBatch, ui: &UiFile, prefix: &[u8], s: &[u8], x: f32, y: f32, sx: f32, sy: f32, tint: u32, icon_tint: u32) {
+pub fn push_name_plate(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    prefix: &[u8],
+    s: &[u8],
+    x: f32,
+    y: f32,
+    sx: f32,
+    sy: f32,
+    tint: u32,
+    icon_tint: u32,
+) {
     let Some(lib) = ui.lib("font    fontshp") else { return };
     // FUN_10086210: rank bytes 0xc8..0xcd become 0xa9 and 0 / 1 / 2 stars 0xaa, the recruiter 0xac gets its star 0xad.
     enum G {
@@ -868,7 +1073,11 @@ pub fn push_name_plate(b: &mut UiBatch, ui: &UiFile, prefix: &[u8], s: &[u8], x:
         let sp = lib.sprites.get(k)?;
         let cell = sp.cells.first()?;
         let [tl, tr, bl, _] = cell.corners;
-        let off = sp.cells.iter().flat_map(|c| c.corners).fold([f32::MAX; 2], |m, p| [m[0].min(p[0] as f32), m[1].min(p[1] as f32)]);
+        let off = sp
+            .cells
+            .iter()
+            .flat_map(|c| c.corners)
+            .fold([f32::MAX; 2], |m, p| [m[0].min(p[0] as f32), m[1].min(p[1] as f32)]);
         Some((cell, [(tr[0] - tl[0] - 1) as f32, (bl[1] - tl[1] - 1) as f32], off))
     };
     // Pass 1: the width; a badge (0x8e..0xa8 after the first glyph) shrinks to 0.8, a rank star 0xaa to half.
@@ -937,13 +1146,15 @@ pub fn push_name_plate(b: &mut UiBatch, ui: &UiFile, prefix: &[u8], s: &[u8], x:
 
 /// FUN_10086900: line 2, 16 glyph units above the name: the job master stars (glyph 0xad) small, big, small.
 pub fn push_plate_stars(b: &mut UiBatch, ui: &UiFile, x: f32, y: f32, sx: f32, sy: f32) {
-    let Some(cell) = ui.lib("font    fontshp").and_then(|l| l.sprites.get(0xad - 0x20)).and_then(|s| s.cells.first()) else { return };
+    let Some(cell) = ui.lib("font    fontshp").and_then(|l| l.sprites.get(0xad - 0x20)).and_then(|s| s.cells.first())
+    else {
+        return;
+    };
     let (x, y) = (x.round(), (y - 16.0 * sy).round());
     for (l, t, r, bt) in [(-14.5, 5.0, -7.5, 12.0), (-7.5, -2.0, 7.5, 13.0), (7.5, 5.0, 14.5, 12.0)] {
         b.push_cell_span(ui, cell, x + l * sx, y + t * sy, (r - l) * sx, (bt - t) * sy, 0x8080_8080, 0x44);
     }
 }
-
 
 /// HP number colour (FUN_101f93e0): "menu    hpcol" sprite 3 below 25 %, 2 below 50, 1 below 75, else 0;
 /// its first cell's colour as an ARGB tint.
@@ -961,13 +1172,25 @@ pub fn hp_tint(ui: &UiFile, hpp: u8) -> u32 {
 pub fn hud_menu_arrows(ui: &UiFile, w: f32, h: f32, page: u8) -> Vec<[f32; 4]> {
     let Some(m) = ui.menu(menu_window(page)) else { return Vec::new() };
     let (x, y) = window_pos(m, w, h, 1.0, 1.0);
-    m.elements.iter().filter(|c| c.id == 13 || c.id == 14).map(|c| [x + c.x as f32 - 4.0, y + c.y as f32 - 4.0, c.w as f32 + 8.0, c.h as f32 + 8.0]).collect()
+    m.elements
+        .iter()
+        .filter(|c| c.id == 13 || c.id == 14)
+        .map(|c| [x + c.x as f32 - 4.0, y + c.y as f32 - 4.0, c.w as f32 + 8.0, c.h as f32 + 8.0])
+        .collect()
 }
 
 /// A 512x448-space menu window (FUN_101144b0): frame, window sprite, each child's kind-0 sprite (labels,
 /// arrows), the selected label tinted and nudged with the hand cursor. `sel` counts the windowps labels
 /// in file order; returns their rects.
-pub fn push_menu(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, name: &str, w: f32, h: f32, sel: usize) -> Vec<[f32; 4]> {
+pub fn push_menu(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    name: &str,
+    w: f32,
+    h: f32,
+    sel: usize,
+) -> Vec<[f32; 4]> {
     let Some(m) = ui.menu(name) else { return Vec::new() };
     let (x, y) = push_window(b, ui, style, m, w, h);
     let mut rects = Vec::new();
@@ -978,7 +1201,17 @@ pub fn push_menu(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, name: &str, w:
         let label = r.lib.ends_with("windowps");
         let on = label && rects.len() == sel;
         let d = if on { -1.0 } else { 0.0 };
-        b.push_sprite(ui, lib, r.index as usize, cx + d, cy + d, 1.0, 1.0, if on { 0x8080_5020 } else { 0x8080_8080 }, 0);
+        b.push_sprite(
+            ui,
+            lib,
+            r.index as usize,
+            cx + d,
+            cy + d,
+            1.0,
+            1.0,
+            if on { 0x8080_5020 } else { 0x8080_8080 },
+            0,
+        );
         if on && let Some(anc) = ui.lib("anc     anc_s") {
             b.push_sprite(ui, anc, 0, cx, cy, 1.0, 1.0, 0x8080_8080, 0);
         }
@@ -991,7 +1224,15 @@ pub fn push_menu(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, name: &str, w:
 
 /// A menu window with each child's kind-0 sprite at the child's place, child `sel` tinted 0x80805020 and
 /// nudged up-left with the anc_s hand (FUN_101144b0). Returns the window position.
-pub fn push_menu_sel(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, name: &str, w: f32, h: f32, sel: u16) -> Option<(f32, f32)> {
+pub fn push_menu_sel(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    name: &str,
+    w: f32,
+    h: f32,
+    sel: u16,
+) -> Option<(f32, f32)> {
     let m = ui.menu(name)?;
     let (x, y) = push_window(b, ui, style, m, w, h);
     for c in m.elements.iter().skip(1) {
@@ -1000,7 +1241,17 @@ pub fn push_menu_sel(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, name: &str
         let (cx, cy) = (x + c.x as f32, y + c.y as f32);
         let on = c.id == sel;
         let d = if on { -1.0 } else { 0.0 };
-        b.push_sprite(ui, lib, r.index as usize, cx + d, cy + d, 1.0, 1.0, if on { 0x8080_5020 } else { 0x8080_8080 }, 0);
+        b.push_sprite(
+            ui,
+            lib,
+            r.index as usize,
+            cx + d,
+            cy + d,
+            1.0,
+            1.0,
+            if on { 0x8080_5020 } else { 0x8080_8080 },
+            0,
+        );
         if on && let Some(anc) = ui.lib("anc     anc_s") {
             b.push_sprite(ui, anc, 0, cx, cy, 1.0, 1.0, 0x8080_8080, 0);
         }
@@ -1087,7 +1338,17 @@ pub fn hud_screen(ui: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &HudState)
         // FUN_10149900: name at (+5, +6), HP gauge at (+0x1c, +0x1d) unless the actor hides it.
         text.push(TextSlot { what: "target name", x: x + 5.0, y: y + 6.0, align: 0 });
         if let Some(hp) = hp {
-            push_gauge_eased(&mut b, ui, wps, x + 28.0, y + 29.0, GAUGE_HP.0, GAUGE_HP.1, hp, st.target_anim.unwrap_or(hp));
+            push_gauge_eased(
+                &mut b,
+                ui,
+                wps,
+                x + 28.0,
+                y + 29.0,
+                GAUGE_HP.0,
+                GAUGE_HP.1,
+                hp,
+                st.target_anim.unwrap_or(hp),
+            );
         }
         // FUN_101501a0: the plate glyph's whole fontshp sprite at (R - 24, T - 8), over the frame's corner.
         if let (Some(g), Some(lib)) = (st.target_glyph, ui.lib("font    fontshp")) {
@@ -1151,7 +1412,11 @@ pub fn hud_screen(ui: &UiFile, style: &SpriteLib, w: f32, h: f32, st: &HudState)
         for (i, c) in m.elements.iter().skip(1).enumerate() {
             let swap = st.menu_swap.iter().find(|s| s.0 == c.id).map(|s| s.1);
             let off = st.menu_off.contains(&c.id) && swap.is_none();
-            let r = if off { c.refs.iter().rfind(|r| r.kind == 0 || r.kind == 4) } else { c.refs.iter().find(|r| r.kind == 0) };
+            let r = if off {
+                c.refs.iter().rfind(|r| r.kind == 0 || r.kind == 4)
+            } else {
+                c.refs.iter().find(|r| r.kind == 0)
+            };
             let Some(r) = r else { continue };
             let (lib, index) = match swap {
                 Some(k) => (ui.lib("menu    windowps"), k),

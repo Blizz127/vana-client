@@ -82,7 +82,17 @@ fn step(id: u8, fresh: bool) -> (u32, Vec<Call>) {
                 0x14 => 0x17,
                 _ => 0x18,
             };
-            (10, vec![c(Some(t), 1, false), c(None, 2, false), c(None, 3, false), c(None, 4, true), c(None, 5, false), c(None, 10, false)])
+            (
+                10,
+                vec![
+                    c(Some(t), 1, false),
+                    c(None, 2, false),
+                    c(None, 3, false),
+                    c(None, 4, true),
+                    c(None, 5, false),
+                    c(None, 10, false),
+                ],
+            )
         }
         5 => (2, vec![c(Some(0x1c), 1, false), c(None, 2, true)]),
         0x13 => (4, vec![c(Some(9), 1, false), c(None, 2, false), c(None, 3, false), c(None, 4, false)]),
@@ -133,7 +143,12 @@ impl NetWait {
             frames.extend([Frame { text: None, p: None, reply: false, refusable: false }; 2]);
             let refusable = matches!(steps[k], 4 | 0x14 | 0x16);
             for call in calls {
-                frames.push(Frame { text: call.text, p: Some((done + call.sub) as f32 / total), reply: call.reply, refusable: refusable && call.reply });
+                frames.push(Frame {
+                    text: call.text,
+                    p: Some((done + call.sub) as f32 / total),
+                    reply: call.reply,
+                    refusable: refusable && call.reply,
+                });
             }
             // The call that returns done (sub = N).
             frames.push(Frame { text: None, p: Some((done + n) as f32 / total), reply: false, refusable: false });

@@ -17,7 +17,9 @@ pub const MENU: &str = "menu    region";
 /// The maps by mode (DAT_1037f454): menumap conquest, m_ex3_rg, m_ex4_rg, m_ex5_rg.
 const IMAGES: [u32; 4] = [5312, 53416, 53443, 53569];
 /// The icon set (DAT_10381e10): keytops3 sprites by icon index.
-const ICONS: [usize; 24] = [63, 63, 307, 113, 110, 111, 112, 432, 115, 113, 118, 117, 116, 114, 115, 180, 179, 178, 383, 385, 384, 502, 433, 0];
+const ICONS: [usize; 24] = [
+    63, 63, 307, 113, 110, 111, 112, 432, 115, 113, 118, 117, 116, 114, 115, 180, 179, 178, 383, 385, 384, 502, 433, 0,
+];
 /// Label colours (DAT_10382084).
 const COLOURS: [u32; 5] = [0x2020c0, 0x6060a0, 0x606070, 0x504010, 0x7020c0];
 /// The legend windows and the title (group 0xd) per mode.
@@ -150,7 +152,8 @@ pub fn on_influence(w: &mut World, p: &[u8]) {
             if off < 26 {
                 for k in 0..13.min(26 - off) {
                     let o = 0x24 + 12 * (off + k);
-                    d.camp_build[o..o + 12].copy_from_slice(&(0..12).map(|i| at(0x30 + 12 * k + i)).collect::<Vec<u8>>());
+                    d.camp_build[o..o + 12]
+                        .copy_from_slice(&(0..12).map(|i| at(0x30 + 12 * k + i)).collect::<Vec<u8>>());
                 }
             }
             // LAB_101e8200 (kept once set): the 26 areas' battle squares and owner icons.
@@ -241,11 +244,23 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     }
     // The modern layer draws the menu and takes its mouse.
     let Some(sel) = shown(w).filter(|_| !w.modern) else { return };
-    super::winhits::generic(w, gu, MENU, sel, 1..=4, p, moved, clicked, right, |w, id| {
-        if let Some(r) = w.region_menu.as_mut() {
-            r.sel = id;
-        }
-    }, |w, gu, k| menu_key(w, gu, k, sw, sh));
+    super::winhits::generic(
+        w,
+        gu,
+        MENU,
+        sel,
+        1..=4,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(r) = w.region_menu.as_mut() {
+                r.sel = id;
+            }
+        },
+        |w, gu, k| menu_key(w, gu, k, sw, sh),
+    );
 }
 
 /// The menu's cursor while it shows (not while its map is up).
@@ -317,7 +332,8 @@ impl View {
     fn frame(&mut self) {
         let (level, target, step) = self.fade;
         if level != target {
-            self.fade.0 = if (target - level).abs() <= step { target } else { level + step * (target - level).signum() };
+            self.fade.0 =
+                if (target - level).abs() <= step { target } else { level + step * (target - level).signum() };
         }
         if let Some(t) = self.zoom_to {
             let dz = (t - self.zoom) * 0.2;
@@ -452,7 +468,18 @@ pub fn open_map(w: &mut World, gu: &GameUi, mode: usize, sw: f32, sh: f32) -> bo
     let zoom = fit * 2.3;
     // FUN_101ee440 at the window's open: the point (W x 200 / 512, H / 2), a fade-in.
     let point = ((sw * 200.0 / 512.0).trunc(), (sh / 2.0).trunc());
-    let mut view = View { screen: (sw, sh), fit, zoom, zoom_base: zoom, zoom_to: None, view: (px - point.0, py - point.1), point, scroll_to: None, fade: (128.0, 0.0, 8.0), closing: None };
+    let mut view = View {
+        screen: (sw, sh),
+        fit,
+        zoom,
+        zoom_base: zoom,
+        zoom_to: None,
+        view: (px - point.0, py - point.1),
+        point,
+        scroll_to: None,
+        fade: (128.0, 0.0, 8.0),
+        closing: None,
+    };
     view.clamp();
     view.scroll_to_px((px, py));
     let rx = w.index.clone().map(|index| super::map::load(index, IMAGES[mode]));
@@ -533,7 +560,12 @@ impl CnqMap {
     fn under_cursor(&self, m: &[CnqMarker]) -> Option<usize> {
         let (mx, my) = self.view.under_point();
         let (mx, my) = (mx.trunc() as i32, my.trunc() as i32);
-        m.iter().position(|e| e.flags & 0x800 == 0 && (e.flags & 1 != 0 || e.flags & 0x20 == 0) && (e.px as i32 - mx).abs() < 5 && (e.py as i32 - my).abs() < 5)
+        m.iter().position(|e| {
+            e.flags & 0x800 == 0
+                && (e.flags & 1 != 0 || e.flags & 0x20 == 0)
+                && (e.px as i32 - mx).abs() < 5
+                && (e.py as i32 - my).abs() < 5
+        })
     }
 }
 
@@ -543,7 +575,15 @@ fn fill_conquer1(w: &World, id: i32, player_region: i32) -> Conquer1 {
     let d = &w.conquest;
     let r = (id - 5).max(0) as usize;
     let g = d.byte(0x18 + 4 * r);
-    let mut c = Conquer1 { precise: false, top: 0, levels: [-1.0; 3], beast: 0.0, owner: 4, beast_flag: g & 0x40 != 0, tally: d.byte(0x88) };
+    let mut c = Conquer1 {
+        precise: false,
+        top: 0,
+        levels: [-1.0; 3],
+        beast: 0.0,
+        owner: 4,
+        beast_flag: g & 0x40 != 0,
+        tally: d.byte(0x88),
+    };
     if id == player_region && conquest_zone(w, w.pos_zone, true) {
         let rank = d.byte(0x16 + 4 * r);
         let mut firsts = 0;
@@ -605,7 +645,8 @@ fn frame_logic(w: &mut World, m: &mut CnqMap, recentre: bool) {
                         }
                         let bt = w.battle.clone();
                         // sprintf of group 10 8 "This region is currently under the control of %s." with group 0x13 k.
-                        let control = |k: usize| Some(super::textcmd::printf(&bt.as_ref()?.group10(8)?, &[m.nations[k].clone()]));
+                        let control =
+                            |k: usize| Some(super::textcmd::printf(&bt.as_ref()?.group10(8)?, &[m.nations[k].clone()]));
                         help = match e.icon {
                             c @ 4..=6 => control(c as usize - 4),
                             2 => control(3),
@@ -757,7 +798,9 @@ pub fn update(w: &mut World, input: &mut super::input::Input, ticks: f32) -> boo
     use super::input::mode::{HELD, PRESS};
     let Some(mut m) = w.cnq.take() else { return true };
     if let Some(deadline) = m.view.closing {
-        if (m.view.fade.0 == m.view.fade.1 && m.view.scroll_to.is_none() && m.view.zoom_to.is_none()) || Instant::now() >= deadline {
+        if (m.view.fade.0 == m.view.fade.1 && m.view.scroll_to.is_none() && m.view.zoom_to.is_none())
+            || Instant::now() >= deadline
+        {
             close_done(w);
             return false;
         }
@@ -769,7 +812,13 @@ pub fn update(w: &mut World, input: &mut super::input::Input, ticks: f32) -> boo
             if input.test(0x7d, PRESS) || (input.test(0xa4, HELD) && input.test(0xa5, HELD)) {
                 m.view.zoom_to = Some(m.view.zoom_base);
             } else {
-                let keys: f32 = -(if input.test(0xa4, HELD) { 1.0 } else if input.test(0xa5, HELD) { -1.0 } else { 0.0 });
+                let keys: f32 = -(if input.test(0xa4, HELD) {
+                    1.0
+                } else if input.test(0xa5, HELD) {
+                    -1.0
+                } else {
+                    0.0
+                });
                 let stick = input.axis(0x7c);
                 let a = if stick.abs() > keys.abs() { stick } else { keys };
                 if a != 0.0 {
@@ -780,7 +829,8 @@ pub fn update(w: &mut World, input: &mut super::input::Input, ticks: f32) -> boo
         // Cursor mode (flag 0x100) reads only the cursor axes, not the scroll ones (0x79 / 0x7a).
         let dead = |v: f32| if (v * fast).abs() < 2.0 { 0.0 } else { v };
         let (sw, sh) = m.view.screen;
-        let v = (dead(input.axis(0x9d) * 15.0) * fast * ticks * 0.5, dead(input.axis(0x9e) * 15.0) * fast * ticks * 0.5);
+        let v =
+            (dead(input.axis(0x9d) * 15.0) * fast * ticks * 0.5, dead(input.axis(0x9e) * 15.0) * fast * ticks * 0.5);
         let (bx, by) = ([sw / 512.0 * 40.0, sw - sw / 512.0 * 60.0], [sh / 448.0 * 65.0, sh - sh / 448.0 * 180.0]);
         let want = (m.view.point.0 + v.0, m.view.point.1 + v.1);
         let moved = (want.0.clamp(bx[0], bx[1]), want.1.clamp(by[0], by[1]));
@@ -819,7 +869,8 @@ pub fn key(w: &mut World, key: egui::Key) {
         w.sounds.push(Ui::Cancel as u32);
         m.view.closing = Some(Instant::now() + Duration::from_secs(3));
         m.view.fade = (m.view.fade.0, 255.0, 16.0);
-        (m.conquer1, m.conq6sta, m.legend, m.beseige1, m.beseige2, m.coloresu, m.colorank) = (None, false, false, false, None, None, false);
+        (m.conquer1, m.conq6sta, m.legend, m.beseige1, m.beseige2, m.coloresu, m.colorank) =
+            (None, false, false, false, None, None, false);
     }
 }
 
@@ -867,7 +918,14 @@ fn gauge(gu: &mut GameUi, x: f32, y: f32, f: f32, ghost: bool) {
 
 /// An info window at its layout place, or at x 16 while the cursor is on the right half; `size` overrides its frame
 /// (FUN_1011a5a0). Returns its top-left and width.
-fn info(gu: &mut GameUi, name: &str, sw: f32, sh: f32, left: bool, size: Option<(f32, f32)>) -> Option<(f32, f32, f32)> {
+fn info(
+    gu: &mut GameUi,
+    name: &str,
+    sw: f32,
+    sh: f32,
+    left: bool,
+    size: Option<(f32, f32)>,
+) -> Option<(f32, f32, f32)> {
     let [_, ly, lw, lh] = gu.window_rect(name, sw, sh)?;
     let (w, h) = size.unwrap_or((lw, lh));
     // Right: 496 - width from the right edge (as the layout's 384 for 112 wide); in by the modern frame's margin.
@@ -902,7 +960,14 @@ pub fn draw_map(gu: &mut GameUi, w: &World) {
     let z = m.view.zoom;
     if let Some(t) = &m.texture {
         let a = if level == 0.0 { 160.0 } else { (255.0 - level).min(160.0) } / 128.0;
-        gu.image_rect(t, -m.view.view.0 * z + 0.5, -m.view.view.1 * z + 0.5, 512.0 * z, 512.0 * z, [0.5, 0.5, 0.5, a.min(1.0)]);
+        gu.image_rect(
+            t,
+            -m.view.view.0 * z + 0.5,
+            -m.view.view.1 * z + 0.5,
+            512.0 * z,
+            512.0 * z,
+            [0.5, 0.5, 0.5, a.min(1.0)],
+        );
     }
     if level == 0.0 {
         let mode = m.mode;
@@ -933,7 +998,8 @@ fn label(gu: &GameUi, mode: usize, e: &CnqMarker) -> Option<String> {
     if e.name < 0 {
         return None;
     }
-    let region = if mode == 3 { e.par == -1 && (e.id == 1 && e.name == 49 || e.id == 9) } else { matches!(e.par, -1 | -2) };
+    let region =
+        if mode == 3 { e.par == -1 && (e.id == 1 && e.name == 49 || e.id == 9) } else { matches!(e.par, -1 | -2) };
     gu.item_msg(if region { 0x13 } else { 0x15 }, e.name as usize)
 }
 
@@ -988,7 +1054,10 @@ fn draw_marker(gu: &mut GameUi, v: &View, e: &CnqMarker, name: Option<&str>) {
 
 /// sprintf of a group 10 line with one number (e.g. 0x56 "%d day.").
 fn line10(w: &World, id: usize, n: i32) -> String {
-    w.battle.as_ref().and_then(|b| b.group10(id)).map_or(String::new(), |f| super::textcmd::printf(&f, &[n.to_string()]))
+    w.battle
+        .as_ref()
+        .and_then(|b| b.group10(id))
+        .map_or(String::new(), |f| super::textcmd::printf(&f, &[n.to_string()]))
 }
 
 /// The mode's info windows (sections R5): conquer1 / conq6sta / conq3pts, beseige1 / beseige2 / imperial, coloresu /
@@ -1015,7 +1084,13 @@ fn draw_windows(gu: &mut GameUi, w: &World, m: &CnqMap, sw: f32, sh: f32) {
                 for k in 0..if c.precise { 4 } else { 3 } {
                     // FUN_101e9010: the label (the nation ahead pulsing), then a gauge or the level mark.
                     let on = c.precise && k == c.top as usize;
-                    gu.sprite("menu    framesus", LABELS[k], rx, ry, if on { (m.pulse.0 as u32) << 24 | 0x80_8080 } else { WHITE });
+                    gu.sprite(
+                        "menu    framesus",
+                        LABELS[k],
+                        rx,
+                        ry,
+                        if on { (m.pulse.0 as u32) << 24 | 0x80_8080 } else { WHITE },
+                    );
                     let (gx, gy) = (rx + 20.0, ry + 13.0);
                     if c.precise {
                         gauge(gu, gx, gy, if k < 3 { c.levels[k] } else { c.beast }, !on);
@@ -1057,7 +1132,14 @@ fn draw_windows(gu: &mut GameUi, w: &World, m: &CnqMap, sw: f32, sh: f32) {
         // FUN_101e99c0: Al Zahbi's orders, then each army's level and orders.
         let ov = d.word(0x9c);
         gu.sprite("menu    keytops3", 370 + (ov >> 2 & 3) as usize, x + 8.0, y + 0x18 as f32, WHITE);
-        for (k, (dy, lv, ord)) in [(0x44, ov >> 4 & 0xf, ov >> 16 & 7), (0x72, ov >> 8 & 0xf, ov >> 19 & 7), (0xa0, ov >> 12 & 0xf, ov >> 22 & 7)].into_iter().enumerate() {
+        for (k, (dy, lv, ord)) in [
+            (0x44, ov >> 4 & 0xf, ov >> 16 & 7),
+            (0x72, ov >> 8 & 0xf, ov >> 19 & 7),
+            (0xa0, ov >> 12 & 0xf, ov >> 22 & 7),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             army(gu, x + 8.0, y + dy as f32, k, lv, ord);
         }
     }
@@ -1079,7 +1161,8 @@ fn draw_windows(gu: &mut GameUi, w: &World, m: &CnqMap, sw: f32, sh: f32) {
         && let Some((x, y, _)) = info(gu, COLORESU, sw, sh, left, None)
     {
         // FUN_101ea6e0 with FUN_101e6b80's area: the rate, its gauge (framesus 148), the bivouacs.
-        let area = [(2, 0), (3, 1), (4, 2), (5, 4), (6, 3), (7, 5), (8, 6), (9, 7)].iter().find(|p| p.0 == id).map(|p| p.1);
+        let area =
+            [(2, 0), (3, 1), (4, 2), (5, 4), (6, 3), (7, 5), (8, 6), (9, 7)].iter().find(|p| p.0 == id).map(|p| p.1);
         let (rate, biv, max) = area.map_or((0, 0, 0), |a| d.areas[a]);
         number(gu, &format!("{rate:3}%"), x + 100.0, y + 5.0);
         gu.sprite_scaled("menu    framesus", 148, x + 0x1f as f32, y + 0x13 as f32, rate as f32 * 0.01, 1.0, WHITE);
@@ -1176,7 +1259,8 @@ pub fn info_view(w: &World) -> Option<InfoView> {
         (k, s >> 3 & 0xff, (s >> 11 & 0xf, s & 7), s >> 15 & 0xf, s >> 19 & 0xf)
     });
     let colony = m.coloresu.map(|id| {
-        let area = [(2, 0), (3, 1), (4, 2), (5, 4), (6, 3), (7, 5), (8, 6), (9, 7)].iter().find(|p| p.0 == id).map(|p| p.1);
+        let area =
+            [(2, 0), (3, 1), (4, 2), (5, 4), (6, 3), (7, 5), (8, 6), (9, 7)].iter().find(|p| p.0 == id).map(|p| p.1);
         area.map_or((0, 0, 0), |a| d.areas[a])
     });
     let shown = match m.mode {
@@ -1191,7 +1275,17 @@ pub fn info_view(w: &World) -> Option<InfoView> {
         2 => d.campaign.as_ref().map_or(0, |c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])),
         _ => d.bayld,
     });
-    Some(InfoView { mode: m.mode, left: m.left, region, ranking, besieged, stronghold, colony, coalitions: m.colorank.then_some(d.ranks), legend })
+    Some(InfoView {
+        mode: m.mode,
+        left: m.left,
+        region,
+        ranking,
+        besieged,
+        stronghold,
+        colony,
+        coalitions: m.colorank.then_some(d.ranks),
+        legend,
+    })
 }
 
 /// FUN_101e97c0: the army (keytops3 367 + k), "Lv" (0xc 0x59) and its level, its orders (keytops3 377 + orders).

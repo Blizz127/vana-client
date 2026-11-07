@@ -39,7 +39,11 @@ pub fn devices() -> Vec<(String, String)> {
             Some((id.to_string(), name.to_string(), d.supports_output()))
         })
         .collect();
-    let mics: Vec<(String, String)> = all.iter().filter(|(id, _, out)| !out && !id.ends_with(".monitor") && !id.ends_with(":input_default")).map(|(id, n, _)| (id.clone(), n.clone())).collect();
+    let mics: Vec<(String, String)> = all
+        .iter()
+        .filter(|(id, _, out)| !out && !id.ends_with(".monitor") && !id.ends_with(":input_default"))
+        .map(|(id, n, _)| (id.clone(), n.clone()))
+        .collect();
     let mut list = if mics.is_empty() { all.into_iter().map(|(id, n, _)| (id, n)).collect() } else { mics };
     // The short names, unless two would read the same.
     let short: Vec<String> = list.iter().map(|d| tidy(&d.1)).collect();
@@ -116,7 +120,10 @@ where
     Ok(device.build_input_stream(
         config,
         move |data: &[T], _: &cpal::InputCallbackInfo| {
-            let mono: Vec<f32> = data.chunks_exact(ch).map(|f| f.iter().map(|s| s.to_sample::<f32>()).sum::<f32>() / ch as f32).collect();
+            let mono: Vec<f32> = data
+                .chunks_exact(ch)
+                .map(|f| f.iter().map(|s| s.to_sample::<f32>()).sum::<f32>() / ch as f32)
+                .collect();
             let _ = tx.try_send(mono);
         },
         |e| log::warn!("voice: microphone: {e}"),
@@ -125,10 +132,20 @@ where
 }
 
 /// A tone (one second on, one off) or a WAV file looped, at real time.
-fn stand_in(shared: &Arc<Shared>, stop: &Arc<AtomicBool>, src: &std::path::Path, tx: SyncSender<Vec<f32>>) -> Result<(u32, String)> {
-    let tone = src.to_str().and_then(|s| s.strip_prefix("tone")).map(|hz| hz.strip_prefix(':').and_then(|h| h.parse::<f32>().ok()).unwrap_or(440.0));
+fn stand_in(
+    shared: &Arc<Shared>,
+    stop: &Arc<AtomicBool>,
+    src: &std::path::Path,
+    tx: SyncSender<Vec<f32>>,
+) -> Result<(u32, String)> {
+    let tone = src
+        .to_str()
+        .and_then(|s| s.strip_prefix("tone"))
+        .map(|hz| hz.strip_prefix(':').and_then(|h| h.parse::<f32>().ok()).unwrap_or(440.0));
     let (samples, rate, name) = if let Some(hz) = tone {
-        let s = (0..RATE * 2).map(|i| if i < RATE { (i as f32 * hz * std::f32::consts::TAU / RATE as f32).sin() * 0.25 } else { 0.0 }).collect();
+        let s = (0..RATE * 2)
+            .map(|i| if i < RATE { (i as f32 * hz * std::f32::consts::TAU / RATE as f32).sin() * 0.25 } else { 0.0 })
+            .collect();
         (s, RATE, format!("test tone {hz} Hz"))
     } else {
         let (s, rate) = super::wav::read(src)?;
@@ -147,7 +164,9 @@ fn stand_in(shared: &Arc<Shared>, stop: &Arc<AtomicBool>, src: &std::path::Path,
             if tx.send(chunk).is_err() {
                 break;
             }
-            if let Some(d) = (start + Duration::from_micros(sent * 1_000_000 / rate as u64)).checked_duration_since(std::time::Instant::now()) {
+            if let Some(d) = (start + Duration::from_micros(sent * 1_000_000 / rate as u64))
+                .checked_duration_since(std::time::Instant::now())
+            {
                 std::thread::sleep(d);
             }
         }
@@ -204,7 +223,14 @@ const FALL: f32 = 0.68;
 
 impl Denoise {
     fn new() -> Self {
-        Self { state: nnnoiseless::DenoiseState::new(), buf: [0.0; FRAME], out: [0.0; FRAME], started: false, gain: FLOOR, hold: 0 }
+        Self {
+            state: nnnoiseless::DenoiseState::new(),
+            buf: [0.0; FRAME],
+            out: [0.0; FRAME],
+            started: false,
+            gain: FLOOR,
+            hold: 0,
+        }
     }
 
     fn frame(&mut self, f: &mut [f32]) {
@@ -237,7 +263,14 @@ pub struct Gate {
 
 impl Gate {
     /// One frame in: the frames to send now (the pre-roll first when the gate opens).
-    pub fn frame(&mut self, f: &[f32], talk: Talk, held: bool, threshold_db: f32, muted: bool) -> (f32, Vec<(u32, Vec<i16>)>) {
+    pub fn frame(
+        &mut self,
+        f: &[f32],
+        talk: Talk,
+        held: bool,
+        threshold_db: f32,
+        muted: bool,
+    ) -> (f32, Vec<(u32, Vec<i16>)>) {
         let rms = (f.iter().map(|x| x * x).sum::<f32>() / f.len().max(1) as f32).sqrt();
         let db = 20.0 * (rms + 1e-9).log10();
         let open = !muted
@@ -320,7 +353,10 @@ mod tests {
     #[test]
     fn device_names_tidied() {
         assert_eq!(tidy("Anker PowerConf C200 Analog Stereo via USB"), "Anker PowerConf C200 Analog Stereo");
-        assert_eq!(tidy("Ryzen HD Audio Controller Stereo Microphone [Microphone] via PCI"), "Ryzen HD Audio Controller Stereo Microphone");
+        assert_eq!(
+            tidy("Ryzen HD Audio Controller Stereo Microphone [Microphone] via PCI"),
+            "Ryzen HD Audio Controller Stereo Microphone"
+        );
         assert_eq!(tidy("WH-1000XM6"), "WH-1000XM6");
     }
 

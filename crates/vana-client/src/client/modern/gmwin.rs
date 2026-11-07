@@ -90,9 +90,13 @@ pub fn events(w: &mut World, events: &[egui::Event]) -> bool {
                 g.find_typing = false;
             }
             // A held Enter repeats: only its press runs (and arms a risky command's second press).
-            egui::Event::Key { key: egui::Key::Enter, pressed: true, repeat: false, .. } if g.find_typing => g.find_typing = false,
+            egui::Event::Key { key: egui::Key::Enter, pressed: true, repeat: false, .. } if g.find_typing => {
+                g.find_typing = false
+            }
             egui::Event::Key { key: egui::Key::Enter, pressed: true, repeat: false, .. } if sel.is_some() => run = true,
-            egui::Event::Key { key: k @ (egui::Key::ArrowUp | egui::Key::ArrowDown), pressed: true, .. } if g.typing.is_none() => {
+            egui::Event::Key { key: k @ (egui::Key::ArrowUp | egui::Key::ArrowDown), pressed: true, .. }
+                if g.typing.is_none() =>
+            {
                 let names: Vec<String> = g.shown().iter().map(|c| c.name.clone()).collect();
                 if !names.is_empty() {
                     let at = sel.as_ref().and_then(|s| names.iter().position(|n| n == s));
@@ -101,11 +105,14 @@ pub fn events(w: &mut World, events: &[egui::Event]) -> bool {
                         (Some(i), true) => (i + 1).min(names.len() - 1),
                         (Some(i), false) => i.saturating_sub(1),
                     };
-                    (g.selected, g.page, g.armed, g.find_typing) = (Some(names[next].clone()), next / gm::PER_PAGE, false, false);
+                    (g.selected, g.page, g.armed, g.find_typing) =
+                        (Some(names[next].clone()), next / gm::PER_PAGE, false, false);
                     w.sounds.push(Se::Cursor as u32);
                 }
             }
-            egui::Event::Key { key: k @ (egui::Key::ArrowLeft | egui::Key::ArrowRight), pressed: true, .. } if g.typing.is_none() && !g.find_typing => {
+            egui::Event::Key { key: k @ (egui::Key::ArrowLeft | egui::Key::ArrowRight), pressed: true, .. }
+                if g.typing.is_none() && !g.find_typing =>
+            {
                 let pages = g.shown().len().div_ceil(gm::PER_PAGE).max(1);
                 let page = g.page.min(pages - 1);
                 g.page = if *k == egui::Key::ArrowRight { (page + 1).min(pages - 1) } else { page.saturating_sub(1) };
@@ -134,14 +141,20 @@ fn text(ui: &Ui, at: egui::Pos2, align: Align2, s: &str, size: f32, c: Color32) 
 
 fn heading(ui: &mut Ui, m: &super::Modern, s: &str) {
     ui.add_space(4.0);
-    ui.label(egui::RichText::new(s).size(m.theme.small).family(egui::FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(s)
+            .size(m.theme.small)
+            .family(egui::FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
 }
 
 /// The groups: All, then gm::GROUPS with their counts (those with none are left out).
 fn rail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
     ui.vertical(|ui| {
         ui.set_width(NAV_W);
-        let count = |k: Option<usize>| g.commands.iter().filter(|c| k.is_none_or(|k| gm::GROUPS[k].0 == c.group)).count();
+        let count =
+            |k: Option<usize>| g.commands.iter().filter(|c| k.is_none_or(|k| gm::GROUPS[k].0 == c.group)).count();
         for k in std::iter::once(None).chain((0..gm::GROUPS.len()).map(Some)) {
             let n = count(k);
             if n == 0 {
@@ -149,19 +162,40 @@ fn rail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
             }
             let (r, resp) = ui.allocate_exact_size(vec2(NAV_W, 28.0), Sense::click());
             let on = g.group == k;
-            let face = if on { "controls/list_row_selected" } else if resp.hovered() { "controls/list_row_hover" } else { "controls/list_row_normal" };
+            let face = if on {
+                "controls/list_row_selected"
+            } else if resp.hovered() {
+                "controls/list_row_hover"
+            } else {
+                "controls/list_row_normal"
+            };
             super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
             let ink = if on { m.theme.color("gold") } else { m.theme.color("text") };
             let label = k.map_or("All commands", |k| gm::GROUPS[k].1);
             text(ui, pos2(r.min.x + 12.0, r.center().y), Align2::LEFT_CENTER, label, m.theme.ui, ink);
-            text(ui, pos2(r.max.x - 10.0, r.center().y), Align2::RIGHT_CENTER, &n.to_string(), m.theme.small, m.theme.color("muted"));
+            text(
+                ui,
+                pos2(r.max.x - 10.0, r.center().y),
+                Align2::RIGHT_CENTER,
+                &n.to_string(),
+                m.theme.small,
+                m.theme.color("muted"),
+            );
             if resp.clicked() {
                 *click = Some(Click::Group(k));
             }
             ui.add_space(2.0);
         }
         ui.add_space(10.0);
-        ui.label(egui::RichText::new(format!("Vana Client only: not in the retail client. Shown to GMs only; level {} sees {} commands.", g.level, g.commands.len())).size(m.theme.small).color(m.theme.color("muted")));
+        ui.label(
+            egui::RichText::new(format!(
+                "Vana Client only: not in the retail client. Shown to GMs only; level {} sees {} commands.",
+                g.level,
+                g.commands.len()
+            ))
+            .size(m.theme.small)
+            .color(m.theme.color("muted")),
+        );
     });
 }
 
@@ -169,7 +203,15 @@ fn rail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
 fn list(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
     ui.vertical(|ui| {
         ui.set_width(LIST_W);
-        let r = kit::field(ui, m, if g.find.is_empty() && !g.find_typing { "Search commands" } else { &g.find }, g.find_typing.then(|| g.find.chars().count()), LIST_W, FontId::proportional(m.theme.small), Some("icons/find"));
+        let r = kit::field(
+            ui,
+            m,
+            if g.find.is_empty() && !g.find_typing { "Search commands" } else { &g.find },
+            g.find_typing.then(|| g.find.chars().count()),
+            LIST_W,
+            FontId::proportional(m.theme.small),
+            Some("icons/find"),
+        );
         if ui.interact(r, ui.scope_id().with("gm find"), Sense::click()).clicked() {
             *click = Some(Click::Focus(None));
         }
@@ -178,20 +220,58 @@ fn list(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
         let pages = shown.len().div_ceil(gm::PER_PAGE).max(1);
         let page = g.page.min(pages - 1);
         if shown.is_empty() {
-            ui.label(egui::RichText::new("No commands match. Try another word, or All commands.").size(m.theme.small).color(m.theme.color("muted")));
+            ui.label(
+                egui::RichText::new("No commands match. Try another word, or All commands.")
+                    .size(m.theme.small)
+                    .color(m.theme.color("muted")),
+            );
         }
         for c in shown.iter().skip(page * gm::PER_PAGE).take(gm::PER_PAGE) {
             let (r, resp) = ui.allocate_exact_size(vec2(LIST_W, ROW_H), Sense::click());
             let on = g.selected.as_deref() == Some(c.name.as_str());
-            let face = if on { "controls/list_row_selected" } else if resp.hovered() { "controls/list_row_hover" } else { "controls/list_row_normal" };
+            let face = if on {
+                "controls/list_row_selected"
+            } else if resp.hovered() {
+                "controls/list_row_hover"
+            } else {
+                "controls/list_row_normal"
+            };
             super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
-            ui.painter().text(pos2(r.min.x + 12.0, r.min.y + 14.0), Align2::LEFT_CENTER, format!("!{}", c.name), FontId::monospace(m.theme.small), if on { m.theme.color("gold") } else { m.theme.color("text") });
+            ui.painter().text(
+                pos2(r.min.x + 12.0, r.min.y + 14.0),
+                Align2::LEFT_CENTER,
+                format!("!{}", c.name),
+                FontId::monospace(m.theme.small),
+                if on { m.theme.color("gold") } else { m.theme.color("text") },
+            );
             // Its fields, as a summary (the scripts' descriptions are the server's to send).
-            let desc = if c.fields.is_empty() { "No fields".to_string() } else { c.fields.iter().map(|f| if f.optional { format!("[{}]", f.label) } else { f.label.clone() }).collect::<Vec<_>>().join(", ") };
+            let desc = if c.fields.is_empty() {
+                "No fields".to_string()
+            } else {
+                c.fields
+                    .iter()
+                    .map(|f| if f.optional { format!("[{}]", f.label) } else { f.label.clone() })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
             let desc = kit::elide(ui, &desc, &FontId::proportional(m.theme.small), LIST_W - 110.0);
-            text(ui, pos2(r.min.x + 12.0, r.max.y - 12.0), Align2::LEFT_CENTER, &desc, m.theme.small, m.theme.color("muted"));
+            text(
+                ui,
+                pos2(r.min.x + 12.0, r.max.y - 12.0),
+                Align2::LEFT_CENTER,
+                &desc,
+                m.theme.small,
+                m.theme.color("muted"),
+            );
             let tag = if c.danger { format!("Danger · GM {}", c.level) } else { format!("GM {}", c.level) };
-            text(ui, pos2(r.max.x - 10.0, r.min.y + 14.0), Align2::RIGHT_CENTER, &tag, m.theme.small, if c.danger { m.theme.color("hp") } else { m.theme.color("bronze") });
+            text(
+                ui,
+                pos2(r.max.x - 10.0, r.min.y + 14.0),
+                Align2::RIGHT_CENTER,
+                &tag,
+                m.theme.small,
+                if c.danger { m.theme.color("hp") } else { m.theme.color("bronze") },
+            );
             if resp.clicked() {
                 *click = Some(Click::Select(c.name.clone()));
             }
@@ -203,7 +283,11 @@ fn list(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, click: &mut Option<Click>) {
             if kit::clicked(&kit::button(ui, m, "Previous", 90.0, prev), prev) {
                 *click = Some(Click::Page(page - 1));
             }
-            ui.label(egui::RichText::new(format!("Page {} of {pages}", page + 1)).size(m.theme.small).color(m.theme.color("muted")));
+            ui.label(
+                egui::RichText::new(format!("Page {} of {pages}", page + 1))
+                    .size(m.theme.small)
+                    .color(m.theme.color("muted")),
+            );
             let next = Btn { off: page + 1 >= pages, ..Default::default() };
             if kit::clicked(&kit::button(ui, m, "Next", 90.0, next), next) {
                 *click = Some(Click::Page(page + 1));
@@ -218,25 +302,41 @@ fn detail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, target: Option<u32>, click
         ui.set_width(DETAIL_W);
         let Some(c) = g.selected() else {
             heading(ui, m, "Details");
-            ui.label(egui::RichText::new("Pick a command to see its fields.").size(m.theme.small).color(m.theme.color("muted")));
+            ui.label(
+                egui::RichText::new("Pick a command to see its fields.")
+                    .size(m.theme.small)
+                    .color(m.theme.color("muted")),
+            );
             replies(ui, m, g);
             return;
         };
         heading(ui, m, &format!("!{} · needs GM {}", c.name, c.level));
         if c.danger {
-            ui.label(egui::RichText::new("This command can delete data, disrupt the server or affect other players. Run asks twice.").size(m.theme.small).color(m.theme.color("hp")));
+            ui.label(
+                egui::RichText::new(
+                    "This command can delete data, disrupt the server or affect other players. Run asks twice.",
+                )
+                .size(m.theme.small)
+                .color(m.theme.color("hp")),
+            );
         }
         let values = g.values_of(c);
         let result = c.line(&values);
         if c.fields.is_empty() {
-            ui.label(egui::RichText::new("No fields: runs as it is.").size(m.theme.small).color(m.theme.color("muted")));
+            ui.label(
+                egui::RichText::new("No fields: runs as it is.").size(m.theme.small).color(m.theme.color("muted")),
+            );
         }
         let mut coords = false;
         let augs = c.fields.iter().filter(|f| f.pick == Pick::Augment).count();
         // A long form (!additem's augments) scrolls rather than running off the screen.
         kit::scroll(ui, "gm fields", 430.0, |ui| {
             for (i, f) in c.fields.iter().enumerate() {
-                if f.pick == Pick::Augment && !g.augments && !result.as_ref().err().is_some_and(|e| e.0 == i) && values[i].is_empty() {
+                if f.pick == Pick::Augment
+                    && !g.augments
+                    && !result.as_ref().err().is_some_and(|e| e.0 == i)
+                    && values[i].is_empty()
+                {
                     continue;
                 }
                 field(ui, m, g, c, f, i, &values[i], result.as_ref().err().is_some_and(|e| e.0 == i), target, click);
@@ -261,7 +361,12 @@ fn detail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, target: Option<u32>, click
             Ok(l) => format!("!{l}"),
             Err((_, e)) => e.clone(),
         };
-        ui.label(egui::RichText::new(line).size(m.theme.small).family(egui::FontFamily::Monospace).color(if result.is_ok() { m.theme.color("gold") } else { m.theme.color("hp") }));
+        ui.label(
+            egui::RichText::new(line)
+                .size(m.theme.small)
+                .family(egui::FontFamily::Monospace)
+                .color(if result.is_ok() { m.theme.color("gold") } else { m.theme.color("hp") }),
+        );
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             let run = Btn { off: result.is_err(), lit: g.armed, ..Default::default() };
@@ -278,16 +383,39 @@ fn detail(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, target: Option<u32>, click
 }
 
 #[allow(clippy::too_many_arguments)]
-fn field(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, c: &Command, f: &gm::Field, i: usize, value: &str, bad: bool, target: Option<u32>, click: &mut Option<Click>) {
+fn field(
+    ui: &mut Ui,
+    m: &super::Modern,
+    g: &gm::Gm,
+    c: &Command,
+    f: &gm::Field,
+    i: usize,
+    value: &str,
+    bad: bool,
+    target: Option<u32>,
+    click: &mut Option<Click>,
+) {
     let typing = g.typing == Some(i);
     let list = g.lists.get(&f.pick);
     let found = if list.is_some() { g.lookup(f.pick, value, SUGGEST) } else { gm::Found::default() };
     let label = if f.optional { format!("{} (optional)", f.label) } else { f.label.clone() };
-    ui.label(egui::RichText::new(label).size(m.theme.small).color(if bad { m.theme.color("hp") } else { m.theme.color("text") }));
+    ui.label(egui::RichText::new(label).size(m.theme.small).color(if bad {
+        m.theme.color("hp")
+    } else {
+        m.theme.color("text")
+    }));
     ui.horizontal(|ui| {
         let extra = matches!(f.pick, Pick::Entity) && target.is_some();
         let width = if extra { DETAIL_W - 100.0 } else { DETAIL_W };
-        let r = kit::field(ui, m, value, typing.then(|| value.chars().count()), width, FontId::proportional(m.theme.small), None);
+        let r = kit::field(
+            ui,
+            m,
+            value,
+            typing.then(|| value.chars().count()),
+            width,
+            FontId::proportional(m.theme.small),
+            None,
+        );
         if ui.interact(r, ui.scope_id().with(("gm field", &c.name, i)), Sense::click()).clicked() {
             *click = Some(Click::Focus(Some(i)));
         }
@@ -306,7 +434,11 @@ fn field(ui: &mut Ui, m: &super::Modern, g: &gm::Gm, c: &Command, f: &gm::Field,
         None => f.pick.hint().to_string(),
     };
     if !hint.is_empty() {
-        ui.label(egui::RichText::new(hint).size(m.theme.small * 0.9).color(m.theme.color(if known.is_some() { "gold" } else { "muted" })));
+        ui.label(egui::RichText::new(hint).size(m.theme.small * 0.9).color(m.theme.color(if known.is_some() {
+            "gold"
+        } else {
+            "muted"
+        })));
     }
     if let (true, Some(_)) = (typing, list) {
         let hits = &found.hits;
@@ -338,14 +470,25 @@ fn replies(ui: &mut Ui, m: &super::Modern, g: &gm::Gm) {
     heading(ui, m, "Server replies");
     kit::scroll(ui, "gm replies", 220.0, |ui| {
         for (_, r) in g.replies.iter().rev() {
-            ui.label(egui::RichText::new(format!("!{}", r.line)).size(m.theme.small).family(egui::FontFamily::Monospace).color(m.theme.color("gold")));
+            ui.label(
+                egui::RichText::new(format!("!{}", r.line))
+                    .size(m.theme.small)
+                    .family(egui::FontFamily::Monospace)
+                    .color(m.theme.color("gold")),
+            );
             let ok = r.result == Some(0);
-            ui.label(egui::RichText::new(r.status()).size(m.theme.small).color(if ok || r.result.is_none() { m.theme.color("muted") } else { m.theme.color("hp") }));
+            ui.label(egui::RichText::new(r.status()).size(m.theme.small).color(if ok || r.result.is_none() {
+                m.theme.color("muted")
+            } else {
+                m.theme.color("hp")
+            }));
             for l in &r.output {
                 ui.label(egui::RichText::new(l).size(m.theme.small).color(m.theme.color("text")));
             }
             if r.cut {
-                ui.label(egui::RichText::new("(more output was cut off)").size(m.theme.small).color(m.theme.color("muted")));
+                ui.label(
+                    egui::RichText::new("(more output was cut off)").size(m.theme.small).color(m.theme.color("muted")),
+                );
             }
             ui.add_space(6.0);
         }
@@ -373,7 +516,9 @@ fn apply(w: &mut World, click: Click) {
             let g = &mut w.gm;
             g.armed = false;
             if let Some(c) = g.selected().cloned() {
-                for (k, (i, _)) in c.fields.iter().enumerate().filter(|(_, f)| f.pick == Pick::Coord).enumerate().take(3) {
+                for (k, (i, _)) in
+                    c.fields.iter().enumerate().filter(|(_, f)| f.pick == Pick::Coord).enumerate().take(3)
+                {
                     g.values.insert((c.name.clone(), i), format!("{:.3}", pos[k]));
                 }
             }
@@ -412,9 +557,18 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // The party and the zone's names, rebuilt twice a second rather than every frame.
     if w.gm.selected.is_some() && w.gm.lists_at.is_none_or(|t| t.elapsed().as_secs_f32() >= 0.5) {
         w.gm.lists_at = Some(std::time::Instant::now());
-        let mut people: gm::Choices = std::iter::once(w.name.clone()).chain(w.party.members().filter(|r| r.id != w.my_id).map(|r| r.name.clone())).filter(|n| !n.is_empty()).map(|n| (n.clone(), n)).collect();
+        let mut people: gm::Choices = std::iter::once(w.name.clone())
+            .chain(w.party.members().filter(|r| r.id != w.my_id).map(|r| r.name.clone()))
+            .filter(|n| !n.is_empty())
+            .map(|n| (n.clone(), n))
+            .collect();
         people.dedup();
-        let mut around: gm::Choices = w.entities.iter().filter(|(_, e)| !e.name.trim().is_empty()).map(|(id, e)| (id.to_string(), e.name.trim().to_string())).collect();
+        let mut around: gm::Choices = w
+            .entities
+            .iter()
+            .filter(|(_, e)| !e.name.trim().is_empty())
+            .map(|(id, e)| (id.to_string(), e.name.trim().to_string()))
+            .collect();
         around.sort_by(|a, b| a.1.cmp(&b.1));
         w.gm.fill_lists(w.names.as_ref(), people, around);
     }
@@ -433,22 +587,31 @@ fn window(p: &mut Panels, g: &gm::Gm, target: Option<u32>) -> Option<Click> {
     let m = p.m;
     let mut click = None;
     let note = format!("GM {}", g.level);
-    p.panel("window", Some(Title { icon: Some("icons/system"), text: "Game Master", note: Some(&note), name: false }), NAV_W + LIST_W + DETAIL_W + 48.0, |ui| {
-        ui.horizontal_top(|ui| {
-            rail(ui, m, g, &mut click);
-            ui.add_space(16.0);
-            list(ui, m, g, &mut click);
-            ui.add_space(16.0);
-            detail(ui, m, g, target, &mut click);
-        });
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            let b = Btn::default();
-            if kit::clicked(&kit::button(ui, m, "Close", 90.0, b), b) {
-                click = Some(Click::Close);
-            }
-            ui.label(egui::RichText::new("Commands run directly, not through chat. The server checks your level again.").size(m.theme.small).color(m.theme.color("muted")));
-        });
-    });
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/system"), text: "Game Master", note: Some(&note), name: false }),
+        NAV_W + LIST_W + DETAIL_W + 48.0,
+        |ui| {
+            ui.horizontal_top(|ui| {
+                rail(ui, m, g, &mut click);
+                ui.add_space(16.0);
+                list(ui, m, g, &mut click);
+                ui.add_space(16.0);
+                detail(ui, m, g, target, &mut click);
+            });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                let b = Btn::default();
+                if kit::clicked(&kit::button(ui, m, "Close", 90.0, b), b) {
+                    click = Some(Click::Close);
+                }
+                ui.label(
+                    egui::RichText::new("Commands run directly, not through chat. The server checks your level again.")
+                        .size(m.theme.small)
+                        .color(m.theme.color("muted")),
+                );
+            });
+        },
+    );
     click
 }

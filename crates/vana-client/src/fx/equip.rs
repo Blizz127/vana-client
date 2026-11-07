@@ -74,7 +74,9 @@ impl Effects {
         let s = self.equip_state(id);
         match call {
             EquipCall::Glow { n, on } => {
-                let (Some(on_name), Some(off_name)) = (glow_names(n, true), glow_names(n, false)) else { return Ok(()) };
+                let (Some(on_name), Some(off_name)) = (glow_names(n, true), glow_names(n, false)) else {
+                    return Ok(());
+                };
                 let bit = 1u16 << n;
                 if on {
                     // Config 0xbe 1 (Misc. 3 weapon effect Off): the bit clears without the scheduler.
@@ -95,7 +97,8 @@ impl Effects {
             EquipCall::Kill => {
                 if s.in_on {
                     // Each of the three is looked up and started on its own.
-                    let found = [cc(b"!kl1"), cc(b"!kl2"), cc(b"!kl3")].map(|name| self.part_scheduler(id, name, actors));
+                    let found =
+                        [cc(b"!kl1"), cc(b"!kl2"), cc(b"!kl3")].map(|name| self.part_scheduler(id, name, actors));
                     if found.iter().any(|f| f.is_err()) {
                         return Err(());
                     }
@@ -220,11 +223,27 @@ mod tests {
     }
 
     fn frame() -> Frame {
-        Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: 0.5, view: Mat4::IDENTITY, view_rot: Mat4::IDENTITY, eye: Vec3::new(0.0, -2.0, -10.0), draw_distance: 2000.0, area_light: Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 }
+        Frame {
+            dt: 1.0,
+            seconds: 1.0 / 60.0,
+            dayfrac: 0.5,
+            view: Mat4::IDENTITY,
+            view_rot: Mat4::IDENTITY,
+            eye: Vec3::new(0.0, -2.0, -10.0),
+            draw_distance: 2000.0,
+            area_light: Vec3::ONE,
+            focal: 350.0,
+            moon_phase: 0,
+            weekday: 0,
+        }
     }
 
     fn tasks(fx: &Effects) -> Vec<String> {
-        fx.tasks.iter().flatten().map(|t| String::from_utf8_lossy(&fx.reg.libs[t.res.0].tree.nodes[t.res.1].name).into_owned()).collect()
+        fx.tasks
+            .iter()
+            .flatten()
+            .map(|t| String::from_utf8_lossy(&fx.reg.libs[t.res.0].tree.nodes[t.res.1].name).into_owned())
+            .collect()
     }
 
     /// Hume M main 8875: off runs `!w02` and sets the bit; on runs `!w01` (glwc glwa bld1 bld4, SeSep 6191) and
@@ -240,7 +259,8 @@ mod tests {
         fx.equip(HUME, EquipCall::Glow { n: 0, on: true });
         fx.tick(&frame(), &pc);
         assert_eq!(fx.equip_state(HUME).glow_off, 0);
-        let names: Vec<String> = fx.insts.iter().flatten().map(|x| String::from_utf8_lossy(&x.name).into_owned()).collect();
+        let names: Vec<String> =
+            fx.insts.iter().flatten().map(|x| String::from_utf8_lossy(&x.name).into_owned()).collect();
         for g in ["glwc", "glwa", "bld1", "bld4"] {
             assert!(names.iter().any(|n| n == g), "{g}: {names:?}");
         }
@@ -303,8 +323,18 @@ mod tests {
         op[..8].copy_from_slice(&[0x75, 4, 0, 0, 10, 0, 100, 0]);
         op[8..12].copy_from_slice(&raw8.to_le_bytes());
         op[0xe..0x10].copy_from_slice(&gate.to_le_bytes());
-        let ops = vec![SOp { code: 0x75, wait: 10, dur: 100, raw: op }, SOp { code: 0x00, wait: 0, dur: 0, raw: vec![0, 2, 0, 0, 0, 0, 0, 0] }];
-        fx.tasks.push(Some(Task::new((fx.reg.global.unwrap(), 0), Rc::new(ops), Who::Actor(HUME), Who::Actor(HUME), None, 1.0)));
+        let ops = vec![
+            SOp { code: 0x75, wait: 10, dur: 100, raw: op },
+            SOp { code: 0x00, wait: 0, dur: 0, raw: vec![0, 2, 0, 0, 0, 0, 0, 0] },
+        ];
+        fx.tasks.push(Some(Task::new(
+            (fx.reg.global.unwrap(), 0),
+            Rc::new(ops),
+            Who::Actor(HUME),
+            Who::Actor(HUME),
+            None,
+            1.0,
+        )));
     }
 
     /// Op 0x75 with a length: hidden now, shown when its scheduler ends after its wait of 10 (not at 100); with @8 set it stays

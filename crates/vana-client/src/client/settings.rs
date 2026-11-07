@@ -207,7 +207,13 @@ struct Row {
 
 impl From<&SRow> for Row {
     fn from(r: &SRow) -> Self {
-        Row { label: r.label.into(), help: r.help.into(), val: r.val, choices: r.choices.iter().map(|c| (c.0, c.1.to_string())).collect(), when: r.when }
+        Row {
+            label: r.label.into(),
+            help: r.help.into(),
+            val: r.val,
+            choices: r.choices.iter().map(|c| (c.0, c.1.to_string())).collect(),
+            when: r.when,
+        }
     }
 }
 
@@ -236,13 +242,53 @@ pub struct ModRow {
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
-const MODERN_SCALES: &[(u32, &str)] = &[(50, "50%"), (55, "55%"), (60, "60%"), (65, "65%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%"), (100, "100%"), (105, "105%"), (110, "110%"), (115, "115%"), (120, "120%"), (125, "125%"), (130, "130%"), (135, "135%"), (140, "140%"), (145, "145%"), (150, "150%")];
+const MODERN_SCALES: &[(u32, &str)] = &[
+    (50, "50%"),
+    (55, "55%"),
+    (60, "60%"),
+    (65, "65%"),
+    (70, "70%"),
+    (75, "75%"),
+    (80, "80%"),
+    (85, "85%"),
+    (90, "90%"),
+    (95, "95%"),
+    (100, "100%"),
+    (105, "105%"),
+    (110, "110%"),
+    (115, "115%"),
+    (120, "120%"),
+    (125, "125%"),
+    (130, "130%"),
+    (135, "135%"),
+    (140, "140%"),
+    (145, "145%"),
+    (150, "150%"),
+];
 
-const fn row(label: &'static str, help: &'static str, val: Val, choices: &'static [(u32, &'static str)], when: When) -> SRow {
+const fn row(
+    label: &'static str,
+    help: &'static str,
+    val: Val,
+    choices: &'static [(u32, &'static str)],
+    when: When,
+) -> SRow {
     SRow { label, help, val, choices, when }
 }
 
-const TABS: [&str; 11] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Controls", "Graphics", "DAT Packs", "Mods"];
+const TABS: [&str; 11] = [
+    "General",
+    "Screen",
+    "Textures",
+    "Effects",
+    "Sound",
+    "Misc.",
+    "Client",
+    "Controls",
+    "Graphics",
+    "DAT Packs",
+    "Mods",
+];
 /// The DAT Packs and Mods pages (client/modsui.rs): their rows come from the mods folder, not a table.
 const PACKS: usize = 9;
 const MODS: usize = 10;
@@ -254,85 +300,341 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     use Val::*;
     use When::*;
     const GENERAL: &[SRow] = &[
-        row("Window Mode", "Full screen, a window, or a borderless window at your chosen size or the size of your desktop.", Tool("0034"), &[(0, "Full Screen"), (1, "Windowed"), (2, "Borderless"), (3, "Desktop")], Now),
-        row("MIP Mapping", "Uses smaller copies of textures on things far away, which stops distant ground and walls from shimmering.", Tool("0000"), OFF_ON, NextZone),
-        row("Gamma Base", "Overall brightness. The Gameplay page's red, green and blue brightness sliders are added on top.", Gamma, &[], Now),
+        row(
+            "Window Mode",
+            "Full screen, a window, or a borderless window at your chosen size or the size of your desktop.",
+            Tool("0034"),
+            &[(0, "Full Screen"), (1, "Windowed"), (2, "Borderless"), (3, "Desktop")],
+            Now,
+        ),
+        row(
+            "MIP Mapping",
+            "Uses smaller copies of textures on things far away, which stops distant ground and walls from shimmering.",
+            Tool("0000"),
+            OFF_ON,
+            NextZone,
+        ),
+        row(
+            "Gamma Base",
+            "Overall brightness. The Gameplay page's red, green and blue brightness sliders are added on top.",
+            Gamma,
+            &[],
+            Now,
+        ),
     ];
     const SCREEN: &[SRow] = &[
         row("Resolution", "The size of the game window.", Size("0001", "0002", Sizes::Window), &[], Now),
         row("Monitor", "Which monitor the game opens on (not retail).", Monitor, &[], Now),
-        row("GPU", "Which graphics card draws the game. Default picks the faster one in laptops with two (not retail).", Gpu, &[], Restart),
-        row("Background", "How sharp the 3D world is drawn. Set it higher than the window for a sharper picture at a cost in speed, or lower for speed.", Size("0003", "0004", Sizes::Background), &[], Now),
-        row("Menu Size", "The size menus and text are drawn at before they are stretched to the window. Smaller numbers make menus bigger.", Size("0037", "0038", Sizes::Ui), &[], Now),
-        row("3D Aspect", "Window keeps the 3D world in proportion to the window. Config uses the shape set in the game's config tool, as retail does.", RetailAspect, &[(0, "Window"), (1, "Config")], Now),
-        row("Draw Distance", "How far away scenery, characters and effects still appear. Retail is the game's distance, the others reach farther (not retail).", DrawDistance, &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")], Now),
+        row(
+            "GPU",
+            "Which graphics card draws the game. Default picks the faster one in laptops with two (not retail).",
+            Gpu,
+            &[],
+            Restart,
+        ),
+        row(
+            "Background",
+            "How sharp the 3D world is drawn. Set it higher than the window for a sharper picture at a cost in speed, or lower for speed.",
+            Size("0003", "0004", Sizes::Background),
+            &[],
+            Now,
+        ),
+        row(
+            "Menu Size",
+            "The size menus and text are drawn at before they are stretched to the window. Smaller numbers make menus bigger.",
+            Size("0037", "0038", Sizes::Ui),
+            &[],
+            Now,
+        ),
+        row(
+            "3D Aspect",
+            "Window keeps the 3D world in proportion to the window. Config uses the shape set in the game's config tool, as retail does.",
+            RetailAspect,
+            &[(0, "Window"), (1, "Config")],
+            Now,
+        ),
+        row(
+            "Draw Distance",
+            "How far away scenery, characters and effects still appear. Retail is the game's distance, the others reach farther (not retail).",
+            DrawDistance,
+            &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")],
+            Now,
+        ),
     ];
     const TEXTURES: &[SRow] = &[
-        row("Textures", "Texture quality. High and Low save video memory, Full is the sharpest.", Tool("0018"), &[(0, "High"), (1, "Low"), (2, "Full")], NextZone),
-        row("2-D Mapping", "Map quality. Compressed saves memory, Full is the sharpest.", Tool("0019"), &[(0, "Compressed"), (1, "Full")], NextZone),
-        row("Fonts", "Text quality. Higher is sharper.", Tool("0036"), &[(0, "Compressed"), (1, "Full"), (2, "High")], Restart),
+        row(
+            "Textures",
+            "Texture quality. High and Low save video memory, Full is the sharpest.",
+            Tool("0018"),
+            &[(0, "High"), (1, "Low"), (2, "Full")],
+            NextZone,
+        ),
+        row(
+            "2-D Mapping",
+            "Map quality. Compressed saves memory, Full is the sharpest.",
+            Tool("0019"),
+            &[(0, "Compressed"), (1, "Full")],
+            NextZone,
+        ),
+        row(
+            "Fonts",
+            "Text quality. Higher is sharper.",
+            Tool("0036"),
+            &[(0, "Compressed"), (1, "Full"), (2, "High")],
+            Restart,
+        ),
     ];
     const EFFECTS: &[SRow] = &[
-        row("Lamp Lights", "Baked keeps the lamplight painted onto the walls, as retail. Real makes the lamps give off light of their own (not retail).", LampLights, &[(0, "Baked"), (1, "Real")], Now),
-        row("Environment Animation", "Makes grass, trees and other plants sway. Smooth sways them more smoothly than Normal.", Tool("0011"), &[(0, "Off"), (1, "Normal"), (2, "Smooth")], Now),
-        row("Bump Mapping", "Gives some walls and floors a raised, textured look. Off also lights them a little differently.", Tool("0017"), OFF_ON, NextZone),
-        row("Graphics Stabilization", "Retail's fix for glitches on some old graphics cards. It only changes the moving shine some spells and effects put on characters. Leave it Off unless that shine looks broken.", Tool("0040"), OFF_ON, Now),
-        row("3D LCD Mode", "Draws the game for 3D screens that need two side-by-side pictures. Leave it Off on a normal screen.", Tool("0030"), OFF_ON, Now),
+        row(
+            "Lamp Lights",
+            "Baked keeps the lamplight painted onto the walls, as retail. Real makes the lamps give off light of their own (not retail).",
+            LampLights,
+            &[(0, "Baked"), (1, "Real")],
+            Now,
+        ),
+        row(
+            "Environment Animation",
+            "Makes grass, trees and other plants sway. Smooth sways them more smoothly than Normal.",
+            Tool("0011"),
+            &[(0, "Off"), (1, "Normal"), (2, "Smooth")],
+            Now,
+        ),
+        row(
+            "Bump Mapping",
+            "Gives some walls and floors a raised, textured look. Off also lights them a little differently.",
+            Tool("0017"),
+            OFF_ON,
+            NextZone,
+        ),
+        row(
+            "Graphics Stabilization",
+            "Retail's fix for glitches on some old graphics cards. It only changes the moving shine some spells and effects put on characters. Leave it Off unless that shine looks broken.",
+            Tool("0040"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "3D LCD Mode",
+            "Draws the game for 3D screens that need two side-by-side pictures. Leave it Off on a normal screen.",
+            Tool("0030"),
+            OFF_ON,
+            Now,
+        ),
     ];
     const SOUND: &[SRow] = &[
         row("Sound", "Turns all sound on or off.", Tool("0007"), OFF_ON, Now),
-        row("Sound Effect Channels", "How many sound effects can play at the same time. More means fewer sounds are cut off.", Tool("0029"), &[(12, "12"), (13, "13"), (14, "14"), (15, "15"), (16, "16"), (17, "17"), (18, "18"), (19, "19"), (20, "20")], Now),
+        row(
+            "Sound Effect Channels",
+            "How many sound effects can play at the same time. More means fewer sounds are cut off.",
+            Tool("0029"),
+            &[
+                (12, "12"),
+                (13, "13"),
+                (14, "14"),
+                (15, "15"),
+                (16, "16"),
+                (17, "17"),
+                (18, "18"),
+                (19, "19"),
+                (20, "20"),
+            ],
+            Now,
+        ),
         row("Sound in Background", "Keeps playing sound while you are in another window.", Tool("0035"), OFF_ON, Now),
         // The title's one volume (lobby config 0xa8); in game the Gameplay page has them (rows left out there).
-        row("Music Volume", "Music volume at the title screen. In game, use the sliders on the Gameplay page.", Music, &[], Now),
-        row("Sound Effects Volume", "Sound effects volume at the title screen. In game, use the sliders on the Gameplay page.", Effects, &[], Now),
+        row(
+            "Music Volume",
+            "Music volume at the title screen. In game, use the sliders on the Gameplay page.",
+            Music,
+            &[],
+            Now,
+        ),
+        row(
+            "Sound Effects Volume",
+            "Sound effects volume at the title screen. In game, use the sliders on the Gameplay page.",
+            Effects,
+            &[],
+            Now,
+        ),
     ];
     const MISC: &[SRow] = &[
-        row("Hardware Mouse", "Uses your system's mouse pointer with the game's cursor images, instead of a cursor the game draws.", Tool("0021"), OFF_ON, Now),
-        row("Cursor Size", "How big the game's cursor is, when Hardware Mouse is Off. Auto makes it bigger in bigger windows (not retail).", CursorSize, &[(0, "Auto"), (100, "1x"), (150, "1.5x"), (200, "2x"), (300, "3x"), (400, "4x")], Now),
-        row("Keys Hide the Cursor", "On, as the game does, a key press hides the mouse cursor until the mouse moves. Off keeps it shown while you walk with the keys (not retail).", KeysHideCursor, OFF_ON, Now),
-        row("Opening Movie", "Plays the opening movie before the title screen. Any key skips it.", Tool("0022"), OFF_ON, Restart),
-        row("Simple Character Creation", "Shows flat pictures instead of 3D models during character creation.", Tool("0023"), OFF_ON, Now),
-        row("Screenshot Size", "Also saves each screenshot at your screen's size, in ffxiuser/screenshots.", Tool("0043"), OFF_ON, Now),
-        row("Send Rate", "How often the client sends to a private server, which answers each time: faster brings what happens around you sooner. A PlayOnline sign-in keeps the game's rate (not retail).", SendRate, &[(400, "Retail"), (200, "2x"), (100, "4x"), (50, "8x")], Now),
+        row(
+            "Hardware Mouse",
+            "Uses your system's mouse pointer with the game's cursor images, instead of a cursor the game draws.",
+            Tool("0021"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Cursor Size",
+            "How big the game's cursor is, when Hardware Mouse is Off. Auto makes it bigger in bigger windows (not retail).",
+            CursorSize,
+            &[(0, "Auto"), (100, "1x"), (150, "1.5x"), (200, "2x"), (300, "3x"), (400, "4x")],
+            Now,
+        ),
+        row(
+            "Keys Hide the Cursor",
+            "On, as the game does, a key press hides the mouse cursor until the mouse moves. Off keeps it shown while you walk with the keys (not retail).",
+            KeysHideCursor,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Opening Movie",
+            "Plays the opening movie before the title screen. Any key skips it.",
+            Tool("0022"),
+            OFF_ON,
+            Restart,
+        ),
+        row(
+            "Simple Character Creation",
+            "Shows flat pictures instead of 3D models during character creation.",
+            Tool("0023"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Screenshot Size",
+            "Also saves each screenshot at your screen's size, in ffxiuser/screenshots.",
+            Tool("0043"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Send Rate",
+            "How often the client sends to a private server, which answers each time: faster brings what happens around you sooner. A PlayOnline sign-in keeps the game's rate (not retail).",
+            SendRate,
+            &[(400, "Retail"), (200, "2x"), (100, "4x"), (50, "8x")],
+            Now,
+        ),
     ];
     const CLIENT: &[SRow] = &[
-        row("Frame Limit", "The most frames drawn each second. The game itself always runs at the same speed.", FrameLimit, &[], Now),
-        row("Anisotropic Filtering", "Keeps ground and walls sharp when you look at them at a slant. Higher is sharper.", Aniso, &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")], NextZone),
+        row(
+            "Frame Limit",
+            "The most frames drawn each second. The game itself always runs at the same speed.",
+            FrameLimit,
+            &[],
+            Now,
+        ),
+        row(
+            "Anisotropic Filtering",
+            "Keeps ground and walls sharp when you look at them at a slant. Higher is sharper.",
+            Aniso,
+            &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")],
+            NextZone,
+        ),
         row("Party TP", "Shows each member's TP in the party window.", PartyTp, OFF_ON, Now),
-        row("Interface", "Classic uses the game's windows. Modern uses the new windows where there is one (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
+        row(
+            "Interface",
+            "Classic uses the game's windows. Modern uses the new windows where there is one (not retail).",
+            ModernUi,
+            &[(0, "Classic"), (1, "Modern")],
+            Now,
+        ),
         row("Interface Size", "How big the modern windows are (not retail).", ModernScale, MODERN_SCALES, Now),
-        row("Panel Opacity", "How see-through the modern windows' backgrounds are (not retail).", ModernOpacity, &[], Now),
-        row("Panel Places", "Reset puts this character's modern windows back where they started (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now),
+        row(
+            "Panel Opacity",
+            "How see-through the modern windows' backgrounds are (not retail).",
+            ModernOpacity,
+            &[],
+            Now,
+        ),
+        row(
+            "Panel Places",
+            "Reset puts this character's modern windows back where they started (not retail).",
+            ResetPlaces,
+            &[(0, "As Moved"), (1, "Reset")],
+            Now,
+        ),
     ];
     // Ours: the graphics options retail has no page for (a page holds 7 rows).
     const GRAPHICS: &[SRow] = &[
-        row("Character Shadows", "Retail gives characters the game's simple shadows. Real makes characters cast proper shadows from the sun and moon, and from lamps when Lamp Lights is Real (not retail).", ActorShadows, &[(0, "Retail"), (1, "Real")], Now),
-        row("Shadow Quality", "How sharp Real shadows are. Higher is sharper and uses more video memory (not retail).", ShadowMap, &[(1024, "Low"), (2048, "Medium"), (4096, "High")], Now),
-        row("Ambient Occlusion", "Adds soft shade in corners and creases of the world, so buildings look more solid (not retail).", Ssao, OFF_ON, Now),
-        row("Colour Grading", "Gives the 3D world a colour tint. Menus and text keep their colours (not retail).", Grading, &[(0, "Off"), (1, "Vivid"), (2, "Warm"), (3, "Cool"), (4, "Film")], Now),
-        row("Anti-aliasing", "Smooths jagged edges in the 3D world. Menus and text are left alone (not retail). For even smoother edges, set Background higher than the window.", Antialias, &[(0, "Off"), (1, "SMAA")], Now),
+        row(
+            "Character Shadows",
+            "Retail gives characters the game's simple shadows. Real makes characters cast proper shadows from the sun and moon, and from lamps when Lamp Lights is Real (not retail).",
+            ActorShadows,
+            &[(0, "Retail"), (1, "Real")],
+            Now,
+        ),
+        row(
+            "Shadow Quality",
+            "How sharp Real shadows are. Higher is sharper and uses more video memory (not retail).",
+            ShadowMap,
+            &[(1024, "Low"), (2048, "Medium"), (4096, "High")],
+            Now,
+        ),
+        row(
+            "Ambient Occlusion",
+            "Adds soft shade in corners and creases of the world, so buildings look more solid (not retail).",
+            Ssao,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Colour Grading",
+            "Gives the 3D world a colour tint. Menus and text keep their colours (not retail).",
+            Grading,
+            &[(0, "Off"), (1, "Vivid"), (2, "Warm"), (3, "Cool"), (4, "Film")],
+            Now,
+        ),
+        row(
+            "Anti-aliasing",
+            "Smooths jagged edges in the 3D world. Menus and text are left alone (not retail). For even smoother edges, set Background higher than the window.",
+            Antialias,
+            &[(0, "Off"), (1, "SMAA")],
+            Now,
+        ),
     ];
     // A page holds 7 rows; the controls' (the gamepad, mouse look) have their own.
     const GAMEPAD: &[SRow] = &[
-        row("Gamepad", "Lets you play with a game controller. The button layout follows the game's pad config tool.", Gamepad, OFF_ON, Now),
-        row("Stick Dead Zone", "How far you must push a stick before it moves you. Raise it if you drift with the stick let go. 33% matches retail (not retail).", PadDeadZone, &[(15, "15%"), (20, "20%"), (25, "25%"), (33, "33%"), (40, "40%"), (50, "50%")], Now),
-        row("Mouse Camera Speed", "How fast the camera turns when you hold a mouse button and move the mouse. Lower it if the camera spins too fast. Controllers are not affected (not retail).", MouseCamSpeed, &[(25, "25%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")], Now),
+        row(
+            "Gamepad",
+            "Lets you play with a game controller. The button layout follows the game's pad config tool.",
+            Gamepad,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Stick Dead Zone",
+            "How far you must push a stick before it moves you. Raise it if you drift with the stick let go. 33% matches retail (not retail).",
+            PadDeadZone,
+            &[(15, "15%"), (20, "20%"), (25, "25%"), (33, "33%"), (40, "40%"), (50, "50%")],
+            Now,
+        ),
+        row(
+            "Mouse Camera Speed",
+            "How fast the camera turns when you hold a mouse button and move the mouse. Lower it if the camera spins too fast. Controllers are not affected (not retail).",
+            MouseCamSpeed,
+            &[(25, "25%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")],
+            Now,
+        ),
     ];
     const MAPS: &[SRow] = &[
         row("Map Overlay Opacity", "How see-through the map overlay is.", MapOpacity, &[], Now),
-        row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
+        row(
+            "Minimap Position",
+            "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.",
+            MinimapDock,
+            &[(0, "Top Right"), (1, "Top Left")],
+            Now,
+        ),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
-    const TIMERS: &[SRow] = &[
-        row("Timers Position", "Docks the timers window on the left, on the right above the party list, or at the top.", TimersDock, &[(0, "Left"), (1, "Right"), (2, "Top")], Now),
-    ];
+    const TIMERS: &[SRow] = &[row(
+        "Timers Position",
+        "Docks the timers window on the left, on the right above the party list, or at the top.",
+        TimersDock,
+        &[(0, "Left"), (1, "Right"), (2, "Top")],
+        Now,
+    )];
     const TIMERS_MODERN: &[SRow] = &[];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[];
     match kind {
-        Kind::Extras if modern => [&MAPS[..1], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
+        Kind::Extras if modern => {
+            [&MAPS[..1], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[])
+        }
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab >= PACKS => &[],
@@ -343,8 +645,23 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
 }
 
 const RESOLUTIONS: [[u32; 2]; 17] = [
-    [640, 480], [800, 600], [1024, 768], [1280, 720], [1280, 800], [1280, 1024], [1366, 768], [1440, 900], [1600, 900], [1680, 1050],
-    [1920, 1080], [1920, 1200], [2560, 1080], [2560, 1440], [2560, 1600], [3440, 1440], [3840, 2160],
+    [640, 480],
+    [800, 600],
+    [1024, 768],
+    [1280, 720],
+    [1280, 800],
+    [1280, 1024],
+    [1366, 768],
+    [1440, 900],
+    [1600, 900],
+    [1680, 1050],
+    [1920, 1080],
+    [1920, 1200],
+    [2560, 1080],
+    [2560, 1440],
+    [2560, 1600],
+    [3440, 1440],
+    [3840, 2160],
 ];
 
 /// The Config pages' size (conf2win and its siblings, 366 x 296 at (16, 48)).
@@ -418,7 +735,30 @@ impl SettingsUi {
     }
 
     pub fn open_kind(c: &Config, window: [u32; 2], kind: Kind) -> Self {
-        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new(), tab_rows: Vec::new(), lua_names: crate::modpack::lua_folders(), m_dat_tab: 0, lua_info: crate::modpack::lua_info() };
+        let mut s = Self {
+            kind,
+            s: Settings::of(c),
+            monitors: Vec::new(),
+            gpus: Vec::new(),
+            window,
+            in_game: false,
+            tab: 0,
+            row: 0,
+            col: 0,
+            edit: false,
+            sounds: Vec::new(),
+            dirty: false,
+            hover: false,
+            mods_ui: None,
+            m_mods: (0, 0),
+            m_remove: None,
+            mod_pages: Vec::new(),
+            mod_changes: Vec::new(),
+            tab_rows: Vec::new(),
+            lua_names: crate::modpack::lua_folders(),
+            m_dat_tab: 0,
+            lua_info: crate::modpack::lua_info(),
+        };
         s.col = s.marked_col();
         s
     }
@@ -436,7 +776,8 @@ impl SettingsUi {
         self.tab_rows.clear();
         self.mod_pages.clear();
         for mut p in pages {
-            let (tabbed, own): (Vec<ModRow>, Vec<ModRow>) = p.rows.into_iter().partition(|r| EXTRA_TABS.contains(&r.tab.as_str()));
+            let (tabbed, own): (Vec<ModRow>, Vec<ModRow>) =
+                p.rows.into_iter().partition(|r| EXTRA_TABS.contains(&r.tab.as_str()));
             self.tab_rows.extend(tabbed.into_iter().map(|r| (p.id.clone(), r)));
             if !own.is_empty() {
                 p.rows = own;
@@ -448,7 +789,13 @@ impl SettingsUi {
     /// A mod's setting on our Extras tabs as a row.
     fn tab_row(&self, i: usize) -> Row {
         let r = &self.tab_rows[i].1;
-        Row { label: r.label.clone(), help: r.help.clone(), val: Val::Tabbed(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now }
+        Row {
+            label: r.label.clone(),
+            help: r.help.clone(),
+            val: Val::Tabbed(i),
+            choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(),
+            when: When::Now,
+        }
     }
 
     /// The Lua mod page on screen (Extras, past our own pages).
@@ -465,15 +812,33 @@ impl SettingsUi {
                 .rows
                 .iter()
                 .enumerate()
-                .map(|(i, r)| Row { label: r.label.clone(), help: r.help.clone(), val: Val::Mod(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now })
+                .map(|(i, r)| Row {
+                    label: r.label.clone(),
+                    help: r.help.clone(),
+                    val: Val::Mod(i),
+                    choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(),
+                    when: When::Now,
+                })
                 .collect();
         }
-        let mut out: Vec<Row> = rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect();
+        let mut out: Vec<Row> =
+            rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect();
         // Mods' settings on this Extras tab, at their places.
         if self.kind == Kind::Extras
             && let Some(tab) = EXTRA_TABS.get(self.tab)
         {
-            let mut mine: Vec<(usize, Row)> = self.tab_rows.iter().enumerate().filter(|(_, (_, r))| r.tab == *tab).map(|(i, (_, r))| ((if self.s.modern_ui { r.place_modern.or(r.place) } else { r.place }).unwrap_or(usize::MAX), self.tab_row(i))).collect();
+            let mut mine: Vec<(usize, Row)> = self
+                .tab_rows
+                .iter()
+                .enumerate()
+                .filter(|(_, (_, r))| r.tab == *tab)
+                .map(|(i, (_, r))| {
+                    (
+                        (if self.s.modern_ui { r.place_modern.or(r.place) } else { r.place }).unwrap_or(usize::MAX),
+                        self.tab_row(i),
+                    )
+                })
+                .collect();
             mine.sort_by_key(|m| m.0);
             for (place, r) in mine {
                 out.insert(place.min(out.len()), r);
@@ -484,7 +849,15 @@ impl SettingsUi {
 
     fn ctl(r: &Row) -> Ctl {
         match r.val {
-            Val::Size(..) | Val::Gamma | Val::FrameLimit | Val::Monitor | Val::Gpu | Val::Music | Val::Effects | Val::MapOpacity | Val::ModernOpacity => Ctl::Slider,
+            Val::Size(..)
+            | Val::Gamma
+            | Val::FrameLimit
+            | Val::Monitor
+            | Val::Gpu
+            | Val::Music
+            | Val::Effects
+            | Val::MapOpacity
+            | Val::ModernOpacity => Ctl::Slider,
             _ if r.choices.len() <= 3 => Ctl::Buttons(r.choices.len()),
             _ => Ctl::Slider,
         }
@@ -601,7 +974,12 @@ impl SettingsUi {
     }
 
     fn tool_get(&self, n: &str) -> u32 {
-        self.s.tool.get(n).copied().or_else(|| crate::config::TOOL_DEFAULTS.iter().find(|d| d.0 == n).map(|d| d.1)).unwrap_or(0)
+        self.s
+            .tool
+            .get(n)
+            .copied()
+            .or_else(|| crate::config::TOOL_DEFAULTS.iter().find(|d| d.0 == n).map(|d| d.1))
+            .unwrap_or(0)
     }
 
     fn tool_set(&mut self, n: &str, x: u32) {
@@ -621,9 +999,13 @@ impl SettingsUi {
                 let cur = [self.tool_get(a), self.tool_get(b)];
                 (list.len(), list.iter().position(|&x| x == cur).unwrap_or(0))
             }
-            Val::Gamma => (21, ((f32::from_bits(self.tool_get("0028")) + 1.0) * 10.0).round().clamp(0.0, 20.0) as usize),
+            Val::Gamma => {
+                (21, ((f32::from_bits(self.tool_get("0028")) + 1.0) * 10.0).round().clamp(0.0, 20.0) as usize)
+            }
             Val::FrameLimit => (FRAME_LIMITS.len(), pos(&FRAME_LIMITS, self.s.frame_limit)),
-            Val::Monitor => (self.monitors.len().max(1), self.monitors.iter().position(|m| m.0 == self.s.monitor).unwrap_or(0)),
+            Val::Monitor => {
+                (self.monitors.len().max(1), self.monitors.iter().position(|m| m.0 == self.s.monitor).unwrap_or(0))
+            }
             Val::Gpu => (self.gpus.len() + 1, self.gpus.iter().position(|g| *g == self.s.gpu).map_or(0, |i| i + 1)),
             Val::Music => (21, (self.s.music / 5) as usize),
             Val::Effects => (21, (self.s.effects / 5) as usize),
@@ -656,7 +1038,9 @@ impl SettingsUi {
                     self.s.monitor = m.0.clone();
                 }
             }
-            Val::Gpu => self.s.gpu = if i == 0 { String::new() } else { self.gpus.get(i - 1).cloned().unwrap_or_default() },
+            Val::Gpu => {
+                self.s.gpu = if i == 0 { String::new() } else { self.gpus.get(i - 1).cloned().unwrap_or_default() }
+            }
             Val::Music => self.s.music = (i as u32 * 5).min(100),
             Val::Effects => self.s.effects = (i as u32 * 5).min(100),
             Val::ModernOpacity => self.s.modern_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
@@ -686,7 +1070,12 @@ impl SettingsUi {
             Val::Effects => format!("{}%", self.s.effects),
             Val::ModernOpacity => format!("{}%", self.s.modern_opacity),
             Val::MapOpacity => format!("{}%", self.s.map_opacity),
-            Val::Monitor => self.monitors.iter().find(|m| m.0 == self.s.monitor).or(self.monitors.first()).map_or_else(|| "Default".into(), |m| m.0.clone()),
+            Val::Monitor => self
+                .monitors
+                .iter()
+                .find(|m| m.0 == self.s.monitor)
+                .or(self.monitors.first())
+                .map_or_else(|| "Default".into(), |m| m.0.clone()),
             Val::Gpu if self.s.gpu.is_empty() => "Default".into(),
             // The name without the driver's part ("AMD Radeon RX 6800 XT (RADV NAVI21)").
             Val::Gpu => self.s.gpu.split(" (").next().unwrap_or_default().to_string(),
@@ -842,7 +1231,8 @@ impl SettingsUi {
             let y = Self::TOP + PITCH * i as f32 + 14.0;
             // conf2win's two 88-px and conf3win's three 64-px columns; a caption that does not fit (12 px of the
             // button are its ends) widens every button of the row, from the bullets' column.
-            let need = r.choices.iter().map(|c| super::super::render::screens::label_width(&c.1) + 12.0).fold(0.0, f32::max);
+            let need =
+                r.choices.iter().map(|c| super::super::render::screens::label_width(&c.1) + 12.0).fold(0.0, f32::max);
             match Self::ctl(r) {
                 Ctl::Buttons(n) if n <= 2 && need <= 88.0 => {
                     for (c, x) in WIDE.iter().enumerate().take(n) {
@@ -871,7 +1261,10 @@ impl SettingsUi {
         self.sounds.clear();
         self.hover = false;
         let (x, y) = self.origin(gu, sw, sh);
-        if let Some(k) = self.arrow_rects().iter().position(|r| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
+        if let Some(k) = self
+            .arrow_rects()
+            .iter()
+            .position(|r| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
         {
             self.hover = true;
             if clicked {
@@ -883,7 +1276,10 @@ impl SettingsUi {
         if self.on_mods() && self.mods_ui.as_ref().is_some_and(|m| m.held.is_some()) {
             return;
         }
-        let hit = self.controls().into_iter().find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3]);
+        let hit = self
+            .controls()
+            .into_iter()
+            .find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3]);
         let Some((row, col, r)) = hit else { return };
         self.hover = true;
         if (moved || clicked) && (row, col) != (self.row, self.col) && !self.edit {
@@ -934,7 +1330,8 @@ impl SettingsUi {
                 gu.sprite_cells("menu    windowps", 465, 2..3, x + 20.0 - b[0], hy + 2.0 - b[1], N);
             }
             gu.label(&r.label, x + 32.0, hy, N, false);
-            let icon = if self.warns(r) { gu.warning_icon(x + 32.0 + gu.label_width(&r.label) + 4.0, hy) + 4.0 } else { 0.0 };
+            let icon =
+                if self.warns(r) { gu.warning_icon(x + 32.0 + gu.label_width(&r.label) + 4.0, hy) + 4.0 } else { 0.0 };
             // A slider's value at the heading's end, right-aligned to the slider's (cut to the room left).
             if matches!(Self::ctl(r), Ctl::Slider) {
                 let room = SLIDER_X + SLIDER_W - 32.0 - gu.label_width(&r.label) - icon - 16.0;
@@ -949,7 +1346,13 @@ impl SettingsUi {
                     Ctl::Buttons(_) => {
                         let d = if on { -1.0 } else { 0.0 };
                         button(gu, [x + b[0] + d, y + b[1] + d, b[2], b[3]], if on { ON } else { N });
-                        gu.label(&r.choices[*c].1, x + b[0] + 5.0 + d, y + b[1] + 1.0 + d, if on { ON } else { N }, true);
+                        gu.label(
+                            &r.choices[*c].1,
+                            x + b[0] + 5.0 + d,
+                            y + b[1] + 1.0 + d,
+                            if on { ON } else { N },
+                            true,
+                        );
                         if r.choices[*c].0 == self.get(r.val) {
                             marker(gu, x + b[0], y + b[1], b[2]);
                         }
@@ -962,7 +1365,15 @@ impl SettingsUi {
                         // The track is baked into each page's backing (465 cells 8..10 under conf2win child 3 at (88, 80)).
                         gu.sprite_cells("menu    windowps", 465, 8..11, x + b[0] - 88.0, y + b[1] - 80.0, N);
                         if f > 0.0 {
-                            gu.sprite_scaled("menu    windowps", 384, x + b[0], y + b[1], f, 1.0, if editing { 0xa0a0_a0a0 } else { N });
+                            gu.sprite_scaled(
+                                "menu    windowps",
+                                384,
+                                x + b[0],
+                                y + b[1],
+                                f,
+                                1.0,
+                                if editing { 0xa0a0_a0a0 } else { N },
+                            );
                         }
                     }
                 }
@@ -1036,14 +1447,19 @@ impl SettingsUi {
 impl SettingsUi {
     fn find(&self, label: &str) -> Option<Row> {
         let pages = (0..PACKS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        let ours = pages.flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter()).find(|r| r.label == label).map(Row::from);
+        let ours = pages
+            .flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter())
+            .find(|r| r.label == label)
+            .map(Row::from);
         // Else a bundled mod's, in its extra's place.
         ours.or_else(|| self.tab_rows.iter().position(|(_, r)| r.label == label).map(|i| self.tab_row(i)))
     }
 
     fn vrow(&self, r: &Row) -> VRow {
         let ctl = match Self::ctl(r) {
-            Ctl::Buttons(_) => VCtl::Buttons(r.choices.iter().map(|c| (c.1.to_string(), c.0 == self.get(r.val))).collect()),
+            Ctl::Buttons(_) => {
+                VCtl::Buttons(r.choices.iter().map(|c| (c.1.to_string(), c.0 == self.get(r.val))).collect())
+            }
             Ctl::Slider => {
                 let (n, at) = self.stops(r);
                 VCtl::Slider { n, at, shown: self.shown(r) }
@@ -1137,7 +1553,12 @@ fn plain(help: &str) -> String {
         return format!("{WARNING} {}", plain(rest));
     }
     let body = match help.split_once(": ") {
-        Some((head, rest)) if head.starts_with(|c: char| c.is_ascii_digit()) && head.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == '/') => rest,
+        Some((head, rest))
+            if head.starts_with(|c: char| c.is_ascii_digit())
+                && head.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == '/') =>
+        {
+            rest
+        }
         _ => help,
     };
     let body = body.replace(" (not retail)", "");
@@ -1158,14 +1579,26 @@ impl SettingsUi {
                 }
                 VRow { label: format!("{}. {}", i + 1, m.name), ctl: VCtl::Buttons(b) }
             });
-            installed.chain(offers.into_iter().map(|o| VRow { label: o.label, ctl: VCtl::Buttons(vec![(o.button.into(), false)]) })).collect()
-        } else {
-            self.rows()
-                .iter()
-                .map(|r| self.vrow(r))
+            installed
+                .chain(
+                    offers
+                        .into_iter()
+                        .map(|o| VRow { label: o.label, ctl: VCtl::Buttons(vec![(o.button.into(), false)]) }),
+                )
                 .collect()
+        } else {
+            self.rows().iter().map(|r| self.vrow(r)).collect()
         };
-        View { title: self.title(), tabs: self.tabs(), tab: self.tab, rows, row: self.row, col: self.col, edit: self.edit, help: plain(&self.help()) }
+        View {
+            title: self.title(),
+            tabs: self.tabs(),
+            tab: self.tab,
+            rows,
+            row: self.row,
+            col: self.col,
+            edit: self.edit,
+            help: plain(&self.help()),
+        }
     }
 
     /// The modern layer's mouse: page `t`.
@@ -1247,7 +1680,13 @@ impl SettingsUi {
     /// Buttons on a row: ON / OFF (and Move for a pack), or an offer's one.
     fn mods_cols(&self, row: usize) -> usize {
         match row.checked_sub(1) {
-            Some(i) if i < self.on_page().len() => if self.lua_page() { 2 } else { 3 },
+            Some(i) if i < self.on_page().len() => {
+                if self.lua_page() {
+                    2
+                } else {
+                    3
+                }
+            }
             _ => 1,
         }
     }
@@ -1305,7 +1744,11 @@ impl SettingsUi {
                     if let Some(b) = keep.take() {
                         let name = self.s.mods[sh[i]].name.clone();
                         self.s.mods = b;
-                        self.row = self.on_page().iter().position(|&k| self.s.mods[k].name == name).map_or(self.row, |k| k + 1);
+                        self.row = self
+                            .on_page()
+                            .iter()
+                            .position(|&k| self.s.mods[k].name == name)
+                            .map_or(self.row, |k| k + 1);
                     }
                     self.sounds.push(Se::Cancel);
                 }
@@ -1401,7 +1844,9 @@ impl SettingsUi {
                 gu.sprite_cells("menu    windowps", 465, 2..3, x + 20.0 - b[0], hy + 2.0 - b[1], N);
             }
             let (mut label, tint) = match (sh.get(i), offers.get(i.wrapping_sub(n))) {
-                (Some(&k), _) => (format!("{}. {}", i + 1, self.s.mods[k].name), if held && self.row == i + 1 { ON } else { N }),
+                (Some(&k), _) => {
+                    (format!("{}. {}", i + 1, self.s.mods[k].name), if held && self.row == i + 1 { ON } else { N })
+                }
                 // A row being installed shows its per cent, lit.
                 (None, Some(o)) => (o.label.clone(), if o.label.contains("%  ") { ON } else { N }),
                 _ => continue,
@@ -1429,7 +1874,14 @@ impl SettingsUi {
             gu.cursor(hx, hy);
         }
         if total > super::modsui::VISIBLE {
-            gu.scroll_bar(x + W - 12.0, y + Self::TOP, PITCH * super::modsui::VISIBLE as f32, total, super::modsui::VISIBLE, top);
+            gu.scroll_bar(
+                x + W - 12.0,
+                y + Self::TOP,
+                PITCH * super::modsui::VISIBLE as f32,
+                total,
+                super::modsui::VISIBLE,
+                top,
+            );
         }
     }
 
@@ -1521,12 +1973,19 @@ impl SettingsUi {
     fn modern_mods_help(&self) -> String {
         let lua = self.lua_page();
         if self.mods_ui.as_ref().is_some_and(|m| m.browse.is_some()) {
-            return if lua { "Enter: open the folder, or install the Lua mod's folder or archive (zip, 7z, rar). Escape: back." } else { "Enter: open the folder, or install the archive (zip, 7z, rar). Escape: back." }.into();
+            return if lua {
+                "Enter: open the folder, or install the Lua mod's folder or archive (zip, 7z, rar). Escape: back."
+            } else {
+                "Enter: open the folder, or install the archive (zip, 7z, rar). Escape: back."
+            }
+            .into();
         }
         let n = self.on_page().len();
         match self.m_mods {
             (0, _) => "Left / Right or Tab: another page of settings.".into(),
-            (1, _) if lua => "Pick a Lua mod's archive (zip, 7z, rar) or folder to install. It starts at the next login.".into(),
+            (1, _) if lua => {
+                "Pick a Lua mod's archive (zip, 7z, rar) or folder to install. It starts at the next login.".into()
+            }
             (1, _) => "Pick a DAT pack archive (zip, 7z, rar) to install. Takes effect on restart.".into(),
             (st, b) if st >= 2 && st - 2 < n => match (b, lua) {
                 (0, true) => "This mod on or off. Takes effect at the next login.",
@@ -1545,10 +2004,17 @@ impl SettingsUi {
         let m = self.mods_ui.as_ref();
         match self.row.checked_sub(1) {
             None => "Left / Right: another page of settings.".into(),
-            Some(_) if m.is_some_and(|m| m.held.is_some()) => "Up / Down: move the pack. Enter: place it here. Escape: put it back.".into(),
-            Some(_) if m.and_then(|m| m.error.as_ref()).is_some() => format!("The last install failed: {}", m.and_then(|m| m.error.clone()).unwrap_or_default()),
+            Some(_) if m.is_some_and(|m| m.held.is_some()) => {
+                "Up / Down: move the pack. Enter: place it here. Escape: put it back.".into()
+            }
+            Some(_) if m.and_then(|m| m.error.as_ref()).is_some() => {
+                format!("The last install failed: {}", m.and_then(|m| m.error.clone()).unwrap_or_default())
+            }
             Some(i) if i < n && self.lua_page() => "A Lua mod: ON / OFF. Takes effect at the next login.".into(),
-            Some(i) if i < n => format!("DAT pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.", i + 1),
+            Some(i) if i < n => format!(
+                "DAT pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.",
+                i + 1
+            ),
             Some(i) => self.offers().into_iter().nth(i - n).map_or_else(String::new, |o| o.help),
         }
     }
@@ -1612,7 +2078,10 @@ mod tests {
         }
         let (title, game) = (rows(Kind::Settings, 6, false, false), rows(Kind::Settings, 6, true, false));
         assert_eq!(title.len() + 1, game.len());
-        assert!(!title.iter().any(|r| matches!(r.val, Val::ResetPlaces)) && matches!(game.last().unwrap().val, Val::ResetPlaces));
+        assert!(
+            !title.iter().any(|r| matches!(r.val, Val::ResetPlaces))
+                && matches!(game.last().unwrap().val, Val::ResetPlaces)
+        );
     }
 
     /// A bundled mod's rows on our Extras tabs stand at their places; its other rows make its own page; a choice there
@@ -1620,8 +2089,22 @@ mod tests {
     #[test]
     fn mod_rows_on_our_tabs() {
         let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
-        let row = |key: &str, tab: &str, place| ModRow { preview: None, key: key.into(), label: key.into(), help: String::new(), choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())], at: 0, tab: tab.into(), place, place_modern: None };
-        ui.set_mod_pages(vec![ModPage { id: "m".into(), name: "M".into(), rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)] }]);
+        let row = |key: &str, tab: &str, place| ModRow {
+            preview: None,
+            key: key.into(),
+            label: key.into(),
+            help: String::new(),
+            choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())],
+            at: 0,
+            tab: tab.into(),
+            place,
+            place_modern: None,
+        };
+        ui.set_mod_pages(vec![ModPage {
+            id: "m".into(),
+            name: "M".into(),
+            rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)],
+        }]);
         assert_eq!((ui.mod_pages.len(), ui.mod_pages[0].rows.len()), (1, 1));
         ui.tab = 3;
         let shown = ui.rows();

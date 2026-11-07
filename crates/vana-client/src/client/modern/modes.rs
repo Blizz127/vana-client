@@ -19,7 +19,8 @@ pub enum Mode {
     Management = 2,
 }
 
-pub const MODES: [(Mode, &str); 3] = [(Mode::Exploration, "Exploration"), (Mode::Combat, "Combat"), (Mode::Management, "Management")];
+pub const MODES: [(Mode, &str); 3] =
+    [(Mode::Exploration, "Exploration"), (Mode::Combat, "Combat"), (Mode::Management, "Management")];
 
 /// The panels a mode may hide (panel id, name). Windows the player opens are never hidden.
 pub const PANELS: [(&str, &str); 13] = [
@@ -71,7 +72,13 @@ pub fn visibility(ctx: &Context, cfg: &ModernModes, mode: Mode, mods: &[(String,
         .chain(mods.iter().map(|m| m.0.as_str()))
         .map(|id| {
             let on = shows(cfg, mode, id);
-            let v = if cfg.fades { ctx.animate_bool_with_time(Id::unique(("modern mode fade", id)), on, FADE) } else if on { 1.0 } else { 0.0 };
+            let v = if cfg.fades {
+                ctx.animate_bool_with_time(Id::unique(("modern mode fade", id)), on, FADE)
+            } else if on {
+                1.0
+            } else {
+                0.0
+            };
             (id.to_string(), v)
         })
         .collect()
@@ -99,69 +106,84 @@ pub fn editor(p: &mut Panels, open: &mut bool, cfg: &mut ModernModes, mode: Mode
     let mut close = false;
     let note = format!("now: {}", MODES[mode as usize].1);
     let at = p.ctx.content_rect().center() - vec2(300.0, 230.0);
-    p.panel_at("uimodes", Some(Title { icon: None, text: "UI Modes", note: Some(&note), name: false }), 600.0, at, |ui| {
-        ui.label(egui::RichText::new("Which panels each mode shows, the mods' windows too. A pinned panel always shows.").size(m.theme.small).color(m.theme.color("muted")));
-        ui.add_space(6.0);
-        let font = FontId::proportional(m.theme.small);
-        let max_h = (p.ctx.content_rect().height() * 0.6).max(200.0);
-        egui::ScrollArea::vertical().max_height(max_h).auto_shrink([false, true]).show(ui, |ui| {
-        egui::Grid::new(Id::unique("modern ui modes")).spacing(vec2(8.0, 4.0)).show(ui, |ui| {
-            ui.label("");
-            for (_, name) in MODES {
-                ui.label(egui::RichText::new(name).size(m.theme.small).color(m.theme.color("gold")));
-            }
-            ui.label(egui::RichText::new("Pinned").size(m.theme.small).color(m.theme.color("gold")));
-            ui.end_row();
-            for (id, name) in rows(mods) {
-                let id = id.as_str();
-                let (r, _) = ui.allocate_exact_size(vec2(170.0, 26.0), Sense::hover());
-                let g = super::one_line(ui.painter(), &name, font.clone(), m.theme.color("text"), r.width());
-                ui.painter().galley(pos2(r.min.x, r.center().y - g.size().y / 2.0), g, egui::Color32::WHITE);
-                m.tip(ui, r, &name, "");
-                let pinned = cfg.pinned.iter().any(|p| p == id);
-                for (k, _) in MODES.iter().enumerate() {
-                    let on = !cfg.hidden[k].iter().any(|p| p == id);
-                    let s = kit::Btn { lit: on && !pinned, cursor: false, off: pinned };
-                    if kit::clicked(&kit::button(ui, m, if on || pinned { "Shown" } else { "Hidden" }, 84.0, s), s) {
-                        if on {
-                            cfg.hidden[k].push(id.to_string());
-                        } else {
-                            cfg.hidden[k].retain(|p| p != id);
+    p.panel_at(
+        "uimodes",
+        Some(Title { icon: None, text: "UI Modes", note: Some(&note), name: false }),
+        600.0,
+        at,
+        |ui| {
+            ui.label(
+                egui::RichText::new(
+                    "Which panels each mode shows, the mods' windows too. A pinned panel always shows.",
+                )
+                .size(m.theme.small)
+                .color(m.theme.color("muted")),
+            );
+            ui.add_space(6.0);
+            let font = FontId::proportional(m.theme.small);
+            let max_h = (p.ctx.content_rect().height() * 0.6).max(200.0);
+            egui::ScrollArea::vertical().max_height(max_h).auto_shrink([false, true]).show(ui, |ui| {
+                egui::Grid::new(Id::unique("modern ui modes")).spacing(vec2(8.0, 4.0)).show(ui, |ui| {
+                    ui.label("");
+                    for (_, name) in MODES {
+                        ui.label(egui::RichText::new(name).size(m.theme.small).color(m.theme.color("gold")));
+                    }
+                    ui.label(egui::RichText::new("Pinned").size(m.theme.small).color(m.theme.color("gold")));
+                    ui.end_row();
+                    for (id, name) in rows(mods) {
+                        let id = id.as_str();
+                        let (r, _) = ui.allocate_exact_size(vec2(170.0, 26.0), Sense::hover());
+                        let g = super::one_line(ui.painter(), &name, font.clone(), m.theme.color("text"), r.width());
+                        ui.painter().galley(pos2(r.min.x, r.center().y - g.size().y / 2.0), g, egui::Color32::WHITE);
+                        m.tip(ui, r, &name, "");
+                        let pinned = cfg.pinned.iter().any(|p| p == id);
+                        for (k, _) in MODES.iter().enumerate() {
+                            let on = !cfg.hidden[k].iter().any(|p| p == id);
+                            let s = kit::Btn { lit: on && !pinned, cursor: false, off: pinned };
+                            if kit::clicked(
+                                &kit::button(ui, m, if on || pinned { "Shown" } else { "Hidden" }, 84.0, s),
+                                s,
+                            ) {
+                                if on {
+                                    cfg.hidden[k].push(id.to_string());
+                                } else {
+                                    cfg.hidden[k].retain(|p| p != id);
+                                }
+                                changed = true;
+                            }
                         }
-                        changed = true;
+                        let s = kit::Btn { lit: pinned, cursor: false, off: false };
+                        if kit::clicked(&kit::button(ui, m, if pinned { "Pinned" } else { "Pin" }, 84.0, s), s) {
+                            if pinned {
+                                cfg.pinned.retain(|p| p != id);
+                            } else {
+                                cfg.pinned.push(id.to_string());
+                            }
+                            changed = true;
+                        }
+                        ui.end_row();
                     }
-                }
-                let s = kit::Btn { lit: pinned, cursor: false, off: false };
-                if kit::clicked(&kit::button(ui, m, if pinned { "Pinned" } else { "Pin" }, 84.0, s), s) {
-                    if pinned {
-                        cfg.pinned.retain(|p| p != id);
-                    } else {
-                        cfg.pinned.push(id.to_string());
-                    }
+                });
+            });
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                let s = kit::Btn { lit: cfg.fades, cursor: false, off: false };
+                if kit::clicked(&kit::button(ui, m, if cfg.fades { "Fades: On" } else { "Fades: Off" }, 0.0, s), s) {
+                    cfg.fades = !cfg.fades;
                     changed = true;
                 }
-                ui.end_row();
-            }
-        });
-        });
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            let s = kit::Btn { lit: cfg.fades, cursor: false, off: false };
-            if kit::clicked(&kit::button(ui, m, if cfg.fades { "Fades: On" } else { "Fades: Off" }, 0.0, s), s) {
-                cfg.fades = !cfg.fades;
-                changed = true;
-            }
-            let plain = kit::Btn { lit: false, cursor: false, off: false };
-            if kit::clicked(&kit::button(ui, m, "Reset", 0.0, plain), plain) {
-                *cfg = ModernModes::default();
-                changed = true;
-            }
-            if kit::clicked(&kit::button(ui, m, "Close", 0.0, plain), plain) {
-                close = true;
-            }
-        });
-    });
+                let plain = kit::Btn { lit: false, cursor: false, off: false };
+                if kit::clicked(&kit::button(ui, m, "Reset", 0.0, plain), plain) {
+                    *cfg = ModernModes::default();
+                    changed = true;
+                }
+                if kit::clicked(&kit::button(ui, m, "Close", 0.0, plain), plain) {
+                    close = true;
+                }
+            });
+        },
+    );
     // Escape closes it in the key chain (client/mod.rs), so it reaches nothing under it.
     if close {
         *open = false;

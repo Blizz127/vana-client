@@ -132,7 +132,9 @@ pub fn frame(gu: &mut GameUi, w: &mut World, input: &UiInput) -> Option<UiInput>
         match (hold.drag, site, input.pointer) {
             (Some((start, sy)), Some(s), Some(p)) => {
                 let (total, visible, top) = s.bar;
-                let t = (start as f32 + (p.1 - sy) * total as f32 / (s.rect[2] - 8.0)).trunc().clamp(0.0, total.saturating_sub(visible) as f32) as usize;
+                let t = (start as f32 + (p.1 - sy) * total as f32 / (s.rect[2] - 8.0))
+                    .trunc()
+                    .clamp(0.0, total.saturating_sub(visible) as f32) as usize;
                 if t != top {
                     msgs.push((s.owner, Msg::Set(t)));
                 }
@@ -166,8 +168,17 @@ pub fn frame(gu: &mut GameUi, w: &mut World, input: &UiInput) -> Option<UiInput>
     }
     // The bar holds the mouse: the windows under it see neither the press nor the pointer (no hover moving the hand
     // during a drag).
-    let grabbed = on.is_some() || gu.bar_hold.is_some() || (input.released && sites.iter().any(|s| Some(s.owner) == held));
-    grabbed.then(|| UiInput { pointer: None, moved: false, pressed: false, clicked: false, released: false, events: input.events.clone(), ..*input })
+    let grabbed =
+        on.is_some() || gu.bar_hold.is_some() || (input.released && sites.iter().any(|s| Some(s.owner) == held));
+    grabbed.then(|| UiInput {
+        pointer: None,
+        moved: false,
+        pressed: false,
+        clicked: false,
+        released: false,
+        events: input.events.clone(),
+        ..*input
+    })
 }
 
 /// A list message to its owner, with the bar's (total, visible, top); true when the list moved (SE 0001).
@@ -181,7 +192,13 @@ fn dispatch(w: &mut World, owner: Owner, m: Msg, bar: (usize, usize, usize)) -> 
         Owner::MapList | Owner::ScanList => w.map.as_mut().is_some_and(|map| map.bar(owner, m)),
         Owner::Search => super::search::bar(w, m),
         Owner::Picker => super::post::picker_bar(w, m),
-        Owner::Journal => super::missions::bar(w, m) || super::quests::bar(w, m) || super::roe::bar(w, m) || super::keyitems::bar(w, m) || super::currencies::bar(w, m),
+        Owner::Journal => {
+            super::missions::bar(w, m)
+                || super::quests::bar(w, m)
+                || super::roe::bar(w, m)
+                || super::keyitems::bar(w, m)
+                || super::currencies::bar(w, m)
+        }
         Owner::Linkshell => super::linkshell::bar(w, m) || super::linklist::bar(w, m) || super::concierge::bar(w, m),
         Owner::BlueSet => super::bluset::bar(w, m),
         Owner::PupSet => super::pupset::bar(w, m),
@@ -190,7 +207,12 @@ fn dispatch(w: &mut World, owner: Owner, m: Msg, bar: (usize, usize, usize)) -> 
         Owner::Auction => super::auction::bar(w, m),
         Owner::Primer => super::primer::bar(w, m),
         Owner::Faq => super::faqmain::bar(w, m, bar),
-        Owner::Points => super::merits::bar(w, m) || super::jobpoints::bar(w, m) || super::aepoints::bar(w, m) || super::unity::bar(w, m),
+        Owner::Points => {
+            super::merits::bar(w, m)
+                || super::jobpoints::bar(w, m)
+                || super::aepoints::bar(w, m)
+                || super::unity::bar(w, m)
+        }
         Owner::Config => match &mut w.config {
             Some(c) => super::configui2::bar(c, &w.game, m),
             None => false,

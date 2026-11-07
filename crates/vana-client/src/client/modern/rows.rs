@@ -83,11 +83,18 @@ fn back(p: &Painter, m: &Modern, r: Rect, s: State, style: Style) {
         Style::Hairline => {
             if s.on {
                 p.add(gradient(r, focus.gamma_multiply(0.55), focus.gamma_multiply(0.0), true));
-                p.rect_filled(Rect::from_min_max(pos2(r.min.x, r.min.y + 3.0), pos2(r.min.x + 3.0, r.max.y - 3.0)), 1.5, gold);
+                p.rect_filled(
+                    Rect::from_min_max(pos2(r.min.x, r.min.y + 3.0), pos2(r.min.x + 3.0, r.max.y - 3.0)),
+                    1.5,
+                    gold,
+                );
             } else if s.hover {
                 p.rect_filled(r, 0.0, Color32::from_white_alpha(14));
             }
-            p.line_segment([pos2(r.min.x + 10.0, r.max.y + 1.0), pos2(r.max.x - 10.0, r.max.y + 1.0)], Stroke::new(1.0, bronze.gamma_multiply(0.35)));
+            p.line_segment(
+                [pos2(r.min.x + 10.0, r.max.y + 1.0), pos2(r.max.x - 10.0, r.max.y + 1.0)],
+                Stroke::new(1.0, bronze.gamma_multiply(0.35)),
+            );
         }
         Style::Soft => {
             let r = r.shrink2(vec2(2.0, 1.0));
@@ -102,13 +109,27 @@ fn back(p: &Painter, m: &Modern, r: Rect, s: State, style: Style) {
         Style::Gilt => {
             if s.on {
                 let mid = r.center().x;
-                p.add(gradient(Rect::from_min_max(r.min, pos2(mid, r.max.y)), gold.gamma_multiply(0.02), gold.gamma_multiply(0.13), true));
-                p.add(gradient(Rect::from_min_max(pos2(mid, r.min.y), r.max), gold.gamma_multiply(0.13), gold.gamma_multiply(0.02), true));
+                p.add(gradient(
+                    Rect::from_min_max(r.min, pos2(mid, r.max.y)),
+                    gold.gamma_multiply(0.02),
+                    gold.gamma_multiply(0.13),
+                    true,
+                ));
+                p.add(gradient(
+                    Rect::from_min_max(pos2(mid, r.min.y), r.max),
+                    gold.gamma_multiply(0.13),
+                    gold.gamma_multiply(0.02),
+                    true,
+                ));
                 rule(p, r, r.min.y, gold.gamma_multiply(0.9));
                 rule(p, r, r.max.y - 1.0, gold.gamma_multiply(0.9));
                 // In the row's left margin, clear of the icons every list draws from x + 10.
                 let c = pos2(r.min.x + 5.5, r.center().y);
-                p.add(Shape::convex_polygon(vec![pos2(c.x, c.y - 3.5), pos2(c.x + 3.5, c.y), pos2(c.x, c.y + 3.5), pos2(c.x - 3.5, c.y)], gold, Stroke::NONE));
+                p.add(Shape::convex_polygon(
+                    vec![pos2(c.x, c.y - 3.5), pos2(c.x + 3.5, c.y), pos2(c.x, c.y + 3.5), pos2(c.x - 3.5, c.y)],
+                    gold,
+                    Stroke::NONE,
+                ));
             } else if s.hover {
                 p.rect_filled(r, 0.0, gold.gamma_multiply(0.06));
             }
@@ -125,8 +146,18 @@ fn back(p: &Painter, m: &Modern, r: Rect, s: State, style: Style) {
             p.line_segment([r.left_top(), r.right_top()], Stroke::new(1.0, Color32::from_white_alpha(22)));
             p.line_segment([r.left_bottom(), r.right_bottom()], Stroke::new(1.0, Color32::from_black_alpha(110)));
             if s.on {
-                p.rect_stroke(r.expand(1.0), 3.0, Stroke::new(1.0, focus.gamma_multiply(0.5)), egui::StrokeKind::Outside);
-                p.rect_stroke(r.expand(2.5), 4.0, Stroke::new(2.0, focus.gamma_multiply(0.18)), egui::StrokeKind::Outside);
+                p.rect_stroke(
+                    r.expand(1.0),
+                    3.0,
+                    Stroke::new(1.0, focus.gamma_multiply(0.5)),
+                    egui::StrokeKind::Outside,
+                );
+                p.rect_stroke(
+                    r.expand(2.5),
+                    4.0,
+                    Stroke::new(2.0, focus.gamma_multiply(0.18)),
+                    egui::StrokeKind::Outside,
+                );
             }
         }
     }
@@ -134,7 +165,13 @@ fn back(p: &Painter, m: &Modern, r: Rect, s: State, style: Style) {
 
 /// The mark of a row that opens a submenu, at its right: an arrow toward the side the submenu opens on.
 fn more(p: &Painter, m: &Modern, r: Rect, s: State, style: Style, left: bool) {
-    let c = if s.on && style != Style::Bevel { m.theme.color("gold") } else if s.on { Color32::WHITE } else { m.theme.color("muted") };
+    let c = if s.on && style != Style::Bevel {
+        m.theme.color("gold")
+    } else if s.on {
+        Color32::WHITE
+    } else {
+        m.theme.color("muted")
+    };
     let at = pos2(r.max.x - 16.0, r.center().y);
     // The tip's and the tail's x.
     let (tip, tail) = if left { (at.x - 3.0, at.x + 2.0) } else { (at.x + 2.0, at.x - 3.0) };
@@ -146,7 +183,11 @@ fn more(p: &Painter, m: &Modern, r: Rect, s: State, style: Style, left: bool) {
         }
         Style::Bevel => {
             let (tip, tail) = if left { (at.x - 3.0, at.x + 3.0) } else { (at.x + 3.0, at.x - 3.0) };
-            p.add(Shape::convex_polygon(vec![pos2(tail, at.y - 5.0), pos2(tip, at.y), pos2(tail, at.y + 5.0)], c, Stroke::NONE));
+            p.add(Shape::convex_polygon(
+                vec![pos2(tail, at.y - 5.0), pos2(tip, at.y), pos2(tail, at.y + 5.0)],
+                c,
+                Stroke::NONE,
+            ));
         }
         _ => {
             p.line_segment([pos2(tail, at.y - 5.0), pos2(tip, at.y)], Stroke::new(1.6, c));
@@ -174,7 +215,8 @@ pub fn face(p: &Painter, m: &Modern, r: Rect, face: &str, tint: Color32) {
         }
         return;
     }
-    let s = State { on: face.ends_with("_selected"), hover: face.ends_with("_hover"), off: face.ends_with("_disabled") };
+    let s =
+        State { on: face.ends_with("_selected"), hover: face.ends_with("_hover"), off: face.ends_with("_disabled") };
     let mut q = p.clone();
     if tint != Color32::WHITE {
         q.multiply_opacity(0.55);
@@ -196,16 +238,37 @@ pub fn more_mark(p: &Painter, m: &Modern, r: Rect, on: bool) -> Rect {
 /// A menu row in the current style (Modern::row_style): its icon, its label, the submenu mark when `sub` (pointing left
 /// when `left`, the submenu opening at that side); hovered by the pointer or `hover`. Its response.
 #[allow(clippy::too_many_arguments)]
-pub fn menu_row(ui: &mut Ui, m: &Modern, icon: &str, label: &str, on: bool, off: bool, sub: bool, left: bool, hover: bool) -> egui::Response {
+pub fn menu_row(
+    ui: &mut Ui,
+    m: &Modern,
+    icon: &str,
+    label: &str,
+    on: bool,
+    off: bool,
+    sub: bool,
+    left: bool,
+    hover: bool,
+) -> egui::Response {
     let style = m.row_style.get();
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::click());
     let s = State { on, off, hover: hover || resp.hovered() };
     let p = ui.painter();
     back(p, m, r, s, style);
     if let Some(sp) = m.art.sprite(icon) {
-        p.add(paint::image(&sp, pos2(r.min.x + 20.0, r.center().y - 11.0), 22.0, if off { Color32::from_gray(110) } else { Color32::WHITE }));
+        p.add(paint::image(
+            &sp,
+            pos2(r.min.x + 20.0, r.center().y - 11.0),
+            22.0,
+            if off { Color32::from_gray(110) } else { Color32::WHITE },
+        ));
     }
-    p.text(pos2(r.min.x + 50.0, r.center().y), Align2::LEFT_CENTER, label, FontId::new(m.theme.ui, FontFamily::Name(super::STRONG.into())), ink(m, s, style));
+    p.text(
+        pos2(r.min.x + 50.0, r.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        FontId::new(m.theme.ui, FontFamily::Name(super::STRONG.into())),
+        ink(m, s, style),
+    );
     if sub {
         more(p, m, r, s, style, left);
     }

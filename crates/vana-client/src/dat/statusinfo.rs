@@ -22,7 +22,10 @@ fn raw(file: &[u8], id: u16) -> Option<&[u8]> {
 pub fn entry(file: &[u8], id: u16) -> Option<Entry> {
     let mut head = raw(file, id)?.get(..0x1fc)?.to_vec();
     super::actions::unmask(&mut head);
-    let desc = string_table(&head[4..]).into_iter().find_map(|f| if let Field::Text(s) = f { Some(s) } else { None }).unwrap_or_default();
+    let desc = string_table(&head[4..])
+        .into_iter()
+        .find_map(|f| if let Field::Text(s) = f { Some(s) } else { None })
+        .unwrap_or_default();
     Some(Entry { cancel: head[2] != 0, no_timer: head[3] == 0xff, desc })
 }
 

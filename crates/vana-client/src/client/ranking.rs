@@ -100,13 +100,33 @@ pub fn busy(w: &World) -> bool {
 
 impl Transfer {
     fn new() -> Self {
-        Transfer { state: 0, stamp: 0, total: 0, piece: 0, done: 0, asked: 0, slots: [None; SLOTS], heard: Instant::now(), late: 0.0, starts: 2 }
+        Transfer {
+            state: 0,
+            stamp: 0,
+            total: 0,
+            piece: 0,
+            done: 0,
+            asked: 0,
+            slots: [None; SLOTS],
+            heard: Instant::now(),
+            late: 0.0,
+            starts: 2,
+        }
     }
 
     /// FUN_100a2b70: a slot for the next bytes; commands 1 and 2 get two tries, the others one.
     fn slot(&self, size: i32) -> Slot {
         let tries = if matches!(self.state, 1 | 2) { 2 } else { 1 };
-        Slot { cmd: self.state, offset: self.asked, size: size.min(MAX_PIECE), stamp: self.stamp, total: self.total, tries, sent: None, answered: false }
+        Slot {
+            cmd: self.state,
+            offset: self.asked,
+            size: size.min(MAX_PIECE),
+            stamp: self.stamp,
+            total: self.total,
+            tries,
+            sent: None,
+            answered: false,
+        }
     }
 
     /// FUN_100a28e0: command 1 asks the first piece (one start used), 10..13 one piece of 0 (no restart).
@@ -250,8 +270,9 @@ impl State {
         let i32_at = |o: usize| p.get(o..o + 4).map_or(0, |b| i32::from_le_bytes(b.try_into().unwrap()));
         let (cmd, result, kind, val) = (u8_at(4), u8_at(5) as i8, u8_at(6), u8_at(7));
         let (stamp, total, offset, size) = (i32_at(8), i32_at(0xc), i32_at(0x10), i32_at(0x14));
-        let own =
-            |p: &[u8]| -> Option<(u32, [u8; ENTRY])> { Some((u32::from_le_bytes(p.get(0x18..0x1c)?.try_into().ok()?), p.get(0x1c..0x40)?.try_into().ok()?)) };
+        let own = |p: &[u8]| -> Option<(u32, [u8; ENTRY])> {
+            Some((u32::from_le_bytes(p.get(0x18..0x1c)?.try_into().ok()?), p.get(0x1c..0x40)?.try_into().ok()?))
+        };
         t.heard = Instant::now();
         t.late = 0.0;
         // FUN_100a2c30: a timestamp, a size, the state's command, kind and value.
@@ -312,7 +333,9 @@ impl State {
                     st.req.buf[offset as usize..offset as usize + n].copy_from_slice(&data[..n]);
                 }
                 // FUN_100a2f00: answered slots at the bytes in order move them on.
-                while let Some(k) = t.slots.iter().position(|s| s.is_some_and(|s| s.sent.is_some() && s.answered && s.offset == t.done)) {
+                while let Some(k) =
+                    t.slots.iter().position(|s| s.is_some_and(|s| s.sent.is_some() && s.answered && s.offset == t.done))
+                {
                     t.done += t.slots[k].map_or(0, |s| s.size);
                     t.slots[k] = None;
                 }
@@ -340,7 +363,16 @@ pub fn values(w: &World, full: bool) -> Option<[i32; 8]> {
     // FUN_100a3410: the main job only for values 1..4, 6 and 7.
     let mjob = if matches!(r.val, 1..=4 | 6 | 7) { e[0x10] } else { 0 };
     let u32_at = |o: usize| u32::from_le_bytes(e[o..o + 4].try_into().unwrap()) as i32;
-    Some([r.result as i32, r.header as u16 as i16 as i32, e[0x20] as i32, mjob as i32, e[0x23] as i32, e[0x22] as i32, u32_at(0x18), u32_at(0x1c)])
+    Some([
+        r.result as i32,
+        r.header as u16 as i16 as i32,
+        e[0x20] as i32,
+        mjob as i32,
+        e[0x23] as i32,
+        e[0x22] as i32,
+        u32_at(0x18),
+        u32_at(0x1c),
+    ])
 }
 
 /// Op 0xb3 2 (FUN_1020a2a0 with FUN_100a3490): a kind 2 request with a value of 1..7 opens the window of that type;
@@ -440,7 +472,11 @@ pub fn key(w: &mut World, key: egui::Key) {
             w.sounds.push(Ui::Cursor as u32);
         }
         egui::Key::ArrowRight | egui::Key::ArrowLeft => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             if super::scrollbar::rows_abs(m, &mut a.top, &mut a.cursor, n, ROWS) {
                 w.sounds.push(Ui::Cursor as u32);
             }
@@ -484,10 +520,19 @@ pub enum Cell {
 pub fn layout(kind: u8) -> ([f32; 6], [Option<Cell>; 5]) {
     use Cell::*;
     match kind {
-        1..=3 => ([0.0, 18.0, 160.0, 243.0, 275.0, 305.0], [Some(Rank), Some(Job), Some(Name), Some(Score("[%d]")), Some(VanaDate)]),
+        1..=3 => (
+            [0.0, 18.0, 160.0, 243.0, 275.0, 305.0],
+            [Some(Rank), Some(Job), Some(Name), Some(Score("[%d]")), Some(VanaDate)],
+        ),
         4 => ([0.0, 18.0, 24.0, 120.0, 243.0, 305.0], [Some(Rank), None, Some(Icon), Some(Name), Some(Score("[%d]"))]),
-        5 => ([0.0, 18.0, 185.0, 200.0, 265.0, 305.0], [Some(Rank), Some(Name), Some(Score("%d")), Some(Triple), Some(EarthDate { from_2002: false })]),
-        _ => ([0.0, 24.0, 160.0, 250.0, 265.0, 305.0], [Some(Rank), Some(Name), Some(Score("%d P")), None, Some(EarthDate { from_2002: true })]),
+        5 => (
+            [0.0, 18.0, 185.0, 200.0, 265.0, 305.0],
+            [Some(Rank), Some(Name), Some(Score("%d")), Some(Triple), Some(EarthDate { from_2002: false })],
+        ),
+        _ => (
+            [0.0, 24.0, 160.0, 250.0, 265.0, 305.0],
+            [Some(Rank), Some(Name), Some(Score("%d P")), None, Some(EarthDate { from_2002: true })],
+        ),
     }
 }
 
@@ -508,7 +553,8 @@ pub fn text(w: &World, c: Cell, r: &Row) -> Option<String> {
             Some(crate::dat::font::decode_sjis(&crate::dat::msgfmt::vana_datetime(&g, r.time as u64, 2, key)))
         }
         Cell::EarthDate { from_2002 } => {
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+            let now =
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
             let t = (r.time as i32).wrapping_sub(super::vana_now(w) as i32).wrapping_add(now as i32);
             if from_2002 && t < 0x3ca7_2470 {
                 return None;
@@ -615,7 +661,8 @@ mod tests {
     /// order with a contest rank; our entry's values for op 0xb3 1.
     #[test]
     fn table_in_pieces() {
-        let es: Vec<_> = (0..7).map(|i| entry(&format!("Fisher{i}"), if i == 6 { 0 } else { i as u8 + 1 }, 3, 900 - i)).collect();
+        let es: Vec<_> =
+            (0..7).map(|i| entry(&format!("Fisher{i}"), if i == 6 { 0 } else { i as u8 + 1 }, 3, 900 - i)).collect();
         let total = (7 * ENTRY) as i32;
         let mut st = State::default();
         st.start(1, 4);
@@ -629,7 +676,10 @@ mod tests {
         let sent = st.tick();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0][0], 2);
-        assert_eq!(sent[0][4..20], [77i32, total, PIECE, total - PIECE].iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<_>>()[..]);
+        assert_eq!(
+            sent[0][4..20],
+            [77i32, total, PIECE, total - PIECE].iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<_>>()[..]
+        );
         st.reply(&reply(2, 1, 4, total, PIECE, &es[5..]));
         assert!(st.xfer.is_none());
         assert_eq!(st.req.result, 1);

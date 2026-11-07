@@ -42,7 +42,11 @@ impl Default for RaceStore {
 impl RaceStore {
     /// Mode @4, record index @5, size in bytes @6, data from @8; modes 1..4 clear the flag, any other sets it.
     pub fn apply(&mut self, p: &[u8]) {
-        let (mode, index, size) = (p.get(4).copied().unwrap_or(0), p.get(5).copied().unwrap_or(0) as usize, p.get(6).copied().unwrap_or(0) as usize);
+        let (mode, index, size) = (
+            p.get(4).copied().unwrap_or(0),
+            p.get(5).copied().unwrap_or(0) as usize,
+            p.get(6).copied().unwrap_or(0) as usize,
+        );
         let data = p.get(8..).unwrap_or_default();
         let data = &data[..size.min(data.len())];
         match mode {
@@ -61,7 +65,9 @@ impl RaceStore {
         if !self.ready {
             return 0;
         }
-        let rec = |d: &[u8], n: i32| if (0..n).contains(&a) && (0..3).contains(&b) { u32_at(d, 12 * a as usize + 4 * b as usize) } else { 0 };
+        let rec = |d: &[u8], n: i32| {
+            if (0..n).contains(&a) && (0..3).contains(&b) { u32_at(d, 12 * a as usize + 4 * b as usize) } else { 0 }
+        };
         match sub {
             0 if (0..2).contains(&a) => self.race[a as usize],
             0x20 => rec(&self.chocobos, 8),
@@ -222,11 +228,23 @@ pub fn step(w: &mut World, ticks: f32) {
 /// FUN_101c93c0: "%d:%02d", "%d:%02d:%02d" from an hour.
 fn clock(secs: i32) -> String {
     let s = secs.max(0);
-    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
+    } else {
+        format!("{}:{:02}", s / 60, s % 60)
+    }
 }
 
 /// The pairs' column origins (0x10385584) and counts (0x1033b2ec), rows 16 apart.
-const COLUMNS: [(f32, f32, usize); 7] = [(102.0, 83.0, 7), (182.0, 83.0, 6), (262.0, 83.0, 5), (342.0, 83.0, 4), (342.0, 179.0, 3), (262.0, 195.0, 2), (182.0, 211.0, 1)];
+const COLUMNS: [(f32, f32, usize); 7] = [
+    (102.0, 83.0, 7),
+    (182.0, 83.0, 6),
+    (262.0, 83.0, 5),
+    (342.0, 83.0, 4),
+    (342.0, 179.0, 3),
+    (262.0, 195.0, 2),
+    (182.0, 211.0, 1),
+];
 /// The tiers' colours (0x1033b2dc).
 const TIER: [u32; 4] = [0x8050_9050, 0x8080_8080, 0x8090_9040, 0x8080_4020];
 
@@ -243,7 +261,10 @@ fn draw_board(gu: &mut GameUi, w: &World, b: &Board, sw: f32, sh: f32) {
     let [x0, y0, fw, fh] = win.frame;
     let (x1, y1) = (x0 + fw, y0 + fh);
     let r = &w.racing;
-    let title = gu.lobby_msg(0x0a, 0x66, "%s (Race No. %d)").replacen("%s", b.name.as_deref().unwrap_or(""), 1).replacen("%d", &r.race_no.to_string(), 1);
+    let title = gu
+        .lobby_msg(0x0a, 0x66, "%s (Race No. %d)")
+        .replacen("%s", b.name.as_deref().unwrap_or(""), 1)
+        .replacen("%d", &r.race_no.to_string(), 1);
     gu.text(&title, x0 + 16.0, y0 + 24.0, 0, WHITE.to_le_bytes());
     let line = if b.left <= 0.0 {
         gu.lobby_msg(0x0b, 0xbb, "Bet placement closed")
@@ -257,12 +278,20 @@ fn draw_board(gu: &mut GameUi, w: &World, b: &Board, sw: f32, sh: f32) {
     for &(cx, cy, n) in &COLUMNS {
         for row in 0..n {
             let (bt, ui, _, _) = gu.parts();
-            crate::render::screens::push_shape_text_right(bt, ui, r.odds[k].to_string().as_bytes(), x0 + cx, y0 + cy + 16.0 * row as f32, TIER[r.tiers[k] as usize & 3]);
+            crate::render::screens::push_shape_text_right(
+                bt,
+                ui,
+                r.odds[k].to_string().as_bytes(),
+                x0 + cx,
+                y0 + cy + 16.0 * row as f32,
+                TIER[r.tiers[k] as usize & 3],
+            );
             k += 1;
         }
     }
     if b.left > 0.0 {
-        let s = gu.lobby_msg(0x0a, 0x64, "Toteboard updated in (%s)").replacen("%s", &clock((b.refresh / 60.0) as i32), 1);
+        let s =
+            gu.lobby_msg(0x0a, 0x64, "Toteboard updated in (%s)").replacen("%s", &clock((b.refresh / 60.0) as i32), 1);
         right(gu, &s, x1 - 4.0, y1 - 20.0, 0x8040_4040);
     }
 }
@@ -370,6 +399,9 @@ mod tests {
 
     #[test]
     fn clocks() {
-        assert_eq!((clock(65), clock(3661), clock(-3)), ("1:05".to_string(), "1:01:01".to_string(), "0:00".to_string()));
+        assert_eq!(
+            (clock(65), clock(3661), clock(-3)),
+            ("1:05".to_string(), "1:01:01".to_string(), "0:00".to_string())
+        );
     }
 }

@@ -257,8 +257,21 @@ impl Trail {
             _ => 0,
         } as f32;
         let n = n as f32;
-        let col = |c: [f32; 4], da: f32| -> [f32; 4] { [(c[0] - m * self.dec[0]).clamp(0.0, 255.0), (c[1] - m * self.dec[1]).clamp(0.0, 255.0), (c[2] - m * self.dec[2]).clamp(0.0, 255.0), (c[3] - n * da).clamp(0.0, 255.0)] };
-        Aged { a: s.b0 + u0 * sa, b: s.b0 + u0 * sb, ca: col(self.ca, self.dec[3]), cb: col(self.cb, self.dec_b), void: [s.birth < self.void_below[0], s.birth < self.void_below[1]] }
+        let col = |c: [f32; 4], da: f32| -> [f32; 4] {
+            [
+                (c[0] - m * self.dec[0]).clamp(0.0, 255.0),
+                (c[1] - m * self.dec[1]).clamp(0.0, 255.0),
+                (c[2] - m * self.dec[2]).clamp(0.0, 255.0),
+                (c[3] - n * da).clamp(0.0, 255.0),
+            ]
+        };
+        Aged {
+            a: s.b0 + u0 * sa,
+            b: s.b0 + u0 * sb,
+            ca: col(self.ca, self.dec[3]),
+            cb: col(self.cb, self.dec_b),
+            void: [s.birth < self.void_below[0], s.birth < self.void_below[1]],
+        }
     }
 
     /// The trim (asm:28827..28976): pairs (newer P, older Q) with both edges under 0.005 (a NaN edge never is), or
@@ -269,7 +282,9 @@ impl Trail {
         aged.windows(2)
             .filter(|w| {
                 let (p, q) = (&w[0], &w[1]);
-                (short(q) && short(p)) || q.ca[3] + q.cb[3] + p.cb[3] + p.ca[3] <= 0.0 || [q.ca, q.cb, p.ca, p.cb].iter().map(|c| c[0] + c[1] + c[2]).sum::<f32>() <= 0.0
+                (short(q) && short(p))
+                    || q.ca[3] + q.cb[3] + p.cb[3] + p.ca[3] <= 0.0
+                    || [q.ca, q.cb, p.ca, p.cb].iter().map(|c| c[0] + c[1] + c[2]).sum::<f32>() <= 0.0
             })
             .count()
     }
@@ -286,14 +301,31 @@ impl Trail {
     /// The GPU record: count, head, aged, fade_from (or !0), split, void A / B; CA, CB, V18, (p, q, V28.w); samples.
     pub fn gpu_words(&self) -> Vec<u32> {
         let mut w = vec![0u32; WORDS];
-        w[..7].copy_from_slice(&[self.count as u32, self.head as u32, self.aged, self.fade_from.unwrap_or(u32::MAX), self.split as u32, self.void_below[0], self.void_below[1]]);
+        w[..7].copy_from_slice(&[
+            self.count as u32,
+            self.head as u32,
+            self.aged,
+            self.fade_from.unwrap_or(u32::MAX),
+            self.split as u32,
+            self.void_below[0],
+            self.void_below[1],
+        ]);
         let floats = [self.ca, self.cb, self.dec, [self.shrink.0, self.shrink.1, self.dec_b, 0.0]];
         for (i, v) in floats.iter().flatten().enumerate() {
             w[8 + i] = v.to_bits();
         }
         for (k, s) in self.ring.iter().enumerate() {
             let o = HEAD_WORDS + k * 8;
-            w[o..o + 8].copy_from_slice(&[s.a0.x.to_bits(), s.a0.y.to_bits(), s.a0.z.to_bits(), s.birth, s.b0.x.to_bits(), s.b0.y.to_bits(), s.b0.z.to_bits(), 0]);
+            w[o..o + 8].copy_from_slice(&[
+                s.a0.x.to_bits(),
+                s.a0.y.to_bits(),
+                s.a0.z.to_bits(),
+                s.birth,
+                s.b0.x.to_bits(),
+                s.b0.y.to_bits(),
+                s.b0.z.to_bits(),
+                0,
+            ]);
         }
         w
     }
@@ -312,7 +344,12 @@ mod tests {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok()?;
         let lib = crate::fx::lib::Library::load(file, index.read(file).unwrap()).unwrap();
-        let n = lib.tree.nodes.iter().position(|x| x.kind == crate::dat::generator::kind::AFB && x.name[..3] == name[..]).expect("no Afb");
+        let n = lib
+            .tree
+            .nodes
+            .iter()
+            .position(|x| x.kind == crate::dat::generator::kind::AFB && x.name[..3] == name[..])
+            .expect("no Afb");
         Some(Afb::parse(lib.data(n)).expect("Afb parse"))
     }
 
@@ -337,8 +374,13 @@ mod tests {
         let (bone, off) = skel.points[0];
         let r = skel.point_rots.first().copied().unwrap_or(Vec3::ZERO);
         let b = crate::dat::character::pose(&skel, &[])[bone as usize];
-        let local = Mat4::from_translation(off) * Mat4::from_rotation_z(r.z) * Mat4::from_rotation_y(r.y) * Mat4::from_rotation_x(r.x);
-        let w = Mat4::from_scale_rotation_translation(b.s, b.q, b.t) * local * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let local = Mat4::from_translation(off)
+            * Mat4::from_rotation_z(r.z)
+            * Mat4::from_rotation_y(r.y)
+            * Mat4::from_rotation_x(r.x);
+        let w = Mat4::from_scale_rotation_translation(b.s, b.q, b.t)
+            * local
+            * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2);
         let p = Vec3::new(2.773, -0.008, 0.320);
         let d = w.transform_vector3(p) - p;
         assert!(d.length() < 1e-3, "bone {bone} {b:?}: {p} -> {}", w.transform_vector3(p));

@@ -2,10 +2,10 @@
 //! side (the last three), the command menus as the Social pages draw retail's, the item list, the price history and the
 //! inventory for sale as lists of every row; the price and shopsell asked under them.
 
+use super::super::World;
 use super::super::auction::{self, Look, Pane, PaneRow};
 use super::super::game_ui::GameUi;
 use super::super::items::ItemCache;
-use super::super::World;
 use super::craft::{button, caption, money_row, tint};
 use super::{MenuWin, Panels, Title, social};
 use crate::audio::Ui as Se;
@@ -37,14 +37,29 @@ fn width(p: &Pane) -> f32 {
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     ui.add_space(4.0);
 }
 
 /// Item rows (the list, the inventory for sale): icon, the stack size, the name in its tint, the cell at the right; the
 /// cursor's kept in view. The row clicked on the pane with the keys.
 #[allow(clippy::too_many_arguments)]
-fn item_rows(ui: &mut Ui, m: &super::Modern, info: &ItemCache, salt: &str, rows: &[PaneRow], cur: usize, focused: bool, note: Option<&str>, tall: f32) -> Option<usize> {
+fn item_rows(
+    ui: &mut Ui,
+    m: &super::Modern,
+    info: &ItemCache,
+    salt: &str,
+    rows: &[PaneRow],
+    cur: usize,
+    focused: bool,
+    note: Option<&str>,
+    tall: f32,
+) -> Option<usize> {
     let ctx = ui.ctx().clone();
     let seen = egui::Id::unique((salt, "auction cursor seen"));
     let follow = ctx.data(|d| d.get_temp::<usize>(seen)) != Some(cur);
@@ -60,15 +75,32 @@ fn item_rows(ui: &mut Ui, m: &super::Modern, info: &ItemCache, salt: &str, rows:
             };
             super::rows::face(ui.painter(), m, rect, face, Color32::WHITE);
             if let Some(t) = m.item_icon(&ctx, info, r.item) {
-                ui.painter().image(t, Rect::from_min_size(pos2(rect.min.x + 8.0, rect.center().y - ICON / 2.0), vec2(ICON, ICON)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                ui.painter().image(
+                    t,
+                    Rect::from_min_size(pos2(rect.min.x + 8.0, rect.center().y - ICON / 2.0), vec2(ICON, ICON)),
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
             }
             let mut name = info.item(r.item).map(|it| it.name.clone()).unwrap_or_default();
             if let Some(n) = r.stack {
                 name = format!("{name} x{n}");
             }
             let clip = Rect::from_min_max(rect.min, pos2(rect.max.x - 100.0, rect.max.y));
-            ui.painter().with_clip_rect(clip).text(pos2(rect.min.x + 38.0, rect.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.ui), tint(m, r.tint));
-            ui.painter().text(pos2(rect.max.x - 10.0, rect.center().y), Align2::RIGHT_CENTER, &r.right, FontId::proportional(m.theme.ui), m.theme.color("text"));
+            ui.painter().with_clip_rect(clip).text(
+                pos2(rect.min.x + 38.0, rect.center().y),
+                Align2::LEFT_CENTER,
+                name,
+                FontId::proportional(m.theme.ui),
+                tint(m, r.tint),
+            );
+            ui.painter().text(
+                pos2(rect.max.x - 10.0, rect.center().y),
+                Align2::RIGHT_CENTER,
+                &r.right,
+                FontId::proportional(m.theme.ui),
+                m.theme.color("text"),
+            );
             if k == cur && follow {
                 ui.scroll_to_rect(rect, None);
             }
@@ -85,29 +117,51 @@ fn item_rows(ui: &mut Ui, m: &super::Modern, info: &ItemCache, salt: &str, rows:
 }
 
 /// The price history: date, seller → buyer, price per sale.
-fn history_rows(ui: &mut Ui, m: &super::Modern, rows: &[[String; 4]], cur: usize, focused: bool, note: Option<&str>, tall: f32) -> Option<usize> {
+fn history_rows(
+    ui: &mut Ui,
+    m: &super::Modern,
+    rows: &[[String; 4]],
+    cur: usize,
+    focused: bool,
+    note: Option<&str>,
+    tall: f32,
+) -> Option<usize> {
     let mut click = None;
     let follow = m.moved("auction history", cur);
-    super::kit::scroll(ui, "auction history", tall, |ui| for (k, r) in rows.iter().enumerate() {
-        let (rect, resp) = ui.allocate_exact_size(vec2(HIST_W - 14.0, ROW - 4.0), Sense::click());
-        if k == cur && follow {
-            ui.scroll_to_rect(rect, None);
+    super::kit::scroll(ui, "auction history", tall, |ui| {
+        for (k, r) in rows.iter().enumerate() {
+            let (rect, resp) = ui.allocate_exact_size(vec2(HIST_W - 14.0, ROW - 4.0), Sense::click());
+            if k == cur && follow {
+                ui.scroll_to_rect(rect, None);
+            }
+            let face = match () {
+                _ if k == cur && focused => "controls/list_row_selected",
+                _ if resp.hovered() => "controls/list_row_hover",
+                _ => "controls/list_row_normal",
+            };
+            super::rows::face(ui.painter(), m, rect, face, Color32::WHITE);
+            let (font, text) = (FontId::proportional(m.theme.small), m.theme.color("text"));
+            let y = rect.center().y;
+            ui.painter().text(
+                pos2(rect.min.x + 10.0, y),
+                Align2::LEFT_CENTER,
+                &r[0],
+                font.clone(),
+                m.theme.color("muted"),
+            );
+            ui.painter().text(
+                pos2(rect.min.x + 150.0, y),
+                Align2::LEFT_CENTER,
+                format!("{}  →  {}", r[1], r[2]),
+                font.clone(),
+                text,
+            );
+            ui.painter().text(pos2(rect.max.x - 10.0, y), Align2::RIGHT_CENTER, &r[3], font, text);
+            if focused && resp.clicked() {
+                click = Some(k);
+            }
+            ui.add_space(2.0);
         }
-        let face = match () {
-            _ if k == cur && focused => "controls/list_row_selected",
-            _ if resp.hovered() => "controls/list_row_hover",
-            _ => "controls/list_row_normal",
-        };
-        super::rows::face(ui.painter(), m, rect, face, Color32::WHITE);
-        let (font, text) = (FontId::proportional(m.theme.small), m.theme.color("text"));
-        let y = rect.center().y;
-        ui.painter().text(pos2(rect.min.x + 10.0, y), Align2::LEFT_CENTER, &r[0], font.clone(), m.theme.color("muted"));
-        ui.painter().text(pos2(rect.min.x + 150.0, y), Align2::LEFT_CENTER, format!("{}  →  {}", r[1], r[2]), font.clone(), text);
-        ui.painter().text(pos2(rect.max.x - 10.0, y), Align2::RIGHT_CENTER, &r[3], font, text);
-        if focused && resp.clicked() {
-            click = Some(k);
-        }
-        ui.add_space(2.0);
     });
     if let Some(n) = note {
         ui.label(egui::RichText::new(n).size(m.theme.small).color(m.theme.color("muted")));
@@ -125,27 +179,54 @@ fn search_box(ui: &mut Ui, m: &super::Modern) -> bool {
     if let Some(s) = m.art.sprite("controls/search") {
         ui.painter().add(super::paint::image(&s, pos2(r.min.x + 8.0, r.center().y - 9.0), 18.0, Color32::WHITE));
     }
-    ui.painter().text(pos2(r.min.x + 32.0, r.center().y), Align2::LEFT_CENTER, "Search the auction house", FontId::proportional(m.theme.ui), m.theme.color("muted"));
+    ui.painter().text(
+        pos2(r.min.x + 32.0, r.center().y),
+        Align2::LEFT_CENTER,
+        "Search the auction house",
+        FontId::proportional(m.theme.ui),
+        m.theme.color("muted"),
+    );
     resp.clicked()
 }
 
 /// One pane as a column; a list reaches down to `fill` (the tallest menu column last frame), 12 rows at least. Its
 /// height.
 #[allow(clippy::too_many_arguments)]
-fn pane(ui: &mut Ui, m: &super::Modern, gu: &GameUi, info: &ItemCache, p: &Pane, focused: bool, bazaar: usize, mouse: &mut Mouse, fill: f32) -> f32 {
+fn pane(
+    ui: &mut Ui,
+    m: &super::Modern,
+    gu: &GameUi,
+    info: &ItemCache,
+    p: &Pane,
+    focused: bool,
+    bazaar: usize,
+    mouse: &mut Mouse,
+    fill: f32,
+) -> f32 {
     ui.vertical(|ui| {
         ui.set_width(width(p));
         let tall = |ui: &Ui| (fill - ui.min_rect().height()).max(TALL);
         match p {
             Pane::Menu { name, sel, off, labels } => {
-                let v = MenuWin { name, sel: *sel, off: off.clone(), labels: labels.clone(), marked: Vec::new(), values: Vec::new() };
+                let v = MenuWin {
+                    name,
+                    sel: *sel,
+                    off: off.clone(),
+                    labels: labels.clone(),
+                    marked: Vec::new(),
+                    values: Vec::new(),
+                };
                 let got = social::column(ui, m, gu, &v, focused);
                 if focused {
                     mouse.menu = got;
                 }
             }
             Pane::List { sales, rows, cursor, note } => {
-                let t = if *sales { caption(gu, "menu    auc1", 3, "Sales Status") } else { gu.title_msg(0x79).unwrap_or_else(|| "Bid".into()) };
+                let t = if *sales {
+                    caption(gu, "menu    auc1", 3, "Sales Status")
+                } else {
+                    gu.title_msg(0x79).unwrap_or_else(|| "Bid".into())
+                };
                 heading(ui, m, &t);
                 let got = item_rows(ui, m, info, "auction list", rows, *cursor, focused, note.as_deref(), tall(ui));
                 if focused {
@@ -162,13 +243,27 @@ fn pane(ui: &mut Ui, m: &super::Modern, gu: &GameUi, info: &ItemCache, p: &Pane,
             }
             Pane::Sell { rows, cursor } => {
                 heading(ui, m, &caption(gu, "menu    auc1", 2, "Sell"));
-                let got = item_rows(ui, m, info, "auction sell", rows, *cursor, focused, rows.is_empty().then_some("Nothing to sell."), tall(ui));
+                let got = item_rows(
+                    ui,
+                    m,
+                    info,
+                    "auction sell",
+                    rows,
+                    *cursor,
+                    focused,
+                    rows.is_empty().then_some("Nothing to sell."),
+                    tall(ui),
+                );
                 if focused {
                     mouse.row = got;
                 }
                 // Retail leaves bazaar items out without a word (ours).
                 if bazaar > 0 {
-                    let s = if bazaar == 1 { "1 item in your bazaar is not listed.".to_string() } else { format!("{bazaar} items in your bazaar are not listed.") };
+                    let s = if bazaar == 1 {
+                        "1 item in your bazaar is not listed.".to_string()
+                    } else {
+                        format!("{bazaar} items in your bazaar are not listed.")
+                    };
                     ui.label(egui::RichText::new(s).size(m.theme.small).color(m.theme.color("gold")));
                 }
             }
@@ -181,7 +276,13 @@ fn pane(ui: &mut Ui, m: &super::Modern, gu: &GameUi, info: &ItemCache, p: &Pane,
 
 /// Type-to-search (modern/search.rs) in the item list, Sales Status or the inventory for sale while it has the keys.
 pub(super) fn search_open(w: &World) -> bool {
-    w.confirm.is_none() && auction::look(w).is_some_and(|v| !v.busy && v.money.is_none() && v.shopsell.is_none() && matches!(v.panes.last(), Some(Pane::List { .. } | Pane::Sell { .. })))
+    w.confirm.is_none()
+        && auction::look(w).is_some_and(|v| {
+            !v.busy
+                && v.money.is_none()
+                && v.shopsell.is_none()
+                && matches!(v.panes.last(), Some(Pane::List { .. } | Pane::Sell { .. }))
+        })
 }
 
 pub(super) fn search_rows(w: &World) -> Vec<super::super::listsearch::Entry> {
@@ -189,7 +290,11 @@ pub(super) fn search_rows(w: &World) -> Vec<super::super::listsearch::Entry> {
         Some(Pane::List { rows, .. } | Pane::Sell { rows, .. }) => rows,
         _ => return Vec::new(),
     };
-    rows.into_iter().map(|r| super::super::listsearch::Entry::item(w, r.item).note(r.right).dim(r.tint == crate::inventory::TINT_DIM)).collect()
+    rows.into_iter()
+        .map(|r| {
+            super::super::listsearch::Entry::item(w, r.item).note(r.right).dim(r.tint == crate::inventory::TINT_DIM)
+        })
+        .collect()
 }
 
 /// A pick: the cursor onto row `k`, then Enter.
@@ -224,69 +329,90 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let (mut found, mut start) = (super::lists::Mouse::default(), false);
     let mut generic = super::lists::found(p, w, "auction");
     let wide = if search.is_some() { LIST_W + 44.0 } else { 0.0 };
-    p.panel("window", Some(Title { icon: Some("icons/currency"), text: &title, note: Some(&gil), name: false }), total.max(MENU_W + 44.0).max(wide), |ui| {
-        if let Some((text, sel, hits, icons)) = search.as_ref().filter(|s| !s.0.is_empty()) {
-            if loading {
-                // Every category is asked once, slowly (the server limits its sessions); later searches are instant.
-                super::lists::search_field(ui, m, text);
-                let dots = ".".repeat(1 + (ui.input(|i| i.time) * 2.0) as usize % 3);
-                ui.label(egui::RichText::new(format!("Searching{dots}")).size(m.theme.ui).color(m.theme.color("muted")));
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/currency"), text: &title, note: Some(&gil), name: false }),
+        total.max(MENU_W + 44.0).max(wide),
+        |ui| {
+            if let Some((text, sel, hits, icons)) = search.as_ref().filter(|s| !s.0.is_empty()) {
+                if loading {
+                    // Every category is asked once, slowly (the server limits its sessions); later searches are instant.
+                    super::lists::search_field(ui, m, text);
+                    let dots = ".".repeat(1 + (ui.input(|i| i.time) * 2.0) as usize % 3);
+                    ui.label(
+                        egui::RichText::new(format!("Searching{dots}")).size(m.theme.ui).color(m.theme.color("muted")),
+                    );
+                    return;
+                }
+                found = super::lists::search_rows(ui, m, w, icons, text, *sel, hits);
                 return;
             }
-            found = super::lists::search_rows(ui, m, w, icons, text, *sel, hits);
-            return;
-        }
-        if searchable {
-            // The field reached with Up and still empty: focused, the pages under it as they were.
-            match &search {
-                Some(_) => super::lists::search_field(ui, m, ""),
-                None => start = search_box(ui, m),
+            if searchable {
+                // The field reached with Up and still empty: focused, the pages under it as they were.
+                match &search {
+                    Some(_) => super::lists::search_field(ui, m, ""),
+                    None => start = search_box(ui, m),
+                }
+                ui.add_space(6.0);
             }
-            ui.add_space(6.0);
-        }
-        ui.horizontal_top(|ui| {
-            let id = egui::Id::new("auction tallest menu");
-            let fill = ui.ctx().data(|d| d.get_temp::<f32>(id)).unwrap_or(0.0);
-            let mut tallest = 0.0f32;
-            for (k, pn) in panes.iter().enumerate() {
-                if k > 0 {
-                    ui.add_space(16.0);
-                }
-                let top = k + 1 == panes.len();
-                // A search in the top list: its hits in the list's place.
-                if top && generic.is_some() {
-                    ui.vertical(|ui| {
-                        ui.set_width(width(pn));
-                        super::lists::rows_or(ui, m, &mut generic);
-                    });
-                    continue;
-                }
-                let h = pane(ui, m, gu, &info, pn, top && free && !asking && !v.busy && search.is_none(), bazaar, &mut mouse, fill);
-                if matches!(pn, Pane::Menu { .. }) {
-                    tallest = tallest.max(h);
-                }
-            }
-            ui.ctx().data_mut(|d| d.insert_temp(id, tallest));
-        });
-        if let Some((step, max, val, item)) = v.money {
-            ui.add_space(10.0);
-            let name = info.item(item).map(|it| it.name.clone()).unwrap_or_default();
-            ui.label(egui::RichText::new(name).size(m.theme.ui).color(m.theme.color("gold")));
-            (mouse.key, mouse.money) = money_row(ui, m, gu, (step, max, val), v.money_btn);
-        }
-        if let Some((sel, item, price)) = v.shopsell {
-            ui.add_space(10.0);
-            let name = info.item(item).map(|it| it.name.clone()).unwrap_or_default();
-            ui.label(egui::RichText::new(format!("Put {name} up for {}?", crate::inventory::gil_text(price as i64))).size(m.theme.ui).color(m.theme.color("gold")));
-            ui.horizontal(|ui| {
-                for (k, d) in [(1u16, "Sell"), (2, "Cancel")] {
-                    if button(ui, m, &caption(gu, "menu    shopsell", k, d), 110.0, sel == k, false) {
-                        mouse.shopsell = Some(k);
+            ui.horizontal_top(|ui| {
+                let id = egui::Id::new("auction tallest menu");
+                let fill = ui.ctx().data(|d| d.get_temp::<f32>(id)).unwrap_or(0.0);
+                let mut tallest = 0.0f32;
+                for (k, pn) in panes.iter().enumerate() {
+                    if k > 0 {
+                        ui.add_space(16.0);
+                    }
+                    let top = k + 1 == panes.len();
+                    // A search in the top list: its hits in the list's place.
+                    if top && generic.is_some() {
+                        ui.vertical(|ui| {
+                            ui.set_width(width(pn));
+                            super::lists::rows_or(ui, m, &mut generic);
+                        });
+                        continue;
+                    }
+                    let h = pane(
+                        ui,
+                        m,
+                        gu,
+                        &info,
+                        pn,
+                        top && free && !asking && !v.busy && search.is_none(),
+                        bazaar,
+                        &mut mouse,
+                        fill,
+                    );
+                    if matches!(pn, Pane::Menu { .. }) {
+                        tallest = tallest.max(h);
                     }
                 }
+                ui.ctx().data_mut(|d| d.insert_temp(id, tallest));
             });
-        }
-    });
+            if let Some((step, max, val, item)) = v.money {
+                ui.add_space(10.0);
+                let name = info.item(item).map(|it| it.name.clone()).unwrap_or_default();
+                ui.label(egui::RichText::new(name).size(m.theme.ui).color(m.theme.color("gold")));
+                (mouse.key, mouse.money) = money_row(ui, m, gu, (step, max, val), v.money_btn);
+            }
+            if let Some((sel, item, price)) = v.shopsell {
+                ui.add_space(10.0);
+                let name = info.item(item).map(|it| it.name.clone()).unwrap_or_default();
+                ui.label(
+                    egui::RichText::new(format!("Put {name} up for {}?", crate::inventory::gil_text(price as i64)))
+                        .size(m.theme.ui)
+                        .color(m.theme.color("gold")),
+                );
+                ui.horizontal(|ui| {
+                    for (k, d) in [(1u16, "Sell"), (2, "Cancel")] {
+                        if button(ui, m, &caption(gu, "menu    shopsell", k, d), 110.0, sel == k, false) {
+                            mouse.shopsell = Some(k);
+                        }
+                    }
+                });
+            }
+        },
+    );
     if !free {
         return;
     }

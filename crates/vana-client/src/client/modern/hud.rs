@@ -5,7 +5,9 @@
 //! draw them too.
 
 use super::super::resttick::Shown;
-use super::super::{App, World, buffs, event, hudtop, items::JOBS, monstrosity, objective, radar, self_entity, target, vana_now};
+use super::super::{
+    App, World, buffs, event, hudtop, items::JOBS, monstrosity, objective, radar, self_entity, target, vana_now,
+};
 use super::{Look, Modern, Panels, Title, chat, paint};
 use egui::{Align2, Color32, FontFamily, FontId, Painter, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use std::f32::consts::PI;
@@ -20,7 +22,16 @@ pub fn job_icon(j: u8) -> Option<String> {
 }
 
 /// The pack's element icons in day order (Firesday .. Darksday).
-const ELEMENTS: [&str; 8] = ["icons/fire", "icons/earth", "icons/water", "icons/wind", "icons/ice", "icons/lightning", "icons/light", "icons/dark"];
+const ELEMENTS: [&str; 8] = [
+    "icons/fire",
+    "icons/earth",
+    "icons/water",
+    "icons/wind",
+    "icons/ice",
+    "icons/lightning",
+    "icons/light",
+    "icons/dark",
+];
 
 /// An effect icon: the game's status icon by id, or one of the pack's (the offscreen shot).
 #[derive(Clone)]
@@ -45,7 +56,12 @@ fn effect_tip(p: Look, w: &World, id: u16, rem: Option<i32>) -> Option<(std::rc:
     let small = w.game.get(0x99) & 4 != 0;
     let bt = w.battle.as_ref()?;
     let mut cache = p.m.status_tips.borrow_mut();
-    let text = cache.entry((id, small)).or_insert_with(|| std::rc::Rc::new((bt.status_title(id), p.gu.and_then(|gu| gu.status_entry(small, id)).map(|e| e.desc).unwrap_or_default())));
+    let text = cache.entry((id, small)).or_insert_with(|| {
+        std::rc::Rc::new((
+            bt.status_title(id),
+            p.gu.and_then(|gu| gu.status_entry(small, id)).map(|e| e.desc).unwrap_or_default(),
+        ))
+    });
     Some((text.clone(), rem))
 }
 
@@ -55,7 +71,11 @@ fn show_effect_tip(ui: &Ui, m: &Modern, r: Rect, e: &Effect) {
     m.tip_with(ui, r, || {
         let mut body = text.1.clone();
         if let Some(r) = rem.filter(|r| *r > 0) {
-            let t = if r >= 3600 { format!("{}:{:02}:{:02}", r / 3600, r / 60 % 60, r % 60) } else { format!("{}:{:02}", r / 60, r % 60) };
+            let t = if r >= 3600 {
+                format!("{}:{:02}:{:02}", r / 3600, r / 60 % 60, r % 60)
+            } else {
+                format!("{}:{:02}", r / 60, r % 60)
+            };
             body = if body.is_empty() { format!("{t} left") } else { format!("{body}\n{t} left") };
         }
         (text.0.clone(), body)
@@ -140,7 +160,11 @@ fn target_cast(w: &World, id: u32) -> Option<(String, Option<f32>)> {
     let c = w.casts.get(&id)?;
     let t = c.start.elapsed().as_secs_f32();
     let name = if c.skill {
-        if c.id >= 0x100 { w.battle.as_ref().map(|b| b.mob_skill(c.id)) } else { w.names.as_ref().and_then(|n| n.ability(c.id as u32)) }
+        if c.id >= 0x100 {
+            w.battle.as_ref().map(|b| b.mob_skill(c.id))
+        } else {
+            w.names.as_ref().and_then(|n| n.ability(c.id as u32))
+        }
     } else {
         w.names.as_ref().and_then(|n| n.spell(c.id as u32))
     }
@@ -182,7 +206,9 @@ pub struct CompassView {
 
 /// The pack's gauge pair (`kind`_empty, `kind`_full) cut at `f` over `r`.
 fn bar(ui: &Ui, m: &Modern, kind: &str, r: Rect, f: f32) {
-    if let (Some(e), Some(full)) = (m.art.sprite(&format!("gauges/{kind}_empty")), m.art.sprite(&format!("gauges/{kind}_full"))) {
+    if let (Some(e), Some(full)) =
+        (m.art.sprite(&format!("gauges/{kind}_empty")), m.art.sprite(&format!("gauges/{kind}_full")))
+    {
         paint::gauge(ui.painter(), &e, &full, r, f);
     }
 }
@@ -192,7 +218,15 @@ pub(super) const BAR: f32 = 14.0;
 const LABEL_SIZE: f32 = 18.0;
 
 /// A bar with its label and value over its top edge, the label a little in from the bar's start.
-pub(super) fn labelled_bar(ui: &Ui, m: &Modern, kind: &str, r: Rect, f: f32, label: (&str, Color32), value: (&str, Color32)) {
+pub(super) fn labelled_bar(
+    ui: &Ui,
+    m: &Modern,
+    kind: &str,
+    r: Rect,
+    f: f32,
+    label: (&str, Color32),
+    value: (&str, Color32),
+) {
     bar(ui, m, kind, r, f);
     let p = ui.painter();
     let font = FontId::new(LABEL_SIZE, FontFamily::Name(super::LABEL.into()));
@@ -207,13 +241,22 @@ pub(super) fn labelled_bar(ui: &Ui, m: &Modern, kind: &str, r: Rect, f: f32, lab
 /// A gauge row: the bar across the row, its label and value over it.
 fn gauge_row(ui: &mut Ui, m: &Modern, label: &str, kind: &str, f: f32, value: &str) {
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
-    labelled_bar(ui, m, kind, Rect::from_min_max(pos2(r.min.x, r.max.y - BAR), r.max), f, (label, m.theme.color("text")), (value, m.theme.color("text")));
+    labelled_bar(
+        ui,
+        m,
+        kind,
+        Rect::from_min_max(pos2(r.min.x, r.max.y - BAR), r.max),
+        f,
+        (label, m.theme.color("text")),
+        (value, m.theme.color("text")),
+    );
 }
 
 /// An effect's icon at `r`, dimmed while it blinks.
 fn effect_icon(p: Look, painter: &egui::Painter, e: &Effect, r: Rect, small: bool) {
     let t = p.ctx.input(|i| i.time) as f32;
-    let tint = if e.ending { Color32::from_gray((140.0 + 115.0 * (t * 4.0).sin().abs()) as u8) } else { Color32::WHITE };
+    let tint =
+        if e.ending { Color32::from_gray((140.0 + 115.0 * (t * 4.0).sin().abs()) as u8) } else { Color32::WHITE };
     match e.icon {
         Icon::Game(id) => {
             if let Some((tex, uv)) = p.gu.and_then(|gu| p.m.status_icon(p.ctx, gu, small, id)) {
@@ -237,7 +280,16 @@ const FX_STEP: f32 = 40.0;
 const FX_ROW: usize = buffs::MODERN_ROW;
 
 /// Effects in rows of `per` icons `size` points square, `step` apart, their times under them.
-fn effects_grid(ui: &mut Ui, p: Look, effects: &[Effect], size: f32, step: f32, per: usize, small: bool, cursor: Option<usize>) {
+fn effects_grid(
+    ui: &mut Ui,
+    p: Look,
+    effects: &[Effect],
+    size: f32,
+    step: f32,
+    per: usize,
+    small: bool,
+    cursor: Option<usize>,
+) {
     let m = p.m;
     for (row, chunk) in effects.chunks(per).enumerate() {
         let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), size + 19.0), Sense::hover());
@@ -247,10 +299,22 @@ fn effects_grid(ui: &mut Ui, p: Look, effects: &[Effect], size: f32, step: f32, 
             show_effect_tip(ui, m, at, e);
             // Retail's cursor box (anc_equi) in its orange-red, on the icon's cell, clear of the time under it.
             if cursor == Some(row * per + k) {
-                ui.painter().rect_stroke(at.expand(1.0), 4.0, egui::Stroke::new(2.0, Color32::from_rgb(0xff, 0x6a, 0x2a)), egui::StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    at.expand(1.0),
+                    4.0,
+                    egui::Stroke::new(2.0, Color32::from_rgb(0xff, 0x6a, 0x2a)),
+                    egui::StrokeKind::Outside,
+                );
             }
             if let Some(l) = &e.label {
-                paint::outlined(ui.painter(), pos2(at.center().x, at.max.y + 4.0), Align2::CENTER_TOP, l, FontId::proportional(m.theme.small), m.theme.color("text"));
+                paint::outlined(
+                    ui.painter(),
+                    pos2(at.center().x, at.max.y + 4.0),
+                    Align2::CENTER_TOP,
+                    l,
+                    FontId::proportional(m.theme.small),
+                    m.theme.color("text"),
+                );
             }
         }
     }
@@ -273,7 +337,9 @@ pub fn status_panel(p: &mut Panels, v: &StatusView, small: bool) {
     let per = v.effects.len().min(FX_ROW);
     let width = super::MARGIN.sum().x + (per - 1) as f32 * FX_STEP + FX;
     // No frame: the icons alone (movable all the same).
-    p.framed("status", None, width, "none", |ui| effects_grid(ui, look, &v.effects, FX, FX_STEP, FX_ROW, small, v.cursor));
+    p.framed("status", None, width, "none", |ui| {
+        effects_grid(ui, look, &v.effects, FX, FX_STEP, FX_ROW, small, v.cursor)
+    });
 }
 
 /// Row heights: party rows carry an MP bar under the HP bar, alliance rows not.
@@ -291,13 +357,43 @@ fn rest_strip(ui: &mut Ui, m: &Modern, rest: Shown) {
     let painter = ui.painter();
     match rest {
         Shown::Timing(t) => {
-            painter.text(pos2(r.min.x + 4.0, y), Align2::LEFT_CENTER, "Timing rest ticks...", font.clone(), m.theme.color("muted"));
-            painter.text(pos2(r.max.x - 4.0, y), Align2::RIGHT_CENTER, format!("{t:.0} s"), font, m.theme.color("muted"));
+            painter.text(
+                pos2(r.min.x + 4.0, y),
+                Align2::LEFT_CENTER,
+                "Timing rest ticks...",
+                font.clone(),
+                m.theme.color("muted"),
+            );
+            painter.text(
+                pos2(r.max.x - 4.0, y),
+                Align2::RIGHT_CENTER,
+                format!("{t:.0} s"),
+                font,
+                m.theme.color("muted"),
+            );
         }
         Shown::Next(f, left) => {
-            let label = painter.text(pos2(r.min.x + 4.0, y), Align2::LEFT_CENTER, "Next tick", font.clone(), m.theme.color("text"));
-            let secs = painter.text(pos2(r.max.x - 4.0, y), Align2::RIGHT_CENTER, format!("{:.0} s", left.ceil()), font, m.theme.color("text"));
-            bar(ui, m, "recast", Rect::from_min_max(pos2(label.max.x + 10.0, y - 3.5), pos2(secs.min.x - 10.0, y + 3.5)), f);
+            let label = painter.text(
+                pos2(r.min.x + 4.0, y),
+                Align2::LEFT_CENTER,
+                "Next tick",
+                font.clone(),
+                m.theme.color("text"),
+            );
+            let secs = painter.text(
+                pos2(r.max.x - 4.0, y),
+                Align2::RIGHT_CENTER,
+                format!("{:.0} s", left.ceil()),
+                font,
+                m.theme.color("text"),
+            );
+            bar(
+                ui,
+                m,
+                "recast",
+                Rect::from_min_max(pos2(label.max.x + 10.0, y - 3.5), pos2(secs.min.x - 10.0, y + 3.5)),
+                f,
+            );
         }
     }
 }
@@ -327,15 +423,32 @@ fn exp_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<Exp
         // One merit point a 10,000 limit points.
         let (now, merits) = (limit as i64, bits & 0x7f);
         let full = merits >= max as u16;
-        let body = format!("Limit points {} / {} ({}%)\nMerit points {merits} / {max}", num(now), num(10_000), pct(now, 10_000));
+        let body = format!(
+            "Limit points {} / {} ({}%)\nMerit points {merits} / {max}",
+            num(now),
+            num(10_000),
+            pct(now, 10_000)
+        );
         return Some(ExpView { title: "Limit Points".into(), now, next: 10_000, capped: full, body });
     }
     let (title, label, now, next, capped) = if st.ml.1 & 1 != 0 {
         let (now, next) = (st.ml_exp.0 as i64, st.ml_exp.1 as i64);
-        (format!("{} {}", msg(0x203, "M. Level"), st.ml.0), "Exemplar points", now, next, st.ml.1 & 2 != 0 && now >= next - 1)
+        (
+            format!("{} {}", msg(0x203, "M. Level"), st.ml.0),
+            "Exemplar points",
+            now,
+            next,
+            st.ml.1 & 2 != 0 && now >= next - 1,
+        )
     } else {
         let level = w.real_level.unwrap_or(st.main.1);
-        (format!("{} {level}", msg(0x56, "Level")), "EXP", st.exp.0 as i64, st.exp.1 as i64, w.merits.is_some_and(|m| m.1 & 0x4000 != 0))
+        (
+            format!("{} {level}", msg(0x56, "Level")),
+            "EXP",
+            st.exp.0 as i64,
+            st.exp.1 as i64,
+            w.merits.is_some_and(|m| m.1 & 0x4000 != 0),
+        )
     };
     let mut body = format!("{label} {} / {} ({}%)", num(now), num(next), pct(now, next));
     if capped {
@@ -350,7 +463,10 @@ fn exp_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<Exp
 /// numbers in its tooltip.
 fn exp_bar(p: &Panels, id: &str, r: Rect, e: &ExpView) {
     let m = p.m;
-    let (Some(empty), Some(full)) = (m.art.sprite("gauges/experience_empty"), m.art.sprite("gauges/experience_full")) else { return };
+    let (Some(empty), Some(full)) = (m.art.sprite("gauges/experience_empty"), m.art.sprite("gauges/experience_full"))
+    else {
+        return;
+    };
     let a = p.vis(id);
     // The frame's line is its top 3 points.
     let mid = r.min.y + EXP_CAP + 1.5;
@@ -362,9 +478,15 @@ fn exp_bar(p: &Panels, id: &str, r: Rect, e: &ExpView) {
     if f > 0.0 {
         let tint = if e.capped { Color32::from_rgb(120, 170, 255) } else { Color32::WHITE };
         let clip = Rect::from_min_max(bar.min, pos2(bar.min.x + bar.width() * f, bar.max.y));
-        painter.with_clip_rect(clip.intersect(painter.clip_rect())).add(paint::faded(paint::nine_slice(&full, bar, k, tint), a));
+        painter
+            .with_clip_rect(clip.intersect(painter.clip_rect()))
+            .add(paint::faded(paint::nine_slice(&full, bar, k, tint), a));
     }
-    if let Some(at) = p.ctx.input(|i| i.pointer.hover_pos()).filter(|at| bar.expand2(vec2(0.0, 3.0)).contains(*at) && p.ctx.layer_id_at(*at) == Some(painter.layer_id())) {
+    if let Some(at) = p
+        .ctx
+        .input(|i| i.pointer.hover_pos())
+        .filter(|at| bar.expand2(vec2(0.0, 3.0)).contains(*at) && p.ctx.layer_id_at(*at) == Some(painter.layer_id()))
+    {
         m.tip_at(p.ctx, at, &e.title, &e.body);
     }
 }
@@ -391,7 +513,16 @@ pub enum PartyPick {
     Entity(u32),
 }
 
-pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], pets: &[PetRow], small: bool, rest: Option<Shown>, exp: Option<&ExpView>) -> Option<PartyPick> {
+pub fn party_panel(
+    p: &mut Panels,
+    id: &str,
+    title: &str,
+    rows: &[PartyRow],
+    pets: &[PetRow],
+    small: bool,
+    rest: Option<Shown>,
+    exp: Option<&ExpView>,
+) -> Option<PartyPick> {
     if rows.is_empty() {
         return None;
     }
@@ -406,7 +537,13 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], pet
     let pets_h = pets.len() as f32 * (PET_ROW + 4.0);
     let height = cap + super::MARGIN.sum().y + 37.0 + strip + n * row_h + (n - 1.0) * 4.0 + pets_h;
     let mut clicked = None;
-    let show = super::Show { title: Some(Title { icon: None, text: title, note: note.as_deref(), name: false }), size: vec2(340.0, 0.0), height: Some(height), cap, ..Default::default() };
+    let show = super::Show {
+        title: Some(Title { icon: None, text: title, note: note.as_deref(), name: false }),
+        size: vec2(340.0, 0.0),
+        height: Some(height),
+        cap,
+        ..Default::default()
+    };
     let shown = p.show(id, show, |ui, _| {
         ui.spacing_mut().item_spacing.y = 0.0;
         if let Some(r) = rest {
@@ -450,24 +587,46 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], pet
             // The level on its lower right corner, as the status icons' counts.
             if row.level > 0 && row.icon.is_some() {
                 let icon = Rect::from_min_size(pos2(x, r.center().y - 12.0), vec2(24.0, 24.0));
-                super::corner_number(painter, icon, &row.level.to_string(), if row.here.is_some() { Color32::WHITE } else { m.theme.color("muted") });
+                super::corner_number(
+                    painter,
+                    icon,
+                    &row.level.to_string(),
+                    if row.here.is_some() { Color32::WHITE } else { m.theme.color("muted") },
+                );
             }
             // Leader marks on the job's corner: gold the party's, blue the alliance's.
-            for (k, (bit, col)) in [(1u8, m.theme.color("gold")), (2u8, m.theme.color("focus"))].into_iter().enumerate() {
+            for (k, (bit, col)) in [(1u8, m.theme.color("gold")), (2u8, m.theme.color("focus"))].into_iter().enumerate()
+            {
                 if row.marks & bit != 0 {
                     painter.add(paint::star(pos2(x + 1.0 + 11.0 * k as f32, r.max.y - 9.0), 6.5, col));
                 }
             }
             m.tip_with(ui, Rect::from_min_size(pos2(x - 2.0, r.min.y), vec2(32.0, r.height())), || {
-                let lead = [(1u8, "Party leader"), (2, "Alliance leader")].iter().filter(|(b, _)| row.marks & b != 0).map(|(_, t)| *t);
-                (row.name.clone(), std::iter::once(row.jobs.as_str()).filter(|t| !t.is_empty()).chain(lead).collect::<Vec<_>>().join("\n"))
+                let lead = [(1u8, "Party leader"), (2, "Alliance leader")]
+                    .iter()
+                    .filter(|(b, _)| row.marks & b != 0)
+                    .map(|(_, t)| *t);
+                (
+                    row.name.clone(),
+                    std::iter::once(row.jobs.as_str())
+                        .filter(|t| !t.is_empty())
+                        .chain(lead)
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                )
             });
             x += 32.0;
             let right = r.max.x - 10.0;
             let Some(v) = &row.here else {
                 let font = FontId::new(m.theme.ui, FontFamily::Name(super::NAME.into()));
                 painter.text(pos2(x, r.center().y), Align2::LEFT_CENTER, &row.name, font, m.theme.color("muted"));
-                painter.text(pos2(right, r.center().y), Align2::RIGHT_CENTER, format!("({})", row.zone), FontId::proportional(m.theme.small), m.theme.color("muted"));
+                painter.text(
+                    pos2(right, r.center().y),
+                    Align2::RIGHT_CENTER,
+                    format!("({})", row.zone),
+                    FontId::proportional(m.theme.small),
+                    m.theme.color("muted"),
+                );
                 if resp.clicked() {
                     clicked = Some(PartyPick::Slot(row.slot));
                 }
@@ -486,20 +645,51 @@ pub fn party_panel(p: &mut Panels, id: &str, title: &str, rows: &[PartyRow], pet
                 let mut mx = x;
                 if let Some(tp) = v.tp {
                     let col = if tp > 999 { m.theme.color("focus") } else { m.theme.color("muted") };
-                    mx = paint::outlined(painter, pos2(x + 2.0, my), Align2::LEFT_CENTER, &tp.to_string(), small_font.clone(), col).max.x + 8.0;
+                    mx = paint::outlined(
+                        painter,
+                        pos2(x + 2.0, my),
+                        Align2::LEFT_CENTER,
+                        &tp.to_string(),
+                        small_font.clone(),
+                        col,
+                    )
+                    .max
+                    .x + 8.0;
                 }
                 let mp_w = painter.layout_no_wrap("88888".into(), small_font.clone(), Color32::WHITE).size().x;
                 bar(ui, m, "mp", Rect::from_min_max(pos2(mx, my - 3.5), pos2(right - mp_w - 6.0, my + 3.5)), mpf);
-                paint::outlined(painter, pos2(right, my), Align2::RIGHT_CENTER, &v.mp.to_string(), small_font, m.theme.color("text"));
+                paint::outlined(
+                    painter,
+                    pos2(right, my),
+                    Align2::RIGHT_CENTER,
+                    &v.mp.to_string(),
+                    small_font,
+                    m.theme.color("text"),
+                );
             } else if let Some(tp) = v.tp {
                 let col = if tp > 999 { m.theme.color("focus") } else { m.theme.color("muted") };
-                paint::outlined(painter, pos2(x + 2.0, hp_r.max.y + 6.0), Align2::LEFT_CENTER, &tp.to_string(), small_font, col);
+                paint::outlined(
+                    painter,
+                    pos2(x + 2.0, hp_r.max.y + 6.0),
+                    Align2::LEFT_CENTER,
+                    &tp.to_string(),
+                    small_font,
+                    col,
+                );
             }
             // Their effects (s2c 0x076) above the bar at its right, as many as fit beside the name.
             if full {
                 let font = FontId::new(LABEL_SIZE, FontFamily::Name(super::LABEL.into()));
-                let name_end = x + 6.0 + painter.layout_no_wrap(row.name.clone(), font.clone(), Color32::WHITE).size().x;
-                let hp_w = painter.layout_no_wrap(v.hp_max.map_or(v.hp.to_string(), |max| format!("{} / {max}", v.hp)), font, Color32::WHITE).size().x;
+                let name_end =
+                    x + 6.0 + painter.layout_no_wrap(row.name.clone(), font.clone(), Color32::WHITE).size().x;
+                let hp_w = painter
+                    .layout_no_wrap(
+                        v.hp_max.map_or(v.hp.to_string(), |max| format!("{} / {max}", v.hp)),
+                        font,
+                        Color32::WHITE,
+                    )
+                    .size()
+                    .x;
                 let mut ex = right - 6.0 - hp_w - 12.0 - 14.0;
                 for e in &row.effects {
                     if ex < name_end + 8.0 {
@@ -549,17 +739,45 @@ fn pet_row(ui: &mut Ui, m: &Modern, pet: &PetRow) -> bool {
     let small_font = FontId::new(14.0, FontFamily::Name(super::LABEL.into()));
     paint::outlined(painter, pos2(x, r.min.y + 10.0), Align2::LEFT_CENTER, &pet.name, font, name_col);
     let kind = if pet.pet { "Pet" } else { "Fellow" };
-    painter.text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, kind, FontId::proportional(m.theme.small - 1.0), m.theme.color("muted"));
+    painter.text(
+        pos2(r.min.x + 22.0, r.center().y),
+        Align2::LEFT_CENTER,
+        kind,
+        FontId::proportional(m.theme.small - 1.0),
+        m.theme.color("muted"),
+    );
     if pet.gauge {
         let pct = format!("{}%", pet.hpp);
         let pw = painter.layout_no_wrap("100%".into(), small_font.clone(), Color32::WHITE).size().x;
         let mut bx = x;
         if let Some(tp) = pet.tp {
             let col = if tp > 999 { m.theme.color("focus") } else { m.theme.color("muted") };
-            bx = paint::outlined(painter, pos2(x + 2.0, r.min.y + 24.0), Align2::LEFT_CENTER, &tp.to_string(), small_font.clone(), col).max.x + 8.0;
+            bx = paint::outlined(
+                painter,
+                pos2(x + 2.0, r.min.y + 24.0),
+                Align2::LEFT_CENTER,
+                &tp.to_string(),
+                small_font.clone(),
+                col,
+            )
+            .max
+            .x + 8.0;
         }
-        bar(ui, m, "hp", Rect::from_min_max(pos2(bx, r.min.y + 21.0), pos2(right - pw - 6.0, r.min.y + 27.0)), pet.hpp.min(100) as f32 / 100.0);
-        paint::outlined(painter, pos2(right, r.min.y + 24.0), Align2::RIGHT_CENTER, &pct, small_font, m.theme.color("text"));
+        bar(
+            ui,
+            m,
+            "hp",
+            Rect::from_min_max(pos2(bx, r.min.y + 21.0), pos2(right - pw - 6.0, r.min.y + 27.0)),
+            pet.hpp.min(100) as f32 / 100.0,
+        );
+        paint::outlined(
+            painter,
+            pos2(right, r.min.y + 24.0),
+            Align2::RIGHT_CENTER,
+            &pct,
+            small_font,
+            m.theme.color("text"),
+        );
     }
     resp.clicked()
 }
@@ -588,7 +806,9 @@ pub fn target_panel(p: &mut Panels, v: &TargetView) {
             Some((name, Some(f))) => gauge_row(ui, m, name, "mp", *f, ""),
             Some((name, None)) => {
                 ui.add_space(4.0);
-                ui.label(egui::RichText::new(format!("Readying {name}")).size(m.theme.small).color(m.theme.color("tp")));
+                ui.label(
+                    egui::RichText::new(format!("Readying {name}")).size(m.theme.small).color(m.theme.color("tp")),
+                );
             }
             None => {}
         }
@@ -618,18 +838,40 @@ pub(super) fn other_rows(ui: &mut egui::Ui, m: &Modern, rows: &[OtherRow]) -> Op
     let mut picked = None;
     for row in rows {
         let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-        let face = if row.current { "controls/list_row_selected" } else if resp.hovered() { "controls/list_row_hover" } else { "controls/list_row_normal" };
+        let face = if row.current {
+            "controls/list_row_selected"
+        } else if resp.hovered() {
+            "controls/list_row_hover"
+        } else {
+            "controls/list_row_normal"
+        };
         super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
-        let label = ui.painter().text(pos2(r.min.x + 8.0, r.center().y), Align2::LEFT_CENTER, &row.label, FontId::proportional(m.theme.small), m.theme.color("muted"));
+        let label = ui.painter().text(
+            pos2(r.min.x + 8.0, r.center().y),
+            Align2::LEFT_CENTER,
+            &row.label,
+            FontId::proportional(m.theme.small),
+            m.theme.color("muted"),
+        );
         let name_x = (r.min.x + 52.0).max(label.max.x + 8.0);
         let bar_w = 70.0;
         let room = r.max.x - 12.0 - bar_w - 8.0 - name_x;
-        let g = super::one_line(ui.painter(), &row.name, FontId::proportional(m.theme.ui), row.colour.unwrap_or(m.theme.color("text")), room);
+        let g = super::one_line(
+            ui.painter(),
+            &row.name,
+            FontId::proportional(m.theme.ui),
+            row.colour.unwrap_or(m.theme.color("text")),
+            room,
+        );
         ui.painter().galley(pos2(name_x, r.center().y - g.size().y / 2.0), g, Color32::WHITE);
         if let Some(hpp) = row.hpp {
             let bar = Rect::from_min_size(pos2(r.max.x - 12.0 - bar_w, r.center().y - 3.0), vec2(bar_w, 6.0));
             ui.painter().rect_filled(bar, 3.0, m.theme.color("charcoal"));
-            ui.painter().rect_filled(Rect::from_min_size(bar.min, vec2(bar_w * hpp.min(100) as f32 / 100.0, 6.0)), 3.0, m.theme.color("hp"));
+            ui.painter().rect_filled(
+                Rect::from_min_size(bar.min, vec2(bar_w * hpp.min(100) as f32 / 100.0, 6.0)),
+                3.0,
+                m.theme.color("hp"),
+            );
         }
         if resp.clicked() {
             picked = Some(row.id);
@@ -739,15 +981,37 @@ const DAY_ELEMENTS: [&str; 8] = ["Fire", "Earth", "Water", "Wind", "Ice", "Light
 /// A weather's name and what it does (ours): ids 4..19 an element's single (even) and double (odd) weather.
 fn weather_tip(id: u16) -> (&'static str, String) {
     const NAMES: [&str; 20] = [
-        "Clear", "Sunshine", "Clouds", "Fog", "Hot Spells", "Heat Waves", "Rain", "Squalls", "Dust Storms", "Sand Storms", "Wind", "Gales", "Snow", "Blizzards",
-        "Thunder", "Thunderstorms", "Auroras", "Stellar Glare", "Gloom", "Darkness",
+        "Clear",
+        "Sunshine",
+        "Clouds",
+        "Fog",
+        "Hot Spells",
+        "Heat Waves",
+        "Rain",
+        "Squalls",
+        "Dust Storms",
+        "Sand Storms",
+        "Wind",
+        "Gales",
+        "Snow",
+        "Blizzards",
+        "Thunder",
+        "Thunderstorms",
+        "Auroras",
+        "Stellar Glare",
+        "Gloom",
+        "Darkness",
     ];
     const ELEMENTS: [&str; 8] = ["Fire", "Water", "Earth", "Wind", "Ice", "Lightning", "Light", "Darkness"];
     let name = NAMES.get(id as usize).copied().unwrap_or("Weather");
     let body = match id {
         4..=19 => {
             let e = ELEMENTS[(id as usize - 4) / 2];
-            if id % 2 == 0 { format!("{e} weather: {e} is stronger here while it lasts.") } else { format!("Double {} weather: {e} is stronger still while it lasts.", e.to_lowercase()) }
+            if id % 2 == 0 {
+                format!("{e} weather: {e} is stronger here while it lasts.")
+            } else {
+                format!("Double {} weather: {e} is stronger still while it lasts.", e.to_lowercase())
+            }
         }
         _ => "No elemental weather.".to_string(),
     };
@@ -784,7 +1048,10 @@ fn compass(painter: &Painter, m: &Modern, c: Pos2, v: &CompassView) {
     for i in (0..24).filter(|i| i % 6 != 0) {
         let a = i as f32 * PI / 12.0;
         let long = if i % 3 == 0 { 5.0 } else { 2.5 };
-        painter.line_segment([at(a.sin(), a.cos(), DIAL - 1.0), at(a.sin(), a.cos(), DIAL - 1.0 - long)], Stroke::new(1.0, bronze));
+        painter.line_segment(
+            [at(a.sin(), a.cos(), DIAL - 1.0), at(a.sin(), a.cos(), DIAL - 1.0 - long)],
+            Stroke::new(1.0, bronze),
+        );
     }
     let k = (DIAL - 6.0) / v.range.max(1.0);
     for &(lx, ly, col) in &v.dots {
@@ -806,8 +1073,16 @@ fn compass(painter: &Painter, m: &Modern, c: Pos2, v: &CompassView) {
         let (tip, base) = (at(lx, ly, DIAL + 8.0 * k), at(lx, ly, DIAL - 6.0 * k));
         let n = (tip - base).normalized().rot90() * 6.0 * k;
         let colour = m.theme.color(col);
-        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], colour.gamma_multiply(0.25 * pulse), Stroke::new(4.0 * pulse, colour.gamma_multiply(0.35 * pulse))));
-        painter.add(egui::Shape::convex_polygon(vec![tip, base + n, base - n], colour, Stroke::new(1.0, Color32::from_black_alpha(180))));
+        painter.add(egui::Shape::convex_polygon(
+            vec![tip, base + n, base - n],
+            colour.gamma_multiply(0.25 * pulse),
+            Stroke::new(4.0 * pulse, colour.gamma_multiply(0.35 * pulse)),
+        ));
+        painter.add(egui::Shape::convex_polygon(
+            vec![tip, base + n, base - n],
+            colour,
+            Stroke::new(1.0, Color32::from_black_alpha(180)),
+        ));
         painter.ctx().request_repaint();
     }
 }
@@ -821,7 +1096,10 @@ fn compass_view(w: &World) -> Option<CompassView> {
     let f = glam::Vec3::new(f.x, 0.0, f.z).normalize_or(glam::Vec3::Z);
     // The job fields as the open compass samples them (NIN sees further and monsters).
     let rs = w.stats.as_ref().map_or_else(|| radar::sample(0, 0, 0), |st| radar::sample(st.main.0, st.sub.0, st.sub.1));
-    let dots = radar::dots(w, 0x80, &rs).into_iter().map(|(x, y, c)| (x as f32, y as f32, chat::colour(c.to_le_bytes()))).collect();
+    let dots = radar::dots(w, 0x80, &rs)
+        .into_iter()
+        .map(|(x, y, c)| (x as f32, y as f32, chat::colour(c.to_le_bytes())))
+        .collect();
     let aim = match w.scan.tracking() {
         Some(t) => Some((t.pos[0], t.pos[2], "focus")),
         None => target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| (e.pos.x, e.pos.z, "hp")),
@@ -860,11 +1138,23 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let exp = exp_view(w, p.gu).filter(|_| !w.lua.hides("experience"));
     let pets: Vec<PetRow> = super::super::petrow::rows(w)
         .into_iter()
-        .map(|r| PetRow { id: r.id, marked: w.target == Some(r.id), name: r.name, hpp: r.hpp, gauge: r.model, tp: r.pet.then_some(r.tp).flatten(), pet: r.pet })
+        .map(|r| PetRow {
+            id: r.id,
+            marked: w.target == Some(r.id),
+            name: r.name,
+            hpp: r.hpp,
+            gauge: r.model,
+            tp: r.pet.then_some(r.tp).flatten(),
+            pet: r.pet,
+        })
         .collect();
-    let mut picked = party_panel(p, "party", title, &party, &pets, small, super::super::resttick::shown(w), exp.as_ref());
+    let mut picked =
+        party_panel(p, "party", title, &party, &pets, small, super::super::resttick::shown(w), exp.as_ref());
     // The frame's top, under the experience bar's strip.
-    let frame = p.this.get("party").map(|r| Rect::from_min_max(pos2(r.min.x, r.min.y + if exp.is_some() { EXP_CAP } else { 0.0 }), r.max));
+    let frame = p
+        .this
+        .get("party")
+        .map(|r| Rect::from_min_max(pos2(r.min.x, r.min.y + if exp.is_some() { EXP_CAP } else { 0.0 }), r.max));
     // FUN_102041d0: while the pool holds items, retail's chest (fontshp 0x7a) on the party window's top edge near its
     // left end.
     if super::super::treasure::count(w) > 0
@@ -897,7 +1187,9 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // An event takes the target window down unless it keeps it (EventPara2 bit 1, FUN_10085a00), as the retail HUD
     // does (client/mod.rs world_hud); the focus panel goes with it.
     let keeps_target = event::keeps_target(w);
-    if let Some(v) = target_view(w, p.gu).filter(|_| if w.target_event.is_some() { !w.target_suspended } else { keeps_target }) {
+    if let Some(v) =
+        target_view(w, p.gu).filter(|_| if w.target_event.is_some() { !w.target_suspended } else { keeps_target })
+    {
         target_panel(p, &v);
     }
     if let Some((total, left)) = w.cast_bar {
@@ -916,7 +1208,15 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         let c = chat::colour(argb.to_le_bytes());
         p.panel("countdown", None, 300.0, |ui| {
             let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
-            labelled_bar(ui, m, "cast", Rect::from_min_max(pos2(r.min.x, r.max.y - BAR), r.max), f, ("Time Left", m.theme.color("text")), (&text, c));
+            labelled_bar(
+                ui,
+                m,
+                "cast",
+                Rect::from_min_max(pos2(r.min.x, r.max.y - BAR), r.max),
+                f,
+                ("Time Left", m.theme.color("text")),
+                (&text, c),
+            );
         });
     }
     // The progress bars or the scoreboard (FUN_1021fe10).
@@ -955,7 +1255,12 @@ fn effects(p: Look, w: &World) -> Vec<Effect> {
             let no_timer = p.gu.and_then(|gu| gu.status_entry(small, id)).is_some_and(|e| e.no_timer);
             let timed = timers && end != 0x7fff_ffff && !no_timer;
             let rem = (end.wrapping_sub(now).wrapping_add(59) as i32) / 60;
-            Effect { icon: Icon::Game(id), label: buffs::label(rem).filter(|_| timed), ending: timed && rem <= 15, tip: effect_tip(p, w, id, timed.then_some(rem)) }
+            Effect {
+                icon: Icon::Game(id),
+                label: buffs::label(rem).filter(|_| timed),
+                ending: timed && rem <= 15,
+                tip: effect_tip(p, w, id, timed.then_some(rem)),
+            }
         })
         .collect()
 }
@@ -973,7 +1278,11 @@ fn where_view(p: Look, w: &World) -> Option<WhereView> {
     let day = ((secs % 27648) / 3456) as usize;
     let name = w.battle.as_ref().and_then(|b| b.day_name(day)).unwrap_or_default();
     Some(WhereView {
-        zone: w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, w.pos_zone as u32)).unwrap_or_else(|| crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(w.pos_zone)))),
+        zone: w
+            .names
+            .as_ref()
+            .and_then(|n| crate::dat::names::NameSource::place(&**n, w.pos_zone as u32))
+            .unwrap_or_else(|| crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(w.pos_zone)))),
         grid: p.m.grid(w, gu),
         time: (m / 60, m % 60),
         day: (day, name),
@@ -990,11 +1299,27 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
     let hand_at = target::party_hand(w);
     let hand = hand_at.map(|h| h.0);
     let hand_of = |slot: usize| hand_at.filter(|h| h.0 == slot).map(|h| h.1);
-    let hp_colour = |hpp: u8| p.gu.map_or(p.m.theme.color("text"), |gu| super::chat::colour(gu.hp_tint(hpp).to_le_bytes()));
-    let marked = |slot: usize, id: u32, index: u16| hand == Some(slot) || w.target.is_some_and(|t| t == id || (id != w.my_id && w.entities.get(&t).is_some_and(|e| e.index == index)));
-    let marks = |id: u32, party: usize| (id != 0 && id == slots.leaders[party]) as u8 | ((id != 0 && id == slots.alliance_leader) as u8) << 1;
-    let zone = |z: u16| p.gu.map(|gu| crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(z)))).unwrap_or_default();
-    let effects = |id: u32| w.party_buffs.get(&id).map_or(Vec::new(), |row| row.iter().filter(|&&b| b != 0xffff && b != 0).map(|&b| Effect { icon: Icon::Game(b), label: None, ending: false, tip: effect_tip(p, w, b, None) }).collect());
+    let hp_colour =
+        |hpp: u8| p.gu.map_or(p.m.theme.color("text"), |gu| super::chat::colour(gu.hp_tint(hpp).to_le_bytes()));
+    let marked = |slot: usize, id: u32, index: u16| {
+        hand == Some(slot)
+            || w.target
+                .is_some_and(|t| t == id || (id != w.my_id && w.entities.get(&t).is_some_and(|e| e.index == index)))
+    };
+    let marks = |id: u32, party: usize| {
+        (id != 0 && id == slots.leaders[party]) as u8 | ((id != 0 && id == slots.alliance_leader) as u8) << 1
+    };
+    let zone = |z: u16| {
+        p.gu.map(|gu| crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(z)))).unwrap_or_default()
+    };
+    let effects = |id: u32| {
+        w.party_buffs.get(&id).map_or(Vec::new(), |row| {
+            row.iter()
+                .filter(|&&b| b != 0xffff && b != 0)
+                .map(|&b| Effect { icon: Icon::Game(b), label: None, ending: false, tip: effect_tip(p, w, b, None) })
+                .collect()
+        })
+    };
     let gauge = |k: usize, hpp: u8, mpp: u8| w.party_gauges.get(k).map_or((hpp, mpp), |g| (g.1, g.2));
     // A member's max HP: as last seen at 100 %, else HP / HP %.
     let hp_max = |id: u32, hp: u32, hpp: u8| match w.party_hp_max.get(&id) {
@@ -1011,7 +1336,15 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
             name,
             icon: w.stats.as_ref().and_then(|s| job_icon(s.main.0)),
             sub_icon: w.stats.as_ref().and_then(|s| job_icon(s.sub.0)),
-            here: Some(RowVitals { hp, hp_max: w.stats.as_ref().map(|s| s.hp_max), mp, tp: w.party_tp.then_some(tp), hpf: gh as f32 / 100.0, mpf: Some(gm as f32 / 100.0), hp_colour: hp_colour(hpp) }),
+            here: Some(RowVitals {
+                hp,
+                hp_max: w.stats.as_ref().map(|s| s.hp_max),
+                mp,
+                tp: w.party_tp.then_some(tp),
+                hpf: gh as f32 / 100.0,
+                mpf: Some(gm as f32 / 100.0),
+                hp_colour: hp_colour(hpp),
+            }),
             zone: String::new(),
             marked: marked(0, w.my_id, 0),
             hand: hand_of(0),
@@ -1029,7 +1362,15 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
             name: if m.away == 0 { monstrosity::row_name(m) } else { &m.name }.to_string(),
             icon: job_icon(m.jobs[0]),
             sub_icon: job_icon(m.jobs[2]),
-            here: (m.away == 0 && m.zone == w.pos_zone).then(|| RowVitals { hp: m.hp, hp_max: hp_max(m.id, m.hp, m.hpp), mp: m.mp, tp: (w.party_tp && !trust).then_some(m.tp), hpf: gh as f32 / 100.0, mpf: Some(gm as f32 / 100.0), hp_colour: hp_colour(m.hpp) }),
+            here: (m.away == 0 && m.zone == w.pos_zone).then(|| RowVitals {
+                hp: m.hp,
+                hp_max: hp_max(m.id, m.hp, m.hpp),
+                mp: m.mp,
+                tp: (w.party_tp && !trust).then_some(m.tp),
+                hpf: gh as f32 / 100.0,
+                mpf: Some(gm as f32 / 100.0),
+                hp_colour: hp_colour(m.hpp),
+            }),
             zone: zone(m.zone),
             marked: marked(k, m.id, m.index),
             hand: hand_of(k),
@@ -1052,7 +1393,15 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
                         name: m.name.clone(),
                         icon: job_icon(m.jobs[0]),
                         sub_icon: job_icon(m.jobs[2]),
-                        here: (m.away == 0 && m.zone == w.pos_zone).then(|| RowVitals { hp: m.hp, hp_max: hp_max(m.id, m.hp, m.hpp), mp: m.mp, tp: (w.party_tp && m.index < 0x700).then_some(m.tp), hpf: gh as f32 / 100.0, mpf: None, hp_colour: hp_colour(m.hpp) }),
+                        here: (m.away == 0 && m.zone == w.pos_zone).then(|| RowVitals {
+                            hp: m.hp,
+                            hp_max: hp_max(m.id, m.hp, m.hpp),
+                            mp: m.mp,
+                            tp: (w.party_tp && m.index < 0x700).then_some(m.tp),
+                            hpf: gh as f32 / 100.0,
+                            mpf: None,
+                            hp_colour: hp_colour(m.hpp),
+                        }),
                         zone: zone(m.zone),
                         marked: marked(s, m.id, m.index),
                         hand: hand_of(s),
@@ -1070,16 +1419,31 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
 
 /// A `targets` element's rows as drawn: the entity's name (a party member's when it is out of sight), its colour,
 /// its HP (a party member's, else the entity's when it shows a gauge), whether it is our target. Rows for nobody go.
-pub(super) fn other_views(w: &World, gu: Option<&super::super::game_ui::GameUi>, rows: &[super::super::lua::window::TargetRow]) -> Vec<OtherRow> {
-    let colour = |id: u32, e: &super::super::Entity| gu.map(|gu| super::chat::colour(super::super::name_colour(id, e, w, |i| gu.ncol(i)).to_le_bytes()));
+pub(super) fn other_views(
+    w: &World,
+    gu: Option<&super::super::game_ui::GameUi>,
+    rows: &[super::super::lua::window::TargetRow],
+) -> Vec<OtherRow> {
+    let colour = |id: u32, e: &super::super::Entity| {
+        gu.map(|gu| super::chat::colour(super::super::name_colour(id, e, w, |i| gu.ncol(i)).to_le_bytes()))
+    };
     rows.iter()
         .filter_map(|r| {
             let id = r.entity;
             let member = w.party.slots().slots.iter().flatten().find(|m| m.id == id).cloned();
             let e = w.entities.get(&id);
-            let name = e.map(|e| monstrosity::name(e).to_string()).or_else(|| member.as_ref().map(|m| m.name.clone()))?;
+            let name =
+                e.map(|e| monstrosity::name(e).to_string()).or_else(|| member.as_ref().map(|m| m.name.clone()))?;
             let hpp = member.as_ref().map(|m| m.hpp).or_else(|| e.filter(|e| !e.no_gauge).map(|e| e.hpp));
-            Some(OtherRow { label: r.label.clone(), tag: r.tag.clone(), id, name, hpp, colour: e.and_then(|e| colour(id, e)), current: w.target == Some(id) })
+            Some(OtherRow {
+                label: r.label.clone(),
+                tag: r.tag.clone(),
+                id,
+                name,
+                hpp,
+                colour: e.and_then(|e| colour(id, e)),
+                current: w.target == Some(id),
+            })
         })
         .collect()
 }
@@ -1088,7 +1452,15 @@ fn target_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<
     // Event op 0xb4 sub 2: the event's name and gauge whatever is targeted, in +0x68 (white), as the retail HUD.
     if let Some((name, v)) = &w.target_event {
         let colour = gu.map(|_| super::chat::colour(0x8080_8080u32.to_le_bytes()));
-        return Some(TargetView { name: name.clone(), ring: "indicators/target_neutral", locked: false, hp: Some((*v, *v as f32 / 100.0)), colour, cast: None, distance: None });
+        return Some(TargetView {
+            name: name.clone(),
+            ring: "indicators/target_neutral",
+            locked: false,
+            hp: Some((*v, *v as f32 / 100.0)),
+            colour,
+            cast: None,
+            distance: None,
+        });
     }
     let id = w.target?;
     let me = (id == w.my_id).then(|| self_entity(w));
@@ -1107,5 +1479,13 @@ fn target_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<
         "indicators/target_neutral"
     };
     let colour = gu.map(|gu| super::chat::colour(super::super::name_colour(id, e, w, |i| gu.ncol(i)).to_le_bytes()));
-    Some(TargetView { name, ring, locked: w.locked, hp: (!e.no_gauge).then_some((e.hpp, w.target_gauge.1 as f32 / 100.0)), colour, cast: target_cast(w, id), distance: w.lua.slot_num("target_distance").map(|d| d as f32) })
+    Some(TargetView {
+        name,
+        ring,
+        locked: w.locked,
+        hp: (!e.no_gauge).then_some((e.hpp, w.target_gauge.1 as f32 / 100.0)),
+        colour,
+        cast: target_cast(w, id),
+        distance: w.lua.slot_num("target_distance").map(|d| d as f32),
+    })
 }

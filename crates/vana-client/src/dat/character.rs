@@ -1,7 +1,7 @@
 //! Character models: skeleton (0x29), skinned mesh (0x2A), animation (0x2B) and textures (0x20).
 
-use super::{DatIndex, chunks};
 use super::zone::{Texture, parse_img};
+use super::{DatIndex, chunks};
 use anyhow::{Result, bail};
 use glam::{Quat, Vec3};
 
@@ -89,22 +89,35 @@ pub fn parse_skeleton(name: String, d: &[u8]) -> Result<Skeleton> {
     // u16 count, u16 0xffff, then 26-byte points {i16 bone, f32 rotation xyz, f32 translation xyz}.
     let at = 4 + n * 30;
     let count = if at + 4 <= d.len() { u16_at(d, at) as usize } else { 0 };
-    let points = (0..count).map_while(|i| {
-        let o = at + 4 + i * 26;
-        (o + 26 <= d.len()).then(|| (u16_at(d, o), vec3_at(d, o + 14)))
-    }).collect();
-    let point_rots = (0..count).map_while(|i| {
-        let o = at + 4 + i * 26;
-        (o + 26 <= d.len()).then(|| vec3_at(d, o + 2))
-    }).collect();
+    let points = (0..count)
+        .map_while(|i| {
+            let o = at + 4 + i * 26;
+            (o + 26 <= d.len()).then(|| (u16_at(d, o), vec3_at(d, o + 14)))
+        })
+        .collect();
+    let point_rots = (0..count)
+        .map_while(|i| {
+            let o = at + 4 + i * 26;
+            (o + 26 <= d.len()).then(|| vec3_at(d, o + 2))
+        })
+        .collect();
     let lim = at + 4 + count * 26 + 0x48;
-    let look_limits = [0, 1].map(|i| [0, 1, 2].map(|k| if lim + 12 * i + 4 * k + 4 <= d.len() { f32_at(d, lim + 12 * i + 4 * k) } else { 0.0 }));
+    let look_limits = [0, 1].map(|i| {
+        [0, 1, 2].map(|k| if lim + 12 * i + 4 * k + 4 <= d.len() { f32_at(d, lim + 12 * i + 4 * k) } else { 0.0 })
+    });
     let at_box = at + 4 + count * 26;
-    let boxes = (0..3).take_while(|i| at_box + 0x18 * i + 0x18 <= d.len()).map(|i| std::array::from_fn(|k| f32_at(d, at_box + 0x18 * i + 4 * k))).collect();
+    let boxes = (0..3)
+        .take_while(|i| at_box + 0x18 * i + 0x18 <= d.len())
+        .map(|i| std::array::from_fn(|k| f32_at(d, at_box + 0x18 * i + 4 * k)))
+        .collect();
     // FUN_10035290 (FUN_10035270(0) + 0x24): 64 slots of {s16 bone, f32 radius, f32 offset xyz}, unused ones 0xCD
     // fill.
     let sph = at_box + 0x6c;
-    let spheres = (0..64).map(|i| sph + i * 0x12).take_while(|o| o + 0x12 <= d.len()).map(|o| ClothSphere { bone: u16_at(d, o) as i16, radius: f32_at(d, o + 2), offset: vec3_at(d, o + 6) }).collect();
+    let spheres = (0..64)
+        .map(|i| sph + i * 0x12)
+        .take_while(|o| o + 0x12 <= d.len())
+        .map(|o| ClothSphere { bone: u16_at(d, o) as i16, radius: f32_at(d, o + 2), offset: vec3_at(d, o + 6) })
+        .collect();
     Ok(Skeleton { name, bones, points, point_rots, look_limits, boxes, spheres })
 }
 
@@ -198,7 +211,10 @@ fn parse_cloth(name: &str, d: &[u8], counts: [usize; 2], poly: &[u8]) -> Result<
     if edges_at + (g1 + g2) * 8 > d.len() {
         bail!("cloth {name}: edges out of range");
     }
-    let edges: Vec<ClothEdge> = (0..g1 + g2).map(|i| edges_at + i * 8).map(|o| ClothEdge { a: u16_at(d, o), b: u16_at(d, o + 2), rest: f32_at(d, o + 4) }).collect();
+    let edges: Vec<ClothEdge> = (0..g1 + g2)
+        .map(|i| edges_at + i * 8)
+        .map(|o| ClothEdge { a: u16_at(d, o), b: u16_at(d, o + 2), rest: f32_at(d, o + 4) })
+        .collect();
     if edges.iter().any(|e| (e.a & 0x7fff) as usize >= n || (e.b & 0x7fff) as usize >= n) {
         bail!("cloth {name}: an edge refers past {n} particles");
     }
@@ -318,7 +334,8 @@ pub fn parse_mesh(name: &str, d: &[u8]) -> Result<Vec<MeshPart>> {
         let resolve = |r: u16| -> Result<(usize, u16)> {
             let slot = if mirrored { (r >> 7) & 0x7F } else { r & 0x7F } as usize;
             let bone = if flags & 0x80 != 0 {
-                *table.get(slot).ok_or_else(|| anyhow::anyhow!("mesh {name}: bone table index {slot} out of range"))? as usize
+                *table.get(slot).ok_or_else(|| anyhow::anyhow!("mesh {name}: bone table index {slot} out of range"))?
+                    as usize
             } else {
                 slot
             };
@@ -338,7 +355,12 @@ pub fn parse_mesh(name: &str, d: &[u8]) -> Result<Vec<MeshPart>> {
                 let at = o + i * size;
                 let (bone, axis) = resolve(refs[0])?;
                 let normal = if cloth { Vec3::ZERO } else { vec3_at(d, at + 12) };
-                vertices.push(vec![Influence { bone, pos: flip(vec3_at(d, at), axis), normal: flip(normal, axis), weight: 1.0 }]);
+                vertices.push(vec![Influence {
+                    bone,
+                    pos: flip(vec3_at(d, at), axis),
+                    normal: flip(normal, axis),
+                    weight: 1.0,
+                }]);
             } else {
                 let size = if cloth { 32 } else { 56 };
                 let at = verts_at + one * if cloth { 12 } else { 24 } + (i - one) * size;
@@ -396,7 +418,9 @@ fn parse_polys(name: &str, p: &[u8]) -> Result<Vec<Group>> {
     let mut at = 0;
     while at + 4 <= p.len() {
         let (tag, n) = (u16_at(p, at), u16_at(p, at + 2) as usize);
-        let need = |len: usize| if at + len > p.len() { bail!("mesh {name}: poly record {tag:#06x} overruns") } else { Ok(()) };
+        let need = |len: usize| {
+            if at + len > p.len() { bail!("mesh {name}: poly record {tag:#06x} overruns") } else { Ok(()) }
+        };
         if tag == 0xFFFF {
             break;
         } else if tag & 0x80F0 == 0x8010 {
@@ -426,7 +450,11 @@ fn parse_polys(name: &str, p: &[u8]) -> Result<Vec<Group>> {
             at += 4 + 30 + n.saturating_sub(1) * 10;
         } else if tag == 0x0054 {
             need(4 + n * 30)?;
-            groups.push(Group { texture: texture.clone(), triangles: (0..n).map(|k| tri(at + 4 + k * 30)).collect(), light });
+            groups.push(Group {
+                texture: texture.clone(),
+                triangles: (0..n).map(|k| tri(at + 4 + k * 30)).collect(),
+                light,
+            });
             at += 4 + n * 30;
         } else if tag == 0x4353 {
             at += n * 2 + 12;
@@ -591,7 +619,8 @@ pub fn pose_held(skel: &Skeleton, anims: &[(&Animation, f32)], grips: &[(u16, u1
             local[t.bone] = (r * b.rot, b.pos + tr, s);
         }
     }
-    let grips: Vec<(usize, usize)> = grips.iter().map(|&(c, g)| (c as usize, g as usize)).filter(|&(c, g)| c > 0 && c < n && g < n).collect();
+    let grips: Vec<(usize, usize)> =
+        grips.iter().map(|&(c, g)| (c as usize, g as usize)).filter(|&(c, g)| c > 0 && c < n && g < n).collect();
     // Pass 0's set-up: the grip's local scale takes the carry's; the carry's subtree waits for pass 1.
     let mut held = vec![false; n];
     for &(c, g) in &grips {
@@ -1015,7 +1044,10 @@ impl Character {
             .iter()
             .filter(|a| {
                 let n = a.name.trim_end().as_bytes();
-                n.len() == 4 && n.starts_with(prefix.as_bytes()) && (b'0'..=b'6').contains(&n[3]) && regions.insert(n[3])
+                n.len() == 4
+                    && n.starts_with(prefix.as_bytes())
+                    && (b'0'..=b'6').contains(&n[3])
+                    && regions.insert(n[3])
             })
             .collect()
     }
@@ -1093,9 +1125,29 @@ pub fn load_character(index: &DatIndex, look: &Look) -> Result<Character> {
     let (skel_id, part_ids) = file_ids(look)?;
     let base = load_file(&index.read(skel_id)?)?;
     let Some(skeleton) = base.skeleton else { bail!("file {skel_id} has no skeleton") };
-    let mut log = vec![format!("skeleton {skel_id}: {} bones, {} animations", skeleton.bones.len(), base.animations.len())];
+    let mut log =
+        vec![format!("skeleton {skel_id}: {} bones, {} animations", skeleton.bones.len(), base.animations.len())];
     log.extend(base.warnings);
-    let mut ch = Character { skeleton, parts: base.parts, textures: base.textures, animations: base.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: base.schedulers, pc: None, mount: None, log, packed: None, skin: None, files: vec![skel_id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
+    let mut ch = Character {
+        skeleton,
+        parts: base.parts,
+        textures: base.textures,
+        animations: base.animations,
+        size_info: [0xFF; 4],
+        motions: Default::default(),
+        schedulers: base.schedulers,
+        pc: None,
+        mount: None,
+        log,
+        packed: None,
+        skin: None,
+        files: vec![skel_id],
+        part_files: Vec::new(),
+        cib: [-1; 3],
+        ranged: -1,
+        init_hidden: Default::default(),
+        grips: [None; 2],
+    };
     ch.merge_size_info(base.info);
     let (mut body_info, mut sub_info, mut main_info) = (None, None, None);
     for (slot, model, id) in part_ids {
@@ -1106,7 +1158,11 @@ pub fn load_character(index: &DatIndex, look: &Look) -> Result<Character> {
                 continue;
             }
         };
-        ch.log.push(format!("{slot} {model} -> file {id}: {} mesh copies, {} textures", f.parts.len(), f.textures.len()));
+        ch.log.push(format!(
+            "{slot} {model} -> file {id}: {} mesh copies, {} textures",
+            f.parts.len(),
+            f.textures.len()
+        ));
         ch.log.extend(f.warnings.into_iter().map(|w| format!("{slot} {id}: {w}")));
         match slot {
             "body" => body_info = f.info,
@@ -1139,12 +1195,22 @@ pub fn load_character(index: &DatIndex, look: &Look) -> Result<Character> {
     }
     // Main weapon info[3] / [4] (+0x87b / +0x87c); the empty weapon 0 still has its info chunk.
     if main_info.is_none() {
-        main_info = part_file(look.race, 6, look.main).and_then(|id| index.read(id).ok()).and_then(|b| load_file(&b).ok()).and_then(|f| f.info);
+        main_info = part_file(look.race, 6, look.main)
+            .and_then(|id| index.read(id).ok())
+            .and_then(|b| load_file(&b).ok())
+            .and_then(|f| f.info);
     }
     let byte = |i: Option<[u8; 16]>, at: usize| i.map_or(-1, |i| i[at] as i8);
     // FUN_100cea10 case 7: a weapon in the sub slot gives its info[3] (+0x88a) and zeroes the upper-body pick (+0x87d).
     let dual = super::motionfile::dual_wield(look.sub);
-    ch.pc = Some(super::motionfile::PcMotion { race: look.race, weapon: byte(main_info, 3), draw: byte(main_info, 4), skirt: byte(body_info, 9), dual: dual.then(|| byte(sub_info, 3)), sub_draw: byte(sub_info, 4) });
+    ch.pc = Some(super::motionfile::PcMotion {
+        race: look.race,
+        weapon: byte(main_info, 3),
+        draw: byte(main_info, 4),
+        skirt: byte(body_info, 9),
+        dual: dual.then(|| byte(sub_info, 3)),
+        sub_draw: byte(sub_info, 4),
+    });
     // FUN_10029b90: a point's bone, 0 past 0x7f or without the point. A grip bone 0 means no remap; so does a carry
     // bone 0 *(ours: retail would remap the root)*.
     let point_bone = |p: i8| if p < 0 { 0 } else { ch.skeleton.points.get(p as usize).map_or(0, |x| x.0) };

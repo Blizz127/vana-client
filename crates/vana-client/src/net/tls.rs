@@ -93,7 +93,10 @@ pub fn key(host: &str, port: u16) -> String {
 /// 64 hex digits, colons and spaces ignored (openssl's "AB:CD:..." form works as it prints).
 pub fn parse_fingerprint(text: &str) -> Result<Fingerprint> {
     let hex: String = text.chars().filter(|c| *c != ':' && !c.is_whitespace()).collect();
-    let bytes = hex::decode(&hex).ok().filter(|b| b.len() == 32).with_context(|| format!("{text:?} is not a SHA-256 fingerprint (64 hex digits)"))?;
+    let bytes = hex::decode(&hex)
+        .ok()
+        .filter(|b| b.len() == 32)
+        .with_context(|| format!("{text:?} is not a SHA-256 fingerprint (64 hex digits)"))?;
     Ok(bytes.try_into().unwrap())
 }
 
@@ -126,7 +129,9 @@ fn accepts(pin: Option<&Pin>, seen: Seen) -> bool {
     match pin {
         None => true,
         Some(Pin::Authority) => seen.authority,
-        Some(Pin::Key { sha256, fixed }) => parse_fingerprint(sha256).is_ok_and(|k| k == seen.key) || (seen.authority && !fixed),
+        Some(Pin::Key { sha256, fixed }) => {
+            parse_fingerprint(sha256).is_ok_and(|k| k == seen.key) || (seen.authority && !fixed)
+        }
     }
 }
 
@@ -159,7 +164,9 @@ impl ServerCertVerifier for Verifier {
         ocsp: &[u8],
         now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
-        let key = cert_spki(cert).map(fingerprint).ok_or(rustls::Error::InvalidCertificate(rustls::CertificateError::BadEncoding))?;
+        let key = cert_spki(cert)
+            .map(fingerprint)
+            .ok_or(rustls::Error::InvalidCertificate(rustls::CertificateError::BadEncoding))?;
         let authority = self.authority.verify_server_cert(cert, intermediates, name, ocsp, now).is_ok();
         let seen = Seen { key, authority };
         *self.seen.lock().unwrap() = Some(seen);
@@ -188,7 +195,12 @@ impl ServerCertVerifier for Verifier {
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
         let spki = cert_spki(cert).ok_or(rustls::Error::InvalidCertificate(rustls::CertificateError::BadEncoding))?;
-        rustls::crypto::verify_tls13_signature_with_raw_key(message, &SubjectPublicKeyInfoDer::from(spki), dss, &self.provider.signature_verification_algorithms)
+        rustls::crypto::verify_tls13_signature_with_raw_key(
+            message,
+            &SubjectPublicKeyInfoDer::from(spki),
+            dss,
+            &self.provider.signature_verification_algorithms,
+        )
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
@@ -244,7 +256,12 @@ fn client_config(pin: Option<Pin>, seen: Arc<Mutex<Option<Seen>>>) -> Result<Arc
     let config = ClientConfig::builder_with_provider(provider.clone())
         .with_protocol_versions(&[&rustls::version::TLS13])?
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(Verifier { provider: provider.clone(), authority: authority.clone(), pin, seen }))
+        .with_custom_certificate_verifier(Arc::new(Verifier {
+            provider: provider.clone(),
+            authority: authority.clone(),
+            pin,
+            seen,
+        }))
         .with_no_client_auth();
     Ok(Arc::new(config))
 }
@@ -279,8 +296,16 @@ pub fn connect_pinned(store: &Path, host: &str, port: u16) -> Result<TlsStream> 
             if let (Some(want), Some(got)) = (&pin, *seen.lock().unwrap())
                 && !accepts(Some(want), got)
             {
-                let sent = if got.authority { Pin::Authority } else { Pin::Key { sha256: hex::encode(got.key), fixed: false } };
-                log::warn!("tls: {key} sent key {} (authority-signed: {}); pinned {want:?}", show(&got.key), got.authority);
+                let sent = if got.authority {
+                    Pin::Authority
+                } else {
+                    Pin::Key { sha256: hex::encode(got.key), fixed: false }
+                };
+                log::warn!(
+                    "tls: {key} sent key {} (authority-signed: {}); pinned {want:?}",
+                    show(&got.key),
+                    got.authority
+                );
                 // The caller names the server.
                 bail!(
                     "the certificate changed: expected {}, sent {}. Someone may be intercepting the connection. If the \
@@ -312,7 +337,8 @@ fn record_pin(store: &Path, key: &str, was: Option<&Pin>, seen: Seen) -> Result<
     let held = known.0.get(key).cloned().or_else(|| session_pin(store, key));
     let now = held.as_ref();
     if now != was {
-        let sent = if seen.authority { Pin::Authority } else { Pin::Key { sha256: hex::encode(seen.key), fixed: false } };
+        let sent =
+            if seen.authority { Pin::Authority } else { Pin::Key { sha256: hex::encode(seen.key), fixed: false } };
         let have = now.map_or_else(|| "none".into(), describe);
         match was {
             // A first connection keeps a pin made meanwhile (another login, trust-server) that names this certificate.
@@ -341,10 +367,13 @@ fn record_pin(store: &Path, key: &str, was: Option<&Pin>, seen: Seen) -> Result<
         log::warn!("tls: {key}'s pin not saved: {e:#}");
         let mut n = NOTICE.lock().unwrap_or_else(|e| e.into_inner());
         if !n.0 {
-            *n = (true, Some(format!(
-                "The server's certificate could not be saved ({}: {e:#}). It is checked until you quit, but the next login can't tell whether it changed.",
-                store.display()
-            )));
+            *n = (
+                true,
+                Some(format!(
+                    "The server's certificate could not be saved ({}: {e:#}). It is checked until you quit, but the next login can't tell whether it changed.",
+                    store.display()
+                )),
+            );
         }
     } else {
         session.remove(&at);
@@ -367,7 +396,12 @@ pub fn trust(store: &Path, host: &str, port: Option<u16>, fingerprint: Option<&s
         }
         None => {
             let prefix = format!("{}:", host.trim().to_ascii_lowercase());
-            let keys: Vec<String> = known.0.keys().filter(|k| k.starts_with(&prefix) && port.is_none_or(|p| **k == key(host, p))).cloned().collect();
+            let keys: Vec<String> = known
+                .0
+                .keys()
+                .filter(|k| k.starts_with(&prefix) && port.is_none_or(|p| **k == key(host, p)))
+                .cloned()
+                .collect();
             for k in keys {
                 if matches!(known.0[&k], Pin::Key { fixed: true, .. }) && port.is_none() {
                     out.push(format!("{k}: kept (a fixed fingerprint; forget it with --port)"));
@@ -383,7 +417,10 @@ pub fn trust(store: &Path, host: &str, port: Option<u16>, fingerprint: Option<&s
     }
     // This run's pins for the host go too, so the store's say what holds.
     let prefix = format!("{}:", host.trim().to_ascii_lowercase());
-    session_pins().lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, k), _| !(s == store && k.starts_with(&prefix) && port.is_none_or(|p| *k == key(host, p))));
+    session_pins()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .retain(|(s, k), _| !(s == store && k.starts_with(&prefix) && port.is_none_or(|p| *k == key(host, p))));
     known.save(store)?;
     Ok(out)
 }
@@ -453,14 +490,18 @@ mod tests {
         };
         let (ours, theirs) = (key(&rng), key(&rng));
         // SubjectPublicKeyInfo for a P-256 key: id-ecPublicKey, prime256v1, the point.
-        let mut spki_body = vec![0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07];
+        let mut spki_body = vec![
+            0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d,
+            0x03, 0x01, 0x07,
+        ];
         spki_body.extend([0x03, 0x42, 0x00]);
         spki_body.extend_from_slice(ours.public_key().as_ref());
         let mut spki = vec![0x30, spki_body.len() as u8];
         spki.extend(spki_body);
 
         let (provider, authority) = authorities().unwrap();
-        let verifier = Verifier { provider: provider.clone(), authority: authority.clone(), pin: None, seen: Default::default() };
+        let verifier =
+            Verifier { provider: provider.clone(), authority: authority.clone(), pin: None, seen: Default::default() };
         let msg = b"TLS 1.3, server CertificateVerify";
         // ecdsa_secp256r1_sha256.
         let dss = |k: &EcdsaKeyPair| dss_of(0x0403, k.sign(&rng, msg).unwrap().as_ref());
@@ -486,7 +527,8 @@ mod tests {
         let spki = tlv(0x30, &[alg, tlv(0x03, &bits)].concat());
         let cert = CertificateDer::from(cert_with(&spki, false));
         let (provider, authority) = authorities().unwrap();
-        let verifier = Verifier { provider: provider.clone(), authority: authority.clone(), pin: None, seen: Default::default() };
+        let verifier =
+            Verifier { provider: provider.clone(), authority: authority.clone(), pin: None, seen: Default::default() };
         let msg = b"TLS 1.3, server CertificateVerify";
         let sign = |alg: &'static dyn ring::signature::RsaEncoding| {
             let mut sig = vec![0; key.public().modulus_len()];
@@ -496,7 +538,11 @@ mod tests {
         let pss = sign(&ring::signature::RSA_PSS_SHA256);
         assert!(verifier.verify_tls13_signature(msg, &cert, &dss_of(0x0804, &pss)).is_ok());
         assert!(verifier.verify_tls13_signature(b"another transcript", &cert, &dss_of(0x0804, &pss)).is_err());
-        assert!(verifier.verify_tls13_signature(msg, &cert, &dss_of(0x0401, &sign(&ring::signature::RSA_PKCS1_SHA256))).is_err());
+        assert!(
+            verifier
+                .verify_tls13_signature(msg, &cert, &dss_of(0x0401, &sign(&ring::signature::RSA_PKCS1_SHA256)))
+                .is_err()
+        );
     }
 
     #[test]
@@ -630,11 +676,44 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("vana-tls-pin-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let openssl = |args: &[&str]| assert!(Command::new("openssl").args(args).current_dir(&dir).stderr(Stdio::null()).status().unwrap().success());
+        let openssl = |args: &[&str]| {
+            assert!(
+                Command::new("openssl").args(args).current_dir(&dir).stderr(Stdio::null()).status().unwrap().success()
+            )
+        };
         for n in ["a", "b"] {
-            openssl(&["genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256", "-out", &format!("{n}.key")]);
-            openssl(&["req", "-new", "-key", &format!("{n}.key"), "-subj", "/O=LSB self-signed certificate/CN=127.0.0.1", "-out", &format!("{n}.csr")]);
-            openssl(&["x509", "-req", "-in", &format!("{n}.csr"), "-signkey", &format!("{n}.key"), "-sha384", "-days", "30", "-out", &format!("{n}.pem")]);
+            openssl(&[
+                "genpkey",
+                "-algorithm",
+                "EC",
+                "-pkeyopt",
+                "ec_paramgen_curve:P-256",
+                "-out",
+                &format!("{n}.key"),
+            ]);
+            openssl(&[
+                "req",
+                "-new",
+                "-key",
+                &format!("{n}.key"),
+                "-subj",
+                "/O=LSB self-signed certificate/CN=127.0.0.1",
+                "-out",
+                &format!("{n}.csr"),
+            ]);
+            openssl(&[
+                "x509",
+                "-req",
+                "-in",
+                &format!("{n}.csr"),
+                "-signkey",
+                &format!("{n}.key"),
+                "-sha384",
+                "-days",
+                "30",
+                "-out",
+                &format!("{n}.pem"),
+            ]);
         }
         let der = |n: &str| {
             let pem = std::fs::read_to_string(dir.join(format!("{n}.pem"))).unwrap();
@@ -644,7 +723,19 @@ mod tests {
         let port = 44000 + (std::process::id() % 1000) as u16;
         let serve = |n: &str| {
             let mut child = Command::new("openssl")
-                .args(["s_server", "-quiet", "-tls1_3", "-naccept", "1", "-accept", &format!("127.0.0.1:{port}"), "-cert", &format!("{n}.pem"), "-key", &format!("{n}.key")])
+                .args([
+                    "s_server",
+                    "-quiet",
+                    "-tls1_3",
+                    "-naccept",
+                    "1",
+                    "-accept",
+                    &format!("127.0.0.1:{port}"),
+                    "-cert",
+                    &format!("{n}.pem"),
+                    "-key",
+                    &format!("{n}.key"),
+                ])
                 .current_dir(&dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::null())
@@ -673,7 +764,10 @@ mod tests {
         assert_eq!(pinned(&store), Some(der("a")));
         attempt("a").unwrap();
         let e = format!("{:#}", attempt("b").unwrap_err());
-        assert!(e.contains("certificate changed") && e.contains(&hex::encode(der("a"))[..16].to_ascii_uppercase()), "{e}");
+        assert!(
+            e.contains("certificate changed") && e.contains(&hex::encode(der("a"))[..16].to_ascii_uppercase()),
+            "{e}"
+        );
         // trust-server forgets it: b is pinned next.
         trust(&store, "127.0.0.1", Some(port), None).unwrap();
         attempt("b").unwrap();

@@ -85,14 +85,24 @@ fn needs_no_resource(k: u8) -> bool {
 fn lit_parent_off(file: u32, name: [u8; 4]) -> bool {
     let n = &name[..];
     match file {
-        83895 | 83896 | 83903 | 83904 => [b"0b11", b"0b12", b"0b21", b"0b22", b"0b31", b"0b32"].iter().any(|x| &x[..] == n),
+        83895 | 83896 | 83903 | 83904 => {
+            [b"0b11", b"0b12", b"0b21", b"0b22", b"0b31", b"0b32"].iter().any(|x| &x[..] == n)
+        }
         83897 => n == b"pb41",
         83905..=83908 => [b"0b10", b"0b11", b"0b12", b"0b20", b"0b21", b"0b22"].iter().any(|x| &x[..] == n),
         _ => false,
     }
 }
 
-pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f: &Frame, rng: &mut Rng, ground: &dyn Fn(Vec3, Vec3) -> Option<Vec3>, me: [bool; 2]) -> Option<Spawn> {
+pub fn emit(
+    reg: &mut Registry,
+    inst: &mut Instance,
+    parent: Option<&Parent>,
+    f: &Frame,
+    rng: &mut Rng,
+    ground: &dyn Fn(Vec3, Vec3) -> Option<Vec3>,
+    me: [bool; 2],
+) -> Option<Spawn> {
     let lib = inst.src.0;
     let from = inst.src.1;
     let stream = inst.streams[1].clone();
@@ -127,7 +137,11 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
         Draw::None
     } else {
         match remap(res_kind) {
-            kind::D3M => match reg.resolve(lib, from, kind::D3M, name).map(|r| (r, true)).or_else(|| reg.resolve(lib, from, kind::MMB, name).map(|r| (r, false))) {
+            kind::D3M => match reg
+                .resolve(lib, from, kind::D3M, name)
+                .map(|r| (r, true))
+                .or_else(|| reg.resolve(lib, from, kind::MMB, name).map(|r| (r, false)))
+            {
                 // The ground projection (0x200000, FUN_10040e70): never a plain mesh.
                 Some((r, _)) if flags & 0x20_0000 != 0 => reg.mesh(r).map(Draw::GroundProj).unwrap_or(Draw::None),
                 // DistModel (0x100000, FUN_10043320); an MMB in its place draws nothing (+0x179).
@@ -152,7 +166,10 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
             },
             // D3b, or with 0x100000 CMoDistMorphElem (FUN_10043590).
             0x25 => match reg.resolve(lib, from, 0x25, name) {
-                Some(r) => reg.morph(r).map(if flags & 0x10_0000 != 0 { Draw::DistMorph } else { Draw::Morph }).unwrap_or(Draw::None),
+                Some(r) => reg
+                    .morph(r)
+                    .map(if flags & 0x10_0000 != 0 { Draw::DistMorph } else { Draw::Morph })
+                    .unwrap_or(Draw::None),
                 None => {
                     reg.miss(lib, from, name, res_kind);
                     return None;
@@ -177,7 +194,8 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
     e.0[w::FLAGS] = flags;
     let mut pos = Vec3::new(op1.f32(5), op1.f32(6), op1.f32(7));
     // Step 4: flag 0x800000 snapshots the emitter frame at spawn.
-    let mut snapshot = (flags & 0x80_0000 != 0 && (inst.matrix.is_some() || parent.is_some())).then(|| inst.matrix.unwrap_or(Mat4::IDENTITY));
+    let mut snapshot = (flags & 0x80_0000 != 0 && (inst.matrix.is_some() || parent.is_some()))
+        .then(|| inst.matrix.unwrap_or(Mat4::IDENTITY));
     let mut borrow = None;
     // Step 8: flag 0x4000000 = position in camera space (z negated, through the inverse view).
     if flags & 0x400_0000 != 0 {
@@ -196,7 +214,9 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
     e.set(w::ALPHA, 1.0);
     e.set(w::FADE, 1.0);
     e.set_v3(w::SCALE, Vec3::ZERO);
-    e.0[w::STATE] = st::ALIVE | if inst.flags & 0x2000_0000 != 0 { st::BATCHED } else { 0 } | if matches!(draw, Draw::None) { 0 } else { st::HAS_RES };
+    e.0[w::STATE] = st::ALIVE
+        | if inst.flags & 0x2000_0000 != 0 { st::BATCHED } else { 0 }
+        | if matches!(draw, Draw::None) { 0 } else { st::HAS_RES };
     inst.emitted += 1;
     let batched = inst.flags & 0x2000_0000 != 0;
     // Bit 1: no parent step in the light matrix; MMB stand-ins (elem +0x179) skip it too.
@@ -296,7 +316,11 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
             0x1f => {
                 let a = wrap(op.f32(8) + rng.us(op.f32(9)));
                 let n = op.i16_at(0x2c);
-                let b = if n != 0 { ((count % (n as u32 + 1)) as f32 * PI / (n as f32 + 1.0)) * 2.0 - PI } else { rng.us(PI) };
+                let b = if n != 0 {
+                    ((count % (n as u32 + 1)) as f32 * PI / (n as f32 + 1.0)) * 2.0 - PI
+                } else {
+                    rng.us(PI)
+                };
                 let mr = euler(Vec3::new(0.0, b, a));
                 let ms = Mat4::from_scale(v3(3));
                 let mf = euler(Vec3::new(0.0, op.f32(7), op.f32(6)));
@@ -379,7 +403,14 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
             0x09 => e.set_v3(w::ROT, v3(1)),
             0x0a => {
                 let r = e.v3(w::ROT);
-                e.set_v3(w::ROT, Vec3::new(wrap(r.x + rng.us(op.f32(1))), wrap(r.y + rng.us(op.f32(2))), wrap(r.z + rng.us(op.f32(3)))));
+                e.set_v3(
+                    w::ROT,
+                    Vec3::new(
+                        wrap(r.x + rng.us(op.f32(1))),
+                        wrap(r.y + rng.us(op.f32(2))),
+                        wrap(r.z + rng.us(op.f32(3))),
+                    ),
+                );
             }
             0x3b => {
                 let r = e.v3(w::ROT);
@@ -402,7 +433,9 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
             // vtable +0x34 = FUN_10051dc0 on CMoDist: +0x194 = op+8.
             // vtable +0x34: CMoDist / VuDist / DistModel +0x194, DistMorph +0x1c0 (DistRing's +0x1b6 is never read); a
             // no-op on the rest.
-            0x32 if matches!(draw, Draw::Dist | Draw::VuDist(..) | Draw::DistModel(_) | Draw::DistMorph(_)) => e.set(w::DIST_OFF, op.f32(2)),
+            0x32 if matches!(draw, Draw::Dist | Draw::VuDist(..) | Draw::DistModel(_) | Draw::DistMorph(_)) => {
+                e.set(w::DIST_OFF, op.f32(2))
+            }
             0x32 => {}
             // On the source actor: local matrix times its ground frame, position = its foot contact (+0x63c).
             0x8e => {
@@ -531,7 +564,13 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
                 let (fl, p) = (op.u32(5), op.f32(4));
                 let b = (fl & 2 == 0 && me[0]) || (fl & 4 == 0 && me[1]);
                 let v = if fl & 1 == 0 {
-                    if b { 1.0 } else if p != 0.0 { p } else { 0.5 }
+                    if b {
+                        1.0
+                    } else if p != 0.0 {
+                        p
+                    } else {
+                        0.5
+                    }
                 } else if !b || p == 0.0 {
                     1.0
                 } else {
@@ -539,7 +578,19 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
                 };
                 e.set_sf(s + 2, v);
             }
-            0x21..=0x2f | 0x33..=0x39 | 0x59..=0x66 | 0x68 | 0x69 | 0x6c..=0x70 | 0x74..=0x78 | 0x7c | 0x7d | 0x80..=0x85 | 0x8b..=0x8d | 0x93 | 0x95..=0x97 => {
+            0x21..=0x2f
+            | 0x33..=0x39
+            | 0x59..=0x66
+            | 0x68
+            | 0x69
+            | 0x6c..=0x70
+            | 0x74..=0x78
+            | 0x7c
+            | 0x7d
+            | 0x80..=0x85
+            | 0x8b..=0x8d
+            | 0x93
+            | 0x95..=0x97 => {
                 e.set_s(s, key(reg, op));
                 e.set_s(s + 1, op.u32(3));
                 let r = e.v3(w::ROT);
@@ -569,7 +620,10 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
                     0x38 => Some((1.0f32 / 120.0).to_bits()),
                     // The specular fields' bases: angles / pi, colour bytes R, G, B, A / 255.
                     0x59..=0x5b if spec_on => Some((e.f(w::SPEC_ANG + (op.code - 0x59) as usize) / PI).to_bits()),
-                    0x5c..=0x5f if spec_on => Some((e.0[w::SPEC_COL].to_le_bytes()[[2, 1, 0, 3][(op.code - 0x5c) as usize]] as f32 / 255.0).to_bits()),
+                    0x5c..=0x5f if spec_on => Some(
+                        (e.0[w::SPEC_COL].to_le_bytes()[[2, 1, 0, 3][(op.code - 0x5c) as usize]] as f32 / 255.0)
+                            .to_bits(),
+                    ),
                     _ => None,
                 };
                 if let Some(b) = base {
@@ -638,7 +692,8 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
             0x9e if sound.is_some() => sound.as_mut().unwrap().ymode = 2,
             // Op 0x56: the particle block of a batched D3a (CMoVuAnmElem), from the other ops of this generator.
             0x56 if e.0[w::KIND] == dk::BATCHED => {
-                let find = |st: usize, code: u8| -> Option<Op> { inst.streams[st].iter().find(|o| o.code == code).cloned() };
+                let find =
+                    |st: usize, code: u8| -> Option<Op> { inst.streams[st].iter().find(|o| o.code == code).cloned() };
                 let speed = find(1, 0x08).map_or(0.0, |o| o.f32(1));
                 let o7 = find(1, 0x07);
                 let r = o7.as_ref().map(|o| o.f32(1)).or_else(|| find(1, 0x06).map(|o| o.f32(1))).unwrap_or(0.0);
@@ -654,7 +709,9 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
                     let d = reg.libs[r.0].data(r.1);
                     let c = d.get(0..4).map_or(0, |b| u32::from_le_bytes(b.try_into().unwrap()));
                     let f = |o: usize| d.get(o..o + 4).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
-                    let pts: Vec<Vec3> = (0..c as usize).map(|i| Vec3::new(f(0x10 + i * 16), f(0x14 + i * 16), f(0x18 + i * 16))).collect();
+                    let pts: Vec<Vec3> = (0..c as usize)
+                        .map(|i| Vec3::new(f(0x10 + i * 16), f(0x14 + i * 16), f(0x18 + i * 16)))
+                        .collect();
                     (c > 0).then_some((o.code, pts))
                 });
                 for _ in 0..n {
@@ -684,9 +741,12 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
                 let name = op.u32(4);
                 let hit = if name != 0 { reg.resolve(lib, from, kind::IMG, name) } else { None };
                 let clamp = hit.is_some() && name.to_le_bytes()[..3] == *b"!sp";
-                let img = hit.or_else(|| reg.global.and_then(|g| reg.libs[g].img_named("cubemap spec").map(|i| (g, i))));
+                let img =
+                    hit.or_else(|| reg.global.and_then(|g| reg.libs[g].img_named("cubemap spec").map(|i| (g, i))));
                 let cube = img.is_some_and(|(l, i)| reg.libs[l].is_cubemap(i));
-                spec_tex = img.and_then(|(l, i)| reg.libs[l].texture_at(i).map(|t| crate::fx::SpecTex { tex: (l, t), cube, clamp }));
+                spec_tex = img.and_then(|(l, i)| {
+                    reg.libs[l].texture_at(i).map(|t| crate::fx::SpecTex { tex: (l, t), cube, clamp })
+                });
                 e.0[w::SPEC_BITS] = 32 | (op.u32(9) & 7) | if clamp { 8 } else { 0 } | if cube { 16 } else { 0 };
             }
             0x55 => {}
@@ -749,7 +809,11 @@ pub fn emit(reg: &mut Registry, inst: &mut Instance, parent: Option<&Parent>, f:
         e.0[w::GP_BLEND] = 0x48;
     }
     let cpu = ElemCpu {
-        gp: matches!(draw, Draw::GroundProj(_)).then(|| crate::fx::GroundDecal { blend: e.0[w::GP_BLEND] as u16, cell: None, verts: Vec::new() }),
+        gp: matches!(draw, Draw::GroundProj(_)).then(|| crate::fx::GroundDecal {
+            blend: e.0[w::GP_BLEND] as u16,
+            cell: None,
+            verts: Vec::new(),
+        }),
         quake: None,
         spec: spec_tex,
         inst: usize::MAX,
@@ -865,7 +929,13 @@ pub fn generator_stream(reg: &mut Registry, inst: &mut Instance, f: &Frame) -> b
                 let m = f.view * inst.matrix.unwrap_or(glam::Mat4::IDENTITY);
                 let ys = f.focal / 192.0;
                 let xs = ys / reg.aspect.max(0.1);
-                let corners: Vec<Vec3> = (0..8).map(|k| m.transform_point3(p + s * Vec3::new([-1.0, 1.0][k & 1], [-1.0, 1.0][k >> 1 & 1], [-1.0, 1.0][k >> 2]))).collect();
+                let corners: Vec<Vec3> = (0..8)
+                    .map(|k| {
+                        m.transform_point3(
+                            p + s * Vec3::new([-1.0, 1.0][k & 1], [-1.0, 1.0][k >> 1 & 1], [-1.0, 1.0][k >> 2]),
+                        )
+                    })
+                    .collect();
                 let out = |test: &dyn Fn(Vec3) -> bool| corners.iter().all(|&c| test(c));
                 let hidden = out(&|c| -c.z < crate::render::NEAR)
                     || out(&|c| c.x * xs > -c.z)

@@ -239,11 +239,18 @@ impl Pipes {
         // The cut-off as the CPU used it: coverage at 255 x ALPHA_REF, block solidity at that truncated to a byte.
         let cut = crate::dat::texmip::ALPHA_REF * 255.0;
         let src = WGSL.replace("CUT_VALUE", &format!("{cut:?}")).replace("CUT_BYTEi", &format!("{}", cut as u8));
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("mipgen"), source: wgpu::ShaderSource::Wgsl(src.into()) });
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("mipgen"),
+            source: wgpu::ShaderSource::Wgsl(src.into()),
+        });
         let storage = |binding| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only: false },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
             count: None,
         };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -252,7 +259,11 @@ impl Pipes {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: false }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
                     count: None,
                 },
                 storage(1),
@@ -261,14 +272,29 @@ impl Pipes {
                 wgpu::BindGroupLayoutEntry {
                     binding: 4,
                     visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: wgpu::BufferSize::new((PARAM_WORDS * 4) as u64) },
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: true,
+                        min_binding_size: wgpu::BufferSize::new((PARAM_WORDS * 4) as u64),
+                    },
                     count: None,
                 },
             ],
         });
-        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("mipgen"), bind_group_layouts: &[Some(&layout)], immediate_size: 0 });
+        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mipgen"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
         let make = |entry: &str| {
-            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: Some(entry), layout: Some(&pl), module: &module, entry_point: Some(entry), compilation_options: Default::default(), cache: None })
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some(entry),
+                layout: Some(&pl),
+                module: &module,
+                entry_point: Some(entry),
+                compilation_options: Default::default(),
+                cache: None,
+            })
         };
         Pipes { cover0: make("cover0"), down: make("down"), solve: make("solve"), encode: make("encode"), layout }
     }
@@ -361,17 +387,52 @@ fn record(device: &wgpu::Device, pipes: &Pipes, encoder: &mut wgpu::CommandEncod
         let (w, h) = size(k);
         let (sw, sh) = if k == 0 { (w, h) } else { size(k - 1) };
         let src = if k <= 1 { NONE } else { pix_off[k - 1] };
-        let p = [sw, sh, w, h, src, pix_off[k], k as u32, job.kind as u32, (out_off[k] / 4) as u32, rows[k].0 / 4, job.w * job.h, job.lin as u32];
+        let p = [
+            sw,
+            sh,
+            w,
+            h,
+            src,
+            pix_off[k],
+            k as u32,
+            job.kind as u32,
+            (out_off[k] / 4) as u32,
+            rows[k].0 / 4,
+            job.w * job.h,
+            job.lin as u32,
+        ];
         params[k * PARAM_STRIDE as usize / 4..][..PARAM_WORDS].copy_from_slice(&p);
     }
     let mut stats = vec![0u32; 2 + n * 257];
     stats[1] = 255;
     let storage = wgpu::BufferUsages::STORAGE;
-    let pix = device.create_buffer(&wgpu::BufferDescriptor { label: Some("mip texels"), size: (pix_words.max(1) * 4) as u64, usage: storage, mapped_at_creation: false });
-    let stats = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("mip stats"), contents: bytemuck::cast_slice(&stats), usage: storage });
-    let out = device.create_buffer(&wgpu::BufferDescriptor { label: Some("mip levels"), size: out_bytes.max(4), usage: storage | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
-    let params = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("mip params"), contents: bytemuck::cast_slice(&params), usage: wgpu::BufferUsages::UNIFORM });
-    let view0 = job.texture.create_view(&wgpu::TextureViewDescriptor { base_mip_level: 0, mip_level_count: Some(1), ..Default::default() });
+    let pix = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mip texels"),
+        size: (pix_words.max(1) * 4) as u64,
+        usage: storage,
+        mapped_at_creation: false,
+    });
+    let stats = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("mip stats"),
+        contents: bytemuck::cast_slice(&stats),
+        usage: storage,
+    });
+    let out = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("mip levels"),
+        size: out_bytes.max(4),
+        usage: storage | wgpu::BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+    let params = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("mip params"),
+        contents: bytemuck::cast_slice(&params),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+    let view0 = job.texture.create_view(&wgpu::TextureViewDescriptor {
+        base_mip_level: 0,
+        mip_level_count: Some(1),
+        ..Default::default()
+    });
     let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("mipgen"),
         layout: &pipes.layout,
@@ -382,12 +443,17 @@ fn record(device: &wgpu::Device, pipes: &Pipes, encoder: &mut wgpu::CommandEncod
             wgpu::BindGroupEntry { binding: 3, resource: out.as_entire_binding() },
             wgpu::BindGroupEntry {
                 binding: 4,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &params, offset: 0, size: wgpu::BufferSize::new((PARAM_WORDS * 4) as u64) }),
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &params,
+                    offset: 0,
+                    size: wgpu::BufferSize::new((PARAM_WORDS * 4) as u64),
+                }),
             },
         ],
     });
     {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("mipgen"), timestamp_writes: None });
+        let mut pass =
+            encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("mipgen"), timestamp_writes: None });
         let mut run = |pipe: &wgpu::ComputePipeline, k: usize, x: u32, y: u32| {
             pass.set_pipeline(pipe);
             pass.set_bind_group(0, &group, &[(k as u64 * PARAM_STRIDE) as u32]);
@@ -406,10 +472,26 @@ fn record(device: &wgpu::Device, pipes: &Pipes, encoder: &mut wgpu::CommandEncod
     }
     for k in 1..n {
         let (w, h) = size(k);
-        let extent = if block == 0 { wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 } } else { wgpu::Extent3d { width: w.div_ceil(4) * 4, height: h.div_ceil(4) * 4, depth_or_array_layers: 1 } };
+        let extent = if block == 0 {
+            wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 }
+        } else {
+            wgpu::Extent3d { width: w.div_ceil(4) * 4, height: h.div_ceil(4) * 4, depth_or_array_layers: 1 }
+        };
         encoder.copy_buffer_to_texture(
-            wgpu::TexelCopyBufferInfo { buffer: &out, layout: wgpu::TexelCopyBufferLayout { offset: out_off[k], bytes_per_row: Some(rows[k].0), rows_per_image: Some(rows[k].1) } },
-            wgpu::TexelCopyTextureInfo { texture: &job.texture, mip_level: k as u32, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &out,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: out_off[k],
+                    bytes_per_row: Some(rows[k].0),
+                    rows_per_image: Some(rows[k].1),
+                },
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: &job.texture,
+                mip_level: k as u32,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
             extent,
         );
     }
@@ -425,11 +507,28 @@ mod tests {
     /// Mip `level` of `tex` as bytes, rows packed.
     fn read(gpu: &Gpu, tex: &wgpu::Texture, level: u32, row: u32, rows: u32, extent: wgpu::Extent3d) -> Vec<u8> {
         let pitch = row.div_ceil(256) * 256;
-        let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (pitch * rows) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+        let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (pitch * rows) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
         let mut enc = gpu.device.create_command_encoder(&Default::default());
         enc.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo { texture: tex, mip_level: level, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(pitch), rows_per_image: Some(rows) } },
+            wgpu::TexelCopyTextureInfo {
+                texture: tex,
+                mip_level: level,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buf,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(pitch),
+                    rows_per_image: Some(rows),
+                },
+            },
             extent,
         );
         gpu.queue.submit([enc.finish()]);
@@ -458,16 +557,43 @@ fn main(@builtin(global_invocation_id) g: vec3<u32>) {
 }
 "#;
         let d = &gpu.device;
-        let module = d.create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source: wgpu::ShaderSource::Wgsl(SRC.into()) });
-        let pipe = d.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: None, layout: None, module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None });
+        let module = d.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(SRC.into()),
+        });
+        let pipe = d.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: None,
+            layout: None,
+            module: &module,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
         let size = (w * h * 4) as u64;
-        let out = d.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
-        let back = d.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
-        let view = tex.create_view(&wgpu::TextureViewDescriptor { base_mip_level: level, mip_level_count: Some(1), ..Default::default() });
+        let out = d.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let back = d.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let view = tex.create_view(&wgpu::TextureViewDescriptor {
+            base_mip_level: level,
+            mip_level_count: Some(1),
+            ..Default::default()
+        });
         let group = d.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &pipe.get_bind_group_layout(0),
-            entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) }, wgpu::BindGroupEntry { binding: 1, resource: out.as_entire_binding() }],
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&view) },
+                wgpu::BindGroupEntry { binding: 1, resource: out.as_entire_binding() },
+            ],
         });
         let mut enc = d.create_command_encoder(&Default::default());
         {
@@ -500,7 +626,12 @@ fn main(@builtin(global_invocation_id) g: vec3<u32>) {
             None => (t.rgba.as_slice(), w * 4, h),
         };
         gpu.queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyTextureInfo {
+                texture: &tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
             data,
             wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(rows) },
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -533,9 +664,21 @@ fn main(@builtin(global_invocation_id) g: vec3<u32>) {
         let tex = texture(&gpu, &t, wgpu::TextureFormat::Rgba8UnormSrgb, Kind::Rgba);
         let cov = |p: &[u8]| p.chunks_exact(4).filter(|p| p[3] as f32 >= 76.5).count();
         for (k, (px, lw, lh)) in cpu.iter().enumerate().skip(1) {
-            let got = read(&gpu, &tex, k as u32, lw * 4, *lh, wgpu::Extent3d { width: *lw, height: *lh, depth_or_array_layers: 1 });
+            let got = read(
+                &gpu,
+                &tex,
+                k as u32,
+                lw * 4,
+                *lh,
+                wgpu::Extent3d { width: *lw, height: *lh, depth_or_array_layers: 1 },
+            );
             assert!(worst(&got, px) <= 2, "level {k}: {}", worst(&got, px));
-            assert!(cov(&got).abs_diff(cov(px)) <= (lw * lh / 16) as usize, "level {k} coverage {} vs {}", cov(&got), cov(px));
+            assert!(
+                cov(&got).abs_diff(cov(px)) <= (lw * lh / 16) as usize,
+                "level {k} coverage {} vs {}",
+                cov(&got),
+                cov(px)
+            );
         }
         if !gpu.device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC) {
             return;
@@ -549,7 +692,14 @@ fn main(@builtin(global_invocation_id) g: vec3<u32>) {
         for k in 1..want.data.len() {
             let (lw, lh) = ((w >> k).max(1), (h >> k).max(1));
             let (bx, by) = (lw.div_ceil(4), lh.div_ceil(4));
-            let got = read(&gpu, &tex, k as u32, bx * 8, by, wgpu::Extent3d { width: bx * 4, height: by * 4, depth_or_array_layers: 1 });
+            let got = read(
+                &gpu,
+                &tex,
+                k as u32,
+                bx * 8,
+                by,
+                wgpu::Extent3d { width: bx * 4, height: by * 4, depth_or_array_layers: 1 },
+            );
             let (a, b) = (decode_dxt(&got, bx * 4, by * 4, false), decode_dxt(&want.data[k], bx * 4, by * 4, false));
             // A one-step input difference can move a 565 endpoint (8 levels); on average they agree closely.
             let mean = a.iter().zip(&b).map(|(x, y)| (*x as f32 - *y as f32).abs()).sum::<f32>() / a.len() as f32;
@@ -586,10 +736,21 @@ fn main(@builtin(global_invocation_id) g: vec3<u32>) {
             }
         }
         use wgpu::util::DeviceExt;
-        let buf = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: None, contents: &data, usage: wgpu::BufferUsages::COPY_SRC });
+        let buf = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &data,
+            usage: wgpu::BufferUsages::COPY_SRC,
+        });
         let mut enc = gpu.device.create_command_encoder(&Default::default());
         enc.copy_buffer_to_texture(
-            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(pitch), rows_per_image: Some(h / 4) } },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buf,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(pitch),
+                    rows_per_image: Some(h / 4),
+                },
+            },
             tex.as_image_copy(),
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
         );

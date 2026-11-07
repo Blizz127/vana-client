@@ -41,7 +41,14 @@ pub(in crate::client) enum Who {
 }
 
 pub(in crate::client) enum Act {
-    SignIn { server: Option<String>, account: String, password: String, otp: String, pol_id: Option<String>, pol_password: String },
+    SignIn {
+        server: Option<String>,
+        account: String,
+        password: String,
+        otp: String,
+        pol_id: Option<String>,
+        pol_password: String,
+    },
     Play(Who),
 }
 
@@ -78,8 +85,19 @@ pub(super) fn install(lua: &Lua, g: &Table, mod_id: &str) -> mlua::Result<()> {
             let list = lua.create_table()?;
             for (k, c) in v.characters.iter().enumerate() {
                 let e = lua.create_table()?;
-                (e.set("slot", k + 1)?, e.set("name", c.name.as_str())?, e.set("world", c.world.as_str())?, e.set("race", c.race)?);
-                (e.set("job", c.job)?, e.set("level", c.level)?, e.set("sub_job", c.sub_job)?, e.set("zone", c.zone)?, e.set("available", c.available)?);
+                (
+                    e.set("slot", k + 1)?,
+                    e.set("name", c.name.as_str())?,
+                    e.set("world", c.world.as_str())?,
+                    e.set("race", c.race)?,
+                );
+                (
+                    e.set("job", c.job)?,
+                    e.set("level", c.level)?,
+                    e.set("sub_job", c.sub_job)?,
+                    e.set("zone", c.zone)?,
+                    e.set("available", c.available)?,
+                );
                 list.push(e)?;
             }
             out.set("characters", list)?;
@@ -118,8 +136,16 @@ pub(super) fn install(lua: &Lua, g: &Table, mod_id: &str) -> mlua::Result<()> {
     g.set("lobby", t)?;
     let storage: Table = g.get("storage")?;
     let me = mod_id.to_string();
-    storage.set("seal", lua.create_function(move |_, text: String| crate::secret::seal(SEAL_SERVER, &me, &text).map_err(|e| mlua::Error::runtime(format!("{e:#}"))))?)?;
+    storage.set(
+        "seal",
+        lua.create_function(move |_, text: String| {
+            crate::secret::seal(SEAL_SERVER, &me, &text).map_err(|e| mlua::Error::runtime(format!("{e:#}")))
+        })?,
+    )?;
     let me = mod_id.to_string();
-    storage.set("unseal", lua.create_function(move |_, sealed: String| Ok(crate::secret::open(SEAL_SERVER, &me, &sealed)))?)?;
+    storage.set(
+        "unseal",
+        lua.create_function(move |_, sealed: String| Ok(crate::secret::open(SEAL_SERVER, &me, &sealed)))?,
+    )?;
     Ok(())
 }

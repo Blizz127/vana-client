@@ -97,7 +97,13 @@ impl Objective {
         }
         // FUN_10087990: always stored; the player's border parts are remade (or dropped at radius 0).
         let milli = |o| u32_at(p, o) as i32 as f32 * 0.001;
-        self.border = Border { x: milli(0x14), z: milli(0x18), radius: u32_at(p, 0x1c) as f32 * 0.001, render: u32_at(p, 0x20) as f32 * 0.001, blue: p.get(0x25).copied().unwrap_or(0) != 0 };
+        self.border = Border {
+            x: milli(0x14),
+            z: milli(0x18),
+            radius: u32_at(p, 0x1c) as f32 * 0.001,
+            render: u32_at(p, 0x20) as f32 * 0.001,
+            blue: p.get(0x25).copied().unwrap_or(0) != 0,
+        };
     }
 
     /// cnttime is up (FUN_100873b0: a mode and the countdown flag).
@@ -268,7 +274,9 @@ pub fn countdown(w: &World) -> Option<(f32, String, bool, u32)> {
 
 /// FUN_1021f360: the bottom of the first window up of cnttime, casttime, gaugewin and titlewin.
 fn anchor(gu: &GameUi, w: &World) -> f32 {
-    let bottom = |name: &str, top: Option<f32>| gu.layout(name).map(|m| top.unwrap_or(m.elements[0].y as f32) + m.elements[0].h as f32);
+    let bottom = |name: &str, top: Option<f32>| {
+        gu.layout(name).map(|m| top.unwrap_or(m.elements[0].y as f32) + m.elements[0].h as f32)
+    };
     let cast_top = if w.gauge.is_some() { 94.0 } else { 47.0 };
     let b = if w.objective.counting() {
         bottom("menu    cnttime", Some(countdown_top(gu, w)))
@@ -338,11 +346,27 @@ pub fn draw_bars(gu: &mut GameUi, w: &World) {
         gu.sprite("menu    keytops3", 540, x, y, 0x8080_8080);
         {
             let (bt, ui, _, _) = gu.parts();
-            crate::render::screens::push_shape_text_right(bt, ui, format!("{:2} ", s.scores.0).as_bytes(), x + 40.0, y, 0x8080_8080);
-            crate::render::screens::push_shape_text(bt, ui, format!("{:2}", s.scores.1).as_bytes(), x + 40.0, y, 0x8080_8080);
+            crate::render::screens::push_shape_text_right(
+                bt,
+                ui,
+                format!("{:2} ", s.scores.0).as_bytes(),
+                x + 40.0,
+                y,
+                0x8080_8080,
+            );
+            crate::render::screens::push_shape_text(
+                bt,
+                ui,
+                format!("{:2}", s.scores.1).as_bytes(),
+                x + 40.0,
+                y,
+                0x8080_8080,
+            );
         }
         gu.sprite("menu    keytops3", 541, x + 56.0, y, 0x8080_8080);
-        for (k, (icon, f, name)) in [(540, s.marchland, "Marchland"), (541, s.stronghold, s.second)].into_iter().enumerate() {
+        for (k, (icon, f, name)) in
+            [(540, s.marchland, "Marchland"), (541, s.stronghold, s.second)].into_iter().enumerate()
+        {
             let ry = b + 20.0 + 16.0 * k as f32;
             gu.sprite("menu    keytops3", icon, x, ry, 0x8080_8080);
             gauge(gu, x + 24.0, ry + 8.0, f);

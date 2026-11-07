@@ -50,7 +50,8 @@ impl Profile {
     /// ChangeMyStatus (4/5) with polcore's arguments; the reply's first 16 bytes are the session value.
     fn change_status(&mut self, args: [i32; 6]) -> Result<[u8; 16]> {
         let slots = &self.slots;
-        let (body, status) = polpro::change_my_status(&self.status, args, |c| slots.get(c as usize).copied().unwrap_or_default());
+        let (body, status) =
+            polpro::change_my_status(&self.status, args, |c| slots.get(c as usize).copied().unwrap_or_default());
         let r = self.transact(4, 5, Some(&body), ReplyBody::Fixed(0x20))?;
         self.status = status;
         Ok(r[..16].try_into().unwrap())
@@ -97,12 +98,19 @@ impl Profile {
     /// 0, -2, -1, 1)`.
     pub fn select(&mut self, content_id: u32, world_key: u32) -> Result<()> {
         let u32_at = |c: &[u8], o: usize| u32::from_le_bytes(c[o..o + 4].try_into().unwrap());
-        let Some(c) = self.characters.iter().find(|c| u16::from_le_bytes([c[8], c[9]]) == 1 && u32_at(c, 0xc) == world_key && u32_at(c, 0x10) == content_id && u32_at(c, 0x14) == 0) else {
+        let Some(c) = self.characters.iter().find(|c| {
+            u16::from_le_bytes([c[8], c[9]]) == 1
+                && u32_at(c, 0xc) == world_key
+                && u32_at(c, 0x10) == content_id
+                && u32_at(c, 0x14) == 0
+        }) else {
             bail!("PlayOnline has no entry for this character.");
         };
         if c[4] & 1 == 0 {
             // FFXiMain would attach it to a free handle slot and store the list (1/10); not done here.
-            bail!("This character is not registered to a PlayOnline handle yet. Open it once in the PlayOnline Viewer.");
+            bail!(
+                "This character is not registered to a PlayOnline handle yet. Open it once in the PlayOnline Viewer."
+            );
         }
         let (content, index) = ((c[5] & 0x3f) as i32, c[0] as i32);
         self.change_status([content, index, 0, -2, -1, 1])?;
@@ -166,10 +174,24 @@ pub fn sign_in(c: &Credentials) -> Result<(Session, Pol)> {
 pub fn sign_in_at(c: &Credentials, servers: &Servers) -> Result<(Session, Pol)> {
     let chat = chat::Chat::sign_in(&servers.chat.0, servers.chat.1, &c.pol_id, &c.pol_password)?;
     log::info!("PlayOnline: chat signed in, profile host {}", polpro::host(chat.host_byte));
-    let member = polpro::Member { pol_id: c.pol_id.clone(), pol_password: c.pol_password.clone(), addr20: chat.addr20, host_byte: chat.host_byte, fixed: servers.profile, residue: [0; 12] };
+    let member = polpro::Member {
+        pol_id: c.pol_id.clone(),
+        pol_password: c.pol_password.clone(),
+        addr20: chat.addr20,
+        host_byte: chat.host_byte,
+        fixed: servers.profile,
+        residue: [0; 12],
+    };
     // polcore's starting status (0x1007541c..: no handle or character, presence 4, activity 1000).
     let status = Status { content: -1, service: -1, flag: 0, presence: 4, p5: 0, activity: 1000, changed: false };
-    let mut p = Profile { cipher: chat.cipher.clone(), member, server: None, status, slots: vec![[0; 8]; 64], characters: Vec::new() };
+    let mut p = Profile {
+        cipher: chat.cipher.clone(),
+        member,
+        server: None,
+        status,
+        slots: vec![[0; 8]; 64],
+        characters: Vec::new(),
+    };
     if !chat.skip_member_login {
         let secret = polpro::secret20(&c.se_password);
         let body = polpro::member_login(&c.se_id, &secret, c.otp.as_deref(), chat.now());
@@ -180,7 +202,13 @@ pub fn sign_in_at(c: &Credentials, servers: &Servers) -> Result<(Session, Pol)> 
     let handles = p.transact(0, 9, None, ReplyBody::Records(0x88))?;
     p.load_characters()?;
     // The handle the Viewer plays with: the current one, else the account's first (0/9 records: [0] handle index).
-    let content = if p.status.content >= 0 { p.status.content } else if handles[0] > 0 { (handles[8] & 0x3f) as i32 } else { bail!("This PlayOnline member has no handle.") };
+    let content = if p.status.content >= 0 {
+        p.status.content
+    } else if handles[0] > 0 {
+        (handles[8] & 0x3f) as i32
+    } else {
+        bail!("This PlayOnline member has no handle.")
+    };
     p.change_status([content, -2, 1, 2, 0, -2])?;
     let value = p.change_status([-2, -1, 0, -2, -1, 1])?;
     let auth = polpro::auth_code(&value, &p.member.addr20, chat.clock, &chat.key, p.member.host_byte);

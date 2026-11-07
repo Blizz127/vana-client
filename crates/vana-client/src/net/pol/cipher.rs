@@ -68,7 +68,13 @@ impl PolBlowfish {
         let be = |i: usize| u32::from_be_bytes(buf[i..i + 4].try_into().unwrap());
         // P from overlapping windows (stride 1), S from consecutive words, P then xored with the buffer's words.
         let iv = (u32::from_le_bytes(iv[..4].try_into().unwrap()), u32::from_le_bytes(iv[4..].try_into().unwrap()));
-        let mut bf = Self { p: std::array::from_fn(|i| be(i) ^ be(4 * i)), s: Box::new(std::array::from_fn(|j| be(4 * j))), iv, run: iv, pos: 0 };
+        let mut bf = Self {
+            p: std::array::from_fn(|i| be(i) ^ be(4 * i)),
+            s: Box::new(std::array::from_fn(|j| be(4 * j))),
+            iv,
+            run: iv,
+            pos: 0,
+        };
         // Each pair from the zero block with the tables as they stand: no chaining.
         for i in (0..18).step_by(2) {
             (bf.p[i], bf.p[i + 1]) = bf.block(0, 0);
@@ -81,7 +87,8 @@ impl PolBlowfish {
 
     fn f(&self, x: u32) -> u32 {
         let s = &self.s;
-        (s[(x >> 24) as usize].wrapping_add(s[256 + (x >> 16 & 255) as usize]) ^ s[512 + (x >> 8 & 255) as usize]).wrapping_add(s[768 + (x & 255) as usize])
+        (s[(x >> 24) as usize].wrapping_add(s[256 + (x >> 16 & 255) as usize]) ^ s[512 + (x >> 8 & 255) as usize])
+            .wrapping_add(s[768 + (x & 255) as usize])
     }
 
     /// 0x10064220: Blowfish-16 with xL = lo, xR = hi.
@@ -134,7 +141,10 @@ mod tests {
 
     #[test]
     fn md5_after_final_starts_from_zero() {
-        assert_eq!(md5_from([0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476], b"abc").to_vec(), h("900150983cd24fb0d6963f7d28e17f72"));
+        assert_eq!(
+            md5_from([0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476], b"abc").to_vec(),
+            h("900150983cd24fb0d6963f7d28e17f72")
+        );
         assert_eq!(md5_from([0; 4], b"abc").to_vec(), h("c974bc19183bcf1b909e7f07ea1e8fbb"));
     }
 
@@ -153,7 +163,12 @@ mod tests {
         let mut bf = PolBlowfish::new(&h("a1b2c3d4e5f60718"), [0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01]);
         let mut z = vec![0u8; 64];
         bf.stream(&mut z, true);
-        assert_eq!(z, h("5ad7dcb95eb2005f6255e9e90f1f7afd94aa41ec1e81cbfaeb113b5dd3232750f6a7c5074d1327451fc7a356a6c44e8a7635b8312964bc894165c6730eea3366"));
+        assert_eq!(
+            z,
+            h(
+                "5ad7dcb95eb2005f6255e9e90f1f7afd94aa41ec1e81cbfaeb113b5dd3232750f6a7c5074d1327451fc7a356a6c44e8a7635b8312964bc894165c6730eea3366"
+            )
+        );
     }
 
     /// The profile service's use: header reset, body continued.

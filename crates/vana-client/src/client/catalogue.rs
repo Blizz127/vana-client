@@ -50,7 +50,10 @@ pub struct File {
 
 /// A mod file's place in its folder: relative, no "..", no drive or backslash.
 fn safe_path(p: &str) -> bool {
-    !p.is_empty() && !p.starts_with('/') && !p.contains(['\\', ':']) && p.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
+    !p.is_empty()
+        && !p.starts_with('/')
+        && !p.contains(['\\', ':'])
+        && p.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
 }
 
 fn lua() -> String {
@@ -271,7 +274,8 @@ pub fn install(e: &Entry, root: &Path, progress: &AtomicU32) -> Result<String> {
             let part = share(f);
             let file = downloads.join(format!("{}-{k}.{}", e.id, ext(&f.url)));
             let at = |x: u64| progress.store((x * 1000 / total).min(999) as u32, Ordering::Relaxed);
-            let of = |done: u64, all: u64, share: u64| (done.min(all) as u128 * share as u128 / all.max(1) as u128) as u64;
+            let of =
+                |done: u64, all: u64, share: u64| (done.min(all) as u128 * share as u128 / all.max(1) as u128) as u64;
             super::updater::download(&f.url, &file, &|done, all| at(base + of(done, all, part * 4 / 5)))?;
             if sha256(&file)? != f.sha256.to_ascii_lowercase() {
                 let _ = std::fs::remove_file(&file);
@@ -284,7 +288,9 @@ pub fn install(e: &Entry, root: &Path, progress: &AtomicU32) -> Result<String> {
                 (None, true) => bail!("{} holds no mod.toml", f.url),
                 _ => {}
             }
-            modpack::unpack(&pack, &work, &mut |done, all| at(base + part * 4 / 5 + of(done, all, part - part * 4 / 5)))?;
+            modpack::unpack(&pack, &work, &mut |done, all| {
+                at(base + part * 4 / 5 + of(done, all, part - part * 4 / 5))
+            })?;
             let _ = std::fs::remove_file(&file);
             base += part;
         }
@@ -324,7 +330,10 @@ mod tests {
     /// The repository's lists read whole under the GitHub-only rule: DAT packs in dats.json, Lua mods in mods.json.
     #[test]
     fn committed_list() {
-        for (text, pack) in [(include_str!("../../../../catalogue/dats.json"), true), (include_str!("../../../../catalogue/mods.json"), false)] {
+        for (text, pack) in [
+            (include_str!("../../../../catalogue/dats.json"), true),
+            (include_str!("../../../../catalogue/mods.json"), false),
+        ] {
             let n = serde_json::from_str::<serde_json::Value>(text).unwrap()["mods"].as_array().unwrap().len();
             let got = parse(text, false).unwrap();
             assert_eq!(got.len(), n);
@@ -340,15 +349,24 @@ mod tests {
         let list_path = crate_dir.join("../../catalogue/mods.json");
         let mut list: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&list_path).unwrap()).unwrap();
         let want = standard_entries(&crate_dir.join("assets/mods"));
-        let lua = |l: &serde_json::Value| l["mods"].as_array().unwrap().iter().filter(|e| e["kind"] == "lua").cloned().collect::<Vec<_>>();
+        let lua = |l: &serde_json::Value| {
+            l["mods"].as_array().unwrap().iter().filter(|e| e["kind"] == "lua").cloned().collect::<Vec<_>>()
+        };
         if std::env::var_os("VANA_WRITE_CATALOGUE").is_some() {
-            let packs: Vec<serde_json::Value> = list["mods"].as_array().unwrap().iter().filter(|e| e["kind"] != "lua").cloned().collect();
+            let packs: Vec<serde_json::Value> =
+                list["mods"].as_array().unwrap().iter().filter(|e| e["kind"] != "lua").cloned().collect();
             list["mods"] = packs.into_iter().chain(want).collect();
             std::fs::write(&list_path, serde_json::to_string_pretty(&list).unwrap() + "\n").unwrap();
             return;
         }
-        assert!(lua(&list) == want, "catalogue/mods.json is out of date: VANA_WRITE_CATALOGUE=1 cargo test standard_mods_listed");
-        assert_eq!(parse(&serde_json::to_string(&list).unwrap(), false).unwrap().iter().filter(|e| e.kind == "lua").count(), want.len());
+        assert!(
+            lua(&list) == want,
+            "catalogue/mods.json is out of date: VANA_WRITE_CATALOGUE=1 cargo test standard_mods_listed"
+        );
+        assert_eq!(
+            parse(&serde_json::to_string(&list).unwrap(), false).unwrap().iter().filter(|e| e.kind == "lua").count(),
+            want.len()
+        );
     }
 
     fn standard_entries(mods: &Path) -> Vec<serde_json::Value> {
@@ -374,7 +392,12 @@ mod tests {
                 }
             }
         }
-        let mut ids: Vec<String> = std::fs::read_dir(mods).unwrap().flatten().filter(|e| e.path().join("mod.toml").is_file()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let mut ids: Vec<String> = std::fs::read_dir(mods)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().join("mod.toml").is_file())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
         ids.sort();
         ids.iter()
             .map(|id| {
@@ -399,8 +422,14 @@ mod tests {
     /// A standard mod's files: each needs a safe path; archives and files do not mix.
     #[test]
     fn mod_files_checked() {
-        let f = |path: &str| format!(r#"{{"url": "https://raw.githubusercontent.com/a/b/master/x", "sha256": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", "path": "{path}"}}"#);
-        let list = |files: &str| format!(r#"{{"format": 1, "mods": [{{"id": "m", "name": "M", "version": "1.0.0", "files": [{files}]}}]}}"#);
+        let f = |path: &str| {
+            format!(
+                r#"{{"url": "https://raw.githubusercontent.com/a/b/master/x", "sha256": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", "path": "{path}"}}"#
+            )
+        };
+        let list = |files: &str| {
+            format!(r#"{{"format": 1, "mods": [{{"id": "m", "name": "M", "version": "1.0.0", "files": [{files}]}}]}}"#)
+        };
         assert_eq!(parse(&list(&format!("{}, {}", f("init.lua"), f("src/a.lua"))), false).unwrap().len(), 1);
         for bad in ["../x.lua", "/etc/x", "src/../../x", "c:x"] {
             assert!(parse(&list(&f(bad)), false).unwrap().is_empty(), "{bad}");

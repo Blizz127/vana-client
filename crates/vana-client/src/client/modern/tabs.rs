@@ -28,7 +28,10 @@ pub fn width(ui: &Ui, label: &str, font: &FontId, min: f32) -> f32 {
 /// The baseline under a row of tabs (drawn before them, so the open tab covers it).
 pub fn baseline(p: &Painter, m: &super::Modern, row: Rect, alpha: f32) {
     let y = row.max.y - 0.5;
-    p.line_segment([pos2(row.min.x, y), pos2(row.max.x, y)], Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.6 * alpha)));
+    p.line_segment(
+        [pos2(row.min.x, y), pos2(row.max.x, y)],
+        Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.6 * alpha)),
+    );
 }
 
 /// A tab whose column is `r` (the row's full height): its face, edge and label.
@@ -37,15 +40,26 @@ pub fn paint(p: &Painter, m: &super::Modern, r: Rect, label: &str, font: &FontId
     let (face, edge, text) = if s.open {
         (m.theme.color("surface"), m.theme.color("gold").gamma_multiply(0.9), m.theme.color("gold"))
     } else if s.hover {
-        (m.theme.color("surface").gamma_multiply(0.85), m.theme.color("bronze").gamma_multiply(0.8), m.theme.color("text"))
+        (
+            m.theme.color("surface").gamma_multiply(0.85),
+            m.theme.color("bronze").gamma_multiply(0.8),
+            m.theme.color("text"),
+        )
     } else {
-        (m.theme.color("charcoal").gamma_multiply(0.9), m.theme.color("bronze").gamma_multiply(0.5), m.theme.color("muted"))
+        (
+            m.theme.color("charcoal").gamma_multiply(0.9),
+            m.theme.color("bronze").gamma_multiply(0.5),
+            m.theme.color("muted"),
+        )
     };
     let t = if s.open { r } else { Rect::from_min_max(pos2(r.min.x, r.min.y + DROP), r.max) };
     p.rect(t, radius, face.gamma_multiply(alpha), Stroke::new(1.0, edge.gamma_multiply(alpha)), StrokeKind::Inside);
     if s.open {
         // Open into the content: the bottom edge and the baseline under it painted over in the face.
-        p.line_segment([pos2(t.min.x + 1.0, t.max.y - 0.5), pos2(t.max.x - 1.0, t.max.y - 0.5)], Stroke::new(2.0, face.gamma_multiply(alpha)));
+        p.line_segment(
+            [pos2(t.min.x + 1.0, t.max.y - 0.5), pos2(t.max.x - 1.0, t.max.y - 0.5)],
+            Stroke::new(2.0, face.gamma_multiply(alpha)),
+        );
     }
     // Labels sit low, leaving the room above them.
     let c = t.center() + vec2(0.0, if s.open { 2.0 } else { 1.5 });
@@ -53,13 +67,23 @@ pub fn paint(p: &Painter, m: &super::Modern, r: Rect, label: &str, font: &FontId
     if s.cursor {
         let w = t.width() - 2.0 * PAD + 6.0;
         let y = t.max.y - 4.0;
-        p.line_segment([pos2(c.x - w / 2.0, y), pos2(c.x + w / 2.0, y)], Stroke::new(2.0, m.theme.color("focus").gamma_multiply(alpha)));
+        p.line_segment(
+            [pos2(c.x - w / 2.0, y), pos2(c.x + w / 2.0, y)],
+            Stroke::new(2.0, m.theme.color("focus").gamma_multiply(alpha)),
+        );
     }
 }
 
 /// A strip of `labels` across the available width, wrapping into more rows when it must: `open` the open tab,
 /// `cursor` the keyboard cursor's; each tab's response in order (hovered / clicked).
-pub fn strip(ui: &mut Ui, m: &super::Modern, salt: &str, labels: &[&str], open: Option<usize>, cursor: Option<usize>) -> Vec<Response> {
+pub fn strip(
+    ui: &mut Ui,
+    m: &super::Modern,
+    salt: &str,
+    labels: &[&str],
+    open: Option<usize>,
+    cursor: Option<usize>,
+) -> Vec<Response> {
     let font = FontId::proportional(m.theme.small);
     let avail = ui.available_width();
     let widths: Vec<f32> = labels.iter().map(|l| width(ui, l, &font, 56.0)).collect();

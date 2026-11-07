@@ -49,7 +49,10 @@ fn status_of(w: &World, id: u32) -> u8 {
 
 /// FUN_1008f740's gate: ActIndex <= 0x6ff and neither NpcPetFlag nor Flags3 bit 25 (every PC in practice).
 fn eligible(w: &World, id: u32) -> bool {
-    id == w.my_id || w.entities.get(&id).is_some_and(|e| e.kind == EntityKind::Player && e.index <= 0x6ff && !e.marks.npc_pet && !e.marks.b2b1)
+    id == w.my_id
+        || w.entities
+            .get(&id)
+            .is_some_and(|e| e.kind == EntityKind::Player && e.index <= 0x6ff && !e.marks.npc_pet && !e.marks.b2b1)
 }
 
 /// FUN_100d2bc0(4): the chair motion files (`ci0` / `ci1` / `ci2`, `chi0` / `chi2`) while the sitter has a seat.
@@ -120,7 +123,8 @@ fn axes(w: &World, id: u32) -> Option<Vec3> {
 /// Per frame, before the motion files: seats for new sitters, each chair's model, `chi0` once the files are in, the
 /// chair's `init` and scale; a finished stand-up removes the chair (ours then sends one more "/sitchair off").
 pub fn update(w: &mut World) {
-    let mut sitters: Vec<u32> = w.entities.iter().filter(|(id, e)| **id != w.my_id && is_chair(e.motion.status)).map(|(id, _)| *id).collect();
+    let mut sitters: Vec<u32> =
+        w.entities.iter().filter(|(id, e)| **id != w.my_id && is_chair(e.motion.status)).map(|(id, _)| *id).collect();
     if is_chair(w.my_motion.status) {
         sitters.push(w.my_id);
     }
@@ -174,7 +178,9 @@ pub fn update(w: &mut World) {
         }
         if let Some(f) = file(seat.status) {
             let src = Source::File(f);
-            if w.actors.get(&chair).is_none_or(|a| a.key != format!("{src:?}")) && !w.event_looks.iter().any(|(i, _)| *i == chair) {
+            if w.actors.get(&chair).is_none_or(|a| a.key != format!("{src:?}"))
+                && !w.event_looks.iter().any(|(i, _)| *i == chair)
+            {
                 w.event_looks.push((chair, src));
             }
         }
@@ -194,7 +200,8 @@ pub fn update(w: &mut World) {
         }
         w.seats.insert(id, seat);
     }
-    let stray: Vec<u32> = w.actors.keys().filter(|id| **id & CHAIR != 0 && !w.seats.contains_key(&(**id & !CHAIR))).copied().collect();
+    let stray: Vec<u32> =
+        w.actors.keys().filter(|id| **id & CHAIR != 0 && !w.seats.contains_key(&(**id & !CHAIR))).copied().collect();
     for id in stray {
         w.actors.remove(&id);
         w.effects.forget_actor(id);

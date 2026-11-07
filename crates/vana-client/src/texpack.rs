@@ -23,8 +23,20 @@ const THREADS: usize = 12;
 /// left out: their cells address them in stock texels, so a bigger copy would show a quarter of itself.
 fn images(bytes: &[u8]) -> Vec<(usize, &[u8])> {
     let Ok(chunks) = dat::chunks(bytes) else { return Vec::new() };
-    let sprite_tex: std::collections::HashSet<String> = chunks.iter().filter(|c| c.kind == 0x31).filter_map(|c| dat::ui::parse_sprite_lib(c.data).ok()).flat_map(|l| l.textures).collect();
-    chunks.iter().enumerate().filter(|(_, c)| c.kind == 0x20 && !sprite_tex.contains(&dat::ui::norm_name(c.data.get(1..17).unwrap_or_default()))).map(|(k, c)| (k, c.data)).collect()
+    let sprite_tex: std::collections::HashSet<String> = chunks
+        .iter()
+        .filter(|c| c.kind == 0x31)
+        .filter_map(|c| dat::ui::parse_sprite_lib(c.data).ok())
+        .flat_map(|l| l.textures)
+        .collect();
+    chunks
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| {
+            c.kind == 0x20 && !sprite_tex.contains(&dat::ui::norm_name(c.data.get(1..17).unwrap_or_default()))
+        })
+        .map(|(k, c)| (k, c.data))
+        .collect()
 }
 
 fn image_name(p: &[u8]) -> String {
@@ -132,7 +144,13 @@ pub fn action_icon_dump(out: &Path) -> Result<()> {
         save_png(&out.join(format!("{k}.png")), w, h, &t.rgba)?;
         writeln!(keys, "{k}\t{w}\t{h}\t{}", key(&t))?;
     }
-    println!("{} images for {} spells and {} abilities in {}", used.len(), acts.spells.iter().filter(|s| s.id != 0).count(), acts.abilities.len(), out.display());
+    println!(
+        "{} images for {} spells and {} abilities in {}",
+        used.len(),
+        acts.spells.iter().filter(|s| s.id != 0).count(),
+        acts.abilities.len(),
+        out.display()
+    );
     Ok(())
 }
 
@@ -183,12 +201,19 @@ pub fn export(out: &Path) -> Result<()> {
         }
     });
     let mut rows = rows.into_inner().unwrap();
-    rows.sort_by_key(|r| r.split('\t').take(2).map(|v| v.parse::<u64>().unwrap_or(0)).fold(0, |a, v| a * 1_000_000 + v));
+    rows.sort_by_key(|r| {
+        r.split('\t').take(2).map(|v| v.parse::<u64>().unwrap_or(0)).fold(0, |a, v| a * 1_000_000 + v)
+    });
     let mut f = std::io::BufWriter::new(std::fs::File::create(out.join("manifest.tsv"))?);
     for r in &rows {
         writeln!(f, "{r}")?;
     }
-    println!("{} image chunks, {} unique saved now, {} files skipped (UI, fonts, maps)", rows.len(), saved.into_inner(), skipped.into_inner());
+    println!(
+        "{} image chunks, {} unique saved now, {} files skipped (UI, fonts, maps)",
+        rows.len(),
+        saved.into_inner(),
+        skipped.into_inner()
+    );
     Ok(())
 }
 
@@ -220,10 +245,13 @@ fn encode(dxt1: bool, w: u32, h: u32, rgba: &[u8], levels: Option<&[(u8, f32)]>)
                     sorted.sort_unstable();
                     let n = sorted.len();
                     let mut acc = 0.0;
-                    let cuts: Vec<u8> = l[..l.len() - 1].iter().map(|&(_, share)| {
-                        acc += share;
-                        sorted[((acc * n as f32) as usize).min(n - 1)]
-                    }).collect();
+                    let cuts: Vec<u8> = l[..l.len() - 1]
+                        .iter()
+                        .map(|&(_, share)| {
+                            acc += share;
+                            sorted[((acc * n as f32) as usize).min(n - 1)]
+                        })
+                        .collect();
                     for p in px.chunks_exact_mut(4) {
                         p[3] = l[cuts.iter().position(|&c| p[3] < c).unwrap_or(l.len() - 1)].0;
                     }
@@ -233,7 +261,11 @@ fn encode(dxt1: bool, w: u32, h: u32, rgba: &[u8], levels: Option<&[(u8, f32)]>)
         }
     }
     let mut data = vec![0u8; format.compressed_size(w as usize, h as usize)];
-    let params = texpresso::Params { algorithm: texpresso::Algorithm::ClusterFit, weigh_colour_by_alpha: !dxt1, ..Default::default() };
+    let params = texpresso::Params {
+        algorithm: texpresso::Algorithm::ClusterFit,
+        weigh_colour_by_alpha: !dxt1,
+        ..Default::default()
+    };
     format.compress(&px, w as usize, h as usize, params, &mut data);
     data
 }
@@ -308,8 +340,23 @@ fn image_chunk_from(stock: &[u8], w: u32, h: u32, data: &[u8]) -> Vec<u8> {
 
 /// An image's encoding, made once per key and format (files share images): `cache/<key>.bc1|bc2|bc2q` (bc2q: alpha
 /// quantized to the stock levels) holds w, h, data.
-fn encoded(cache: &Path, key: &str, png: &Path, dxt1: bool, levels: Option<&[(u8, f32)]>) -> Result<(u32, u32, Vec<u8>)> {
-    let path = cache.join(format!("{key}.{}", if dxt1 { "bc1" } else if levels.is_some() { "bc2q" } else { "bc2" }));
+fn encoded(
+    cache: &Path,
+    key: &str,
+    png: &Path,
+    dxt1: bool,
+    levels: Option<&[(u8, f32)]>,
+) -> Result<(u32, u32, Vec<u8>)> {
+    let path = cache.join(format!(
+        "{key}.{}",
+        if dxt1 {
+            "bc1"
+        } else if levels.is_some() {
+            "bc2q"
+        } else {
+            "bc2"
+        }
+    ));
     if let Ok(b) = std::fs::read(&path)
         && b.len() > 8
     {
@@ -390,7 +437,9 @@ pub fn pack(manifest_dir: &Path, up: &Path, out: &Path, redo: Option<&Path>) -> 
     let mut paths = std::collections::HashSet::new();
     files.retain(|(id, _)| index.path(*id).is_some_and(|p| paths.insert(p)));
     let redo: std::collections::HashSet<String> = match redo {
-        Some(p) => std::fs::read_to_string(p)?.lines().filter_map(|l| l.split('\t').next()).map(str::to_string).collect(),
+        Some(p) => {
+            std::fs::read_to_string(p)?.lines().filter_map(|l| l.split('\t').next()).map(str::to_string).collect()
+        }
         None => Default::default(),
     };
     let cache = manifest_dir.join("encoded");
@@ -411,15 +460,19 @@ pub fn pack(manifest_dir: &Path, up: &Path, out: &Path, redo: Option<&Path>) -> 
                     }
                     let Ok(bytes) = std::fs::read(&stock) else { continue };
                     let Ok(chunks) = dat::chunks(&bytes) else { continue };
-                    let allowed: std::collections::HashSet<usize> = images(&bytes).into_iter().map(|(k, _)| k).collect();
-                    let keys: HashMap<usize, &String> = wanted.iter().filter(|(k, _)| allowed.contains(k)).map(|(k, key)| (*k, key)).collect();
+                    let allowed: std::collections::HashSet<usize> =
+                        images(&bytes).into_iter().map(|(k, _)| k).collect();
+                    let keys: HashMap<usize, &String> =
+                        wanted.iter().filter(|(k, _)| allowed.contains(k)).map(|(k, key)| (*k, key)).collect();
                     let mut outb = Vec::with_capacity(bytes.len() * 8);
                     let mut changed = false;
                     for (k, c) in chunks.iter().enumerate() {
                         let header = &bytes[c.offset..c.offset + 16];
                         let end = c.offset + 16 + c.data.len();
                         let up = keys.get(&k).and_then(|key| by_key.get(*key).map(|p| (key, p)));
-                        match up.map(|(key, p)| encoded(&cache, key, p, is_dxt1(c.data), stock_levels(c.data).as_deref())) {
+                        match up
+                            .map(|(key, p)| encoded(&cache, key, p, is_dxt1(c.data), stock_levels(c.data).as_deref()))
+                        {
                             Some(Ok((w, h, data))) => {
                                 outb.extend(chunk_bytes(header, &image_chunk_from(c.data, w, h, &data)));
                                 changed = true;
@@ -484,7 +537,8 @@ pub fn slim(pack: &Path, out: &Path) -> Result<()> {
                     if dest.exists() {
                         continue;
                     }
-                    let (Ok(stock), Ok(full)) = (std::fs::read(stock_root.join(rel)), std::fs::read(pack.join(rel))) else {
+                    let (Ok(stock), Ok(full)) = (std::fs::read(stock_root.join(rel)), std::fs::read(pack.join(rel)))
+                    else {
                         failed.lock().unwrap().push(format!("{}: unreadable", rel.display()));
                         continue;
                     };
@@ -522,7 +576,14 @@ pub fn slim(pack: &Path, out: &Path) -> Result<()> {
     for f in &failed {
         println!("{f}");
     }
-    println!("{} files written ({:.1} GB of {:.1} GB), {} with no image changed, {} failed", c[0], c[3] as f64 / 1e9, c[2] as f64 / 1e9, c[1], failed.len());
+    println!(
+        "{} files written ({:.1} GB of {:.1} GB), {} with no image changed, {} failed",
+        c[0],
+        c[3] as f64 / 1e9,
+        c[2] as f64 / 1e9,
+        c[1],
+        failed.len()
+    );
     Ok(())
 }
 

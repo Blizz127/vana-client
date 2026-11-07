@@ -107,7 +107,11 @@ pub fn key(w: &mut World, key: egui::Key) {
 /// The block list as the modern layer draws it: the names, the cursor, blkmain up; the empty line (group 7 0x67).
 pub(super) fn view(w: &World) -> Option<(Vec<String>, usize, bool, String)> {
     let b = w.blklist.as_ref()?;
-    let empty = if b.rows.is_empty() { w.battle.as_ref().and_then(|bt| bt.group7(0x67)).unwrap_or_default() } else { String::new() };
+    let empty = if b.rows.is_empty() {
+        w.battle.as_ref().and_then(|bt| bt.group7(0x67)).unwrap_or_default()
+    } else {
+        String::new()
+    };
     Some((b.rows.iter().map(|r| r.1.clone()).collect(), b.cursor, b.main, empty))
 }
 
@@ -133,7 +137,10 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         let (ex, ey) = (x + e.x as f32, y + e.y as f32);
         p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
     };
-    if gu.window_rect(win, sw, sh).is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh) {
+    if gu
+        .window_rect(win, sw, sh)
+        .is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh)
+    {
         gu.hover.set(true);
         if right {
             key(w, egui::Key::Escape);
@@ -198,7 +205,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
 /// The bars from the focused window's strings: blklist "Blacklist" with no help, blkmain "Delete from blacklist.".
 pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
     let Some(b) = &w.blklist else { return };
-    let [help, title] = if b.main { gu.focus_text(MAIN, 1) } else { gu.focus_text(LIST, (b.cursor - b.top + 1) as u16) };
+    let [help, title] =
+        if b.main { gu.focus_text(MAIN, 1) } else { gu.focus_text(LIST, (b.cursor - b.top + 1) as u16) };
     (bars.help[1], bars.title[1]) = (help.unwrap_or_default(), title.unwrap_or_default());
     bars.help[2] = String::new();
 }

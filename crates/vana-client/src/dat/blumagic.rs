@@ -32,12 +32,14 @@ impl BluData {
         match index.read(FILE) {
             Ok(d) => {
                 for e in d.chunks_exact(6) {
-                    entries[e[0] as usize] = Some(Entry { points: e[1], desc: e[2], family: e[3], level: e[4], physical: e[5] != 0 });
+                    entries[e[0] as usize] =
+                        Some(Entry { points: e[1], desc: e[2], family: e[3], level: e[4], physical: e[5] != 0 });
                 }
             }
             Err(e) => log::warn!("blue magic file {FILE}: {e:#}"),
         }
-        let descs = desc_file.and_then(|f| DMsg::load(index, f).map_err(|e| log::warn!("blue magic descriptions {f}: {e:#}")).ok());
+        let descs = desc_file
+            .and_then(|f| DMsg::load(index, f).map_err(|e| log::warn!("blue magic descriptions {f}: {e:#}")).ok());
         BluData { entries, descs }
     }
 

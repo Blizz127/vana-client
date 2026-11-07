@@ -13,25 +13,70 @@ struct Sig {
     md5: &'static str,
 }
 
-const KEY1: Sig = Sig { name: "model key 1", hint: &[0xe2, 0xe5, 0x06, 0xa9, 0xed, 0x26, 0xf4, 0x42], len: 0x100, md5: "0bfa75c0e9ff6ff8497b370024b3b148" };
-const KEY2: Sig = Sig { name: "model key 2", hint: &[0xb8, 0xc5, 0xf7, 0x84, 0xe4, 0x5a, 0x23, 0x7b], len: 0x100, md5: "44b34e48298e775a58552e7d9a8f931c" };
+const KEY1: Sig = Sig {
+    name: "model key 1",
+    hint: &[0xe2, 0xe5, 0x06, 0xa9, 0xed, 0x26, 0xf4, 0x42],
+    len: 0x100,
+    md5: "0bfa75c0e9ff6ff8497b370024b3b148",
+};
+const KEY2: Sig = Sig {
+    name: "model key 2",
+    hint: &[0xb8, 0xc5, 0xf7, 0x84, 0xe4, 0x5a, 0x23, 0x7b],
+    len: 0x100,
+    md5: "44b34e48298e775a58552e7d9a8f931c",
+};
 const WIDTHS: Sig = Sig {
     name: "glyph widths",
     hint: &[0x07, 0x07, 0x07, 0x0a, 0x08, 0x0d, 0x0b, 0x05, 0x08, 0x08, 0x09, 0x09, 0x05, 0x08, 0x05, 0x07],
     len: 0x440,
     md5: "592a3523505144cc5dd1314f41421fca",
 };
-const PNG_FONTS: Sig = Sig { name: "PNG fonts", hint: &[0x77, 0x9a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00], len: 0x18, md5: "29ad3dbe3499efcd1c150f200ee8502b" };
+const PNG_FONTS: Sig = Sig {
+    name: "PNG fonts",
+    hint: &[0x77, 0x9a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00],
+    len: 0x18,
+    md5: "29ad3dbe3499efcd1c150f200ee8502b",
+};
 /// Language file-id tables: ja, en, fr, de (FUN_10250de0 / retail FUN_1025b510).
 const LANGS: [Sig; 4] = [
-    Sig { name: "language ja", hint: &[0x6c, 0x9a, 0x00, 0x00, 0x6d, 0x9a, 0x00, 0x00], len: 0x20, md5: "453ac09a342bba80b59b6497c86dafbf" },
-    Sig { name: "language en", hint: &[0x76, 0x9a, 0x00, 0x00, 0x75, 0x9a, 0x00, 0x00], len: 0x20, md5: "6546f5a771b7cef7fe0399f37cd02ad8" },
-    Sig { name: "language fr", hint: &[0xc2, 0xd9, 0x00, 0x00, 0xc1, 0xd9, 0x00, 0x00], len: 0x20, md5: "3d0a638cd18612bc1cd79118c95da551" },
-    Sig { name: "language de", hint: &[0x66, 0xdb, 0x00, 0x00, 0x65, 0xdb, 0x00, 0x00], len: 0x20, md5: "8fff1aa6789f5f74960df9aef2236e95" },
+    Sig {
+        name: "language ja",
+        hint: &[0x6c, 0x9a, 0x00, 0x00, 0x6d, 0x9a, 0x00, 0x00],
+        len: 0x20,
+        md5: "453ac09a342bba80b59b6497c86dafbf",
+    },
+    Sig {
+        name: "language en",
+        hint: &[0x76, 0x9a, 0x00, 0x00, 0x75, 0x9a, 0x00, 0x00],
+        len: 0x20,
+        md5: "6546f5a771b7cef7fe0399f37cd02ad8",
+    },
+    Sig {
+        name: "language fr",
+        hint: &[0xc2, 0xd9, 0x00, 0x00, 0xc1, 0xd9, 0x00, 0x00],
+        len: 0x20,
+        md5: "3d0a638cd18612bc1cd79118c95da551",
+    },
+    Sig {
+        name: "language de",
+        hint: &[0x66, 0xdb, 0x00, 0x00, 0x65, 0xdb, 0x00, 0x00],
+        len: 0x20,
+        md5: "8fff1aa6789f5f74960df9aef2236e95",
+    },
 ];
 /// The lowest of the seven battle mode tables (FUN_1009cda0's second).
-const MODES: Sig = Sig { name: "battle modes", hint: &[0xbf, 0x14, 0x14, 0x32, 0x7a, 0x7a, 0x24, 0x17], len: 0x40, md5: "eef9775da232dbd97559849b5dae6517" };
-const FILTER_KINDS: Sig = Sig { name: "filter kinds", hint: &[0x00, 0x09, 0x0d, 0x0c, 0x2d, 0x2d, 0x01, 0x12], len: 0x40, md5: "6b4b3991e00bfb97c1174c602e5a737c" };
+const MODES: Sig = Sig {
+    name: "battle modes",
+    hint: &[0xbf, 0x14, 0x14, 0x32, 0x7a, 0x7a, 0x24, 0x17],
+    len: 0x40,
+    md5: "eef9775da232dbd97559849b5dae6517",
+};
+const FILTER_KINDS: Sig = Sig {
+    name: "filter kinds",
+    hint: &[0x00, 0x09, 0x0d, 0x0c, 0x2d, 0x2d, 0x01, 0x12],
+    len: 0x40,
+    md5: "6b4b3991e00bfb97c1174c602e5a737c",
+};
 /// FUN_100ad8f0's on-screen kind per message (0 none, 1 damage, 2 recovery, 3 miss); 1024 bytes, SE appends.
 const SCREEN_KINDS: Sig = Sig {
     name: "screen kinds",
@@ -40,22 +85,57 @@ const SCREEN_KINDS: Sig = Sig {
     md5: "0ea9b21e9a7f04a68aeb660b0e0c2244",
 };
 /// DAT_1035bc60 rows 1..7 (row 0 is zeros): knockback speed per tick, decay, constant ticks by level (f32 each).
-const KNOCKBACK: Sig = Sig { name: "knockback levels", hint: &[0xab, 0xaa, 0xaa, 0x3d, 0x9a, 0x99, 0x99, 0x3d, 0x00, 0x00, 0xa0, 0x40], len: 84, md5: "098219a788fd1677fe255d3c7e8c95bf" };
+const KNOCKBACK: Sig = Sig {
+    name: "knockback levels",
+    hint: &[0xab, 0xaa, 0xaa, 0x3d, 0x9a, 0x99, 0x99, 0x3d, 0x00, 0x00, 0xa0, 0x40],
+    len: 84,
+    md5: "098219a788fd1677fe255d3c7e8c95bf",
+};
 /// DAT_1036eba0: the chat call tags, 0x14-byte rows {name[16], u32 SeSep name (byte-swapped), bits 0x800000 /
 /// 0x400000 = <ncall> handling} to a row with sound 0.
 const CALLS: Sig = Sig { name: "chat calls", hint: b"<call>\0", len: 0x40, md5: "806a8a20b9c977474e5c522233d52ec0" };
-const MODE_COLOURS: Sig = Sig { name: "mode colours", hint: &[0x01, 0x00, 0x54, 0x01, 0x02, 0x00, 0x55, 0x01], len: 0x40, md5: "8dcab7880389b2c4c488afb259a5f760" };
-const PALETTE: Sig = Sig { name: "palette", hint: &[0x42, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x60], len: 0x40, md5: "ada7882381d8a7f871792f7f2bc56e63" };
-const BINDINGS: Sig = Sig { name: "key bindings", hint: &[0xc8, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd0, 0x00], len: 0x100, md5: "2979f885eeb95c7f5344400b09026857" };
+const MODE_COLOURS: Sig = Sig {
+    name: "mode colours",
+    hint: &[0x01, 0x00, 0x54, 0x01, 0x02, 0x00, 0x55, 0x01],
+    len: 0x40,
+    md5: "8dcab7880389b2c4c488afb259a5f760",
+};
+const PALETTE: Sig = Sig {
+    name: "palette",
+    hint: &[0x42, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x60],
+    len: 0x40,
+    md5: "ada7882381d8a7f871792f7f2bc56e63",
+};
+const BINDINGS: Sig = Sig {
+    name: "key bindings",
+    hint: &[0xc8, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd0, 0x00],
+    len: 0x100,
+    md5: "2979f885eeb95c7f5344400b09026857",
+};
 const MASKS: Sig = Sig {
     name: "key masks",
     hint: &[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x08, 0x00, 0x08, 0x00, 0x10, 0x00, 0x10, 0x00],
     len: 0x100,
     md5: "d989b989b0e0402124e6af0708690147",
 };
-const COMPACT: Sig = Sig { name: "compact keys", hint: &[0x11, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00], len: 0x100, md5: "dff8338e5664b470f57bfca986a1ee13" };
-const K1: Sig = Sig { name: "k1 keys", hint: &[0x00, 0xff, 0xff, 0xff, 0x01, 0xff, 0xff, 0xff], len: 0x40, md5: "ac0040622246350502b3cdd9e800f821" };
-const K2: Sig = Sig { name: "k2 keys", hint: &[0x3b, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff], len: 0x80, md5: "1599eaca5b50a3f4185ba10b03444576" };
+const COMPACT: Sig = Sig {
+    name: "compact keys",
+    hint: &[0x11, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00],
+    len: 0x100,
+    md5: "dff8338e5664b470f57bfca986a1ee13",
+};
+const K1: Sig = Sig {
+    name: "k1 keys",
+    hint: &[0x00, 0xff, 0xff, 0xff, 0x01, 0xff, 0xff, 0xff],
+    len: 0x40,
+    md5: "ac0040622246350502b3cdd9e800f821",
+};
+const K2: Sig = Sig {
+    name: "k2 keys",
+    hint: &[0x3b, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
+    len: 0x80,
+    md5: "1599eaca5b50a3f4185ba10b03444576",
+};
 const STATS: Sig = Sig {
     name: "creator stats",
     hint: &[0x08, 0x07, 0x06, 0x07, 0x05, 0x05, 0x06, 0x07, 0x07, 0x08, 0x05, 0x05, 0x06, 0x06, 0x06, 0x05],
@@ -89,10 +169,21 @@ const CODE_COLOURS: Sig = Sig {
     len: 0x44,
     md5: "23e1f4ec52b1b2f0d5ddc68efbf06f89",
 };
-const ERRORS: Sig = Sig { name: "error codes", hint: &[0x34, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], len: 0x40, md5: "3e6e09a7959e57630975fc953b865925" };
+const ERRORS: Sig = Sig {
+    name: "error codes",
+    hint: &[0x34, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    len: 0x40,
+    md5: "3e6e09a7959e57630975fc953b865925",
+};
 /// "No. of content IDs purchased: %2d"; the other three formats follow at -0x24 each.
-const COUNT_FMT: Sig = Sig { name: "count formats", hint: b"No. of conte", len: 0x18, md5: "2e622d8e177bbaaf8d9aee67475441ae" };
-const REGIONS: Sig = Sig { name: "map regions", hint: &[0x64, 0x00, 0x00, 0x01, 0x00, 0x01, 0x01, 0x00], len: 0x380, md5: "8ec88ae948b702b4e5c330f71ad73f32" };
+const COUNT_FMT: Sig =
+    Sig { name: "count formats", hint: b"No. of conte", len: 0x18, md5: "2e622d8e177bbaaf8d9aee67475441ae" };
+const REGIONS: Sig = Sig {
+    name: "map regions",
+    hint: &[0x64, 0x00, 0x00, 0x01, 0x00, 0x01, 0x01, 0x00],
+    len: 0x380,
+    md5: "8ec88ae948b702b4e5c330f71ad73f32",
+};
 
 /// Every table's place: file offsets (`*_at`) or VAs.
 #[derive(Debug, Clone)]
@@ -157,7 +248,10 @@ pub fn of(dll: &[u8]) -> Result<Tables> {
     use std::sync::{Mutex, OnceLock};
     static CACHE: OnceLock<Mutex<Vec<((usize, u64), Tables)>>> = OnceLock::new();
     let step = (dll.len() / 61).max(1);
-    let key = (dll.len(), (0..61).fold(0u64, |h, i| h.wrapping_mul(1_000_003).wrapping_add(*dll.get(i * step).unwrap_or(&0) as u64)));
+    let key = (
+        dll.len(),
+        (0..61).fold(0u64, |h, i| h.wrapping_mul(1_000_003).wrapping_add(*dll.get(i * step).unwrap_or(&0) as u64)),
+    );
     let cache = CACHE.get_or_init(Default::default);
     if let Some(t) = cache.lock().unwrap().iter().find(|e| e.0 == key) {
         return Ok(t.1.clone());
@@ -216,7 +310,13 @@ pub fn knockback(dll: &[u8]) -> Result<[[f32; 3]; 8]> {
 /// The 256 Monstrosity prefixes (ids 0xf9.. empty, as the DLL's).
 pub fn mon_prefixes(dll: &[u8]) -> Result<Vec<String>> {
     let at = find(dll, &MON_PREFIXES)?;
-    Ok((0..256).map(|i| dll.get(at + i * 16..at + i * 16 + 16).filter(|_| i < 0xf9).map_or(String::new(), |s| String::from_utf8_lossy(s.split(|&b| b == 0).next().unwrap_or_default()).into_owned())).collect())
+    Ok((0..256)
+        .map(|i| {
+            dll.get(at + i * 16..at + i * 16 + 16).filter(|_| i < 0xf9).map_or(String::new(), |s| {
+                String::from_utf8_lossy(s.split(|&b| b == 0).next().unwrap_or_default()).into_owned()
+            })
+        })
+        .collect())
 }
 
 /// 0x10370280, directly before the prefixes: each species code's type 1..19 for Refine by Type (0 none).
@@ -265,7 +365,11 @@ fn find_pair(dll: &[u8], value: i32, word: &str) -> Result<usize> {
         let s = start + i + 1;
         if let Some(va) = va_of(dll, s) {
             let pat: Vec<u8> = [value.to_le_bytes(), va.to_le_bytes()].concat();
-            if let Some(p) = dll.chunks_exact(4).enumerate().find_map(|(k, _)| (dll.get(k * 4..k * 4 + 8) == Some(&pat[..])).then_some(k * 4)) {
+            if let Some(p) = dll
+                .chunks_exact(4)
+                .enumerate()
+                .find_map(|(k, _)| (dll.get(k * 4..k * 4 + 8) == Some(&pat[..])).then_some(k * 4))
+            {
                 return Ok(p);
             }
         }
@@ -310,7 +414,8 @@ pub struct SearchWords {
 }
 
 /// The level table's first four rows (unique in the image).
-const LEVELS: [u8; 24] = [5, 0, 2, 0x3a, 0x5a, 0, 0x18, 0, 2, 0x1f, 0, 0, 0x19, 0, 2, 0x1f, 0, 0, 0x21, 0, 2, 0x44, 0, 0];
+const LEVELS: [u8; 24] =
+    [5, 0, 2, 0x3a, 0x5a, 0, 0x18, 0, 2, 0x1f, 0, 0, 0x19, 0, 2, 0x1f, 0, 0, 0x21, 0, 2, 0x44, 0, 0];
 
 const ZONE_FLAGS: Sig = Sig {
     name: "zone flags",
@@ -322,7 +427,8 @@ const ZONE_FLAGS: Sig = Sig {
 pub fn search_words(dll: &[u8]) -> Result<SearchWords> {
     let mut w = SearchWords::default();
     let (cats, at) = word_list(dll, find_pair(dll, 0, "NAME")?);
-    let lists: [&mut Vec<(i32, String)>; 6] = [&mut w.unity_word, &mut w.areas, &mut w.nations, &mut w.races, &mut w.jobs, &mut w.statuses];
+    let lists: [&mut Vec<(i32, String)>; 6] =
+        [&mut w.unity_word, &mut w.areas, &mut w.nations, &mut w.races, &mut w.jobs, &mut w.statuses];
     let mut at = at;
     for l in lists {
         (*l, at) = word_list(dll, at);
@@ -341,8 +447,16 @@ pub fn search_words(dll: &[u8]) -> Result<SearchWords> {
     }
     // The region pointer array: its first list is {230..233}.
     let first: Vec<u8> = [230u16, 231, 232, 233, 0].iter().flat_map(|z| z.to_le_bytes()).collect();
-    let list_va = dll.windows(first.len()).position(|x| x == first).and_then(|o| va_of(dll, o)).ok_or_else(|| anyhow!("FFXiMain.dll: no region lists"))?;
-    let arr = dll.chunks_exact(4).position(|c| c == list_va.to_le_bytes()).ok_or_else(|| anyhow!("FFXiMain.dll: no region array"))? * 4;
+    let list_va = dll
+        .windows(first.len())
+        .position(|x| x == first)
+        .and_then(|o| va_of(dll, o))
+        .ok_or_else(|| anyhow!("FFXiMain.dll: no region lists"))?;
+    let arr = dll
+        .chunks_exact(4)
+        .position(|c| c == list_va.to_le_bytes())
+        .ok_or_else(|| anyhow!("FFXiMain.dll: no region array"))?
+        * 4;
     for k in 0..0x32 {
         let mut zones = Vec::new();
         if let Some(mut o) = u32_le(dll, arr + 4 * k).and_then(|p| off_of(dll, p)) {
@@ -378,7 +492,9 @@ impl SearchWords {
 
 impl Tables {
     pub fn find(dll: &[u8]) -> Result<Self> {
-        let va = |s: &Sig| -> Result<u32> { find(dll, s).and_then(|o| va_of(dll, o).ok_or_else(|| anyhow!("{}: not in a section", s.name))) };
+        let va = |s: &Sig| -> Result<u32> {
+            find(dll, s).and_then(|o| va_of(dll, o).ok_or_else(|| anyhow!("{}: not in a section", s.name)))
+        };
         let key2_at = find(dll, &KEY2)?;
         // Model key 1 sits 0x328 before key 2 in every known build; another copy of it exists further on.
         let at_key1 = |o: usize| dll.get(o..o + KEY1.len).is_some_and(|t| hex::encode(Md5::digest(t)) == KEY1.md5);
@@ -487,16 +603,26 @@ const CNQ_PAIRS: isize = -0x6c0;
 pub fn conquest(dll: &[u8]) -> Result<CnqTables> {
     let i16_at = |o: usize| dll.get(o..o + 2).map(|b| i16::from_le_bytes([b[0], b[1]]));
     let base = (0..dll.len().saturating_sub(0x1960 + CNQ_FIRST.len()))
-        .find(|&o| dll[o..o + CNQ_FIRST.len()] == CNQ_FIRST && dll[o + 0x1960..o + 0x1960 + CNQ_FIRST.len()] == CNQ_FIRST)
+        .find(|&o| {
+            dll[o..o + CNQ_FIRST.len()] == CNQ_FIRST && dll[o + 0x1960..o + 0x1960 + CNQ_FIRST.len()] == CNQ_FIRST
+        })
         .ok_or_else(|| anyhow!("FFXiMain.dll: no conquest marker tables"))?;
     let at = |d: isize| base.checked_add_signed(d).ok_or_else(|| anyhow!("conquest tables: offset out of range"));
     let mut t = CnqTables { counts: CNQ_COUNTS, ..Default::default() };
     for mode in 0..4 {
-        let recs: Vec<usize> = CNQ_RUNS[mode].iter().map(|&(d, n)| at(d).map(|o| (0..n).map(move |k| o + 8 * k))).collect::<Result<Vec<_>>>()?.into_iter().flatten().collect();
+        let recs: Vec<usize> = CNQ_RUNS[mode]
+            .iter()
+            .map(|&(d, n)| at(d).map(|o| (0..n).map(move |k| o + 8 * k)))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
         let e0 = at(CNQ_ENTRIES[mode])?;
         for (k, r) in recs.into_iter().enumerate() {
             let e = e0 + 0x20 * k;
-            let (Some(rec), Some(ent)) = (dll.get(r..r + 8), dll.get(e..e + 0x12)) else { bail!("conquest tables: short") };
+            let (Some(rec), Some(ent)) = (dll.get(r..r + 8), dll.get(e..e + 0x12)) else {
+                bail!("conquest tables: short")
+            };
             let s = |b: &[u8], o: usize| i16::from_le_bytes([b[o], b[o + 1]]);
             t.modes[mode].push(CnqMarker {
                 flags: u16::from_le_bytes([ent[0], ent[1]]),
@@ -569,7 +695,10 @@ mod tests {
         let t = super::conquest(&dll).unwrap();
         assert_eq!(t.modes.iter().map(Vec::len).collect::<Vec<_>>(), [0xa9, 0x22, 0x2a, 0x15]);
         let ronfaure = t.modes[0][4];
-        assert_eq!((ronfaure.id, ronfaure.par, ronfaure.name, ronfaure.px, ronfaure.py, ronfaure.place), (5, -1, 4, 177, 182, 3));
+        assert_eq!(
+            (ronfaure.id, ronfaure.par, ronfaure.name, ronfaure.px, ronfaure.py, ronfaure.place),
+            (5, -1, 4, 177, 182, 3)
+        );
         assert_eq!((t.modes[0][23].id, t.modes[0][23].par), (1, 230));
         assert_eq!((t.modes[2][8].par, t.modes[2][8].flags), (-2, 0x840));
         assert_eq!(t.pairs[0], (2, 260));

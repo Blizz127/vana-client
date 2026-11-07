@@ -104,7 +104,8 @@ pub fn format(s: &[u8], strs: &[&[u8]], ints: &[i32], item: &dyn Fn(i32, i32, bo
 }
 
 /// The format rows by key (tables 0x1037d31c date order, 0x1037d34c 12 / 24 hour): group 10 ids at +2 .. +10.
-const DATE_ROWS: [[u16; 5]; 3] = [[0x3b, 0x4d, 0x48, 0x43, 0x43], [0x3c, 0x4e, 0x49, 0x44, 0x44], [0x3d, 0x4f, 0x4a, 0x45, 0x45]];
+const DATE_ROWS: [[u16; 5]; 3] =
+    [[0x3b, 0x4d, 0x48, 0x43, 0x43], [0x3c, 0x4e, 0x49, 0x44, 0x44], [0x3d, 0x4f, 0x4a, 0x45, 0x45]];
 const TIME_ROWS: [[u16; 5]; 2] = [[0x3e, 0x3e, 0x4b, 0x46, 0x40], [0x3f, 0x3f, 0x4b, 0x46, 0x40]];
 
 /// The Vana'diel calendar of a game time t (Earth seconds since the epoch, FUN_101039e0): year, month, day,
@@ -125,7 +126,13 @@ impl VanaParts {
         let d = ((t / 3456) % 84) as i32;
         let v = (d - 4) as f32 * 2.380_952_4_f32;
         let r = if v >= 0.0 { v + 0.5 } else { v - 0.5 };
-        let moon = if d < 4 { (-r).trunc() as i32 } else if d <= 46 { r.trunc() as i32 } else { 200 - r.trunc() as i32 };
+        let moon = if d < 4 {
+            (-r).trunc() as i32
+        } else if d <= 46 {
+            r.trunc() as i32
+        } else {
+            200 - r.trunc() as i32
+        };
         VanaParts {
             year: (t / 0x12fc00) as i32 + 886,
             month: (t % 0x12fc00 / 0x19500) as i32 + 1,
@@ -182,7 +189,11 @@ pub fn earth_datetime(g: &Group<'_>, unix: i64, flags: u32, date_key: usize, h12
         fmt(g, row[1], &[m.as_bytes()], &[year % 100, day])
     };
     let trow = &TIME_ROWS[h12 as usize];
-    let time = if flags & 8 != 0 { fmt(g, trow[4], &[], &[hour, hour12, minute]) } else { fmt(g, trow[0], &[], &[hour, hour12, minute, second]) };
+    let time = if flags & 8 != 0 {
+        fmt(g, trow[4], &[], &[hour, hour12, minute])
+    } else {
+        fmt(g, trow[0], &[], &[hour, hour12, minute, second])
+    };
     if flags & 2 != 0 {
         date
     } else if flags & 0x18 != 0 {

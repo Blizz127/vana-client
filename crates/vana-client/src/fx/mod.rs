@@ -14,8 +14,8 @@ pub mod spline;
 mod tasks;
 pub mod trail;
 pub mod voyage;
-pub use tasks::{HOLD_REACT, HOLD_STATUS};
 pub use tasks::event_action_file;
+pub use tasks::{HOLD_REACT, HOLD_STATUS};
 pub use tasks::{effects_allowed, filter_class};
 
 use crate::dat::generator::{KeyFrame, Op, kind};
@@ -757,7 +757,8 @@ impl Registry {
             return self.libs[lib].texture_at(i).map(|t| (lib, t));
         }
         for l in [self.zone, self.global].into_iter().flatten() {
-            let hit = self.libs[l].find_texture_tail(name).filter(|&i| Some(l) == self.zone || self.libs[l].in_syst_effe(i));
+            let hit =
+                self.libs[l].find_texture_tail(name).filter(|&i| Some(l) == self.zone || self.libs[l].in_syst_effe(i));
             if let Some(i) = hit {
                 return self.libs[l].texture_at(i).map(|t| (l, t));
             }
@@ -771,8 +772,10 @@ impl Registry {
             return Some(id);
         }
         let keys = self.zone_keys.clone()?;
-        let names: Vec<Option<String>> = self.libs[r.0].mesh(r.1, &keys)?.groups.iter().map(|g| g.name.clone()).collect();
-        let textures: Vec<Option<(usize, usize)>> = names.iter().map(|n| n.as_ref().and_then(|n| self.texture(r.0, r.1, n))).collect();
+        let names: Vec<Option<String>> =
+            self.libs[r.0].mesh(r.1, &keys)?.groups.iter().map(|g| g.name.clone()).collect();
+        let textures: Vec<Option<(usize, usize)>> =
+            names.iter().map(|n| n.as_ref().and_then(|n| self.texture(r.0, r.1, n))).collect();
         if let Some(m) = self.libs[r.0].meshes.get_mut(&r.1) {
             for (g, t) in m.groups.iter_mut().zip(textures) {
                 g.texture = t;
@@ -854,13 +857,17 @@ impl Registry {
         self.libs[r.0].sprites.get(&r.1).map_or(0, |s| s.frames.len() as u32)
     }
 
-
     pub fn miss(&mut self, lib: usize, from: usize, name: u32, k: u8) {
         if let Some(a) = self.audit.as_mut() {
             *a.missing.entry((self.libs[lib].file_id, name, k)).or_default() += 1;
         }
         if self.missed.insert((lib, name)) {
-            log::debug!("effects: DAT {} {}: {} (kind {k:#x}) not found", self.libs[lib].file_id, self.libs[lib].tree.nodes[from].name(), String::from_utf8_lossy(&name.to_le_bytes()));
+            log::debug!(
+                "effects: DAT {} {}: {} (kind {k:#x}) not found",
+                self.libs[lib].file_id,
+                self.libs[lib].tree.nodes[from].name(),
+                String::from_utf8_lossy(&name.to_le_bytes())
+            );
         }
     }
 
@@ -1283,7 +1290,12 @@ impl Effects {
             .filter(|g| !self.reg.libs[l].tree.path(g.node).contains(&weat))
             .map(|g| g.node)
             .collect();
-        log::info!("effects: zone DAT {}: {} generators, {} start at load", self.reg.libs[l].file_id, self.reg.libs[l].gens.len(), starts.len());
+        log::info!(
+            "effects: zone DAT {}: {} generators, {} start at load",
+            self.reg.libs[l].file_id,
+            self.reg.libs[l].gens.len(),
+            starts.len()
+        );
         // What the loader parsed goes to the GPU with the zone (render/effects.rs upload_pending).
         let meshes: Vec<usize> = self.reg.libs[l].meshes.keys().copied().collect();
         let sprites: Vec<usize> = self.reg.libs[l].sprites.keys().copied().collect();
@@ -1316,7 +1328,12 @@ impl Effects {
             .filter(|g| !self.reg.libs[l].tree.path(g.node).contains(&weat))
             .map(|g| g.node)
             .collect();
-        log::info!("effects: sub-area DAT {}: {} generators, {} start at load", self.reg.libs[l].file_id, self.reg.libs[l].gens.len(), starts.len());
+        log::info!(
+            "effects: sub-area DAT {}: {} generators, {} start at load",
+            self.reg.libs[l].file_id,
+            self.reg.libs[l].gens.len(),
+            starts.len()
+        );
         let meshes: Vec<usize> = self.reg.libs[l].meshes.keys().copied().collect();
         let sprites: Vec<usize> = self.reg.libs[l].sprites.keys().copied().collect();
         for n in meshes {
@@ -1346,7 +1363,12 @@ impl Effects {
                     None => return false,
                 }
             };
-            if let Some(s) = tree.nodes.iter().enumerate().position(|(i, n)| n.kind == kind::SCHEDULER && n.name == name && inside(i)) {
+            if let Some(s) = tree
+                .nodes
+                .iter()
+                .enumerate()
+                .position(|(i, n)| n.kind == kind::SCHEDULER && n.name == name && inside(i))
+            {
                 let who = sched::Who::Actor(actor);
                 self.spawn_task((l, s), who, who, None, 1.0, None);
                 return true;
@@ -1360,7 +1382,10 @@ impl Effects {
     /// `folder`: this frame's fses / fser choice (Some(rain)), stored after the check as retail does.
     pub fn wade(&mut self, id: u32, water: bool, near: bool, folder: Option<bool>) {
         if water && near && !self.wading.contains_key(&id) {
-            let found = self.foot_folder.get(&id).and_then(|f| Some((f.at.0, self.reg.libs[f.at.0].find_in(f.at.1, kind::GENERATOR, *b"i900")?)));
+            let found = self
+                .foot_folder
+                .get(&id)
+                .and_then(|f| Some((f.at.0, self.reg.libs[f.at.0].find_in(f.at.1, kind::GENERATOR, *b"i900")?)));
             // The flag is set even without the folder (no ripple until it clears).
             let inst = found.and_then(|g| self.start(g, Owner::Step(id)));
             if let Some(x) = inst.and_then(|i| self.insts[i].as_mut()) {
@@ -1371,7 +1396,9 @@ impl Effects {
             }
             self.wading.insert(id, inst);
         } else if !water && let Some(inst) = self.wading.remove(&id) {
-            if let Some(i) = inst.filter(|&i| self.insts[i].as_ref().is_some_and(|x| &x.name == b"i900" && x.owner == Owner::Step(id))) {
+            if let Some(i) = inst
+                .filter(|&i| self.insts[i].as_ref().is_some_and(|x| &x.name == b"i900" && x.owner == Owner::Step(id)))
+            {
                 self.kill(i);
             }
         }
@@ -1424,7 +1451,11 @@ impl Effects {
         let tree = &self.reg.libs[l].tree;
         let named = |parent: Option<usize>, n: &str| {
             let n = crate::dat::generator::fourcc(n);
-            tree.nodes.iter().enumerate().find(|(_, x)| x.kind == kind::FOLDER && x.name == n && (parent.is_none() || x.parent == parent)).map(|(i, _)| i)
+            tree.nodes
+                .iter()
+                .enumerate()
+                .find(|(_, x)| x.kind == kind::FOLDER && x.name == n && (parent.is_none() || x.parent == parent))
+                .map(|(i, _)| i)
         };
         let Some(weat) = named(None, "weat") else { return };
         // FUN_1018a7a0: neither the tag nor `suny`: nothing starts and nothing is killed.
@@ -1437,7 +1468,12 @@ impl Effects {
             }
         };
         let covered = self.covered;
-        let gens: Vec<usize> = self.reg.libs[l].gens.iter().filter(|g| g.flags & 0x1000 != 0 && within(g.node) && !(covered && roofed(g))).map(|g| g.node).collect();
+        let gens: Vec<usize> = self.reg.libs[l]
+            .gens
+            .iter()
+            .filter(|g| g.flags & 0x1000 != 0 && within(g.node) && !(covered && roofed(g)))
+            .map(|g| g.node)
+            .collect();
         self.weather_serial += 1;
         let serial = self.weather_serial;
         log::info!("effects: weather {tag} over {seconds:.0} s: {} generators", gens.len());
@@ -1458,7 +1494,8 @@ impl Effects {
                 None => return false,
             }
         };
-        let old: Vec<usize> = (0..tree.nodes.len()).filter(|&n| tree.nodes[n].kind == kind::SCHEDULER && under(n, weat)).collect();
+        let old: Vec<usize> =
+            (0..tree.nodes.len()).filter(|&n| tree.nodes[n].kind == kind::SCHEDULER && under(n, weat)).collect();
         for n in old {
             self.kill_tasks((l, n), None);
         }
@@ -1473,7 +1510,13 @@ impl Effects {
         let l = self.zone_lib?;
         let lib = &self.reg.libs[l];
         let tree = &lib.tree;
-        let named = |parent: Option<usize>, n: [u8; 4]| tree.nodes.iter().enumerate().find(|(_, x)| x.kind == kind::FOLDER && x.name == n && (parent.is_none() || x.parent == parent)).map(|(i, _)| i);
+        let named = |parent: Option<usize>, n: [u8; 4]| {
+            tree.nodes
+                .iter()
+                .enumerate()
+                .find(|(_, x)| x.kind == kind::FOLDER && x.name == n && (parent.is_none() || x.parent == parent))
+                .map(|(i, _)| i)
+        };
         let fc = crate::dat::generator::fourcc;
         let weat = named(None, fc("weat"))?;
         let tag = self.weathers.last().map_or(fc("suny"), |w| w.tag);
@@ -1485,7 +1528,12 @@ impl Effects {
                 None => return false,
             }
         };
-        let indo = tree.nodes.iter().enumerate().find(|(i, x)| x.kind == kind::FOLDER && x.name == fc("indo") && under(*i, folder)).map(|(i, _)| i);
+        let indo = tree
+            .nodes
+            .iter()
+            .enumerate()
+            .find(|(i, x)| x.kind == kind::FOLDER && x.name == fc("indo") && under(*i, folder))
+            .map(|(i, _)| i);
         let time = |n: &[u8; 4]| -> Option<u32> {
             let d = |c: u8| c.is_ascii_digit().then(|| (c - b'0') as u32);
             let (a, b, c, e) = (d(n[0])?, d(n[1])?, d(n[2])?, d(n[3])?);
@@ -1607,7 +1655,9 @@ impl Effects {
             // FUN_100531d0: the generator's matrix taken at the start; the voyage modes' is V (or its rotation).
             matrix: match g.attach_mode() {
                 0x14 => Some(self.voyage),
-                0x15 => Some(Mat4::from_cols(self.voyage.x_axis, self.voyage.y_axis, self.voyage.z_axis, glam::Vec4::W)),
+                0x15 => {
+                    Some(Mat4::from_cols(self.voyage.x_axis, self.voyage.y_axis, self.voyage.z_axis, glam::Vec4::W))
+                }
                 _ => None,
             },
             scale_a: Vec3::ONE,
@@ -1769,7 +1819,11 @@ impl Effects {
                 self.flash[k] = self.flash[k].saturating_add(*v);
             }
             let f = |k: usize| f32::from_bits(r[k]);
-            let has_drift = self.insts.get(c.inst).and_then(|x| x.as_ref()).is_some_and(|x| self.reg.update_op_slot(x.src, 2).is_some());
+            let has_drift = self
+                .insts
+                .get(c.inst)
+                .and_then(|x| x.as_ref())
+                .is_some_and(|x| self.reg.update_op_slot(x.src, 2).is_some());
             c.key = f(back::KEY);
             c.drawn = r[back::STATUS] & back::DRAWN != 0;
             c.back = Some(emit::Parent {
@@ -1798,7 +1852,8 @@ impl Effects {
         let dt = f.dt;
         // FUN_1018c2b0: the time of day (rounded: 11:00 from an f32 day fraction must not land on 10:59:59.98) and
         // its change since the last frame.
-        let now = ((f.dayfrac as f64 * tasks::VANA_DAY as f64).round() as i64).rem_euclid(tasks::VANA_DAY as i64) as i32;
+        let now =
+            ((f.dayfrac as f64 * tasks::VANA_DAY as f64).round() as i64).rem_euclid(tasks::VANA_DAY as i64) as i32;
         self.vana_dt = if self.vana_seen { (now - self.vana_now).rem_euclid(tasks::VANA_DAY) as f32 } else { 0.0 };
         (self.vana_now, self.vana_seen) = (now, true);
         self.weather_step(f.seconds);
@@ -1813,7 +1868,8 @@ impl Effects {
         for k in self.knocks_later.iter_mut() {
             k.0 -= dt;
         }
-        let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut self.knocks_later).into_iter().partition(|k| k.0 <= 0.0);
+        let (due, later): (Vec<_>, Vec<_>) =
+            std::mem::take(&mut self.knocks_later).into_iter().partition(|k| k.0 <= 0.0);
         self.knocks_later = later;
         self.knocks.extend(due.into_iter().map(|k| k.1));
         self.last_frame = Some(*f);
@@ -1842,13 +1898,18 @@ impl Effects {
                 self.follow(i, word, f, actors);
             }
             // Generator ops 0x0e..0x10: each rebuilds the attachment and spins it, so the stream's last one stands.
-            if let Some(Some(op)) = self.insts[i].as_ref().filter(|x| x.mode != 0).map(|x| x.streams[0].iter().rev().find(|o| matches!(o.code, 0x0e..=0x10)).cloned()) {
+            if let Some(Some(op)) = self.insts[i]
+                .as_ref()
+                .filter(|x| x.mode != 0)
+                .map(|x| x.streams[0].iter().rev().find(|o| matches!(o.code, 0x0e..=0x10)).cloned())
+            {
                 self.spin(i, &op, f, actors);
             }
             self.ground_frame(i, actors);
             let driven = self.drive(i, f);
             let Some(inst) = self.insts[i].as_ref() else { continue };
-            let (m, a, b, wgt, ss, ms) = (inst.matrix, inst.scale_a, inst.scale_b, inst.weather, inst.size_scaled, inst.mslot);
+            let (m, a, b, wgt, ss, ms) =
+                (inst.matrix, inst.scale_a, inst.scale_b, inst.weather, inst.size_scaled, inst.mslot);
             self.put_slot(ms, m, a, b, wgt, ss);
             if driven {
                 self.update_instance(i, f, actors);
@@ -1860,7 +1921,11 @@ impl Effects {
         for i in 0..self.insts.len() {
             let Some(x) = self.insts[i].as_mut() else { continue };
             let orphan = std::mem::take(&mut x.emptied) && x.live.is_empty();
-            if orphan || (x.finished || x.stopping) && x.live.is_empty() && !matches!(x.owner, Owner::Zone | Owner::SubArea | Owner::Actor(_) | Owner::Weather(_)) {
+            if orphan
+                || (x.finished || x.stopping)
+                    && x.live.is_empty()
+                    && !matches!(x.owner, Owner::Zone | Owner::SubArea | Owner::Actor(_) | Owner::Weather(_))
+            {
                 self.kill(i);
             }
         }
@@ -1882,7 +1947,13 @@ impl Effects {
         let (life, back, owner) = (c.life, c.back, self.insts.get(c.inst).and_then(|x| x.as_ref()).map(|x| x.src));
         let Some(owner) = owner else { return false };
         let has = |reg: &Registry, code: u8| reg.update_op_slot(owner, code).is_some();
-        let follow = if has(&self.reg, 0x46) { Some(true) } else if has(&self.reg, 0x33) { Some(false) } else { None };
+        let follow = if has(&self.reg, 0x46) {
+            Some(true)
+        } else if has(&self.reg, 0x33) {
+            Some(false)
+        } else {
+            None
+        };
         if let (Some(cam), Some(b)) = (follow, back)
             && let Some(x) = self.insts[i].as_mut()
         {
@@ -1953,7 +2024,15 @@ impl Effects {
         let mut spawns = Vec::new();
         for _ in 0..emissions.min(512) {
             let me = self.me_pair(&inst, actors);
-            if let Some(s) = emit::emit(&mut self.reg, &mut inst, parent.as_ref(), f, &mut self.rng, &|a, b| actors.ground_hit(a, b), me) {
+            if let Some(s) = emit::emit(
+                &mut self.reg,
+                &mut inst,
+                parent.as_ref(),
+                f,
+                &mut self.rng,
+                &|a, b| actors.ground_hit(a, b),
+                me,
+            ) {
                 spawns.push(s);
             }
         }
@@ -1972,8 +2051,12 @@ impl Effects {
     fn parent_frame(&self, c: &ElemCpu) -> Option<emit::ParentFrame> {
         let x = self.insts.get(c.inst)?.as_ref()?;
         let s = self.slots.get(c.frame as usize);
-        let v3 = |s: &[u32; SLOT_WORDS], k: usize| Vec3::new(f32::from_bits(s[k]), f32::from_bits(s[k + 1]), f32::from_bits(s[k + 2]));
-        let matrix = s.filter(|s| s[slot::HAS_MATRIX] != 0).map(|s| Mat4::from_cols_array(&std::array::from_fn(|k| f32::from_bits(s[slot::MATRIX + k]))));
+        let v3 = |s: &[u32; SLOT_WORDS], k: usize| {
+            Vec3::new(f32::from_bits(s[k]), f32::from_bits(s[k + 1]), f32::from_bits(s[k + 2]))
+        };
+        let matrix = s
+            .filter(|s| s[slot::HAS_MATRIX] != 0)
+            .map(|s| Mat4::from_cols_array(&std::array::from_fn(|k| f32::from_bits(s[slot::MATRIX + k]))));
         Some(emit::ParentFrame {
             slot: c.frame,
             matrix,
@@ -1993,7 +2076,10 @@ impl Effects {
     /// A keyframe by GPU id with its sampler flags (0: linear, else eased), 0 for none.
     fn sample_key(&self, id: u32, prm: u32, x: f32) -> f32 {
         self.reg.key_desc.get(id as usize).map_or(0.0, |d| {
-            crate::dat::generator::KeyFrame { keys: self.reg.key_data[d[0] as usize..(d[0] + d[1]) as usize].iter().map(|p| (p[0], p[1])).collect() }.sample(x, prm & 0xf != 0)
+            crate::dat::generator::KeyFrame {
+                keys: self.reg.key_data[d[0] as usize..(d[0] + d[1]) as usize].iter().map(|p| (p[0], p[1])).collect(),
+            }
+            .sample(x, prm & 0xf != 0)
         })
     }
 
@@ -2049,10 +2135,12 @@ impl Effects {
     }
 
     fn add_elem(&mut self, inst: usize, s: emit::Spawn, f: &Frame, acts: &dyn Actors) {
-        let Some(e) = self.free.pop().or_else(|| (self.elems.len() < MAX_ELEMS).then(|| {
-            self.elems.push(None);
-            (self.elems.len() - 1) as u32
-        })) else {
+        let Some(e) = self.free.pop().or_else(|| {
+            (self.elems.len() < MAX_ELEMS).then(|| {
+                self.elems.push(None);
+                (self.elems.len() - 1) as u32
+            })
+        }) else {
             return;
         };
         self.serial = self.serial.wrapping_add(1);
@@ -2091,18 +2179,38 @@ impl Effects {
             self.sounds.push(snd);
         }
         if let Some(x) = self.insts[inst].as_ref()
-            && let Some(op) = self.reg.libs[x.src.0].generator(x.src.1).and_then(|g| g.streams[2].iter().find(|o| o.code == 0x5f).cloned())
+            && let Some(op) = self.reg.libs[x.src.0]
+                .generator(x.src.1)
+                .and_then(|g| g.streams[2].iter().find(|o| o.code == 0x5f).cloned())
         {
             let k = op.slot as usize;
             let factor = if op.words.len() >= 4 { op.f32(3) } else { 0.0 };
-            let q = Quake { key: elem.s(k), prm: elem.s(k + 1), s2: f32::from_bits(elem.s(k + 2)), pos: elem.v3(w::POS), near: op.f32(1), far: op.f32(2), factor, eye_rel: cpu.flags & 4 != 0 };
-            log::debug!("effects: quake element near {} far {} player factor {} kick factor {} eye-relative {}", q.near, q.far, q.s2, q.factor, q.eye_rel);
+            let q = Quake {
+                key: elem.s(k),
+                prm: elem.s(k + 1),
+                s2: f32::from_bits(elem.s(k + 2)),
+                pos: elem.v3(w::POS),
+                near: op.f32(1),
+                far: op.f32(2),
+                factor,
+                eye_rel: cpu.flags & 4 != 0,
+            };
+            log::debug!(
+                "effects: quake element near {} far {} player factor {} kick factor {} eye-relative {}",
+                q.near,
+                q.far,
+                q.s2,
+                q.factor,
+                q.eye_rel
+            );
             cpu.quake = Some(q);
         }
         elem.0[w::SERIAL] = self.serial;
         if let Some(m) = cpu.snapshot {
             let ms = self.alloc_slot();
-            let (a, b, ss) = self.insts[inst].as_ref().map_or((Vec3::ONE, Vec3::ONE, false), |x| (x.scale_a, x.scale_b, x.size_scaled));
+            let (a, b, ss) = self.insts[inst]
+                .as_ref()
+                .map_or((Vec3::ONE, Vec3::ONE, false), |x| (x.scale_a, x.scale_b, x.size_scaled));
             self.put_slot(ms, Some(m), a, b, 1.0, ss);
             cpu.mslot = ms;
             cpu.frame = ms;
@@ -2114,7 +2222,10 @@ impl Effects {
         }
         let parent = emit::Parent {
             pos: elem.v3(w::POS),
-            world: self.insts[inst].as_ref().and_then(|x| x.matrix).map_or(elem.v3(w::POS), |m| m.transform_point3(elem.v3(w::POS))),
+            world: self.insts[inst]
+                .as_ref()
+                .and_then(|x| x.matrix)
+                .map_or(elem.v3(w::POS), |m| m.transform_point3(elem.v3(w::POS))),
             rot: elem.v3(w::ROT),
             scale: elem.v3(w::SCALE),
             color: elem.0[w::COLOR],
@@ -2142,7 +2253,9 @@ impl Effects {
                     // Ops 0x53 / 0x6a: the clone's matrix is the element's rotation (through the emitter's
                     // rotation, and the camera's for 0x6a) at the element's world position, its scales the
                     // element's; 0x44 leaves the clone's own placement.
-                    let (emitter, size, actors) = self.insts[inst].as_ref().map_or((None, Vec3::ONE, [sched::Who::None; 2]), |x| (x.matrix, x.scale_b, x.actors));
+                    let (emitter, size, actors) = self.insts[inst]
+                        .as_ref()
+                        .map_or((None, Vec3::ONE, [sched::Who::None; 2]), |x| (x.matrix, x.scale_b, x.actors));
                     let dam = self.insts[inst].as_ref().and_then(|x| x.dam.clone());
                     if let Some(ci) = self.start(src, Owner::Element(e as usize)) {
                         if let Some(x) = self.insts[ci].as_mut() {
@@ -2189,7 +2302,10 @@ impl Effects {
         }
         for (g, id) in std::mem::take(&mut self.dust) {
             let Some(i) = self.start(g, Owner::Step(id)) else { continue };
-            log::debug!("footstep dust {} on {id:#x}", String::from_utf8_lossy(&self.reg.libs[g.0].tree.nodes[g.1].name));
+            log::debug!(
+                "footstep dust {} on {id:#x}",
+                String::from_utf8_lossy(&self.reg.libs[g.0].tree.nodes[g.1].name)
+            );
             if let Some(x) = self.insts[i].as_mut() {
                 x.actors = [sched::Who::Actor(id); 2];
                 x.life = 10000.0;
@@ -2229,7 +2345,11 @@ impl Effects {
             let l = self.reg.lib_of(file)?;
             self.reg.libs[l].find_global(kind::GENERATOR, name).map(|n| (l, n))
         });
-        let Some(g) = from_files.or_else(|| self.reg.global.and_then(|l| self.reg.libs[l].find_global(kind::GENERATOR, name).map(|n| (l, n)))) else { return };
+        let Some(g) = from_files.or_else(|| {
+            self.reg.global.and_then(|l| self.reg.libs[l].find_global(kind::GENERATOR, name).map(|n| (l, n)))
+        }) else {
+            return;
+        };
         let Some(i) = self.start(g, Owner::Step(id)) else { return };
         let s = actors.scale(id);
         if let Some(x) = self.insts[i].as_mut() {
@@ -2253,7 +2373,12 @@ impl Effects {
     /// (FUN_10053370), then the soft stop; emission op 0x3c only zeroes the countdown, so a static one emits once per
     /// start.
     fn burst(&mut self, src: Ref, e: u32, f: &Frame, acts: &dyn Actors, end: bool) {
-        let actors = self.elems.get(e as usize).and_then(|c| c.as_ref()).and_then(|c| self.insts.get(c.inst)?.as_ref()).map_or([sched::Who::None; 2], |x| x.actors);
+        let actors = self
+            .elems
+            .get(e as usize)
+            .and_then(|c| c.as_ref())
+            .and_then(|c| self.insts.get(c.inst)?.as_ref())
+            .map_or([sched::Who::None; 2], |x| x.actors);
         let (ci, new) = match self.template_inst(src) {
             Some(ci) => (ci, false),
             None => match self.start(src, Owner::Element(e as usize)) {
@@ -2277,7 +2402,9 @@ impl Effects {
 
     /// FUN_100539e0: a static generator (flag 0x400, or op 1's life 0), whose elements never age.
     pub(super) fn is_static(&self, g: Ref) -> bool {
-        self.reg.libs[g.0].generator(g.1).is_some_and(|gd| gd.flags & 0x400 != 0 || gd.template().is_some_and(|o| o.i16_at(0x22) == 0))
+        self.reg.libs[g.0]
+            .generator(g.1)
+            .is_some_and(|gd| gd.flags & 0x400 != 0 || gd.template().is_some_and(|o| o.i16_at(0x22) == 0))
     }
 
     /// An attach mode that follows an actor (not 0 / 0xe / 0xf / 0x14; FUN_1005e0b0).
@@ -2315,7 +2442,12 @@ impl Effects {
     fn expire(&mut self, e: u32, f: &Frame, acts: &dyn Actors) {
         let Some(c) = self.elems[e as usize].as_ref() else { return };
         let inst = c.inst;
-        let (ops, src, actors) = self.insts.get(inst).and_then(|x| x.as_ref()).map(|x| (x.streams[3].clone(), x.src, x.actors)).unwrap_or_default();
+        let (ops, src, actors) = self
+            .insts
+            .get(inst)
+            .and_then(|x| x.as_ref())
+            .map(|x| (x.streams[3].clone(), x.src, x.actors))
+            .unwrap_or_default();
         for op in &ops {
             match op.code {
                 // Burst a generator at the element / start a scheduler with the element's actor pair.
@@ -2343,7 +2475,8 @@ impl Effects {
         }
         // A held element goes once its linked clone has no live elements (theirs keep the clone's count at 2 or more).
         let child = self.elems[e as usize].as_ref().and_then(|c| c.child);
-        let released = child.is_some_and(|ch| self.insts.get(ch).and_then(|x| x.as_ref()).is_none_or(|x| x.live.is_empty()));
+        let released =
+            child.is_some_and(|ch| self.insts.get(ch).and_then(|x| x.as_ref()).is_none_or(|x| x.live.is_empty()));
         let Some(c) = self.elems[e as usize].as_mut() else { return };
         if c.life < 1.0 {
             if c.flags & 0x2000_0000 != 0 && !released {
@@ -2371,7 +2504,17 @@ impl Effects {
     /// plain tone). One shot at `pos`, centred, at `level` (101 walking, 127 running). Then the dust generator `dust`
     /// of that folder, if any, bursts once on actor `id`.
     #[allow(clippy::too_many_arguments)]
-    pub fn footstep(&mut self, id: u32, model: Option<u32>, pos: Vec3, name: Option<[u8; 4]>, dust: Option<[u8; 4]>, print: bool, rain: bool, level: i32) {
+    pub fn footstep(
+        &mut self,
+        id: u32,
+        model: Option<u32>,
+        pos: Vec3,
+        name: Option<[u8; 4]>,
+        dust: Option<[u8; 4]>,
+        print: bool,
+        rain: bool,
+        level: i32,
+    ) {
         let Some(mut at) = self.foot_set(id, rain) else { return };
         if let Some(name) = name {
             let found = loop {
@@ -2443,7 +2586,12 @@ impl Effects {
             if let Some(e) = s.elem
                 && let Some(c) = self.elems.get(e as usize).and_then(|c| c.as_ref())
             {
-                pos = self.insts.get(c.inst).and_then(|x| x.as_ref()).and_then(|x| x.matrix).map_or(pos, |m| m.transform_point3(pos));
+                pos = self
+                    .insts
+                    .get(c.inst)
+                    .and_then(|x| x.as_ref())
+                    .and_then(|x| x.matrix)
+                    .map_or(pos, |m| m.transform_point3(pos));
             }
             if let Some(caps) = &s.sph {
                 pos = f.eye + sound::nearest(caps, f.eye);
@@ -2453,7 +2601,13 @@ impl Effects {
                     let n = (prm >> 5) & 0x1ff;
                     let x = if n != 0 { (f.dayfrac * n as f32).fract() } else { f.dayfrac };
                     let v = self.reg.key_desc.get(id as usize).map_or(0.0, |d| {
-                        crate::dat::generator::KeyFrame { keys: self.reg.key_data[d[0] as usize..(d[0] + d[1]) as usize].iter().map(|p| (p[0], p[1])).collect() }.sample(x, prm & 0xf != 0)
+                        crate::dat::generator::KeyFrame {
+                            keys: self.reg.key_data[d[0] as usize..(d[0] + d[1]) as usize]
+                                .iter()
+                                .map(|p| (p[0], p[1]))
+                                .collect(),
+                        }
+                        .sample(x, prm & 0xf != 0)
                     });
                     (v * 127.0).round() as i32
                 }
@@ -2463,7 +2617,11 @@ impl Effects {
             if s.grace > 0.0 {
                 s.grace -= f.dt;
             }
-            let r = if s.stream { Some((vol, 64)) } else { sound::attenuate(s.pan_in, vol, pos, f.eye, f.view, s.near, s.far, s.keep, s.ymode, f.focal) };
+            let r = if s.stream {
+                Some((vol, 64))
+            } else {
+                sound::attenuate(s.pan_in, vol, pos, f.eye, f.view, s.near, s.far, s.keep, s.ymode, f.focal)
+            };
             let Some((v, pan)) = r else {
                 if s.persistent() {
                     if s.handle != 0 {
@@ -2497,7 +2655,13 @@ impl Effects {
                 s.last_vol = v;
                 s.last_pan = pan;
                 s.grace = sound::GRACE_TICKS;
-                self.sound_cmds.push(sound::SoundCmd::Play { handle: s.handle, se: s.se, vol: v, pan, stream: s.stream });
+                self.sound_cmds.push(sound::SoundCmd::Play {
+                    handle: s.handle,
+                    se: s.se,
+                    vol: v,
+                    pan,
+                    stream: s.stream,
+                });
                 continue;
             }
             if s.grace > 0.0 || self.alive.contains(&s.handle) {
@@ -2553,7 +2717,11 @@ impl Effects {
             let id = tr.actor;
             let place = || {
                 let s = Mat4::from_scale(Vec3::splat(actors.scale(id)));
-                Some(actors.point_frame(id, 0).map_or(m * s, |p| m * p * s * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2)))
+                Some(
+                    actors
+                        .point_frame(id, 0)
+                        .map_or(m * s, |p| m * p * s * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2)),
+                )
             };
             let (live, changed) = tr.step(f.dt, place);
             if !live {
@@ -2578,8 +2746,14 @@ impl Effects {
             .elems
             .iter()
             .enumerate()
-            .filter_map(|(i, c)| c.as_ref().filter(|c| c.draw != Draw::None && !c.hidden).map(|c| (c.key.clamp(0.0, 512.0), self.insert_order(c), i as u32)))
-            .chain(self.trails.iter().enumerate().filter_map(|(i, t)| t.as_ref().filter(|t| t.count >= 2).map(|t| (t.key(&view), (0, 0), TRAIL_ITEM | i as u32))))
+            .filter_map(|(i, c)| {
+                c.as_ref()
+                    .filter(|c| c.draw != Draw::None && !c.hidden)
+                    .map(|c| (c.key.clamp(0.0, 512.0), self.insert_order(c), i as u32))
+            })
+            .chain(self.trails.iter().enumerate().filter_map(|(i, t)| {
+                t.as_ref().filter(|t| t.count >= 2).map(|t| (t.key(&view), (0, 0), TRAIL_ITEM | i as u32))
+            }))
             .collect();
         v.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
         v.into_iter().map(|(_, _, i)| i).collect()
@@ -2590,7 +2764,11 @@ impl Effects {
             .elems
             .iter()
             .enumerate()
-            .filter_map(|(i, c)| c.as_ref().filter(|c| c.draw != Draw::None && !c.hidden).map(|c| (c.key.clamp(0.0, 512.0), self.insert_order(c), i as u32)))
+            .filter_map(|(i, c)| {
+                c.as_ref()
+                    .filter(|c| c.draw != Draw::None && !c.hidden)
+                    .map(|c| (c.key.clamp(0.0, 512.0), self.insert_order(c), i as u32))
+            })
             .collect();
         v.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
         v.into_iter().map(|(_, _, i)| i).collect()
@@ -2642,7 +2820,12 @@ impl Effects {
                 Draw::Mesh(id) => {
                     let r = self.reg.meshes[id as usize];
                     let Some(m) = self.reg.libs[r.0].meshes.get(&r.1) else { continue };
-                    let names: Vec<String> = m.groups.iter().filter_map(|g| g.name.as_deref().map(|n| n.trim().to_ascii_lowercase())).filter(|n| !n.is_empty()).collect();
+                    let names: Vec<String> = m
+                        .groups
+                        .iter()
+                        .filter_map(|g| g.name.as_deref().map(|n| n.trim().to_ascii_lowercase()))
+                        .filter(|n| !n.is_empty())
+                        .collect();
                     if names.iter().any(|n| n.starts_with("light")) {
                         scan.glows.push((pos, colour));
                         glow_dirs.insert(dir);
@@ -2678,13 +2861,20 @@ impl Effects {
             let Some(c) = c else { continue };
             let Some(inst) = self.insts.get(c.inst).and_then(|x| x.as_ref()) else { continue };
             let l = &self.reg.libs[inst.src.0];
-            let path: Vec<String> = l.tree.path(inst.src.1).iter().map(|n| String::from_utf8_lossy(n).trim_end_matches(['\0', ' ']).to_string()).collect();
+            let path: Vec<String> = l
+                .tree
+                .path(inst.src.1)
+                .iter()
+                .map(|n| String::from_utf8_lossy(n).trim_end_matches(['\0', ' ']).to_string())
+                .collect();
             let what = match c.draw {
                 Draw::Mesh(id) => {
                     let r = self.reg.meshes[id as usize];
                     format!("mesh {}:{}", self.reg.libs[r.0].file_id, self.reg.libs[r.0].tree.nodes[r.1].name())
                 }
-                Draw::Sprite(id) => format!("sprite {id}{}", if self.reg.sprite_is_flare(id) { " (flare)" } else { "" }),
+                Draw::Sprite(id) => {
+                    format!("sprite {id}{}", if self.reg.sprite_is_flare(id) { " (flare)" } else { "" })
+                }
                 Draw::Morph(id) => format!("morph {id}"),
                 Draw::Dist => "dist".into(),
                 Draw::Ring => "ring".into(),
@@ -2697,7 +2887,11 @@ impl Effects {
                 Draw::None => "none".into(),
             };
             let pos = c.back.map(|b| b.world).unwrap_or_default();
-            let frame = if c.frame == NONE { "-".to_string() } else { format!("{}{}", c.frame, if c.borrowed { " borrowed" } else { "" }) };
+            let frame = if c.frame == NONE {
+                "-".to_string()
+            } else {
+                format!("{}{}", c.frame, if c.borrowed { " borrowed" } else { "" })
+            };
             out.push(format!(
                 "{i:4} inst {} file {} actors {:?} frame {frame} {}/{} {what} blend {:#06x} flags {:#010x} key {:.1} life {:.0}/{:.0} at {:.1},{:.1},{:.1} argb {:08x}{}",
                 c.inst,
@@ -2738,10 +2932,12 @@ impl Effects {
         let mut by: HashMap<String, usize> = HashMap::new();
         for t in self.tasks.iter().flatten() {
             let lib = &self.reg.libs[t.res.0];
-            *by.entry(format!("task {} ({})", String::from_utf8_lossy(&lib.tree.nodes[t.res.1].name), lib.file_id)).or_default() += 1;
+            *by.entry(format!("task {} ({})", String::from_utf8_lossy(&lib.tree.nodes[t.res.1].name), lib.file_id))
+                .or_default() += 1;
         }
         for x in self.insts.iter().flatten() {
-            *by.entry(format!("gen {} ({})", String::from_utf8_lossy(&x.name), self.reg.libs[x.src.0].file_id)).or_default() += 1;
+            *by.entry(format!("gen {} ({})", String::from_utf8_lossy(&x.name), self.reg.libs[x.src.0].file_id))
+                .or_default() += 1;
         }
         let mut v: Vec<(String, usize)> = by.into_iter().collect();
         v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -2777,6 +2973,10 @@ fn attach(inst: &mut Instance, f: &Frame, voyage: Mat4) {
 fn sky_point(sun: bool, dayfrac: f32, eye: Vec3, voyage: Mat4) -> Vec3 {
     use std::f32::consts::PI;
     let a = dayfrac * 2.0 * PI;
-    let (dir, d) = if sun { (Vec3::new((a + PI).sin(), (a + PI).cos(), 0.0), 1000.0) } else { (Vec3::new(a.sin(), a.cos(), 0.0), 900.0) };
+    let (dir, d) = if sun {
+        (Vec3::new((a + PI).sin(), (a + PI).cos(), 0.0), 1000.0)
+    } else {
+        (Vec3::new(a.sin(), a.cos(), 0.0), 900.0)
+    };
     voyage.transform_vector3(eye - dir * d)
 }

@@ -56,7 +56,16 @@ pub fn parse(r: &[u8]) -> Vec<Point> {
         .map(|k| 4 + 20 * k)
         .take_while(|&o| o + 20 <= r.len())
         .filter(|&o| u16_at(o + 4) != 0)
-        .map(|o| Point { id: u16_at(o), kind: u16_at(o + 2), zone: u16_at(o + 4), map: r[o + 6], bit: r[o + 7], x: f(o + 8), z: f(o + 12), y: f(o + 16) })
+        .map(|o| Point {
+            id: u16_at(o),
+            kind: u16_at(o + 2),
+            zone: u16_at(o + 4),
+            map: r[o + 6],
+            bit: r[o + 7],
+            x: f(o + 8),
+            z: f(o + 12),
+            y: f(o + 16),
+        })
         .collect()
 }
 

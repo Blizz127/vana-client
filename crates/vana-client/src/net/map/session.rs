@@ -129,7 +129,26 @@ impl MapSession {
         let sock = bind_socket()?;
         sock.connect(server)?;
         log::info!("map: {server} from local port {}", sock.local_addr()?.port());
-        Ok(Self { sock, cipher: Blowfish::for_session_key(key), key: super::blowfish::session_key(key), key20: *key, alt: None, codec, seq: 0, server_seq: 0, bytes_out: 0, bytes_in: 0, bad_in: 0, bad_run: 0, unacked: Vec::new(), server_ack: 0, last_in: None, logged: (0, 0), cert: None, clock: None })
+        Ok(Self {
+            sock,
+            cipher: Blowfish::for_session_key(key),
+            key: super::blowfish::session_key(key),
+            key20: *key,
+            alt: None,
+            codec,
+            seq: 0,
+            server_seq: 0,
+            bytes_out: 0,
+            bytes_in: 0,
+            bad_in: 0,
+            bad_run: 0,
+            unacked: Vec::new(),
+            server_ack: 0,
+            last_in: None,
+            logged: (0, 0),
+            cert: None,
+            clock: None,
+        })
     }
 
     /// Also tries `alt` until a datagram has been read.
@@ -277,7 +296,9 @@ impl MapSession {
         let mut buf = vec![0u8; 4096];
         let n = match self.sock.recv(&mut buf) {
             Ok(n) => n,
-            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => return Ok(None),
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
+                return Ok(None);
+            }
             Err(e) => return Err(e.into()),
         };
         // LSB sends an empty datagram when nothing is queued (send_parse sets the size to 0). It carries nothing, so
@@ -292,7 +313,10 @@ impl MapSession {
             let (data, digest) = d[HEADER..].split_at(d.len() - HEADER - 16);
             Md5::digest(data).as_slice() == digest
         };
-        if !sealed(&dgram) && self.last_in.is_none() && let Some((cipher, _)) = &self.alt {
+        if !sealed(&dgram)
+            && self.last_in.is_none()
+            && let Some((cipher, _)) = &self.alt
+        {
             let mut again = buf[..n].to_vec();
             cipher.decrypt(&mut again[HEADER..]);
             if sealed(&again) {

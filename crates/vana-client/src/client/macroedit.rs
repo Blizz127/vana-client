@@ -164,12 +164,24 @@ fn book_of(w: &World, sel: u16) -> usize {
 /// The text fields take the keyboard: the book name (mode 4, 15 bytes) and the editor's (title 8, lines 60).
 pub fn typing(w: &World) -> bool {
     super::esmenu::typing(w)
-        || w.macroedit.as_ref().and_then(|m| m.book.as_ref()).is_some_and(|b| b.rename.is_some() || b.edit.as_ref().and_then(|e| e.editor.as_ref()).is_some_and(|d| d.editing.is_some() && d.lopt.is_none()))
+        || w.macroedit.as_ref().and_then(|m| m.book.as_ref()).is_some_and(|b| {
+            b.rename.is_some()
+                || b.edit
+                    .as_ref()
+                    .and_then(|e| e.editor.as_ref())
+                    .is_some_and(|d| d.editing.is_some() && d.lopt.is_none())
+        })
 }
 
 /// The field's limits: 15 bytes for a book name, 8 for a title, 60 for a line (FUN_101c5be0 modes 4 / 8 / 9).
 fn field_max(rename: bool, field: usize) -> usize {
-    if rename { 15 } else if field == 0 { 8 } else { 60 }
+    if rename {
+        15
+    } else if field == 0 {
+        8
+    } else {
+        60
+    }
 }
 
 /// Text into the open field (printable ASCII; Shift-JIS input is not done), Tab's auto-translate list (fep.rs
@@ -241,8 +253,8 @@ fn edited(w: &World) -> Option<(usize, Vec<u8>, usize)> {
 /// while it is open its keys are the list's and Enter puts the pick in place of the word (a phrase as its 6-byte
 /// block), refused past the field's bytes; typing closes it. True when the list took the event.
 fn complete(w: &mut World, ev: &egui::Event) -> bool {
-    use crate::dat::font::{decode_sjis, encode_sjis};
     use super::fep::{self, FieldPick};
+    use crate::dat::font::{decode_sjis, encode_sjis};
     // The modern UI's (the classic macro box keeps retail's keys).
     if !w.modern {
         return false;
@@ -284,7 +296,13 @@ fn complete(w: &mut World, ev: &egui::Event) -> bool {
             let max = field_max(false, f);
             match fep::field_put(&text, at, &list.word, &put, |t| encode_sjis(t).len() <= max) {
                 Some((next, c)) => {
-                    if let Some(d) = w.macroedit.as_mut().and_then(|m| m.book.as_mut()).and_then(|b| b.edit.as_mut()).and_then(|e| e.editor.as_mut()) {
+                    if let Some(d) = w
+                        .macroedit
+                        .as_mut()
+                        .and_then(|m| m.book.as_mut())
+                        .and_then(|b| b.edit.as_mut())
+                        .and_then(|e| e.editor.as_mut())
+                    {
                         d.fields[f] = encode_sjis(&next);
                         d.caret = encode_sjis(&next.chars().take(c).collect::<String>()).len();
                     }
@@ -441,7 +459,13 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
         let b = w.macroedit.as_mut().and_then(|m| m.book.as_mut()).unwrap();
         match key {
             K::ArrowUp | K::ArrowDown => {
-                b.opt = Some(if key == K::ArrowDown { o % 5 + 1 } else if o == 1 { 5 } else { o - 1 });
+                b.opt = Some(if key == K::ArrowDown {
+                    o % 5 + 1
+                } else if o == 1 {
+                    5
+                } else {
+                    o - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             K::Escape => {
@@ -606,7 +630,13 @@ fn palette_key(w: &mut World, gu: &GameUi, key: egui::Key) {
         }
         match key {
             K::ArrowUp | K::ArrowDown => {
-                e.bopt = Some(if key == K::ArrowDown { o % 3 + 1 } else if o == 1 { 3 } else { o - 1 });
+                e.bopt = Some(if key == K::ArrowDown {
+                    o % 3 + 1
+                } else if o == 1 {
+                    3
+                } else {
+                    o - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             K::Enter => {
@@ -715,7 +745,13 @@ fn editor_key(w: &mut World, gu: &GameUi, key: egui::Key) {
         let line = d.fields[f].clone();
         match key {
             K::ArrowUp | K::ArrowDown => {
-                d.lopt = Some(if key == K::ArrowDown { o % 3 + 1 } else if o == 1 { 3 } else { o - 1 });
+                d.lopt = Some(if key == K::ArrowDown {
+                    o % 3 + 1
+                } else if o == 1 {
+                    3
+                } else {
+                    o - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             K::Enter if o == 2 && clip.is_none() => w.sounds.push(Ui::Error as u32),
@@ -940,7 +976,11 @@ pub(super) fn view(w: &World, gu: &GameUi) -> Option<View> {
             lopt: d.lopt,
             paste_ok: w.mcr_line.is_some(),
             focused: free && d.lopt.is_none() && d.editing.is_none(),
-            fep: w.field_fep.as_ref().filter(|_| d.editing.is_some()).map(|f| (f.cands.iter().map(|c| c.text.clone()).collect(), f.sel)),
+            fep: w
+                .field_fep
+                .as_ref()
+                .filter(|_| d.editing.is_some())
+                .map(|f| (f.cands.iter().map(|c| c.text.clone()).collect(), f.sel)),
         }
     });
     Some(View { menu, books, palettes, editor })
@@ -957,13 +997,22 @@ pub(super) fn set_menu(w: &mut World, c: u16) -> bool {
 /// The 40 book names while the book list has the keys (type-to-search, modern/macros.rs).
 pub(super) fn search_books(w: &World) -> Option<Vec<String>> {
     let (me, m) = (w.macroedit.as_ref()?, w.macros.as_ref()?);
-    me.book.as_ref().filter(|b| me.sets.is_none() && w.confirm.is_none() && b.opt.is_none() && b.edit.is_none() && b.rename.is_none())?;
+    me.book.as_ref().filter(|b| {
+        me.sets.is_none() && w.confirm.is_none() && b.opt.is_none() && b.edit.is_none() && b.rename.is_none()
+    })?;
     Some((0..40).map(|k| m.book_title(k)).collect())
 }
 
 /// The book list's cursor onto book `k` (0..39: its page and row).
 pub(super) fn set_book(w: &mut World, k: usize) -> bool {
-    let Some(b) = w.macroedit.as_mut().and_then(|m| m.book.as_mut()).filter(|b| b.opt.is_none() && b.edit.is_none() && b.rename.is_none()) else { return false };
+    let Some(b) = w
+        .macroedit
+        .as_mut()
+        .and_then(|m| m.book.as_mut())
+        .filter(|b| b.opt.is_none() && b.edit.is_none() && b.rename.is_none())
+    else {
+        return false;
+    };
     let sel = (k % 20) as u16 + 1;
     let moved = b.sel != sel || w.mcr_page != k / 20;
     b.sel = sel;
@@ -1025,7 +1074,9 @@ pub(super) fn set_field(w: &mut World, c: u16) -> bool {
 
 /// mcrledit opened on the cursor's line with its cursor on `o`.
 pub(super) fn set_lopt(w: &mut World, o: u16) {
-    if let Some(d) = edit_mut(w).and_then(|e| e.editor.as_mut()).filter(|d| d.editing.is_none() && (4..=9).contains(&d.sel)) {
+    if let Some(d) =
+        edit_mut(w).and_then(|e| e.editor.as_mut()).filter(|d| d.editing.is_none() && (4..=9).contains(&d.sel))
+    {
         d.lopt = Some(o);
     }
 }
@@ -1039,7 +1090,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let (Some(me), Some(m)) = (&w.macroedit, &w.macros) else { return rects };
     let free = w.confirm.is_none();
     let off: &[u16] = if super::monstrosity::active(w) { &[2] } else { &[] };
-    if let Some(win) = gu.lobby_window_off(MENU, sw, sh, (0.0, 0.0), Some(me.menu_sel), free && me.book.is_none() && me.sets.is_none(), off) {
+    if let Some(win) = gu.lobby_window_off(
+        MENU,
+        sw,
+        sh,
+        (0.0, 0.0),
+        Some(me.menu_sel),
+        free && me.book.is_none() && me.sets.is_none(),
+        off,
+    ) {
         gu.disabled_children(MENU, win.frame[0], win.frame[1], off, Some(me.menu_sel));
         hit(w, MENU, &win);
         rects.push(win.frame);
@@ -1070,7 +1129,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         rects.push(win.frame);
         // mcrselop left of the cursor row (FUN_10119110): x = row x - its width, y = min(row y, mcrselec bottom - its
         // height).
-        if let (Some(o), Some(&(_, r)), Some([lx, ly, lw, lh])) = (b.opt, win.children.iter().find(|(id, _)| *id == b.sel), gu.window_rect(SELOP, sw, sh)) {
+        if let (Some(o), Some(&(_, r)), Some([lx, ly, lw, lh])) =
+            (b.opt, win.children.iter().find(|(id, _)| *id == b.sel), gu.window_rect(SELOP, sw, sh))
+        {
             let [_, fy, _, fh] = win.frame;
             let (x, y) = (r[0] - lw, r[1].min(fy + fh - lh));
             let off: Vec<u16> = if m.book_copied() { Vec::new() } else { vec![4] };
@@ -1107,7 +1168,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let can_paste = if set_mode(e) { m.set_copied } else { m.macro_copied() };
     let off: Vec<u16> = if can_paste { Vec::new() } else { vec![2] };
-    if let Some(win) = gu.lobby_window_off(BEDIT, sw, sh, (0.0, 0.0), Some(e.bopt.unwrap_or(1)), free && e.bopt.is_some(), &off) {
+    if let Some(win) =
+        gu.lobby_window_off(BEDIT, sw, sh, (0.0, 0.0), Some(e.bopt.unwrap_or(1)), free && e.bopt.is_some(), &off)
+    {
         hit(w, BEDIT, &win);
         gu.disabled_children(BEDIT, win.frame[0], win.frame[1], &off, e.bopt.filter(|_| free));
         rects.push(win.frame);
@@ -1150,7 +1213,9 @@ fn draw_editor(gu: &mut GameUi, w: &World, d: &Editor, sw: f32, sh: f32, free: b
     }
     rects.push(win.frame);
     let off: Vec<u16> = if w.mcr_line.is_some() { Vec::new() } else { vec![2] };
-    if let Some(win) = gu.lobby_window_off(LEDIT, sw, sh, (0.0, 0.0), Some(d.lopt.unwrap_or(1)), free && d.lopt.is_some(), &off) {
+    if let Some(win) =
+        gu.lobby_window_off(LEDIT, sw, sh, (0.0, 0.0), Some(d.lopt.unwrap_or(1)), free && d.lopt.is_some(), &off)
+    {
         hit(w, LEDIT, &win);
         gu.disabled_children(LEDIT, win.frame[0], win.frame[1], &off, d.lopt.filter(|_| free));
         rects.push(win.frame);
@@ -1167,7 +1232,18 @@ pub(super) use super::winhits::child_under;
 
 /// The generic window mouse with this chain's keys.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn generic(w: &mut World, gu: &GameUi, name: &str, cursor: u16, ids: std::ops::RangeInclusive<u16>, p: (f32, f32), moved: bool, clicked: bool, right: bool, set: impl FnOnce(&mut World, u16)) {
+pub(super) fn generic(
+    w: &mut World,
+    gu: &GameUi,
+    name: &str,
+    cursor: u16,
+    ids: std::ops::RangeInclusive<u16>,
+    p: (f32, f32),
+    moved: bool,
+    clicked: bool,
+    right: bool,
+    set: impl FnOnce(&mut World, u16),
+) {
     super::winhits::generic(w, gu, name, cursor, ids, p, moved, clicked, right, set, key);
 }
 
@@ -1275,7 +1351,10 @@ mod tests {
 
     #[test]
     fn glyphs() {
-        assert_eq!([b'1', b'9', b'0', b'a', b'z', b'A', b'Z'].map(alpha_index), [Some(0), Some(8), Some(9), Some(10), Some(35), Some(36), Some(61)]);
+        assert_eq!(
+            [b'1', b'9', b'0', b'a', b'z', b'A', b'Z'].map(alpha_index),
+            [Some(0), Some(8), Some(9), Some(10), Some(35), Some(36), Some(61)]
+        );
         assert_eq!(alpha_index(b' '), None);
     }
 

@@ -32,7 +32,9 @@ pub fn outlined(p: &Painter, at: Pos2, align: Align2, text: &str, font: FontId, 
     let galley = p.layout_no_wrap(text.to_string(), font, colour);
     let r = align.anchor_size(at, galley.size());
     let px = 1.0 / p.pixels_per_point();
-    for (dx, dy) in [(-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (-1.0, 0.0), (1.0, 0.0), (-1.0, 1.0), (0.0, 1.0), (1.0, 1.0)] {
+    for (dx, dy) in
+        [(-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (-1.0, 0.0), (1.0, 0.0), (-1.0, 1.0), (0.0, 1.0), (1.0, 1.0)]
+    {
         p.galley_with_override_text_color(r.min + vec2(dx, dy) * px, galley.clone(), Color32::BLACK);
     }
     p.galley(r.min, galley, colour);

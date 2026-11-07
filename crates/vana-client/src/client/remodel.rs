@@ -79,7 +79,11 @@ pub fn key(w: &mut World, key: egui::Key) {
 /// The list as the modern layer draws it: each row's text and whether it is grey, the cursor.
 pub(super) fn look(w: &World, gu: &GameUi) -> Option<(Vec<(String, bool)>, usize)> {
     let r = w.remodel?;
-    let rows = ROWS.iter().enumerate().map(|(k, (text, _))| (gu.lobby_msg(0x0c, *text as usize, ""), tint(w, k) == GREY)).collect();
+    let rows = ROWS
+        .iter()
+        .enumerate()
+        .map(|(k, (text, _))| (gu.lobby_msg(0x0c, *text as usize, ""), tint(w, k) == GREY))
+        .collect();
     Some((rows, r.sel))
 }
 
@@ -101,7 +105,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let Some(e) = lay.elements.iter().skip(1).find(|e| {
         let (ex, ey) = (x + e.x as f32, y + e.y as f32);
         p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-    }) else { return };
+    }) else {
+        return;
+    };
     let row = e.id as usize - 1;
     if row >= ROWS.len() {
         return;
@@ -135,7 +141,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let Some(r) = w.remodel else { return rects };
     let focused = w.confirm.is_none();
-    let Some(win) = gu.lobby_window_off(WINDOW, sw, sh, (0.0, 0.0), Some(r.sel as u16 + 1), focused, &[]) else { return rects };
+    let Some(win) = gu.lobby_window_off(WINDOW, sw, sh, (0.0, 0.0), Some(r.sel as u16 + 1), focused, &[]) else {
+        return rects;
+    };
     rects.push(win.frame);
     let Some((wx, wy)) = gu.window_xy(WINDOW, sw, sh) else { return rects };
     for (k, (text, _)) in ROWS.iter().enumerate() {

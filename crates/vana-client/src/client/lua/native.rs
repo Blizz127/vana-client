@@ -81,7 +81,11 @@ fn list_rows(w: &World, l: &super::super::magic::ListWin) -> (&'static str, &'st
         Kind::Magic => ("magic", "spell", l.rows.clone()),
         Kind::Ability => {
             let acts = w.actions.as_ref();
-            ("ability", "ability", l.rows.iter().map(|&i| acts.and_then(|a| a.abilities.get(i as usize)).map_or(0, |a| a.id)).collect())
+            (
+                "ability",
+                "ability",
+                l.rows.iter().map(|&i| acts.and_then(|a| a.abilities.get(i as usize)).map_or(0, |a| a.id)).collect(),
+            )
         }
         Kind::Mount => ("ability", "mount", l.rows.clone()),
         Kind::Emote => ("ability", "emote", l.rows.clone()),
@@ -93,10 +97,20 @@ fn list(w: &World) -> Option<(String, Vec<serde_json::Value>, usize, Option<usiz
     use serde_json::json;
     if let Some(l) = w.magic.as_ref().or(w.ability.as_ref()).filter(|l| !l.hidden) {
         let (win, kind, ids) = list_rows(w, l);
-        return Some((win.into(), ids.iter().map(|id| json!({ kind: id })).collect(), l.scroll + l.cursor, Some(l.scroll)));
+        return Some((
+            win.into(),
+            ids.iter().map(|id| json!({ kind: id })).collect(),
+            l.scroll + l.cursor,
+            Some(l.scroll),
+        ));
     }
     if let Some((slots, cursor, top)) = super::super::items::native_list(w) {
-        let rows = slots.iter().map(|(bag, s)| json!({"item": s.id, "count": s.count, "bag": bag, "slot": s.index, "equipped": s.equipped})).collect();
+        let rows = slots
+            .iter()
+            .map(
+                |(bag, s)| json!({"item": s.id, "count": s.count, "bag": bag, "slot": s.index, "equipped": s.equipped}),
+            )
+            .collect();
         return Some(("items".into(), rows, cursor, Some(top)));
     }
     if let Some((view, rows, cursor, top)) = super::super::shop::native_list(w) {
@@ -105,10 +119,20 @@ fn list(w: &World) -> Option<(String, Vec<serde_json::Value>, usize, Option<usiz
     if let Some((layer, rows, cursor, top)) = super::super::auction::native_list(w) {
         // A menu's cursor is its entry's child id (from 1) and it does not scroll.
         let menu = !matches!(layer.as_str(), "list" | "history" | "sell");
-        return Some((format!("auction {layer}"), rows, if menu { cursor.saturating_sub(1) } else { cursor }, (!menu).then_some(top)));
+        return Some((
+            format!("auction {layer}"),
+            rows,
+            if menu { cursor.saturating_sub(1) } else { cursor },
+            (!menu).then_some(top),
+        ));
     }
     if let Some(k) = w.keyitems.as_ref().filter(|k| k.state >= 2) {
-        return Some(("keyitems".into(), k.items.iter().map(|(id, _)| json!({"key_item": id})).collect(), k.cursor, Some(k.top)));
+        return Some((
+            "keyitems".into(),
+            k.items.iter().map(|(id, _)| json!({"key_item": id})).collect(),
+            k.cursor,
+            Some(k.top),
+        ));
     }
     None
 }
@@ -126,12 +150,17 @@ fn highlighted(w: &World) -> Option<(String, &'static str, u16, Option<u8>, Opti
         return Some(("items".into(), "item", id, Some(bag), Some(slot)));
     }
     let (id, ..) = super::super::item_info_source(w)?;
-    let win = super::super::open_windows(w).into_iter().find(|n| ["shop", "auction", "trade", "post", "loot", "inspect", "synth", "moogle", "event"].contains(n)).unwrap_or("info");
+    let win = super::super::open_windows(w)
+        .into_iter()
+        .find(|n| ["shop", "auction", "trade", "post", "loot", "inspect", "synth", "moogle", "event"].contains(n))
+        .unwrap_or("info");
     Some((win.into(), "item", id, None, None))
 }
 
 fn info(lua: &Lua) -> std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>> {
-    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default()
+    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+        .map(|f| f.clone())
+        .unwrap_or_default()
 }
 
 pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
@@ -142,14 +171,19 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
         "highlighted",
         lua.create_function(|lua, ()| {
             let Some((window, kind, id, bag, slot)) = highlighted(world(lua)?) else { return Ok(None) };
-            to_lua(lua, &serde_json::json!({"window": window, "kind": kind, "id": id, "bag": bag, "slot": slot})).map(Some)
+            to_lua(lua, &serde_json::json!({"window": window, "kind": kind, "id": id, "bag": bag, "slot": slot}))
+                .map(Some)
         })?,
     )?;
     t.set(
         "list",
         lua.create_function(|lua, ()| {
             let Some((window, rows, cursor, top)) = list(world(lua)?) else { return Ok(None) };
-            to_lua(lua, &serde_json::json!({"window": window, "rows": rows, "cursor": cursor + 1, "top": top.map(|t| t + 1)})).map(Some)
+            to_lua(
+                lua,
+                &serde_json::json!({"window": window, "rows": rows, "cursor": cursor + 1, "top": top.map(|t| t + 1)}),
+            )
+            .map(Some)
         })?,
     )?;
     t.set("interface_hidden", lua.create_function(|lua, ()| Ok(world(lua)?.ui_hidden))?)?;
@@ -168,8 +202,12 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             need(lua, "ui.native")?;
             // A HUD piece, else a modern panel by name.
             if !PIECES.iter().any(|p| p.0 == what) && !PANELS.iter().any(|p| p.name == what && p.hide) {
-                let names: Vec<&str> = PIECES.iter().map(|p| p.0).chain(PANELS.iter().filter(|p| p.hide).map(|p| p.name)).collect();
-                return Err(mlua::Error::runtime(format!("no HUD piece or panel {what:?} that can hide ({})", names.join(", "))));
+                let names: Vec<&str> =
+                    PIECES.iter().map(|p| p.0).chain(PANELS.iter().filter(|p| p.hide).map(|p| p.name)).collect();
+                return Err(mlua::Error::runtime(format!(
+                    "no HUD piece or panel {what:?} that can hide ({})",
+                    names.join(", ")
+                )));
             }
             let info = info(lua);
             let mut f = info.borrow_mut();
@@ -203,7 +241,11 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
                         Some("bottom_left") => (0.0, 1.0),
                         Some("bottom_right") => (1.0, 1.0),
                         Some("center" | "centre") => (0.5, 0.5),
-                        Some(o) => return Err(mlua::Error::runtime(format!("origin {o:?}: top_left, top_right, bottom_left, bottom_right or center"))),
+                        Some(o) => {
+                            return Err(mlua::Error::runtime(format!(
+                                "origin {o:?}: top_left, top_right, bottom_left, bottom_right or center"
+                            )));
+                        }
                     };
                     let placed = super::state::Placed { x: s.get("x")?, y: s.get("y")?, scale, alpha, origin };
                     f.placed.insert(name, (me.clone(), placed));
@@ -240,7 +282,10 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             find_panel(&name)?;
             let info = info(lua);
             let f = info.borrow();
-            f.native_rects.get(&name).map(|(r, shown)| rect(lua, &name, *r, *shown, f.native_rooms.get(&name))).transpose()
+            f.native_rects
+                .get(&name)
+                .map(|(r, shown)| rect(lua, &name, *r, *shown, f.native_rooms.get(&name)))
+                .transpose()
         })?,
     )?;
     t.set(
@@ -279,13 +324,28 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             };
             // Each slot's shape, checked here so the panels draw only what they can.
             let ok = match name.as_str() {
-                "clock" => v.is_null() || ["earth", "moon_name", "next_day"].iter().all(|k| v.get(k).is_some_and(|x| x.is_string())) && ["moon", "next_minutes"].iter().all(|k| v.get(k).is_some_and(|x| x.is_number())),
+                "clock" => {
+                    v.is_null()
+                        || ["earth", "moon_name", "next_day"].iter().all(|k| v.get(k).is_some_and(|x| x.is_string()))
+                            && ["moon", "next_minutes"].iter().all(|k| v.get(k).is_some_and(|x| x.is_number()))
+                }
                 "target_distance" | "target_hpp" => v.is_null() || v.is_number(),
-                "battle_rows" => v.is_null() || v.as_array().is_some_and(|a| a.len() <= 8 && a.iter().all(|r| super::super::suggest::Suggestion::from_row(r).is_some())),
-                _ => return Err(mlua::Error::runtime(format!("no slot {name:?} (clock, target_distance, target_hpp, battle_rows)"))),
+                "battle_rows" => {
+                    v.is_null()
+                        || v.as_array().is_some_and(|a| {
+                            a.len() <= 8 && a.iter().all(|r| super::super::suggest::Suggestion::from_row(r).is_some())
+                        })
+                }
+                _ => {
+                    return Err(mlua::Error::runtime(format!(
+                        "no slot {name:?} (clock, target_distance, target_hpp, battle_rows)"
+                    )));
+                }
             };
             if !ok {
-                return Err(mlua::Error::runtime(format!("slot {name}: the wrong shape of value (see ui.native.slot)")));
+                return Err(mlua::Error::runtime(format!(
+                    "slot {name}: the wrong shape of value (see ui.native.slot)"
+                )));
             }
             let info = info(lua);
             let mut f = info.borrow_mut();
@@ -301,7 +361,9 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
     )?;
     t.set(
         "hidden",
-        lua.create_function(|lua, what: String| Ok(info(lua).borrow().hidden.get(&what).is_some_and(|m| !m.is_empty())))?,
+        lua.create_function(|lua, what: String| {
+            Ok(info(lua).borrow().hidden.get(&what).is_some_and(|m| !m.is_empty()))
+        })?,
     )?;
     let me = mod_id.to_string();
     t.set(

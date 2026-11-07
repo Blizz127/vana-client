@@ -32,8 +32,15 @@ pub enum Talk {
 }
 
 /// Push-to-talk keys: (config name, label).
-pub const PTT_KEYS: [(&str, &str); 7] =
-    [("mouse4", "Mouse button 4"), ("mouse5", "Mouse button 5"), ("right_ctrl", "Right Ctrl"), ("right_alt", "Right Alt"), ("right_shift", "Right Shift"), ("backquote", "` (backquote)"), ("caps_lock", "Caps Lock")];
+pub const PTT_KEYS: [(&str, &str); 7] = [
+    ("mouse4", "Mouse button 4"),
+    ("mouse5", "Mouse button 5"),
+    ("right_ctrl", "Right Ctrl"),
+    ("right_alt", "Right Alt"),
+    ("right_shift", "Right Shift"),
+    ("backquote", "` (backquote)"),
+    ("caps_lock", "Caps Lock"),
+];
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -64,7 +71,22 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { enabled: false, talk: Talk::Voice, ptt_key: "mouse4".into(), threshold_db: -45, mic_gain: 100, volume: 100, mic_muted: false, noise_suppression: true, deafened: false, input: String::new(), channel: String::new(), peers: Vec::new(), muted: Vec::new(), show_talking: true }
+        Self {
+            enabled: false,
+            talk: Talk::Voice,
+            ptt_key: "mouse4".into(),
+            threshold_db: -45,
+            mic_gain: 100,
+            volume: 100,
+            mic_muted: false,
+            noise_suppression: true,
+            deafened: false,
+            input: String::new(),
+            channel: String::new(),
+            peers: Vec::new(),
+            muted: Vec::new(),
+            show_talking: true,
+        }
     }
 }
 
@@ -136,7 +158,13 @@ impl Shared {
     fn send_audio(&self, seq: u32, pcm: Vec<i16>) {
         let to: Vec<SocketAddrV4> = {
             let chan = self.cfg.lock().unwrap().channel.clone();
-            self.peers.lock().unwrap().values().filter(|p| p.channel.eq_ignore_ascii_case(&chan)).map(|p| p.addr).collect()
+            self.peers
+                .lock()
+                .unwrap()
+                .values()
+                .filter(|p| p.channel.eq_ignore_ascii_case(&chan))
+                .map(|p| p.addr)
+                .collect()
         };
         if to.is_empty() {
             return;
@@ -203,7 +231,16 @@ impl Shared {
             }
             // From a peer (at its hellos' address) on this channel, not muted; deafened, it still shows as talking.
             Some(Packet::Audio { session, seq, pcm }) => {
-                let Some((name, channel)) = self.peers.lock().unwrap().get(&session).filter(|p| p.addr == from).map(|p| (p.name.to_lowercase(), p.channel.clone())) else { return };
+                let Some((name, channel)) = self
+                    .peers
+                    .lock()
+                    .unwrap()
+                    .get(&session)
+                    .filter(|p| p.addr == from)
+                    .map(|p| (p.name.to_lowercase(), p.channel.clone()))
+                else {
+                    return;
+                };
                 let deaf = {
                     let c = self.cfg.lock().unwrap();
                     if !c.channel.eq_ignore_ascii_case(&channel) || c.muted.contains(&name) {
@@ -286,7 +323,13 @@ pub fn devices() -> Vec<(String, String)> {
 impl Engine {
     /// `output`: the cpal output id ("null" in test runs, empty for the default).
     pub fn start(cfg: &Settings, name: &str, output: &str) -> anyhow::Result<Engine> {
-        Self::start_on(cfg, name, Some(output), PORT, Stand { mic: std::env::var_os("FFXI_VOICE_MIC"), rec: std::env::var_os("FFXI_VOICE_REC") })
+        Self::start_on(
+            cfg,
+            name,
+            Some(output),
+            PORT,
+            Stand { mic: std::env::var_os("FFXI_VOICE_MIC"), rec: std::env::var_os("FFXI_VOICE_REC") },
+        )
     }
 
     /// `output` None: no sound devices at all (the tests).
@@ -327,8 +370,22 @@ impl Engine {
         let sh = shared.clone();
         std::thread::Builder::new().name("voice-net".into()).spawn(move || net(sh))?;
         let rec = stand.rec;
-        let out = output.and_then(|o| crate::audio::output::open((!o.is_empty()).then_some(o), |rate| play::Out::new(shared.clone(), rate, rec)).map_err(|e| log::warn!("voice: no output: {e:#}")).ok());
-        let engine = Engine { shared, _out: out, mic: None, opened_with: String::new(), no_mic: output.is_none(), stand_mic: stand.mic, idle: None, linger: MIC_LINGER, discovery };
+        let out = output.and_then(|o| {
+            crate::audio::output::open((!o.is_empty()).then_some(o), |rate| play::Out::new(shared.clone(), rate, rec))
+                .map_err(|e| log::warn!("voice: no output: {e:#}"))
+                .ok()
+        });
+        let engine = Engine {
+            shared,
+            _out: out,
+            mic: None,
+            opened_with: String::new(),
+            no_mic: output.is_none(),
+            stand_mic: stand.mic,
+            idle: None,
+            linger: MIC_LINGER,
+            discovery,
+        };
         engine.apply(cfg);
         log::info!("voice: on as {:?}, session {:016x}", name, engine.shared.session);
         Ok(engine)
@@ -432,8 +489,14 @@ impl Engine {
             })
             .collect();
         peers.sort_by(|a, b| b.same.cmp(&a.same).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
-        let unresolved = self.shared.manual.lock().unwrap().iter().filter(|m| m.1.is_none()).map(|m| m.0.clone()).collect();
-        Status { peers, level_db: f32::from_bits(self.shared.level.load(Ordering::Relaxed)), talking: self.shared.talking.load(Ordering::Relaxed) && matches!(self.mic, Some(Ok(_))), unresolved }
+        let unresolved =
+            self.shared.manual.lock().unwrap().iter().filter(|m| m.1.is_none()).map(|m| m.0.clone()).collect();
+        Status {
+            peers,
+            level_db: f32::from_bits(self.shared.level.load(Ordering::Relaxed)),
+            talking: self.shared.talking.load(Ordering::Relaxed) && matches!(self.mic, Some(Ok(_))),
+            unresolved,
+        }
     }
 }
 
@@ -456,7 +519,14 @@ struct Stand {
 }
 
 /// The voice-probe command: a peer with no window that talks, listens and says who it finds.
-pub fn probe(name: &str, seconds: u64, mic: std::ffi::OsString, record: Option<std::ffi::OsString>, channel: String, peers: Vec<String>) -> anyhow::Result<()> {
+pub fn probe(
+    name: &str,
+    seconds: u64,
+    mic: std::ffi::OsString,
+    record: Option<std::ffi::OsString>,
+    channel: String,
+    peers: Vec<String>,
+) -> anyhow::Result<()> {
     let cfg = Settings { enabled: true, channel, peers, ..Default::default() };
     let mut e = Engine::start_on(&cfg, name, Some("null"), PORT, Stand { mic: Some(mic), rec: record })?;
     let end = Instant::now() + Duration::from_secs(seconds);
@@ -467,7 +537,20 @@ pub fn probe(name: &str, seconds: u64, mic: std::ffi::OsString, record: Option<s
             anyhow::bail!("microphone: {m}");
         }
         let s = e.status();
-        let line = s.peers.iter().map(|p| format!("{} {}{}{}", p.name, p.addr, if p.same { "" } else { " (other channel)" }, if p.talking { " talking" } else { "" })).collect::<Vec<_>>().join(", ");
+        let line = s
+            .peers
+            .iter()
+            .map(|p| {
+                format!(
+                    "{} {}{}{}",
+                    p.name,
+                    p.addr,
+                    if p.same { "" } else { " (other channel)" },
+                    if p.talking { " talking" } else { "" }
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
         let line = format!("peers [{line}]  me {}", if s.talking { "talking" } else { "quiet" });
         if line != last {
             println!("{:>6.1}s  {line}", seconds as f32 - end.saturating_duration_since(Instant::now()).as_secs_f32());
@@ -481,7 +564,11 @@ pub fn probe(name: &str, seconds: u64, mic: std::ffi::OsString, record: Option<s
 /// "host", "host:port" or "a.b.c.d[:port]" to its first LAN IPv4 address.
 fn resolve(s: &str) -> Option<SocketAddrV4> {
     let s = s.trim();
-    let with_port = if s.rsplit_once(':').is_some_and(|(_, p)| p.parse::<u16>().is_ok()) { s.to_string() } else { format!("{s}:{PORT}") };
+    let with_port = if s.rsplit_once(':').is_some_and(|(_, p)| p.parse::<u16>().is_ok()) {
+        s.to_string()
+    } else {
+        format!("{s}:{PORT}")
+    };
     with_port.to_socket_addrs().ok()?.find_map(|a| match a {
         SocketAddr::V4(v) if wire::lan(*v.ip()) => Some(v),
         _ => None,
@@ -549,7 +636,8 @@ mod tests {
         let cfg = Settings { enabled: true, peers: vec![format!("127.0.0.1:{}", port + 1)], ..Default::default() };
         let none = || Stand { mic: None, rec: None };
         let a = Engine::start_on(&cfg, "Alpha", None, port, none()).unwrap();
-        let b = Engine::start_on(&Settings { peers: Vec::new(), ..cfg.clone() }, "Beta", None, port + 1, none()).unwrap();
+        let b =
+            Engine::start_on(&Settings { peers: Vec::new(), ..cfg.clone() }, "Beta", None, port + 1, none()).unwrap();
         let sees = |e: &Engine, name: &str| e.status().peers.iter().any(|p| p.name == name);
         assert!(wait(|| sees(&a, "Beta") && sees(&b, "Alpha")));
         let talking = |e: &Engine| e.status().peers.iter().any(|p| p.talking);
@@ -582,11 +670,19 @@ mod tests {
     fn mic_opens_unless_muted() {
         let port = 57000 + (std::process::id() % 500) as u16 * 2;
         let cfg = Settings { enabled: true, peers: vec![format!("127.0.0.1:{}", port + 1)], ..Default::default() };
-        let mut a = Engine::start_on(&cfg, "Alpha", Some("null"), port, Stand { mic: Some("tone".into()), rec: None }).unwrap();
+        let mut a =
+            Engine::start_on(&cfg, "Alpha", Some("null"), port, Stand { mic: Some("tone".into()), rec: None }).unwrap();
         a.linger = Duration::ZERO;
         a.tick();
         assert_eq!(a.mic(), Ok(Some("test tone 440 Hz")));
-        let b = Engine::start_on(&Settings { peers: Vec::new(), ..cfg.clone() }, "Beta", None, port + 1, Stand { mic: None, rec: None }).unwrap();
+        let b = Engine::start_on(
+            &Settings { peers: Vec::new(), ..cfg.clone() },
+            "Beta",
+            None,
+            port + 1,
+            Stand { mic: None, rec: None },
+        )
+        .unwrap();
         assert!(wait(|| {
             a.tick();
             b.status().peers.iter().any(|p| p.name == "Alpha" && p.talking)
@@ -607,9 +703,17 @@ mod tests {
     #[test]
     fn bye_and_audio_from_the_peer_only() {
         let port = 58000 + (std::process::id() % 500) as u16 * 2;
-        let e = Engine::start_on(&Settings { enabled: true, ..Default::default() }, "Alpha", None, port, Stand { mic: None, rec: None }).unwrap();
+        let e = Engine::start_on(
+            &Settings { enabled: true, ..Default::default() },
+            "Alpha",
+            None,
+            port,
+            Stand { mic: None, rec: None },
+        )
+        .unwrap();
         let s = &e.shared;
-        let (peer, other): (SocketAddrV4, SocketAddrV4) = ("127.0.0.1:40000".parse().unwrap(), "127.0.0.1:40001".parse().unwrap());
+        let (peer, other): (SocketAddrV4, SocketAddrV4) =
+            ("127.0.0.1:40000".parse().unwrap(), "127.0.0.1:40001".parse().unwrap());
         let channel = s.cfg.lock().unwrap().channel.clone();
         s.handle(&wire::encode(&Packet::Hello { session: 7, name: "Beta".into(), channel }), peer);
         let listed = || s.peers.lock().unwrap().contains_key(&7);

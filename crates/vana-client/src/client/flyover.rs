@@ -1,7 +1,7 @@
 //! The title screen's 3D backdrop: one random field movie (mov1..mov8 of file 23's "loop", which
 //! "main" spawns) played behind the lobby art, with its camera paths, fades and crossfades.
 
-use crate::dat::title::{Op, Title, TITLE_FILE, fov_y, hour_of, sample};
+use crate::dat::title::{Op, TITLE_FILE, Title, fov_y, hour_of, sample};
 use crate::dat::weather::{Env, Lighting, ZoneWeather};
 use crate::dat::{DatIndex, zone};
 use crate::render::ui::{UiBatch, UiRenderer};
@@ -39,10 +39,16 @@ impl FlyoverData {
     pub fn load_file(index: &DatIndex, keys: &zone::Keys, file_id: u32, movie: &str) -> Result<Self> {
         let file = index.read(file_id)?;
         let title = Title::parse(&file)?;
-        let envs = crate::dat::chunks(&file)?.into_iter().filter(|c| c.kind == 0x2f).filter_map(|c| Env::parse(c.data).map(|e| (c.name(), e))).collect();
+        let envs = crate::dat::chunks(&file)?
+            .into_iter()
+            .filter(|c| c.kind == 0x2f)
+            .filter_map(|c| Env::parse(c.data).map(|e| (c.name(), e)))
+            .collect();
         let ops = title.scheduler(movie)?.to_vec();
         let zone_of = |ops: &[Op]| ops.iter().find_map(|o| if let Op::Zone(z) = o { Some(*z) } else { None });
-        let zone = zone_of(&ops).or_else(|| title.scheduler("main").ok().and_then(zone_of)).with_context(|| format!("{movie} loads no zone"))?;
+        let zone = zone_of(&ops)
+            .or_else(|| title.scheduler("main").ok().and_then(zone_of))
+            .with_context(|| format!("{movie} loads no zone"))?;
         let zone_file = index.read(crate::dat::zone::file_id(zone))?;
         let scene = zone::load_scene(keys, &zone_file)?;
         let weather = ZoneWeather::parse(&zone_file).ok();
@@ -81,7 +87,22 @@ pub struct Flyover {
 
 impl Flyover {
     pub fn new(data: FlyoverData) -> Self {
-        Self { data, zone: None, ui: None, previous: None, tick: 0.0, next_at: 0.0, cursor: 0, shot: None, fade: ([0.0; 3], [0.0; 3], 0.0, 0.0), cross: None, minute: 12.5 * 60.0, weather: "suny".into(), env: None, done: false }
+        Self {
+            data,
+            zone: None,
+            ui: None,
+            previous: None,
+            tick: 0.0,
+            next_at: 0.0,
+            cursor: 0,
+            shot: None,
+            fade: ([0.0; 3], [0.0; 3], 0.0, 0.0),
+            cross: None,
+            minute: 12.5 * 60.0,
+            weather: "suny".into(),
+            env: None,
+            done: false,
+        }
     }
 
     /// Plays the movie again from the start (the nation files' "loop" repeats mov1).
@@ -152,12 +173,26 @@ impl Flyover {
             return None;
         }
         let k = sample(path, (self.tick - s.start) / s.ticks);
-        Some(Camera { eye: k.eye, target: k.target, up: crate::dat::title::up_of(k.eye, k.target, k.roll), fov_y: fov_y(k.focal) })
+        Some(Camera {
+            eye: k.eye,
+            target: k.target,
+            up: crate::dat::title::up_of(k.eye, k.target, k.roll),
+            fov_y: fov_y(k.focal),
+        })
     }
 
     /// Draws the zone through the movie camera into `view`, with any crossfade and fade.
     /// Returns false (nothing drawn) before the first camera op.
-    pub fn render(&mut self, gpu: &Gpu, format: wgpu::TextureFormat, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, depth: &wgpu::TextureView, size: [u32; 2], aspect: f32) -> bool {
+    pub fn render(
+        &mut self,
+        gpu: &Gpu,
+        format: wgpu::TextureFormat,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        size: [u32; 2],
+        aspect: f32,
+    ) -> bool {
         let Some(cam) = self.camera() else { return false };
         let cross = self.cross.filter(|(_, start, len)| self.tick < start + len);
         let f = self.fade_colour();

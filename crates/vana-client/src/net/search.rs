@@ -28,7 +28,8 @@ static SESSION: std::sync::Mutex<Option<Session>> = std::sync::Mutex::new(None);
 /// A new session word and "more" packet (each map login).
 pub fn begin_session() {
     let word = random();
-    *SESSION.lock().unwrap_or_else(|e| e.into_inner()) = Some(Session { word, more: request(0x10, &[], word, random()) });
+    *SESSION.lock().unwrap_or_else(|e| e.into_inner()) =
+        Some(Session { word, more: request(0x10, &[], word, random()) });
 }
 
 fn session() -> (u32, Vec<u8>) {
@@ -239,7 +240,9 @@ pub fn condition(c: &Cond) -> (u8, Vec<u8>) {
     let mut b = Bits::default();
     // The typed sorts, then name and each set field's type not listed yet.
     let mut sorts = c.sorts.clone();
-    for (flag, t) in [(0, 0), (LEVEL, 4), (MLEVEL, 7), (JOB, 3), (NATION, 2), (RACE, 5), (AREA, 1), (STATUS, 6), (RANK, 0x10)] {
+    for (flag, t) in
+        [(0, 0), (LEVEL, 4), (MLEVEL, 7), (JOB, 3), (NATION, 2), (RACE, 5), (AREA, 1), (STATUS, 6), (RANK, 0x10)]
+    {
         if (flag == 0 || c.flags & flag != 0) && !sorts.iter().any(|s| s & 0x1f == t) {
             sorts.push(t);
         }
@@ -592,7 +595,12 @@ fn ah_decode(r: &[u8], d: usize, kind: u8, total: u16, out: &mut AhReply) {
             out.head = Some((u16_at(0x18), u32_at(0x1a), u16_at(0x1e)));
             let mut o = 0x20;
             while o + 40 <= d {
-                out.sales.push(AhSale { price: u32_at(o), date: u32_at(o + 4), seller: cstr(&r[o + 8..o + 24]), buyer: cstr(&r[o + 24..o + 40]) });
+                out.sales.push(AhSale {
+                    price: u32_at(o),
+                    date: u32_at(o + 4),
+                    seller: cstr(&r[o + 8..o + 24]),
+                    buyer: cstr(&r[o + 24..o + 40]),
+                });
                 o += 40;
             }
         }
@@ -613,7 +621,9 @@ pub fn ah_query(addr: (Ipv4Addr, u16), wire: u8, payload: &[u8], extra: u16) -> 
 pub fn ah_query_many(addr: (Ipv4Addr, u16), wire: u8, payloads: &[Vec<u8>], extra: u16) -> Vec<Result<AhReply>> {
     let _slot = Slot::take();
     let mut out = Vec::new();
-    let mut s = match TcpStream::connect_timeout(&SocketAddr::from(addr), Duration::from_secs(10)).and_then(|s| s.set_read_timeout(Some(TIMEOUT)).map(|_| s)) {
+    let mut s = match TcpStream::connect_timeout(&SocketAddr::from(addr), Duration::from_secs(10))
+        .and_then(|s| s.set_read_timeout(Some(TIMEOUT)).map(|_| s))
+    {
         Ok(s) => s,
         Err(e) => return vec![Err(e.into())],
     };
@@ -743,7 +753,10 @@ mod tests {
         let mut out = AhReply::default();
         ah_decode(&h, h.len(), 0x85, 0, &mut out);
         assert_eq!(out.head, Some((4096, 10, 35)));
-        assert_eq!(out.sales, vec![AhSale { price: 15, date: 4_070_908_800, seller: "M.H.M.U.".into(), buyer: "Nine".into() }]);
+        assert_eq!(
+            out.sales,
+            vec![AhSale { price: 15, date: 4_070_908_800, seller: "M.H.M.U.".into(), buyer: "Nine".into() }]
+        );
     }
 
     fn hex(s: &str) -> Vec<u8> {
@@ -768,9 +781,16 @@ mod tests {
     /// going to the PlayOnline search server (session word 0x920ccdfb): ours match but for the padding.
     #[test]
     fn paged_requests_as_captured() {
-        let list = hex("0c010000495846469bedbd9da385dd3f9dcdeef71adb4aa2f04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4ad1be80521d56a4c7fddc179606fa5271ee0aac4e0082c1f0626290da3323d9540a1573ce191dd4eb073c551e9e8d89253b0db2b0ee2fc47240eb054425c640e4572cf4c92f044af39f32c093644586b1bcd3a773");
-        assert_eq!(request_fields(&request_x(0x15, &ah_list_payload(0x20, 4, &[]), 0x920c_cdfb, 0x73a7_d3bc, 1)), request_fields(&list));
-        let more = hex("4c00000049584646d369775daf3218a626592475ed952be32c24d2047e631d0817a290c2dd011eee36ad4bf0fe8ea2da37851610a963a13cf0c2071d9422ba608535b610626635c1336a2e93");
+        let list = hex(
+            "0c010000495846469bedbd9da385dd3f9dcdeef71adb4aa2f04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4af04535db04eedf4ad1be80521d56a4c7fddc179606fa5271ee0aac4e0082c1f0626290da3323d9540a1573ce191dd4eb073c551e9e8d89253b0db2b0ee2fc47240eb054425c640e4572cf4c92f044af39f32c093644586b1bcd3a773",
+        );
+        assert_eq!(
+            request_fields(&request_x(0x15, &ah_list_payload(0x20, 4, &[]), 0x920c_cdfb, 0x73a7_d3bc, 1)),
+            request_fields(&list)
+        );
+        let more = hex(
+            "4c00000049584646d369775daf3218a626592475ed952be32c24d2047e631d0817a290c2dd011eee36ad4bf0fe8ea2da37851610a963a13cf0c2071d9422ba608535b610626635c1336a2e93",
+        );
         assert_eq!(request_fields(&request(0x10, &[], 0x920c_cdfb, 0x932e_6a33)), request_fields(&more));
         assert_eq!(request_fields(&more).1[8..12], [0x10, 0, 0x80, 0x10]);
     }
@@ -789,7 +809,10 @@ mod tests {
         assert_eq!((w, &p[..3]), (0, &[2u8, 0x01, 0x80][..]));
         let t = 1 + p[0] as usize;
         assert_eq!(u16::from_le_bytes([p[t], p[t + 1]]), 2);
-        assert_eq!((&p[t + 2..t + 4], p[t + 4], &p[t + 18..t + 25], p.len()), (&b"Ab"[..], 0, &b"Lnxtest"[..], t + 2 + 32));
+        assert_eq!(
+            (&p[t + 2..t + 4], p[t + 4], &p[t + 18..t + 25], p.len()),
+            (&b"Ab"[..], 0, &b"Lnxtest"[..], t + 2 + 32)
+        );
     }
 
     /// Type 0xd: three 8-bit ranks, then three 32-bit linkshell ids (the group list's linkshell members).
@@ -817,7 +840,12 @@ mod tests {
     fn live_lookup() {
         let addr = (Ipv4Addr::LOCALHOST, 54002);
         let all = query(addr, &Cond::all()).unwrap();
-        println!("all: {} of {}: {:?}", all.records.len(), all.total, all.records.iter().map(|r| (&r.name, r.zone, r.id)).collect::<Vec<_>>());
+        println!(
+            "all: {} of {}: {:?}",
+            all.records.len(),
+            all.total,
+            all.records.iter().map(|r| (&r.name, r.zone, r.id)).collect::<Vec<_>>()
+        );
         let first = &all.records.first().expect("nobody online").name;
         let one = query(addr, &Cond::name(first.clone())).unwrap();
         println!("{first}: {:?}", one.records);
@@ -830,9 +858,13 @@ mod tests {
     fn spec_vector() {
         let (wire, payload) = condition(&Cond::zone(101));
         let req = request(wire, &payload, 0x1122_3344, 0x5566_7788);
-        let want = hex("4c0000004958464669148a59d7cfb8e92a38ab9c9baa18dcb9d7f22348c37029b9d7f22348c37029b9d7f22348c37029daf440daa68666cc9160a6313f2cd3c4769d706a41c5c56b88776655");
+        let want = hex(
+            "4c0000004958464669148a59d7cfb8e92a38ab9c9baa18dcb9d7f22348c37029b9d7f22348c37029b9d7f22348c37029daf440daa68666cc9160a6313f2cd3c4769d706a41c5c56b88776655",
+        );
         assert_eq!(req, want);
-        let mut r = hex("96000000495846464948e905e24b64ca5e6b543e28494878e1ba66f822835a7840cd4907f300e8314bfcb70d85f025e31a27c452db4ec0ac21ad17175e0e812f0b802580f8da0643000c2749c30ac1d2f7cbcc47e1d5dc20476540682ff59bb85302d05f774407d9c22317a1b74479875de459f288462ef76779e08fc7a39c17efa11f8f2c98abe9b54bd4343d6745bfc2d688776655");
+        let mut r = hex(
+            "96000000495846464948e905e24b64ca5e6b543e28494878e1ba66f822835a7840cd4907f300e8314bfcb70d85f025e31a27c452db4ec0ac21ad17175e0e812f0b802580f8da0643000c2749c30ac1d2f7cbcc47e1d5dc20476540682ff59bb85302d05f774407d9c22317a1b74479875de459f288462ef76779e08fc7a39c17efa11f8f2c98abe9b54bd4343d6745bfc2d688776655",
+        );
         let (d, flags, kind, total) = open(&mut r, 0x1122_3344).unwrap();
         assert_eq!((d, flags, kind, total), (130, 0x80, 0x80, 3));
         let mut names = Vec::new();
@@ -842,6 +874,13 @@ mod tests {
             names.push((rec.name.clone(), rec.zone, rec.id, rec.flags & 0xffff));
             o += 1 + r[o] as usize;
         }
-        assert_eq!(names, [("Korrin".into(), 101, 15, 0x8000), ("Mirelle".into(), 101, 17, 0x8000), ("Rokuro".into(), 101, 19, 0x8000)]);
+        assert_eq!(
+            names,
+            [
+                ("Korrin".into(), 101, 15, 0x8000),
+                ("Mirelle".into(), 101, 17, 0x8000),
+                ("Rokuro".into(), 101, 19, 0x8000)
+            ]
+        );
     }
 }

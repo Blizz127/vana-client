@@ -52,7 +52,17 @@ fn bags(w: &World, b: &Storage) -> Vec<usize> {
         let open = super::super::viewhouse::open_containers(w);
         return (0..BAGS.len()).filter(|&g| BAGS[g].1.iter().any(|c| open.contains(c))).collect();
     }
-    (0..BAGS.len()).filter(|&g| BAGS[g].1.contains(&b.bank) || (!b.read_only && b.bank != BIN && BAGS[g].1.iter().any(|&c| c != BIN && c != 3 && gitems::usable(w, &Storage { bank: 0xff, ..*b }, c)))).collect()
+    (0..BAGS.len())
+        .filter(|&g| {
+            BAGS[g].1.contains(&b.bank)
+                || (!b.read_only
+                    && b.bank != BIN
+                    && BAGS[g]
+                        .1
+                        .iter()
+                        .any(|&c| c != BIN && c != 3 && gitems::usable(w, &Storage { bank: 0xff, ..*b }, c)))
+        })
+        .collect()
 }
 
 /// A bag's rows over its parts.
@@ -62,7 +72,9 @@ fn rows(w: &World, g: usize) -> Vec<(u8, Slot)> {
 
 /// Used and room over a bag's parts.
 fn fill(w: &World, g: usize) -> (usize, usize) {
-    BAGS[g].1.iter().fold((0, 0), |(u, r), &c| (u + gitems::store_rows(w, c).len(), r + (w.inv.sizes[c as usize] as usize).saturating_sub(1)))
+    BAGS[g].1.iter().fold((0, 0), |(u, r), &c| {
+        (u + gitems::store_rows(w, c).len(), r + (w.inv.sizes[c as usize] as usize).saturating_sub(1))
+    })
 }
 
 /// A row's colour by retail's rules for its own part (`c`) against the other side's.
@@ -88,7 +100,8 @@ fn places(w: &World) -> Vec<(Option<usize>, usize, u8, Slot)> {
     let Some((b, ..)) = view(w) else { return Vec::new() };
     let g = group(b.bank);
     let bag = |g: usize| rows(w, g).into_iter().enumerate().map(move |(k, (c, s))| (Some(g), k, c, s));
-    let inv = gitems::store_rows(w, gitems::INVENTORY).into_iter().enumerate().map(|(k, s)| (None, k, gitems::INVENTORY, s));
+    let inv =
+        gitems::store_rows(w, gitems::INVENTORY).into_iter().enumerate().map(|(k, s)| (None, k, gitems::INVENTORY, s));
     let others: Vec<_> = bags(w, &b).into_iter().filter(|&o| o != g).flat_map(bag).collect();
     bag(g).chain(inv).chain(others).collect()
 }
@@ -145,7 +158,11 @@ fn refusal(w: &World, b: &Storage, g: usize, open: &[u8], bank_side: bool, c: u8
         return None;
     }
     // No part takes it: the first part's reason other than room, else the bag is full.
-    let whys: Vec<_> = BAGS[g].1.iter().filter_map(|&c| gitems::judge(w, info, &Storage { bank: c, side: gitems::INVENTORY, ..*b }, false, s).1).collect();
+    let whys: Vec<_> = BAGS[g]
+        .1
+        .iter()
+        .filter_map(|&c| gitems::judge(w, info, &Storage { bank: c, side: gitems::INVENTORY, ..*b }, false, s).1)
+        .collect();
     Some(whys.iter().copied().find(|y| !y.starts_with("No room")).unwrap_or("No room in this bag."))
 }
 
@@ -203,16 +220,31 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let first = BAGS[g].1[0];
     let open = open_parts(w, g);
     let why_bag: Vec<Option<&'static str>> = bag.iter().map(|(c, s)| refusal(w, &b, g, &open, true, *c, s)).collect();
-    let why_inv: Vec<Option<&'static str>> = inv.iter().map(|s| refusal(w, &b, g, &open, false, gitems::INVENTORY, s)).collect();
-    let tints_bag: Vec<u32> = bag.iter().map(|(c, s)| if b.read_only { TINT_DIM } else { tint(w, &b, true, *c, gitems::INVENTORY, s) }).collect();
-    let tints_inv: Vec<u32> = inv.iter().zip(&why_inv).map(|(s, why)| if why.is_some() { TINT_DIM } else { tint(w, &b, false, gitems::INVENTORY, target(w, &b, &open, s).unwrap_or(first), s) }).collect();
+    let why_inv: Vec<Option<&'static str>> =
+        inv.iter().map(|s| refusal(w, &b, g, &open, false, gitems::INVENTORY, s)).collect();
+    let tints_bag: Vec<u32> = bag
+        .iter()
+        .map(|(c, s)| if b.read_only { TINT_DIM } else { tint(w, &b, true, *c, gitems::INVENTORY, s) })
+        .collect();
+    let tints_inv: Vec<u32> = inv
+        .iter()
+        .zip(&why_inv)
+        .map(|(s, why)| {
+            if why.is_some() {
+                TINT_DIM
+            } else {
+                tint(w, &b, false, gitems::INVENTORY, target(w, &b, &open, s).unwrap_or(first), s)
+            }
+        })
+        .collect();
     let icon = |id: u16| m.item_icon(ctx, &info, id);
     let bag_icons: Vec<_> = bag.iter().map(|(_, s)| icon(s.id)).collect();
     let inv_icons: Vec<_> = inv.iter().map(|s| icon(s.id)).collect();
     let names = |s: &Slot| info.item(s.id).map(|it| it.name.clone()).unwrap_or_default();
     let bag_names: Vec<String> = bag.iter().map(|(_, s)| names(s)).collect();
     let inv_names: Vec<String> = inv.iter().map(names).collect();
-    let inv_bazaar: Vec<Option<u32>> = inv.iter().map(|s| super::items::bazaar_price(w, gitems::INVENTORY, s.index)).collect();
+    let inv_bazaar: Vec<Option<u32>> =
+        inv.iter().map(|s| super::items::bazaar_price(w, gitems::INVENTORY, s.index)).collect();
     // The inventory side's cursor on a bazaar item: what frees it under the lists.
     let bazaar_held = !b.on_bank && inv_bazaar.get(iscroll + icursor).copied().flatten().is_some();
     let (used, room) = fill(w, g);
@@ -220,11 +252,22 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let on_bank = b.on_bank;
     let (bcur, icur) = (b.scroll + b.cursor, iscroll + icursor);
     // The stack being split, and the move in flight, by name.
-    let qty = b.qty.map(|q| (q, w.inv.slots.get(&(q.from, q.index)).map(|&(id, _)| info.item(id).map(|it| it.name.clone()).unwrap_or_default()).unwrap_or_default()));
+    let qty = b.qty.map(|q| {
+        (
+            q,
+            w.inv
+                .slots
+                .get(&(q.from, q.index))
+                .map(|&(id, _)| info.item(id).map(|it| it.name.clone()).unwrap_or_default())
+                .unwrap_or_default(),
+        )
+    });
     let pending = b.pending.map(|pd| (pd.count, info.item(pd.id).map(|it| it.name.clone()).unwrap_or_default()));
     let note = b.note;
     let held = egui::DragAndDrop::payload::<Held>(ctx).map(|h| *h);
-    let held_icon = held.and_then(|h| if h.bank_side { bag_icons.get(h.k).copied().flatten() } else { inv_icons.get(h.k).copied().flatten() });
+    let held_icon = held.and_then(|h| {
+        if h.bank_side { bag_icons.get(h.k).copied().flatten() } else { inv_icons.get(h.k).copied().flatten() }
+    });
     let shift = ctx.input(|i| i.modifiers.shift);
     let mut mouse = Mouse::default();
     let mut found = super::lists::found(p, w, "storage");
@@ -337,7 +380,12 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // The row under the pointer while dragged.
     if let (Some(t), Some(at)) = (held_icon, ctx.pointer_hover_pos()) {
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("storage drag")));
-        painter.image(t, Rect::from_center_size(at, vec2(32.0, 32.0)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::from_white_alpha(220));
+        painter.image(
+            t,
+            Rect::from_center_size(at, vec2(32.0, 32.0)),
+            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+            Color32::from_white_alpha(220),
+        );
     }
     if let Some(k) = mouse.bag {
         switch(w, k);
@@ -357,8 +405,16 @@ pub fn draw(p: &mut Panels, w: &mut World) {
 /// A dragged row let go on the other pane: it moves if its stack is still in the list (where it is now).
 fn dropped(w: &mut World, h: Held, how: How) {
     let Some((b, ..)) = view(w) else { return };
-    let side: Vec<(u8, Slot)> = if h.bank_side { rows(w, group(b.bank)) } else { gitems::store_rows(w, gitems::INVENTORY).into_iter().map(|s| (gitems::INVENTORY, s)).collect() };
-    let at = if side.get(h.k).is_some_and(|(c, s)| (*c, s.index, s.id) == (h.c, h.index, h.id)) { Some(h.k) } else { side.iter().position(|(c, s)| (*c, s.index, s.id) == (h.c, h.index, h.id)) };
+    let side: Vec<(u8, Slot)> = if h.bank_side {
+        rows(w, group(b.bank))
+    } else {
+        gitems::store_rows(w, gitems::INVENTORY).into_iter().map(|s| (gitems::INVENTORY, s)).collect()
+    };
+    let at = if side.get(h.k).is_some_and(|(c, s)| (*c, s.index, s.id) == (h.c, h.index, h.id)) {
+        Some(h.k)
+    } else {
+        side.iter().position(|(c, s)| (*c, s.index, s.id) == (h.c, h.index, h.id))
+    };
     let Some(k) = at else {
         refuse(w, "That stack changed: pick it again.");
         return;
@@ -395,7 +451,9 @@ fn store_mut(w: &mut World) -> Option<&mut Storage> {
 fn switch(w: &mut World, g: usize) {
     if w.viewhouse.is_some() {
         let open = super::super::viewhouse::open_containers(w);
-        if let Some(child) = BAGS[g].1.iter().find(|c| open.contains(c)).and_then(|&c| super::super::viewhouse::child_of(c)) {
+        if let Some(child) =
+            BAGS[g].1.iter().find(|c| open.contains(c)).and_then(|&c| super::super::viewhouse::child_of(c))
+        {
             super::super::viewhouse::open_row(w, child);
         }
         return;
@@ -428,14 +486,19 @@ fn set_cursor(w: &mut World, bank_side: bool, k: usize) {
 fn take(w: &mut World, bank_side: bool, k: usize, how: How) {
     let Some((b, ..)) = view(w) else { return };
     let g = group(b.bank);
-    let found = if bank_side { rows(w, g).into_iter().nth(k) } else { gitems::store_rows(w, gitems::INVENTORY).into_iter().nth(k).map(|s| (gitems::INVENTORY, s)) };
+    let found = if bank_side {
+        rows(w, g).into_iter().nth(k)
+    } else {
+        gitems::store_rows(w, gitems::INVENTORY).into_iter().nth(k).map(|s| (gitems::INVENTORY, s))
+    };
     let Some((c, s)) = found else { return };
     let open = open_parts(w, g);
     if let Some(why) = refusal(w, &b, g, &open, bank_side, c, &s) {
         refuse(w, why);
         return;
     }
-    let (from, to) = if bank_side { (c, gitems::INVENTORY) } else { (gitems::INVENTORY, target(w, &b, &open, &s).unwrap_or(c)) };
+    let (from, to) =
+        if bank_side { (c, gitems::INVENTORY) } else { (gitems::INVENTORY, target(w, &b, &open, &s).unwrap_or(c)) };
     if how == How::Split && s.count > 1 {
         // Ours: the strip opens on half the stack (retail's itemctrl on 1).
         if let Some(b) = store_mut(w) {
@@ -483,7 +546,13 @@ fn qty_act(w: &mut World, a: QtyAct) {
         QtyAct::Move => {
             // The stack as it is now (it may have changed while the strip was up).
             match w.inv.slots.get(&(q.from, q.index)).copied() {
-                Some((id, count)) if id != 0 && count >= q.value => send(w, q.from, q.to, &Slot { index: q.index, id, count, equipped: false, equipped_ex: false }, q.value),
+                Some((id, count)) if id != 0 && count >= q.value => send(
+                    w,
+                    q.from,
+                    q.to,
+                    &Slot { index: q.index, id, count, equipped: false, equipped_ex: false },
+                    q.value,
+                ),
                 _ => {
                     if let Some(b) = store_mut(w) {
                         b.qty = None;

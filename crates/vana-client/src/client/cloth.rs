@@ -30,7 +30,18 @@ pub struct Wind {
 
 impl Default for Wind {
     fn default() -> Self {
-        Self { dir: Vec3::new(-1.0, 0.0, 0.0), strength: 0.0, base: 4, spread: 10, on: false, timer: 0.0, saved: None, tick: 0, acc: 0.0, rng: 1 }
+        Self {
+            dir: Vec3::new(-1.0, 0.0, 0.0),
+            strength: 0.0,
+            base: 4,
+            spread: 10,
+            on: false,
+            timer: 0.0,
+            saved: None,
+            tick: 0,
+            acc: 0.0,
+            rng: 1,
+        }
     }
 }
 
@@ -137,7 +148,11 @@ impl Cloth {
             .iter()
             .enumerate()
             .filter_map(|(i, p)| {
-                p.sim.as_ref().map(|s| Sheet { part: i, p: vec![Particle::default(); s.particles()], sphere_prev: vec![None; s.spheres.len()] })
+                p.sim.as_ref().map(|s| Sheet {
+                    part: i,
+                    p: vec![Particle::default(); s.particles()],
+                    sphere_prev: vec![None; s.spheres.len()],
+                })
             })
             .collect();
         (!sheets.is_empty()).then_some(Self { sheets, reset: true, tick: u64::MAX, at: Vec3::ZERO })
@@ -147,7 +162,10 @@ impl Cloth {
     /// particles, carry the free ones by the actor's move, integrate them, then the normals.
     pub fn step(&mut self, parts: &[MeshPart], f: &Frame) {
         for sh in &mut self.sheets {
-            let (Some(part), Some(spec)) = (parts.get(sh.part), parts.get(sh.part).and_then(|p| p.sim.as_deref())) else { continue };
+            let (Some(part), Some(spec)) = (parts.get(sh.part), parts.get(sh.part).and_then(|p| p.sim.as_deref()))
+            else {
+                continue;
+            };
             if self.reset {
                 for (i, q) in sh.p.iter_mut().enumerate() {
                     q.cur = skin(f, &part.vertices[i]);
@@ -257,7 +275,8 @@ fn collide(spec: &ClothSpec, f: &Frame, p: &mut [Particle], prev: &mut [Option<V
         .iter()
         .map(|&s| {
             let r = f.skeleton.spheres.get(s as usize)?;
-            let used = r.bone >= 0 && (r.bone as usize) < f.skeleton.bones.len() && r.radius > 0.0 && r.radius.is_finite();
+            let used =
+                r.bone >= 0 && (r.bone as usize) < f.skeleton.bones.len() && r.radius > 0.0 && r.radius.is_finite();
             let at = used.then(|| {
                 let b = f.bones.get(r.bone as usize).copied().unwrap_or(BoneXf::IDENTITY);
                 (f.model.transform_point3(b.at(r.offset)), r.radius)
@@ -515,7 +534,13 @@ mod tests {
             boxes: Vec::new(),
             spheres: Vec::new(),
         };
-        let f = Frame { skeleton: &skel, bones: &[], model: Mat4::IDENTITY, moved: Vec3::ZERO, wind: Some((Vec3::NEG_X, 0.02)) };
+        let f = Frame {
+            skeleton: &skel,
+            bones: &[],
+            model: Mat4::IDENTITY,
+            moved: Vec3::ZERO,
+            wind: Some((Vec3::NEG_X, 0.02)),
+        };
         integrate(&s, &f, &mut p);
         assert!((p[1].cur - Vec3::new(-0.002, 0.01 + 0.002, 0.0)).length() < 1e-6, "{:?}", p[1].cur);
         // Against the wind: the difference instead.

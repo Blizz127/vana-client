@@ -105,9 +105,16 @@ pub const SLOT_CHILD: [u16; 16] = [1, 5, 9, 13, 2, 3, 7, 12, 16, 6, 8, 10, 14, 1
 /// The equip window's number fields (table 0x103639f8, FUN_1012d920): x, y, w, h from the window
 /// origin. 0..7 are the eight element values (left aligned), 8 attack and 9 defence (right aligned).
 pub const EQUIP_FIELDS: [[i16; 4]; 10] = [
-    [16, 162, 24, 14], [16, 175, 24, 14], [61, 162, 24, 14], [61, 175, 24, 14],
-    [105, 162, 24, 14], [105, 175, 24, 14], [149, 162, 24, 14], [149, 175, 24, 14],
-    [48, 148, 26, 14], [144, 148, 26, 14],
+    [16, 162, 24, 14],
+    [16, 175, 24, 14],
+    [61, 162, 24, 14],
+    [61, 175, 24, 14],
+    [105, 162, 24, 14],
+    [105, 175, 24, 14],
+    [149, 162, 24, 14],
+    [149, 175, 24, 14],
+    [48, 148, 26, 14],
+    [144, 148, 26, 14],
 ];
 
 /// FUN_1012d1f0: clamped to -99..9999 (+0x18 / +0x1a), at most 4 characters.
@@ -232,7 +239,13 @@ mod tests {
             if id < 100 { 12 } else { 1 }
         }
         fn kind(&self, id: u16) -> u16 {
-            if id == 1 { 8 } else if id >= 100 { 4 } else { 1 }
+            if id == 1 {
+                8
+            } else if id >= 100 {
+                4
+            } else {
+                1
+            }
         }
         fn flags(&self, _: u16) -> u16 {
             0
@@ -245,7 +258,11 @@ mod tests {
     #[test]
     fn rows_and_tints() {
         let s = |index, id, count, equipped| Slot { index, id, count, equipped, equipped_ex: false };
-        let rows = build_rows(&[s(0, 0xffff, 500, false), s(1, 1, 12, false), s(2, 2, 3, false), s(3, 100, 1, true)], &Fake, false);
+        let rows = build_rows(
+            &[s(0, 0xffff, 500, false), s(1, 1, 12, false), s(2, 2, 3, false), s(3, 100, 1, true)],
+            &Fake,
+            false,
+        );
         assert_eq!(rows.len(), 3);
         assert_eq!((rows[0].tint, rows[0].count.as_deref()), (TINT_FLAGGED, Some("12")));
         assert_eq!((rows[1].tint, rows[1].count.as_deref()), (TINT_WHITE, Some("3")));

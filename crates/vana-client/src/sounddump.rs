@@ -80,6 +80,10 @@ pub fn audio_test(id: u32, seconds: f32, se: bool, fade: i32, device: Option<Str
         }
     }
     use std::sync::atomic::Ordering;
-    println!("played {} for {seconds} s (mixer saw music {:?})", if se { "effect" } else { "music" }, a.status.bgm.load(Ordering::Relaxed).checked_sub(1));
+    println!(
+        "played {} for {seconds} s (mixer saw music {:?})",
+        if se { "effect" } else { "music" },
+        a.status.bgm.load(Ordering::Relaxed).checked_sub(1)
+    );
     Ok(())
 }

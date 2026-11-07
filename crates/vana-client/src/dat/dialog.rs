@@ -76,7 +76,9 @@ fn bracket_end(s: &[u8], from: usize) -> usize {
 fn grammar_arg(s: &[u8]) -> String {
     match s {
         [b, ..] if b & 0x40 != 0 => format!("slot{}", b & 0x3f),
-        [b, b1, b2, b3, ..] if b & 0x3f == 2 => (((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16).to_string(),
+        [b, b1, b2, b3, ..] if b & 0x3f == 2 => {
+            (((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16).to_string()
+        }
         _ => "?".into(),
     }
 }
@@ -136,7 +138,9 @@ pub fn readable(s: &[u8]) -> String {
                 let body = s.get(i + 2..(i + 2 + n).min(s.len())).unwrap_or_default();
                 (body.first().map_or("{grammar}".into(), |&k| grammar(k, &body[1..])), n + 2)
             }
-            0x02 | 0x03 => (format!("{{{c:02x} {}}}", u16::from_le_bytes([arg(i), s.get(i + 2).copied().unwrap_or(0)])), 3),
+            0x02 | 0x03 => {
+                (format!("{{{c:02x} {}}}", u16::from_le_bytes([arg(i), s.get(i + 2).copied().unwrap_or(0)])), 3)
+            }
             0x05 => (format!("{{text2 work{}}}", arg(i)), 2),
             0x07 => ("\n".into(), 1),
             0x08 => ("{player}".into(), 1),
@@ -282,7 +286,9 @@ fn grammar_expand(kind: u8, args: &[u8], ctx: &Ctx, lines: &mut [Vec<u8>], pendi
     use super::font::encode_sjis;
     // FUN_100bbd20: 0x?2 = packed index; slot args (0x40) are not filled here.
     let arg = match args {
-        [b, b1, b2, b3, ..] if b & 0x40 == 0 && b & 0x3f == 2 => Some(((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16),
+        [b, b1, b2, b3, ..] if b & 0x40 == 0 && b & 0x3f == 2 => {
+            Some(((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16)
+        }
         _ => None,
     };
     let at = |k: u8| -> Option<u32> {
@@ -307,7 +313,13 @@ fn grammar_expand(kind: u8, args: &[u8], ctx: &Ctx, lines: &mut [Vec<u8>], pendi
         if let Some((l, pos, definite)) = pending.take() {
             let art = match (definite, mode) {
                 (true, _) => "the",
-                (false, 3) => if an { "an" } else { "a" },
+                (false, 3) => {
+                    if an {
+                        "an"
+                    } else {
+                        "a"
+                    }
+                }
                 (false, _) => "some",
             };
             if l < lines.len() && pos <= lines[l].len() {
@@ -335,7 +347,9 @@ fn grammar_expand(kind: u8, args: &[u8], ctx: &Ctx, lines: &mut [Vec<u8>], pendi
         // the singular, else the plural.
         0x29 | 0x2a => {
             let idx = |b: &[u8]| match b {
-                [b0, b1, b2, b3, ..] if b0 & 0x40 == 0 && b0 & 0x3f == 2 => Some((((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16) as usize),
+                [b0, b1, b2, b3, ..] if b0 & 0x40 == 0 && b0 & 0x3f == 2 => {
+                    Some((((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16) as usize)
+                }
                 _ => None,
             };
             let val = |i: Option<usize>| -> Option<u32> {
@@ -405,13 +419,17 @@ fn grammar_high(kind: u8, args: &[u8], ctx: &Ctx) -> (Vec<u8>, Option<usize>) {
     let index = |b: &[u8]| -> (Option<usize>, usize) {
         match b {
             [b0, ..] if b0 & 0x40 != 0 => (None, 1),
-            [b0, b1, b2, b3, ..] if b0 & 0x3f == 2 => (Some((((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16) as usize), 4),
+            [b0, b1, b2, b3, ..] if b0 & 0x3f == 2 => {
+                (Some((((((b2 & 0x7f) as u16) | (*b3 as u16) << 7) << 7) | (b1 & 0x7f) as u16) as usize), 4)
+            }
             _ => (None, 4),
         }
     };
     let (first, len) = index(args);
     let num = |i: Option<usize>| i.and_then(|i| ctx.num_at(i));
-    let table = |id: Option<i32>| id.and_then(|id| ctx.texts.as_deref()?.grammar(kind, u32::try_from(id).ok()?)).unwrap_or_default();
+    let table = |id: Option<i32>| {
+        id.and_then(|id| ctx.texts.as_deref()?.grammar(kind, u32::try_from(id).ok()?)).unwrap_or_default()
+    };
     // The op 0xc3 slot that num[index] names; the index must be below 8, the slot is not checked in retail.
     let slot = || first.filter(|&i| i < 8).and_then(|i| ctx.slots.get(usize::try_from(num(Some(i))?).ok()?));
     match kind {
@@ -421,7 +439,9 @@ fn grammar_high(kind: u8, args: &[u8], ctx: &Ctx) -> (Vec<u8>, Option<usize>) {
             let (a, b) = (table(num(first).map(|v| v as i16 as i32)), table(num(second).map(|v| v as i16 as i32)));
             if a.is_empty() || b.is_empty() { (Vec::new(), None) } else { ([a, b" ".to_vec(), b].concat(), None) }
         }
-        0x84 => (slot().map(|(n, _)| n.split(|&b| b == 0).next().unwrap_or_default().to_vec()).unwrap_or_default(), None),
+        0x84 => {
+            (slot().map(|(n, _)| n.split(|&b| b == 0).next().unwrap_or_default().to_vec()).unwrap_or_default(), None)
+        }
         0x85 => (Vec::new(), slot().map(|&(_, w)| w as u8 as usize)),
         0x86 | 0x87 => (table(num(first)), None),
         0x88 | 0x8a => (table(first.and_then(|i| ctx.work.get(i).copied())), None),
@@ -605,7 +625,10 @@ pub fn expand(s: &[u8], ctx: &Ctx) -> Expanded {
             }
             0x14 => {
                 let t = work(a);
-                push(&mut lines, format!("{}:{:02}:{:02}", t / 3600, (t % 3600 / 60) as u32, (t % 60) as u32).as_bytes());
+                push(
+                    &mut lines,
+                    format!("{}:{:02}:{:02}", t / 3600, (t % 3600 / 60) as u32, (t % 60) as u32).as_bytes(),
+                );
                 2
             }
             // 18 n (FUN_100e8df0): the roster record whose MemberNumber is n (n = 0: ours); 19 n (FUN_100e8db0): record n.
@@ -633,7 +656,10 @@ pub fn expand(s: &[u8], ctx: &Ctx) -> Expanded {
             // word k (0 east, increasing toward south); nothing without an actor.
             0x1d => {
                 if let Some(yaw) = ctx.facing {
-                    let k = ((yaw + std::f32::consts::FRAC_PI_8).rem_euclid(std::f32::consts::TAU) * std::f32::consts::FRAC_2_PI * 2.0) as usize & 7;
+                    let k = ((yaw + std::f32::consts::FRAC_PI_8).rem_euclid(std::f32::consts::TAU)
+                        * std::f32::consts::FRAC_2_PI
+                        * 2.0) as usize
+                        & 7;
                     if let Some(t) = texts.and_then(|t| t.compass(k)) {
                         push(&mut lines, &t);
                     }
@@ -679,7 +705,10 @@ pub fn expand(s: &[u8], ctx: &Ctx) -> Expanded {
                     3
                 }
                 0x38 => {
-                    wait = Some(u16::from_le_bytes([s.get(i + 2).copied().unwrap_or(0), s.get(i + 3).copied().unwrap_or(0)]) as u32);
+                    wait = Some(u16::from_le_bytes([
+                        s.get(i + 2).copied().unwrap_or(0),
+                        s.get(i + 3).copied().unwrap_or(0),
+                    ]) as u32);
                     4
                 }
                 0x80 => {
@@ -710,7 +739,10 @@ pub fn expand(s: &[u8], ctx: &Ctx) -> Expanded {
                 // 7f 84 n: the kind-3 names of work[4]'s set bits (n x 0x20 + bit), space separated.
                 0x84 => {
                     let base = s.get(i + 2).copied().unwrap_or(0) as u32 * 0x20;
-                    let names: Vec<Vec<u8>> = (0..32).filter(|b| work(4) as u32 >> b & 1 != 0).filter_map(|b| texts.and_then(|t| t.kind(3, base + b))).collect();
+                    let names: Vec<Vec<u8>> = (0..32)
+                        .filter(|b| work(4) as u32 >> b & 1 != 0)
+                        .filter_map(|b| texts.and_then(|t| t.kind(3, base + b)))
+                        .collect();
                     push(&mut lines, &names.join(&b' '));
                     3
                 }
@@ -757,7 +789,9 @@ pub fn expand(s: &[u8], ctx: &Ctx) -> Expanded {
                     3
                 }
                 0xb5 => {
-                    if let Some(t) = texts.and_then(|t| t.monstrosity(num(s.get(i + 2).copied().unwrap_or(0) as usize) as i16)) {
+                    if let Some(t) =
+                        texts.and_then(|t| t.monstrosity(num(s.get(i + 2).copied().unwrap_or(0) as usize) as i16))
+                    {
                         push(&mut lines, &t);
                     }
                     3
@@ -801,12 +835,20 @@ mod tests {
         let Some(file) = super::super::msg::group_file(&dll, 1, 10) else { return };
         let m = std::sync::Arc::new(super::super::msg::Messages::load(&index, file).unwrap());
         let g = m.clone();
-        let dates = std::sync::Arc::new(Dates { group10: Box::new(move |id: u16| g.raw(id as usize)), date_key: 0, h12: false });
+        let dates = std::sync::Arc::new(Dates {
+            group10: Box::new(move |id: u16| g.raw(id as usize)),
+            date_key: 0,
+            h12: false,
+        });
         let t = 800_000_000;
         let d = Dialog::load(&index, 5).unwrap();
-        let e = expand(&d.raw(7410).unwrap(), &Ctx { num: [t, 0, 0, 0, 0, 0, 0, 0], dates: Some(dates.clone()), ..Default::default() });
+        let e = expand(
+            &d.raw(7410).unwrap(),
+            &Ctx { num: [t, 0, 0, 0, 0, 0, 0, 0], dates: Some(dates.clone()), ..Default::default() },
+        );
         let vana = decode_sjis(&crate::dat::msgfmt::vana_datetime(&*dates.group10, t as u64, 1, 0));
-        let earth = decode_sjis(&crate::dat::msgfmt::earth_datetime(&*dates.group10, t as i64 + 0x3c30_7d70, 1, 0, false));
+        let earth =
+            decode_sjis(&crate::dat::msgfmt::earth_datetime(&*dates.group10, t as i64 + 0x3c30_7d70, 1, 0, false));
         let line = e.lines.iter().map(|l| decode_sjis(l)).collect::<Vec<_>>().join(" ");
         assert!(line.contains(&format!("until {vana} ({earth} Earth time)")), "{line}");
     }
@@ -821,7 +863,10 @@ mod tests {
         let t = 800_000_000;
         let e = expand(&d.raw(6380).unwrap(), &Ctx { num: [t, 0, 0, 0, 0, 0, 0, 0], ..Default::default() });
         let p = crate::dat::msgfmt::earth_parts(t as i64 + 0x3c30_7d70).unwrap();
-        let want = format!("You will be able to use the Assist Channel until {}/{}/{} at {}:{:02} (JST).", p[1], p[2], p[0], p[3], p[4]);
+        let want = format!(
+            "You will be able to use the Assist Channel until {}/{}/{} at {}:{:02} (JST).",
+            p[1], p[2], p[0], p[3], p[4]
+        );
         assert_eq!(decode_sjis(&e.lines[0]), want);
     }
 
@@ -831,14 +876,27 @@ mod tests {
     fn talknumwork2_lines() {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
-        let names = crate::dat::names::Names::load(&index, crate::dat::items::Lang::En).ok().map(|n| std::sync::Arc::new(n) as std::sync::Arc<dyn crate::dat::names::NameSource>);
-        let ctx = |num0| Ctx { strings: vec!["Lnxtest".into()], num: [num0, 1, 0, 0, 0, 0, 0, 0], names: names.clone(), ..Default::default() };
+        let names = crate::dat::names::Names::load(&index, crate::dat::items::Lang::En)
+            .ok()
+            .map(|n| std::sync::Arc::new(n) as std::sync::Arc<dyn crate::dat::names::NameSource>);
+        let ctx = |num0| Ctx {
+            strings: vec!["Lnxtest".into()],
+            num: [num0, 1, 0, 0, 0, 0, 0, 0],
+            names: names.clone(),
+            ..Default::default()
+        };
         let d = Dialog::load(&index, 236).unwrap();
         let e = expand(&d.raw(7164).unwrap(), &ctx(4401));
-        assert_eq!(crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])), "Lnxtest caught a moat carp!");
+        assert_eq!(
+            crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])),
+            "Lnxtest caught a moat carp!"
+        );
         let d = Dialog::load(&index, 103).unwrap();
         let e = expand(&d.raw(8099).unwrap(), &ctx(4112));
-        assert_eq!((crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])).as_str(), e.mode), ("Lnxtest obtains a potion!", Some(0x79)));
+        assert_eq!(
+            (crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])).as_str(), e.mode),
+            ("Lnxtest obtains a potion!", Some(0x79))
+        );
     }
 
     /// Selbina 6865 (Isacio, Elder Memories): `7f 80 01` then kind 0x36 on num[0] = key item 2825 (the script's
@@ -847,10 +905,15 @@ mod tests {
     fn key_item_by_num() {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
-        let names = crate::dat::names::Names::load(&index, crate::dat::items::Lang::En).ok().map(|n| std::sync::Arc::new(n) as std::sync::Arc<dyn crate::dat::names::NameSource>);
+        let names = crate::dat::names::Names::load(&index, crate::dat::items::Lang::En)
+            .ok()
+            .map(|n| std::sync::Arc::new(n) as std::sync::Arc<dyn crate::dat::names::NameSource>);
         let d = Dialog::load(&index, 248).unwrap();
         let e = expand(&d.raw(6865).unwrap(), &Ctx { num: [2825, 0, 0, 0, 0, 0, 0, 0], names, ..Default::default() });
-        assert_eq!(crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])), "A Gilgamesh's introductory letter would be fine, too...if you can find one.");
+        assert_eq!(
+            crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&e.lines[0])),
+            "A Gilgamesh's introductory letter would be fine, too...if you can find one."
+        );
     }
 
     /// East Ronfaure 7906 (a field manual page): `7f 92 00 [/s]` by num[0].
@@ -859,7 +922,11 @@ mod tests {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
         let d = Dialog::load(&index, 101).unwrap();
-        let line = |n| crate::dat::font::decode_sjis(&expand(&d.raw(7906).unwrap(), &Ctx { num: [n, 0, 0, 0, 0, 0, 0, 0], ..Default::default() }).lines[0]);
+        let line = |n| {
+            crate::dat::font::decode_sjis(
+                &expand(&d.raw(7906).unwrap(), &Ctx { num: [n, 0, 0, 0, 0, 0, 0, 0], ..Default::default() }).lines[0],
+            )
+        };
         assert_eq!(line(6), "6 members of the pugil family.");
         assert_eq!(line(1), "1 member of the pugil family.");
     }
@@ -937,7 +1004,11 @@ mod tests {
         }
 
         fn compass(&self, k: usize) -> Option<Vec<u8>> {
-            Some(["east", "southeast", "south", "southwest", "west", "northwest", "north", "northeast"][k].as_bytes().to_vec())
+            Some(
+                ["east", "southeast", "south", "southwest", "west", "northwest", "north", "northeast"][k]
+                    .as_bytes()
+                    .to_vec(),
+            )
         }
     }
 
@@ -974,21 +1045,30 @@ mod tests {
     #[test]
     fn more_codes() {
         let texts = Some(std::sync::Arc::new(Stub) as std::sync::Arc<dyn Texts>);
-        let ctx = Ctx { num: [3, 12, 0, 0, 0, 0, 0, 0], work: [1234567, 0, 0, 0, 0], texts: texts.clone(), ..Default::default() };
+        let ctx = Ctx {
+            num: [3, 12, 0, 0, 0, 0, 0, 0],
+            work: [1234567, 0, 0, 0, 0],
+            texts: texts.clone(),
+            ..Default::default()
+        };
         let Some(t) = line(71, 11627, &ctx) else { return };
         assert_eq!(t, "m3 (lv. 12)");
         assert_eq!(line(280, 7592, &ctx).unwrap(), "GIL:1,234,567 gil");
         let t = line(1, 70, &Ctx { num: [5, 0, 12, 0, 0, 0, 0, 7], ..Default::default() }).unwrap();
         assert!(t.contains("05") && t.contains("12") && t.contains("07"), "{t}");
         let party = vec![(0, 0x100, 0, "Me".into()), (3, 0x200, 1, "Ally".into())];
-        let ctx = Ctx { party, me: 0x100, msg_name: "Kupipi".into(), num: [10, 0, 0, 0, 0, 0, 0, 0], ..Default::default() };
+        let ctx =
+            Ctx { party, me: 0x100, msg_name: "Kupipi".into(), num: [10, 0, 0, 0, 0, 0, 0, 0], ..Default::default() };
         assert_eq!(line(1, 22, &ctx).unwrap(), "The synergy furnace is currently in use by Ally.");
         assert!(line(43, 7418, &ctx).unwrap().starts_with("Your ally, Kupipi, has obtained 10 Petras!"));
         let t = line(210, 7492, &Ctx { num: [0x2d, 0, 0, 0, 0, 0, 0, 0], ..Default::default() }).unwrap();
         assert!(t.ends_with("$2d|Base-2 (binary): %101101"), "{t}");
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).unwrap();
-        let e = expand(&Dialog::load(&index, 102).unwrap().raw(12608).unwrap(), &Ctx { num: [0, 41, 0, 0, 0, 0, 0, 0], ..Default::default() });
+        let e = expand(
+            &Dialog::load(&index, 102).unwrap().raw(12608).unwrap(),
+            &Ctx { num: [0, 41, 0, 0, 0, 0, 0, 0], ..Default::default() },
+        );
         assert_eq!(e.sounds, [41]);
     }
 

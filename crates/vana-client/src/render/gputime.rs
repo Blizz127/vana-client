@@ -48,18 +48,45 @@ impl GpuTime {
         if !gpu.device.features().contains(need) {
             return None;
         }
-        let set = gpu.device.create_query_set(&wgpu::QuerySetDescriptor { label: Some("gpu time"), ty: wgpu::QueryType::Timestamp, count: MARKS });
+        let set = gpu.device.create_query_set(&wgpu::QuerySetDescriptor {
+            label: Some("gpu time"),
+            ty: wgpu::QueryType::Timestamp,
+            count: MARKS,
+        });
         let size = MARKS as u64 * 8;
-        let resolve = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("gpu time resolve"), size, usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
+        let resolve = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gpu time resolve"),
+            size,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
         let reads = (0..READS)
             .map(|_| Read {
-                buf: gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("gpu time read"), size, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false }),
+                buf: gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("gpu time read"),
+                    size,
+                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                    mapped_at_creation: false,
+                }),
                 state: Arc::new(AtomicU8::new(FREE)),
                 labels: Vec::new(),
                 copied: false,
             })
             .collect();
-        Some(Self { set, resolve, reads, labels: Vec::new(), period: gpu.queue.get_timestamp_period() as f64, sums: Vec::new(), frames: 0, window: Instant::now(), ms: Vec::new(), total: 0.0, logged: false, log_all: std::env::var_os("FFXI_PERF").is_some() })
+        Some(Self {
+            set,
+            resolve,
+            reads,
+            labels: Vec::new(),
+            period: gpu.queue.get_timestamp_period() as f64,
+            sums: Vec::new(),
+            frames: 0,
+            window: Instant::now(),
+            ms: Vec::new(),
+            total: 0.0,
+            logged: false,
+            log_all: std::env::var_os("FFXI_PERF").is_some(),
+        })
     }
 
     /// A timestamp ending stage `label` (the first of a frame starts it).
@@ -76,7 +103,9 @@ impl GpuTime {
         if labels.len() < 2 {
             return;
         }
-        let Some(r) = self.reads.iter_mut().find(|r| r.state.load(Ordering::Acquire) == FREE && !r.copied) else { return };
+        let Some(r) = self.reads.iter_mut().find(|r| r.state.load(Ordering::Acquire) == FREE && !r.copied) else {
+            return;
+        };
         let n = labels.len() as u32;
         encoder.resolve_query_set(&self.set, 0..n, &self.resolve, 0);
         encoder.copy_buffer_to_buffer(&self.resolve, 0, &r.buf, 0, n as u64 * 8);
@@ -92,7 +121,9 @@ impl GpuTime {
                 r.copied = false;
                 r.state.store(ASKED, Ordering::Release);
                 let state = r.state.clone();
-                r.buf.slice(..).map_async(wgpu::MapMode::Read, move |res| state.store(if res.is_ok() { MAPPED } else { FREE }, Ordering::Release));
+                r.buf.slice(..).map_async(wgpu::MapMode::Read, move |res| {
+                    state.store(if res.is_ok() { MAPPED } else { FREE }, Ordering::Release)
+                });
             } else if r.state.load(Ordering::Acquire) == MAPPED {
                 let ticks: Vec<u64> = match r.buf.slice(..r.labels.len() as u64 * 8).get_mapped_range() {
                     Ok(v) => bytemuck::cast_slice(&v).to_vec(),
@@ -135,7 +166,8 @@ impl GpuTime {
 
     /// The overlay line: total, then each stage over 0.05 ms.
     pub fn line(&self) -> String {
-        let parts: Vec<String> = self.ms.iter().filter(|(_, v)| *v >= 0.05).map(|(l, v)| format!("{l} {v:.2}")).collect();
+        let parts: Vec<String> =
+            self.ms.iter().filter(|(_, v)| *v >= 0.05).map(|(l, v)| format!("{l} {v:.2}")).collect();
         format!("gpu {:.2} ms/frame: {}", self.total, parts.join("  "))
     }
 }

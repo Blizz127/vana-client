@@ -158,7 +158,12 @@ pub fn update(w: &mut World) {
         r.dirty = true;
         if n == 4 {
             let m = &r.model;
-            log::info!("rest ticks: first heal after {:.1} s, then {:?} s, looked at every {:.1} s", m.first, m.gaps.iter().map(|g| (g * 10.0).round() / 10.0).collect::<Vec<_>>(), m.period);
+            log::info!(
+                "rest ticks: first heal after {:.1} s, then {:?} s, looked at every {:.1} s",
+                m.first,
+                m.gaps.iter().map(|g| (g * 10.0).round() / 10.0).collect::<Vec<_>>(),
+                m.period
+            );
         }
     } else {
         r.chain = false;
@@ -203,7 +208,9 @@ pub fn shown(w: &World) -> Option<Shown> {
     if !r.model.ready() {
         return Some(Shown::Timing(now));
     }
-    let grid = r.grid.filter(|g| g.0 == w.pos_zone).map(|(_, g)| if g >= start { g.duration_since(start).as_secs_f32() } else { -start.duration_since(g).as_secs_f32() });
+    let grid = r.grid.filter(|g| g.0 == w.pos_zone).map(|(_, g)| {
+        if g >= start { g.duration_since(start).as_secs_f32() } else { -start.duration_since(g).as_secs_f32() }
+    });
     let (prev, next) = window(&r.model, &r.rises, grid, now);
     Some(Shown::Next(((now - prev) / (next - prev)).clamp(0.0, 1.0), next - now))
 }
@@ -232,7 +239,11 @@ fn window(m: &Model, rises: &[f32], grid: Option<f32>, now: f32) -> (f32, f32) {
     if let Some(&last) = rises.last() {
         let c = ticks(last + gap(0) * 2.0 + p);
         for &x in rises {
-            let k = c.iter().enumerate().min_by(|a, b| (x - s - a.1 - p / 2.0).abs().total_cmp(&(x - s - b.1 - p / 2.0).abs())).map_or(0, |(k, _)| k);
+            let k = c
+                .iter()
+                .enumerate()
+                .min_by(|a, b| (x - s - a.1 - p / 2.0).abs().total_cmp(&(x - s - b.1 - p / 2.0).abs()))
+                .map_or(0, |(k, _)| k);
             let (a, b) = (x - c[k] - p - JITTER, x - c[k] + JITTER);
             (lo, hi) = if a.max(lo) <= b.min(hi) { (a.max(lo), b.min(hi)) } else { (a, b) };
             s = (lo + hi) / 2.0;

@@ -77,7 +77,12 @@ impl Sprite {
                 for k in 0..q * 6 {
                     let o = at + 24 * k;
                     let c = &d[o + 12..o + 16];
-                    verts.push(MeshVertex { pos: [f(o), f(o + 4), f(o + 8)], normal: [t, 0.0, 0.0], rgba: [c[2], c[1], c[0], c[3]], uv: [f(o + 16), f(o + 20)] });
+                    verts.push(MeshVertex {
+                        pos: [f(o), f(o + 4), f(o + 8)],
+                        normal: [t, 0.0, 0.0],
+                        rgba: [c[2], c[1], c[0], c[3]],
+                        uv: [f(o + 16), f(o + 20)],
+                    });
                 }
                 at += q * 0x90;
             }
@@ -100,7 +105,12 @@ impl Sprite {
             for k in 0..q * 6 {
                 let o = at + 24 * k;
                 let c = &d[o + 12..o + 16];
-                verts.push(MeshVertex { pos: [f(o), f(o + 4), f(o + 8)], normal: [0.0, 0.0, 1.0], rgba: [c[2], c[1], c[0], c[3]], uv: [f(o + 16), f(o + 20)] });
+                verts.push(MeshVertex {
+                    pos: [f(o), f(o + 4), f(o + 8)],
+                    normal: [0.0, 0.0, 1.0],
+                    rgba: [c[2], c[1], c[0], c[3]],
+                    uv: [f(o + 16), f(o + 20)],
+                });
             }
             at += q * 0x90;
         }
@@ -142,7 +152,11 @@ impl Morph {
         if uv <= col {
             uv += 0x10000;
         }
-        if idx + t * 12 > d.len() || col + t * 12 > d.len() || uv + t * 24 > d.len() || 0x20 + k * (v * 12 + n * 4) > d.len() {
+        if idx + t * 12 > d.len()
+            || col + t * 12 > d.len()
+            || uv + t * 24 > d.len()
+            || 0x20 + k * (v * 12 + n * 4) > d.len()
+        {
             bail!("d3b: tables out of range");
         }
         let mut positions = Vec::with_capacity(k * v);
@@ -161,10 +175,27 @@ impl Morph {
             .map(|c| {
                 let b = &d[col + c * 4..col + c * 4 + 4];
                 let rgba = u32::from_le_bytes([b[2], b[1], b[0], b[3]]);
-                [u16_at(idx + c * 2) as u32, u16_at(idx + t * 6 + c * 2) as u32, rgba, u32_at(uv + c * 8), u32_at(uv + c * 8 + 4)]
+                [
+                    u16_at(idx + c * 2) as u32,
+                    u16_at(idx + t * 6 + c * 2) as u32,
+                    rgba,
+                    u32_at(uv + c * 8),
+                    u32_at(uv + c * 8 + 4),
+                ]
             })
             .collect();
-        Ok(Self { k: k as u32, v: v as u32, n: n as u32, t: t as u32, corners, positions, normals, name: String::from_utf8_lossy(&d[0x10..0x20]).into_owned(), texture: None, alpha_test: d[2] & 0x80 != 0 })
+        Ok(Self {
+            k: k as u32,
+            v: v as u32,
+            n: n as u32,
+            t: t as u32,
+            corners,
+            positions,
+            normals,
+            name: String::from_utf8_lossy(&d[0x10..0x20]).into_owned(),
+            texture: None,
+            alpha_test: d[2] & 0x80 != 0,
+        })
     }
 }
 
@@ -201,8 +232,21 @@ impl Library {
                 Err(e) => log::warn!("effects: DAT {file_id}: {e:#}"),
             }
         }
-        let keys = tree.of_kind(kind::KEYFRAME).map(|i| (i, KeyFrame::parse(&file[tree.nodes[i].data.clone()]))).collect();
-        Ok(Self { file_id, tree, gens, gen_at, keys, meshes: HashMap::new(), sprites: HashMap::new(), morphs: HashMap::new(), textures: Vec::new(), tex_of_node: HashMap::new(), file })
+        let keys =
+            tree.of_kind(kind::KEYFRAME).map(|i| (i, KeyFrame::parse(&file[tree.nodes[i].data.clone()]))).collect();
+        Ok(Self {
+            file_id,
+            tree,
+            gens,
+            gen_at,
+            keys,
+            meshes: HashMap::new(),
+            sprites: HashMap::new(),
+            morphs: HashMap::new(),
+            textures: Vec::new(),
+            tex_of_node: HashMap::new(),
+            file,
+        })
     }
 
     pub fn generator(&self, node: usize) -> Option<&Generator> {
@@ -263,7 +307,8 @@ impl Library {
     /// Loader-thread work: the meshes, sprites and textures the file's own generators name (op 1), so the first
     /// frame that emits them does not parse them.
     pub fn prewarm(&mut self, keys: &zone::Keys) {
-        let wanted: Vec<(usize, u8, u32)> = self.gens.iter().filter_map(|g| g.template().map(|o| (g.node, o.byte(0x21), o.u32(3)))).collect();
+        let wanted: Vec<(usize, u8, u32)> =
+            self.gens.iter().filter_map(|g| g.template().map(|o| (g.node, o.byte(0x21), o.u32(3)))).collect();
         for (from, k, name) in wanted {
             let node = match k {
                 0x0b | 0x0c | 0x1f => self.find(from, kind::D3M, name).or_else(|| self.find(from, kind::MMB, name)),
@@ -273,7 +318,10 @@ impl Library {
             let Some(node) = node else { continue };
             let names: Vec<String> = match self.tree.nodes[node].kind {
                 kind::D3A => self.sprite(node).map(|s| vec![s.name.clone()]).unwrap_or_default(),
-                _ => self.mesh(node, keys).map(|m| m.groups.iter().filter_map(|g| g.name.clone()).collect()).unwrap_or_default(),
+                _ => self
+                    .mesh(node, keys)
+                    .map(|m| m.groups.iter().filter_map(|g| g.name.clone()).collect())
+                    .unwrap_or_default(),
             };
             for n in names {
                 if let Some(i) = self.find_texture(node, &n) {
@@ -386,14 +434,28 @@ impl Library {
     /// Whether IMG node `i` sits in a `syst/effe` folder (texture entry flag 0x100, FUN_1001cab0).
     pub fn in_syst_effe(&self, i: usize) -> bool {
         let p = self.tree.nodes[i].parent;
-        p.is_some_and(|p| self.tree.nodes[p].name == crate::dat::generator::fourcc("effe") && self.tree.nodes[p].parent.is_some_and(|q| self.tree.nodes[q].name == crate::dat::generator::fourcc("syst")))
+        p.is_some_and(|p| {
+            self.tree.nodes[p].name == crate::dat::generator::fourcc("effe")
+                && self.tree.nodes[p]
+                    .parent
+                    .is_some_and(|q| self.tree.nodes[q].name == crate::dat::generator::fourcc("syst"))
+        })
     }
 }
 
 /// FUN_10040220's groups: triangles per texture (u16s at +8, any format), then the untextured tail when header
 /// byte 5 is set or there is no texture.
 fn from_d3m(m: &D3m) -> Mesh {
-    let verts: Vec<MeshVertex> = m.vertices.iter().map(|v| MeshVertex { pos: v.pos, normal: v.normal, rgba: [v.bgra[2], v.bgra[1], v.bgra[0], v.bgra[3]], uv: v.uv }).collect();
+    let verts: Vec<MeshVertex> = m
+        .vertices
+        .iter()
+        .map(|v| MeshVertex {
+            pos: v.pos,
+            normal: v.normal,
+            rgba: [v.bgra[2], v.bgra[1], v.bgra[0], v.bgra[3]],
+            uv: v.uv,
+        })
+        .collect();
     let total = verts.len() as u32;
     let mut groups = Vec::new();
     let mut at = 0u32;
@@ -408,12 +470,19 @@ fn from_d3m(m: &D3m) -> Mesh {
         groups.push(MeshGroup { name: None, texture: None, range: at..total });
     }
     let skip = m.textures.is_empty() && (5..=7).contains(&(m.format & 0xf));
-    let dist = groups
-        .iter()
-        .filter(|g| g.name.is_some() || m.untextured_tail)
-        .map(|g| if g.name.is_none() && skip { (g.range.start + 3).min(g.range.end)..g.range.end } else { g.range.clone() })
-        .filter(|r| !r.is_empty())
-        .collect();
+    let dist =
+        groups
+            .iter()
+            .filter(|g| g.name.is_some() || m.untextured_tail)
+            .map(|g| {
+                if g.name.is_none() && skip {
+                    (g.range.start + 3).min(g.range.end)..g.range.end
+                } else {
+                    g.range.clone()
+                }
+            })
+            .filter(|r| !r.is_empty())
+            .collect();
     Mesh { verts, groups, mmb: false, dist }
 }
 

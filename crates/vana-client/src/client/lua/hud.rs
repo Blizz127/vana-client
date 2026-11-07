@@ -1,27 +1,80 @@
 //! The mods' HUD layer (docs/lua-mods.md 4.10): retained text, rectangles, bars and icons placed in window pixels
 //! (negative from the right or bottom edge), drawn under the windows in the active UI's fonts. Hidden with the UI.
 
-use super::World;
 use super::super::game_ui::HudFace;
+use super::World;
 use mlua::{Lua, Table, Value};
 
 #[derive(Clone)]
 pub(in crate::client) enum Kind {
     /// `font` None follows the UI; an outline (its colour and width) or a drop shadow under the text.
-    Text { text: String, size: f32, colour: Option<[u8; 4]>, bg: Option<[u8; 4]>, align: u8, pad: f32, font: Option<HudFace>, outline: Option<[u8; 4]>, outline_w: f32, shadow: bool },
+    Text {
+        text: String,
+        size: f32,
+        colour: Option<[u8; 4]>,
+        bg: Option<[u8; 4]>,
+        align: u8,
+        pad: f32,
+        font: Option<HudFace>,
+        outline: Option<[u8; 4]>,
+        outline_w: f32,
+        shadow: bool,
+    },
     /// Filled, or outlined `line` wide; corners rounded `round` (the modern UI's).
-    Rect { w: f32, h: f32, colour: [u8; 4], line: Option<f32>, round: f32 },
-    Bar { w: f32, h: f32, value: f32, colour: Option<[u8; 4]>, kind: String },
-    Icon { icon: super::window::Icon, size: f32 },
+    Rect {
+        w: f32,
+        h: f32,
+        colour: [u8; 4],
+        line: Option<f32>,
+        round: f32,
+    },
+    Bar {
+        w: f32,
+        h: f32,
+        value: f32,
+        colour: Option<[u8; 4]>,
+        kind: String,
+    },
+    Icon {
+        icon: super::window::Icon,
+        size: f32,
+    },
     /// A PNG from the mod's folder: its texture key, pixels (w, h, RGBA), drawn size and tint.
-    Image { key: String, img: std::sync::Arc<(u32, u32, Vec<u8>)>, w: f32, h: f32, tint: [u8; 4] },
+    Image {
+        key: String,
+        img: std::sync::Arc<(u32, u32, Vec<u8>)>,
+        w: f32,
+        h: f32,
+        tint: [u8; 4],
+    },
     /// The zone's map (the one the client shows here): centred on world (x, z) or on us, `span` map pixels across, at
     /// `alpha` (none: the player's Map Overlay Opacity); our marker on it when `me`.
-    Map { w: f32, h: f32, centre: Option<(f32, f32)>, span: f32, alpha: Option<f32>, me: bool },
+    Map {
+        w: f32,
+        h: f32,
+        centre: Option<(f32, f32)>,
+        span: f32,
+        alpha: Option<f32>,
+        me: bool,
+    },
     /// An actor's face drawn live (client/portrait.rs): its server id, size, tint and finish.
-    Portrait { entity: u32, w: f32, h: f32, tint: [u8; 4], look: Look },
+    Portrait {
+        entity: u32,
+        w: f32,
+        h: f32,
+        tint: [u8; 4],
+        look: Look,
+    },
     /// A speech bubble: a rounded rect, its outline (colour, width) and a tail aimed at a point.
-    Bubble { w: f32, h: f32, round: f32, colour: [u8; 4], edge: Option<[u8; 4]>, edge_w: f32, tail: Option<Tail> },
+    Bubble {
+        w: f32,
+        h: f32,
+        round: f32,
+        colour: [u8; 4],
+        edge: Option<[u8; 4]>,
+        edge_w: f32,
+        tail: Option<Tail>,
+    },
 }
 
 /// A speech bubble's tail: the point it aims at (window pixels), its base width and its longest length.
@@ -46,7 +99,9 @@ fn bubble_outline(r: [f32; 4], round: f32, tail: Option<Tail>) -> (Vec<[f32; 2]>
             return None;
         }
         let hw = (t.w / 2.0).max(1.0);
-        let along = |lo: f32, len: f32, v: f32| if len - 2.0 * (rr + hw) > 0.0 { v.clamp(lo + rr + hw, lo + len - rr - hw) } else { lo + len / 2.0 };
+        let along = |lo: f32, len: f32, v: f32| {
+            if len - 2.0 * (rr + hw) > 0.0 { v.clamp(lo + rr + hw, lo + len - rr - hw) } else { lo + len / 2.0 }
+        };
         let (base, n) = match side {
             0 => ([along(x, w, tx), y], [0.0, -1.0]),
             1 => ([x + w, along(y, h, ty)], [1.0, 0.0]),
@@ -70,7 +125,12 @@ fn bubble_outline(r: [f32; 4], round: f32, tail: Option<Tail>) -> (Vec<[f32; 2]>
         Some((side, base, hw, [base[0] + ux * len, base[1] + uy * len]))
     });
     let steps = ((rr / 2.0).ceil() as usize).clamp(1, 12);
-    let corners = [([x + rr, y + rr], 1.0f32), ([x + w - rr, y + rr], 1.5), ([x + w - rr, y + h - rr], 0.0), ([x + rr, y + h - rr], 0.5)];
+    let corners = [
+        ([x + rr, y + rr], 1.0f32),
+        ([x + w - rr, y + rr], 1.5),
+        ([x + w - rr, y + h - rr], 0.0),
+        ([x + rr, y + h - rr], 0.5),
+    ];
     // The direction each side runs in, after its corner: top right, right down, bottom left, left up.
     let runs = [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]];
     let mut pts: Vec<[f32; 2]> = Vec::new();
@@ -106,13 +166,20 @@ pub(in crate::client) type Tri = [([f32; 2], [f32; 4]); 3];
 
 /// A speech bubble as triangles in window pixels, each corner with its straight colour (0..1): the fill, an outline
 /// `edge` wide centred on the outline, and a pixel of feathering outside it.
-pub(in crate::client) fn bubble_tris(r: [f32; 4], round: f32, tail: Option<Tail>, fill: [u8; 4], edge: Option<([u8; 4], f32)>) -> Vec<Tri> {
+pub(in crate::client) fn bubble_tris(
+    r: [f32; 4],
+    round: f32,
+    tail: Option<Tail>,
+    fill: [u8; 4],
+    edge: Option<([u8; 4], f32)>,
+) -> Vec<Tri> {
     let (pts, tip) = bubble_outline(r, round, tail);
     let n = pts.len();
     if n < 3 {
         return Vec::new();
     }
-    let rgba = |c: [u8; 4], a: f32| [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, c[3] as f32 / 255.0 * a];
+    let rgba =
+        |c: [u8; 4], a: f32| [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, c[3] as f32 / 255.0 * a];
     // Each point's offset direction outward, mitred (outward of a segment d is (d.y, -d.x) going clockwise).
     let out = |d: [f32; 2]| {
         let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-6);
@@ -164,7 +231,11 @@ pub(in crate::client) fn bubble_tris(r: [f32; 4], round: f32, tail: Option<Tail>
     let (solid, clear) = (rgba(col, 1.0), rgba(col, 0.0));
     for i in 0..n {
         let j = (i + 1) % n;
-        quad(&mut tris, [(at(i, rim), solid), (at(i, rim + 1.0), clear)], [(at(j, rim), solid), (at(j, rim + 1.0), clear)]);
+        quad(
+            &mut tris,
+            [(at(i, rim), solid), (at(i, rim + 1.0), clear)],
+            [(at(j, rim), solid), (at(j, rim + 1.0), clear)],
+        );
     }
     tris
 }
@@ -207,7 +278,9 @@ pub(in crate::client) struct Elem {
 pub(super) fn colour(v: Value) -> mlua::Result<Option<[u8; 4]>> {
     Ok(match v {
         Value::Table(t) => {
-            let get = |k: &str, i: i64, d: u8| -> mlua::Result<u8> { Ok(t.get::<Option<u8>>(k)?.or(t.get::<Option<u8>>(i)?).unwrap_or(d)) };
+            let get = |k: &str, i: i64, d: u8| -> mlua::Result<u8> {
+                Ok(t.get::<Option<u8>>(k)?.or(t.get::<Option<u8>>(i)?).unwrap_or(d))
+            };
             Some([get("r", 1, 255)?, get("g", 2, 255)?, get("b", 3, 255)?, get("a", 4, 255)?])
         }
         // false clears a colour set before (a nil field is not seen).
@@ -236,7 +309,9 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             Value::String(s) => {
                 let s = s.to_string_lossy();
                 if !super::native::PANELS.iter().any(|p| p.name == s) {
-                    return Err(mlua::Error::runtime(format!("no panel {s:?} to anchor to (ui.native.panels names them)")));
+                    return Err(mlua::Error::runtime(format!(
+                        "no panel {s:?} to anchor to (ui.native.panels names them)"
+                    )));
                 }
                 Some(s)
             }
@@ -252,14 +327,21 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             "top_right" => 1,
             "bottom_left" => 2,
             "bottom_right" => 3,
-            _ => return Err(mlua::Error::runtime(format!("corner {c:?}: top_left, top_right, bottom_left or bottom_right"))),
+            _ => {
+                return Err(mlua::Error::runtime(format!(
+                    "corner {c:?}: top_left, top_right, bottom_left or bottom_right"
+                )));
+            }
         };
     }
     // A string, {title, text}, or false for none.
     if t.contains_key("tip")? {
         e.tip = match t.get::<Value>("tip")? {
             Value::String(s) => Some((String::new(), s.to_string_lossy())),
-            Value::Table(tt) => Some((tt.get::<Option<String>>("title")?.unwrap_or_default(), tt.get::<Option<String>>("text")?.unwrap_or_default())),
+            Value::Table(tt) => Some((
+                tt.get::<Option<String>>("title")?.unwrap_or_default(),
+                tt.get::<Option<String>>("text")?.unwrap_or_default(),
+            )),
             _ => None,
         };
     }
@@ -431,7 +513,11 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             // A point {x, y} (window pixels) the tail aims at, or false for none; its base width and longest length.
             if t.contains_key("tail")? {
                 *tail = match t.get::<Value>("tail")? {
-                    Value::Table(p) => Some(Tail { at: [p.get("x")?, p.get("y")?], w: tail.map_or(18.0, |t| t.w), len: tail.map_or(22.0, |t| t.len) }),
+                    Value::Table(p) => Some(Tail {
+                        at: [p.get("x")?, p.get("y")?],
+                        w: tail.map_or(18.0, |t| t.w),
+                        len: tail.map_or(22.0, |t| t.len),
+                    }),
                     Value::Nil | Value::Boolean(false) => None,
                     _ => return Err(mlua::Error::runtime("tail is a point {x, y}, or false for none")),
                 };
@@ -459,7 +545,18 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
 }
 
 fn put(lua: &Lua, id: String, kind: Kind, spec: Table) -> mlua::Result<()> {
-    let mut e = Elem { id: id.clone(), x: 0.0, y: 0.0, visible: true, layer: 0, kind, tip: None, anchor: None, corner: 0, window: "hud".into() };
+    let mut e = Elem {
+        id: id.clone(),
+        x: 0.0,
+        y: 0.0,
+        visible: true,
+        layer: 0,
+        kind,
+        tip: None,
+        anchor: None,
+        corner: 0,
+        window: "hud".into(),
+    };
     apply(&mut e, &spec)?;
     let st = super::api::state(lua);
     let mut s = st.borrow_mut();
@@ -471,12 +568,18 @@ fn put(lua: &Lua, id: String, kind: Kind, spec: Table) -> mlua::Result<()> {
 }
 
 /// A PNG from the mod's folder: its texture key (with the file's hash, so a changed file is drawn anew) and pixels.
-pub(super) fn load_png(src: &super::vm::Source, mod_id: &str, path: &str) -> mlua::Result<(String, std::sync::Arc<(u32, u32, Vec<u8>)>)> {
+pub(super) fn load_png(
+    src: &super::vm::Source,
+    mod_id: &str,
+    path: &str,
+) -> mlua::Result<(String, std::sync::Arc<(u32, u32, Vec<u8>)>)> {
     if path.contains("..") || path.starts_with('/') || path.contains(':') {
         return Err(mlua::Error::runtime(format!("{path:?}: outside the mod's folder")));
     }
     let bytes = match src {
-        super::vm::Source::Dir(d) => super::vm::inside(d, path).and_then(std::fs::read).map_err(|e| mlua::Error::runtime(format!("{path}: {e}")))?,
+        super::vm::Source::Dir(d) => super::vm::inside(d, path)
+            .and_then(std::fs::read)
+            .map_err(|e| mlua::Error::runtime(format!("{path}: {e}")))?,
         super::vm::Source::Bundled(_) => return Err(mlua::Error::runtime("bundled mods carry no image files")),
     };
     let img = decode_png(&bytes).map_err(|e| mlua::Error::runtime(format!("{path}: {e} (a PNG)")))?;
@@ -526,27 +629,100 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
                 return Err(mlua::Error::runtime(format!("{path:?}: outside the mod's folder")));
             }
             let bytes = match &src2 {
-                super::vm::Source::Dir(d) => super::vm::inside(d, &path).and_then(std::fs::read).map_err(|e| mlua::Error::runtime(format!("{path}: {e}")))?,
+                super::vm::Source::Dir(d) => super::vm::inside(d, &path)
+                    .and_then(std::fs::read)
+                    .map_err(|e| mlua::Error::runtime(format!("{path}: {e}")))?,
                 super::vm::Source::Bundled(_) => return Err(mlua::Error::runtime("bundled mods carry no image files")),
             };
             let (w, h, rgba) = decode_png(&bytes).map_err(|e| mlua::Error::runtime(format!("{path}: {e} (a PNG)")))?;
-            let c = super::super::chaticons::add(&format!("{mod2}/{path}"), w, h, rgba).ok_or_else(|| mlua::Error::runtime("too many chat icons"))?;
+            let c = super::super::chaticons::add(&format!("{mod2}/{path}"), w, h, rgba)
+                .ok_or_else(|| mlua::Error::runtime("too many chat icons"))?;
             Ok(c.to_string())
         })?,
     )?;
-    t.set("text", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Text { text: String::new(), size: 1.0, colour: None, bg: None, align: 0, pad: 4.0, font: None, outline: None, outline_w: 1.0, shadow: false }, spec))?)?;
-    t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None, round: 0.0 }, spec))?)?;
-    t.set("bar", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Bar { w: 120.0, h: 8.0, value: 0.0, colour: None, kind: "hp".into() }, spec))?)?;
-    t.set("icon", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Icon { icon: super::window::Icon::Item(0), size: 32.0 }, spec))?)?;
-    t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: None, me: false }, spec))?)?;
-    t.set("bubble", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Bubble { w: 200.0, h: 60.0, round: 10.0, colour: [14, 16, 26, 235], edge: None, edge_w: 2.0, tail: None }, spec))?)?;
+    t.set(
+        "text",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(
+                lua,
+                id,
+                Kind::Text {
+                    text: String::new(),
+                    size: 1.0,
+                    colour: None,
+                    bg: None,
+                    align: 0,
+                    pad: 4.0,
+                    font: None,
+                    outline: None,
+                    outline_w: 1.0,
+                    shadow: false,
+                },
+                spec,
+            )
+        })?,
+    )?;
+    t.set(
+        "rect",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None, round: 0.0 }, spec)
+        })?,
+    )?;
+    t.set(
+        "bar",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(lua, id, Kind::Bar { w: 120.0, h: 8.0, value: 0.0, colour: None, kind: "hp".into() }, spec)
+        })?,
+    )?;
+    t.set(
+        "icon",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(lua, id, Kind::Icon { icon: super::window::Icon::Item(0), size: 32.0 }, spec)
+        })?,
+    )?;
+    t.set(
+        "map",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: None, me: false }, spec)
+        })?,
+    )?;
+    t.set(
+        "bubble",
+        lua.create_function(|lua, (id, spec): (String, Table)| {
+            put(
+                lua,
+                id,
+                Kind::Bubble {
+                    w: 200.0,
+                    h: 60.0,
+                    round: 10.0,
+                    colour: [14, 16, 26, 235],
+                    edge: None,
+                    edge_w: 2.0,
+                    tail: None,
+                },
+                spec,
+            )
+        })?,
+    )?;
     t.set(
         "portrait",
         lua.create_function(|lua, (id, spec): (String, Table)| {
             if spec.get::<Option<u32>>("entity")?.is_none() {
                 return Err(mlua::Error::runtime("a portrait needs entity (a server id)"));
             }
-            put(lua, id, Kind::Portrait { entity: 0, w: 96.0, h: 96.0, tint: [255; 4], look: Look { bg: None, oval: true, frame: None, frame_w: 3.0 } }, spec)
+            put(
+                lua,
+                id,
+                Kind::Portrait {
+                    entity: 0,
+                    w: 96.0,
+                    h: 96.0,
+                    tint: [255; 4],
+                    look: Look { bg: None, oval: true, frame: None, frame_w: 3.0 },
+                },
+                spec,
+            )
         })?,
     )?;
     let (src3, mod3) = (vm.src.clone(), vm.manifest.id.clone());
@@ -556,10 +732,16 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             let png = fields.get::<Option<String>>("path")?.map(|p| load_png(&src3, &mod3, &p)).transpose()?;
             let st = super::api::state(lua);
             let mut s = st.borrow_mut();
-            let e = s.hud.iter_mut().find(|x| x.id == id).ok_or_else(|| mlua::Error::runtime(format!("no HUD element {id:?}")))?;
+            let e = s
+                .hud
+                .iter_mut()
+                .find(|x| x.id == id)
+                .ok_or_else(|| mlua::Error::runtime(format!("no HUD element {id:?}")))?;
             // A new picture: its own size unless the fields give one.
             if let Some((k, i)) = png {
-                let Kind::Image { key, img, w, h, .. } = &mut e.kind else { return Err(mlua::Error::runtime("path is an image's field")) };
+                let Kind::Image { key, img, w, h, .. } = &mut e.kind else {
+                    return Err(mlua::Error::runtime("path is an image's field"));
+                };
                 (*w, *h) = (i.0 as f32, i.1 as f32);
                 (*key, *img) = (k, i);
             }
@@ -622,7 +804,10 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     t.set(
         "screen",
         lua.create_function(|lua, ()| {
-            let info = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default();
+            let info = lua
+                .app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+                .map(|f| f.clone())
+                .unwrap_or_default();
             let f = info.borrow();
             let out = lua.create_table()?;
             out.set("width", f.window[0] as i64)?;
@@ -635,7 +820,10 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     t.set(
         "bounds",
         lua.create_function(|lua, id: String| {
-            let info = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default();
+            let info = lua
+                .app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+                .map(|f| f.clone())
+                .unwrap_or_default();
             let mod_id = lua.globals().get::<Table>("mod")?.get::<String>("id")?;
             let f = info.borrow();
             match f.hud_rects.iter().find(|r| r.0 == mod_id && r.1 == id) {
@@ -691,11 +879,18 @@ pub(in crate::client) fn elements(host: &super::Host) -> Vec<(String, Elem)> {
 
 /// An element's place in window pixels. Anchored: signed offsets from a corner of the panel (as last drawn, so where a
 /// hidden panel was; none before a panel ever was). Else negative places count from the window's right or bottom edge.
-pub(in crate::client) fn place(e: &Elem, panels: &std::collections::BTreeMap<String, ([f32; 4], bool)>, win: [f32; 2]) -> Option<(f32, f32)> {
+pub(in crate::client) fn place(
+    e: &Elem,
+    panels: &std::collections::BTreeMap<String, ([f32; 4], bool)>,
+    win: [f32; 2],
+) -> Option<(f32, f32)> {
     Some(match &e.anchor {
         Some(a) => {
             let (r, _) = panels.get(a)?;
-            (r[0] + if e.corner & 1 != 0 { r[2] } else { 0.0 } + e.x, r[1] + if e.corner & 2 != 0 { r[3] } else { 0.0 } + e.y)
+            (
+                r[0] + if e.corner & 1 != 0 { r[2] } else { 0.0 } + e.x,
+                r[1] + if e.corner & 2 != 0 { r[3] } else { 0.0 } + e.y,
+            )
         }
         None => (if e.x < 0.0 { win[0] + e.x } else { e.x }, if e.y < 0.0 { win[1] + e.y } else { e.y }),
     })
@@ -746,7 +941,16 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                     // An outline drawn round the text in 8 directions, or a drop shadow, under it.
                     if let Some(o) = outline {
                         let (oc, d) = (tint(*o), outline_w * size.max(1.0));
-                        for (dx, dy) in [(-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (-1.0, 0.0), (1.0, 0.0), (-1.0, 1.0), (0.0, 1.0), (1.0, 1.0)] {
+                        for (dx, dy) in [
+                            (-1.0, -1.0),
+                            (0.0, -1.0),
+                            (1.0, -1.0),
+                            (-1.0, 0.0),
+                            (1.0, 0.0),
+                            (-1.0, 1.0),
+                            (0.0, 1.0),
+                            (1.0, 1.0),
+                        ] {
                             gu.text_in(l, left + dx * d, ly + dy * d, oc, *size, *font);
                         }
                     }
@@ -764,7 +968,12 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 match line {
                     Some(l) => {
                         let (lx, ly) = (l * k.0, l * k.1);
-                        for r in [[x, y, rw, ly], [x, y + rh - ly, rw, ly], [x, y + ly, lx, rh - 2.0 * ly], [x + rw - lx, y + ly, lx, rh - 2.0 * ly]] {
+                        for r in [
+                            [x, y, rw, ly],
+                            [x, y + rh - ly, rw, ly],
+                            [x, y + ly, lx, rh - 2.0 * ly],
+                            [x + rw - lx, y + ly, lx, rh - 2.0 * ly],
+                        ] {
                             gu.rect(r[0], r[1], r[2], r[3], rgba(*colour));
                         }
                     }
@@ -776,7 +985,13 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 let (bw, bh) = (bw * k.0, bh * k.1);
                 gu.rect(x, y, bw, bh, [0.0, 0.0, 0.0, 0.55]);
                 if *value > 0.0 {
-                    gu.rect(x + 1.0, y + 1.0, (bw - 2.0).max(0.0) * value, (bh - 2.0).max(0.0), rgba(colour.unwrap_or_else(|| bar_colour(kind))));
+                    gu.rect(
+                        x + 1.0,
+                        y + 1.0,
+                        (bw - 2.0).max(0.0) * value,
+                        (bh - 2.0).max(0.0),
+                        rgba(colour.unwrap_or_else(|| bar_colour(kind))),
+                    );
                 }
                 [x, y, bw, bh]
             }
@@ -791,7 +1006,14 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 if let Some(o) = m.as_mut() {
                     let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));
                     let marker = me.then_some(((w.pos.x, w.pos.z), facing));
-                    o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, alpha.unwrap_or(w.map_opacity), marker);
+                    o.draw_window(
+                        gu,
+                        [x, y, mw, mh],
+                        centre.unwrap_or((w.pos.x, w.pos.z)),
+                        *span,
+                        alpha.unwrap_or(w.map_opacity),
+                        marker,
+                    );
                 }
                 [x, y, mw, mh]
             }
@@ -841,7 +1063,11 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
 
 /// A tooltip box by the pointer (UI units), kept on screen: the title in gold over the text.
 fn draw_tip(gu: &mut super::super::game_ui::GameUi, title: &str, text: &str, at: (f32, f32), screen: (f32, f32)) {
-    let lines: Vec<(&str, [u8; 4])> = std::iter::once(title).filter(|t| !t.is_empty()).map(|t| (t, [255, 210, 120, 255])).chain(text.split('\n').map(|l| (l, [255, 255, 255, 255]))).collect();
+    let lines: Vec<(&str, [u8; 4])> = std::iter::once(title)
+        .filter(|t| !t.is_empty())
+        .map(|t| (t, [255, 210, 120, 255]))
+        .chain(text.split('\n').map(|l| (l, [255, 255, 255, 255])))
+        .collect();
     let pad = 6.0;
     let lw = lines.iter().map(|(l, _)| gu.width_in(l, None)).fold(0.0, f32::max);
     let (bw, bh) = (lw + pad * 2.0, 16.0 * lines.len() as f32 + pad * 2.0);
@@ -870,7 +1096,11 @@ fn under(host: &super::Host, x: f64, y: f64, tips: bool) -> Option<(String, Stri
             st.hud_handlers.iter().any(|h| h.0 == id) || (tips && st.hud.iter().any(|e| e.id == id && e.tip.is_some()))
         })
     };
-    f.hud_rects.iter().rev().find(|(m, id, r)| inside(r, x, y) && wanted(m, id)).map(|(m, id, _)| (m.clone(), id.clone()))
+    f.hud_rects
+        .iter()
+        .rev()
+        .find(|(m, id, r)| inside(r, x, y) && wanted(m, id))
+        .map(|(m, id, _)| (m.clone(), id.clone()))
 }
 
 /// The topmost element with a handler under a window pixel: (mod, element).
@@ -883,8 +1113,12 @@ pub(super) fn drop_target(host: &super::Host, m: &str, dragged: &str, x: f64, y:
     let f = host.info.borrow();
     let vm = host.vms.iter().find(|v| v.manifest.id == m)?;
     let st = vm.st.borrow();
-    f.hud_rects.iter().rev()
-        .find(|(mm, id, r)| mm == m && id != dragged && inside(r, x as f32, y as f32) && st.hud_handlers.iter().any(|h| h.0 == *id))
+    f.hud_rects
+        .iter()
+        .rev()
+        .find(|(mm, id, r)| {
+            mm == m && id != dragged && inside(r, x as f32, y as f32) && st.hud_handlers.iter().any(|h| h.0 == *id)
+        })
         .map(|(_, id, _)| id.clone())
 }
 

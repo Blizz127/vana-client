@@ -2,10 +2,10 @@
 //! prints it ("%s : " + text, FUN_100abbb0), with the kaipage prompt arrow; optionally the query menu.
 
 use crate::config::Config;
+use crate::dat::DatIndex;
 use crate::dat::dialog::{Ctx, Dialog, expand};
 use crate::dat::font::{Font, Quality, encode_sjis};
 use crate::dat::ui::{MENU_US, UiFile, UiImage, WINDOW_STYLE_BASE, norm_name};
-use crate::dat::DatIndex;
 use crate::render::screens::{frame_rect, push_window};
 use crate::render::ui::{UiBatch, render_png};
 use crate::uishot::{load_ui, load_ui_full};
@@ -58,7 +58,16 @@ fn font_file(font: &Font) -> UiFile {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn dialogue_shot(out: &Path, zone: u16, id: u32, speaker: &str, choice: Option<u32>, frame: usize, width: u32, height: u32) -> Result<()> {
+pub fn dialogue_shot(
+    out: &Path,
+    zone: u16,
+    id: u32,
+    speaker: &str,
+    choice: Option<u32>,
+    frame: usize,
+    width: u32,
+    height: u32,
+) -> Result<()> {
     let cfg = Config::load();
     let index = DatIndex::open(&cfg.ffxi_dir())?;
     let menu = load_ui_full(&index, MENU_US)?;

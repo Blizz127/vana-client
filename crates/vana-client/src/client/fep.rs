@@ -178,7 +178,9 @@ pub(super) fn key(w: &mut World, key: egui::Key, shift: bool) -> bool {
     let Some(mut f) = w.fep.take() else { return false };
     let n = f.cands.len().max(1);
     match key {
-        egui::Key::Tab | egui::Key::Space | egui::Key::ArrowDown if !(shift && key == egui::Key::Tab) => f.sel = (f.sel + 1) % n,
+        egui::Key::Tab | egui::Key::Space | egui::Key::ArrowDown if !(shift && key == egui::Key::Tab) => {
+            f.sel = (f.sel + 1) % n
+        }
         egui::Key::Tab | egui::Key::ArrowUp => f.sel = (f.sel + n - 1) % n,
         egui::Key::PageDown => f.sel = (f.sel + ROWS).min(n - 1),
         egui::Key::PageUp => f.sel = f.sel.saturating_sub(ROWS),
@@ -227,7 +229,11 @@ pub(super) fn key(w: &mut World, key: egui::Key, shift: bool) -> bool {
                     return true;
                 }
                 Some(id) => {
-                    let block: String = id.iter().enumerate().map(|(k, &b)| char::from_u32(PHRASE_BASE + 0x100 * k as u32 + b as u32).unwrap()).collect();
+                    let block: String = id
+                        .iter()
+                        .enumerate()
+                        .map(|(k, &b)| char::from_u32(PHRASE_BASE + 0x100 * k as u32 + b as u32).unwrap())
+                        .collect();
                     let next = spliced(&line, at, &block);
                     let (raw, plain) = lengths(w, &next);
                     if raw > MAX || plain > MAX {
@@ -290,7 +296,40 @@ pub(super) fn outgoing(w: &World, line: String) -> String {
         return line;
     }
     const CHAT: [&str; 34] = [
-        "/say", "/s", "/shout", "/sh", "/tell", "/t", "/party", "/p", "/linkshell", "/l", "/linkshell2", "/l2", "/unity", "/u", "/assistj", "/aj", "/assiste", "/ae", "/emote", "/em", "/message", "/me", "/yell", "/yl", "//worldmes", "//wm", "/linkshellmes", "/lsmes", "/linkshell2mes", "/ls2mes", "/nominate", "/propose", "/seacom", "/sc",
+        "/say",
+        "/s",
+        "/shout",
+        "/sh",
+        "/tell",
+        "/t",
+        "/party",
+        "/p",
+        "/linkshell",
+        "/l",
+        "/linkshell2",
+        "/l2",
+        "/unity",
+        "/u",
+        "/assistj",
+        "/aj",
+        "/assiste",
+        "/ae",
+        "/emote",
+        "/em",
+        "/message",
+        "/me",
+        "/yell",
+        "/yl",
+        "//worldmes",
+        "//wm",
+        "/linkshellmes",
+        "/lsmes",
+        "/linkshell2mes",
+        "/ls2mes",
+        "/nominate",
+        "/propose",
+        "/seacom",
+        "/sc",
     ];
     if CHAT.contains(&first.to_lowercase().as_str()) {
         format!("{first} {rest}")
@@ -369,7 +408,9 @@ pub(super) fn block(id: [u8; 4]) -> String {
 pub(super) fn field_key(w: &mut World, f: &mut FieldFep, key: egui::Key, shift: bool) -> FieldPick {
     let n = f.cands.len().max(1);
     match key {
-        egui::Key::Tab | egui::Key::Space | egui::Key::ArrowDown if !(shift && key == egui::Key::Tab) => f.sel = (f.sel + 1) % n,
+        egui::Key::Tab | egui::Key::Space | egui::Key::ArrowDown if !(shift && key == egui::Key::Tab) => {
+            f.sel = (f.sel + 1) % n
+        }
         egui::Key::Tab | egui::Key::ArrowUp => f.sel = (f.sel + n - 1) % n,
         egui::Key::PageDown => f.sel = (f.sel + ROWS).min(n - 1),
         egui::Key::PageUp => f.sel = f.sel.saturating_sub(ROWS),
@@ -409,7 +450,13 @@ pub(super) fn field_key(w: &mut World, f: &mut FieldFep, key: egui::Key, shift: 
 }
 
 /// `text` with `word` (ending at char `caret`) replaced by `put`; the new text and caret. None when `fits` refuses it.
-pub(super) fn field_put(text: &str, caret: usize, word: &str, put: &str, fits: impl Fn(&str) -> bool) -> Option<(String, usize)> {
+pub(super) fn field_put(
+    text: &str,
+    caret: usize,
+    word: &str,
+    put: &str,
+    fits: impl Fn(&str) -> bool,
+) -> Option<(String, usize)> {
     let n = word.chars().count().min(caret);
     let before: String = text.chars().take(caret - n).collect();
     let after: String = text.chars().skip(caret).collect();

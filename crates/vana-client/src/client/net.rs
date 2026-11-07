@@ -6,8 +6,8 @@ use crate::net::map::compress::Codec;
 use crate::net::map::session::{MapSession, SubPacket, build};
 use anyhow::Result;
 use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -201,8 +201,24 @@ fn self_plate(p: &SubPacket) -> SelfPlate {
         ..Marks::default()
     };
     let r = p.u8(0x5a);
-    let extra = PlateExtra { ballista: p.u8(0x39), trial: bit(f3, 1), job_master: p.u8(0x58) & 0x80 != 0, ranks: (r & 3) << 2 | (r >> 2 & 3) };
-    SelfPlate { marks, extra, invisible: bit(f1, 15), frozen: bit(f1, 13), charmed: bit(f1, 30), monstrosity: p.u16(0x54), mon_prefix: [p.u8(0x56), p.u8(0x57)], zone_pool: bit(f0, 9), hitbox: p.u8(0x59) as f32 * 0.1, no_snap: bit(f0, 2) || bit(f1, 12) }
+    let extra = PlateExtra {
+        ballista: p.u8(0x39),
+        trial: bit(f3, 1),
+        job_master: p.u8(0x58) & 0x80 != 0,
+        ranks: (r & 3) << 2 | (r >> 2 & 3),
+    };
+    SelfPlate {
+        marks,
+        extra,
+        invisible: bit(f1, 15),
+        frozen: bit(f1, 13),
+        charmed: bit(f1, 30),
+        monstrosity: p.u16(0x54),
+        mon_prefix: [p.u8(0x56), p.u8(0x57)],
+        zone_pool: bit(f0, 9),
+        hitbox: p.u8(0x59) as f32 * 0.1,
+        no_snap: bit(f0, 2) || bit(f1, 12),
+    }
 }
 
 /// The rest of the plate's fields: u8 @0x32 (+0x294 Ballista info) and @0x33 bit 1 trial, bit 6 job master, bits 4..5 /
@@ -231,7 +247,11 @@ pub struct BattleMessage {
 
 /// LAB_1009e8d0 / LAB_1009eb10: 9, 0xb, 0x32, 0x2cf, 0x2d (0x02D also 0x32b, 0x32d) queue as themselves.
 fn queued_message(m: u16, kind: u8, two: bool) -> u16 {
-    if matches!(m, 9 | 0xb | 0x32 | 0x2cf | 0x2d) || (two && matches!(m, 0x32b | 0x32d)) { m } else { kind as i8 as i16 as u16 }
+    if matches!(m, 9 | 0xb | 0x32 | 0x2cf | 0x2d) || (two && matches!(m, 0x32b | 0x32d)) {
+        m
+    } else {
+        kind as i8 as i16 as u16
+    }
 }
 
 /// 0x029: @4 caster, @8 target, @0xc / @0x10 data, @0x14 / @0x16 indices, @0x18 message, @0x1a Type.
@@ -249,18 +269,39 @@ pub struct ShipData {
 fn ship_data(p: &SubPacket) -> Option<ShipData> {
     let start = p.u32(0x78);
     let end = start.wrapping_add(p.u16(0x7c) as u32);
-    (start != 0 && end != 0 && end != start).then(|| ShipData { start, end, reverse: p.u32(0x24) >> 26 & 1 != 0, route: (p.u32(0x28) >> 19 & 3) as u8 })
+    (start != 0 && end != 0 && end != start).then(|| ShipData {
+        start,
+        end,
+        reverse: p.u32(0x24) >> 26 & 1 != 0,
+        route: (p.u32(0x28) >> 19 & 3) as u8,
+    })
 }
 
 pub fn battle_message(p: &SubPacket) -> BattleMessage {
     let message = p.u16(0x18);
-    BattleMessage { actor: p.u32(4), target: p.u32(8), data: [p.u32(12) as i32, p.u32(16) as i32], actor_index: p.u16(0x14), target_index: p.u16(0x16), message, queued: queued_message(message, p.u8(0x1a), false) }
+    BattleMessage {
+        actor: p.u32(4),
+        target: p.u32(8),
+        data: [p.u32(12) as i32, p.u32(16) as i32],
+        actor_index: p.u16(0x14),
+        target_index: p.u16(0x16),
+        message,
+        queued: queued_message(message, p.u8(0x1a), false),
+    }
 }
 
 /// 0x02D: @4 / @8 ids, @0xc / @0xe indices, @0x10 / @0x14 data, @0x18 message, @0x1a Type.
 pub fn battle_message2(p: &SubPacket) -> BattleMessage {
     let message = p.u16(0x18);
-    BattleMessage { actor: p.u32(4), target: p.u32(8), actor_index: p.u16(0xc), target_index: p.u16(0xe), data: [p.u32(0x10) as i32, p.u32(0x14) as i32], message, queued: queued_message(message, p.u8(0x1a), true) }
+    BattleMessage {
+        actor: p.u32(4),
+        target: p.u32(8),
+        actor_index: p.u16(0xc),
+        target_index: p.u16(0xe),
+        data: [p.u32(0x10) as i32, p.u32(0x14) as i32],
+        message,
+        queued: queued_message(message, p.u8(0x1a), true),
+    }
 }
 
 /// s2c 0x0D2 (GP_SERV_COMMAND_TROPHY_LIST): TrophyItemNum @4, TargetUniqueNo @8, Gold @0xc, TrophyItemNo @0x10,
@@ -295,7 +336,12 @@ pub struct MotionState {
 }
 
 fn motion_state(p: &SubPacket) -> MotionState {
-    MotionState { speed: p.u8(0x1C), speed_base: p.u8(0x1D), status: p.u8(0x1F), graph_size: ((p.u32(0x20) >> 9) & 3) as u8 }
+    MotionState {
+        speed: p.u8(0x1C),
+        speed_base: p.u8(0x1D),
+        status: p.u8(0x1F),
+        graph_size: ((p.u32(0x20) >> 9) & 3) as u8,
+    }
 }
 
 /// An event start: s2c 0x032 / 0x034 / 0x033, or the 0x00A login event.
@@ -354,38 +400,113 @@ pub enum NetEvent {
     /// While a mod hooks outgoing packets, a batch about to be sent; it comes back as NetCommand::SendBatch.
     RawOut(u32, Vec<Vec<u8>>),
     /// `game_time` @0x3C (Earth seconds since the Vana'diel epoch), `weather` number @0x68; `area` the log line.
-    ZoneIn { zone: u16, pos: [f32; 3], dir: u8, char_id: u32, index: u16, name: String, look: [u16; 9], motion: MotionState, game_time: u32, weather: u16, music: [u16; 5], event: Option<EventStart>, area: Option<AreaLine>, sub_map: u16, scene: u16, myroom: Option<MyRoom>, room_flag: bool, dead_counter: u32, play_time: u32, mog_zone: bool, send_count: u16, ship: Option<ShipData>, monstrosity: bool },
+    ZoneIn {
+        zone: u16,
+        pos: [f32; 3],
+        dir: u8,
+        char_id: u32,
+        index: u16,
+        name: String,
+        look: [u16; 9],
+        motion: MotionState,
+        game_time: u32,
+        weather: u16,
+        music: [u16; 5],
+        event: Option<EventStart>,
+        area: Option<AreaLine>,
+        sub_map: u16,
+        scene: u16,
+        myroom: Option<MyRoom>,
+        room_flag: bool,
+        dead_counter: u32,
+        play_time: u32,
+        mog_zone: bool,
+        send_count: u16,
+        ship: Option<ShipData>,
+        monstrosity: bool,
+    },
     /// s2c 0x053 (GP_SERV_COMMAND_SYSTEMMES): para @4, para2 @8, Number @0xc (file 7031).
-    SystemMessage { id: u16, para: u32, para2: u32 },
+    SystemMessage {
+        id: u16,
+        para: u32,
+        para2: u32,
+    },
     /// s2c 0x03E (SHOP_OPEN): ShopListNum @4.
-    ShopOpen { count: u16 },
+    ShopOpen {
+        count: u16,
+    },
     /// s2c 0x03C (SHOP_LIST): Flags @6 (bit 0 last), 12-byte entries from @8 (price, ItemNo, ShopIndex, Skill, GuildInfo).
-    ShopList { last: bool, entries: Vec<(u32, u16, u8, u16, u16)> },
+    ShopList {
+        last: bool,
+        entries: Vec<(u32, u16, u8, u16, u16)>,
+    },
     /// s2c 0x03F (SHOP_BUY): ShopItemIndex @4, Count @8.
-    ShopBuy { index: u16, count: u32 },
+    ShopBuy {
+        index: u16,
+        count: u32,
+    },
     /// s2c 0x03D (SHOP_SELL): Price @4, slot @8, Type @9 (0 appraisal), Count @0xc.
-    ShopSell { price: u32, slot: u8, kind: u8, count: u32 },
+    ShopSell {
+        price: u32,
+        slot: u8,
+        kind: u8,
+        count: u32,
+    },
     /// s2c 0x086 (GUILD_OPEN): Stat @4 (0 open, 1 closed, 2 holiday), Time @8 (open hour bits / weekday; bit 31 passive).
-    GuildOpen { stat: u8, time: u32 },
+    GuildOpen {
+        stat: u8,
+        time: u32,
+    },
     /// s2c 0x01D (ITEM_SAME): State @4 (1: the item updates are all in).
     ItemsSettled(u8, u32),
     /// s2c 0x062 (CLISTATUS2): skill_base[64] u16 from @0x80 (crafts: the rank in bits 0..4).
     SkillBase([u16; 64]),
     /// s2c 0x083 / 0x085 (GUILD_BUYLIST / GUILD_SELLLIST): up to 30 {ItemNo u16, Count u8, Max u8, Price i32} from @4,
     /// Count @0xf4, Stat @0xf5 (0x40 first, 0x80 last).
-    GuildList { sell: bool, stat: u8, entries: Vec<(u16, u8, u8, u32)> },
+    GuildList {
+        sell: bool,
+        stat: u8,
+        entries: Vec<(u16, u8, u8, u32)>,
+    },
     /// s2c 0x082 / 0x084 (GUILD_BUY / GUILD_SELL): ItemNo @4 (0 refused), Count @6 (the guild's stock), Trade @7.
-    GuildResult { sell: bool, item: u16, count: u8, trade: i8 },
+    GuildResult {
+        sell: bool,
+        item: u16,
+        count: u8,
+        trade: i8,
+    },
     /// s2c 0x021 (ITEM_TRADE_REQ): UniqueNo @4, ActIndex @8.
-    TradeRequest { id: u32, index: u16 },
+    TradeRequest {
+        id: u32,
+        index: u16,
+    },
     /// s2c 0x022 (ITEM_TRADE_RES): UniqueNo @4, Kind @8, ActIndex @0xc.
-    TradeResponse { id: u32, kind: u32, index: u16 },
+    TradeResponse {
+        id: u32,
+        kind: u32,
+        index: u16,
+    },
     /// s2c 0x023 (ITEM_TRADE_LIST): ItemNum @4, TradeCounter @8, ItemNo @0xa, TradeIndex @0xd, Attr @0xe (24).
-    TradeTheirs { n: u32, counter: u16, item: u16, slot: u8, attr: [u8; 24] },
+    TradeTheirs {
+        n: u32,
+        counter: u16,
+        item: u16,
+        slot: u8,
+        attr: [u8; 24],
+    },
     /// s2c 0x025 (ITEM_TRADE_MYLIST): ItemNum @4, ItemNo @8, TradeIndex @0xa, ItemIndex @0xb.
-    TradeMine { n: u32, item: u16, slot: u8, inv: u8 },
+    TradeMine {
+        n: u32,
+        item: u16,
+        slot: u8,
+        inv: u8,
+    },
     /// s2c 0x0E0 (GP_SERV_COMMAND_GROUP_COMLINK): LinkshellNum @4, ItemIndex @5, Category (bag) @6.
-    LinkshellEquip { num: u8, index: u8, bag: u8 },
+    LinkshellEquip {
+        num: u8,
+        index: u8,
+        bag: u8,
+    },
     /// s2c 0x0CC (GP_SERV_COMMAND_LINKSHELL_MESSAGE), raw.
     LinkshellMessage(Vec<u8>),
     /// s2c 0x048: the Linkshell Concierge's slots.
@@ -401,32 +522,70 @@ pub enum NetEvent {
     /// s2c 0x04D (GP_SERV_COMMAND_FRAGMENTS): the whole packet (client/servmes.rs reads it).
     Fragments(Vec<u8>),
     /// s2c 0x009 (GP_SERV_COMMAND_MESSAGE): MesNo @0xa, Data @0xd as keys (see std_data).
-    MessageStd { id: u16, cas: u32, para: [i32; 4], strings: [String; 2] },
+    MessageStd {
+        id: u16,
+        cas: u32,
+        para: [i32; 4],
+        strings: [String; 2],
+    },
     /// s2c 0x0D2 (GP_SERV_COMMAND_TROPHY_LIST): TargetUniqueNo @8, Gold @0xc, TrophyItemNo @0x10, TrophyItemIndex @0x14,
     /// IsContainer @0x16.
     TrophyList(TrophyList),
     /// s2c 0x0D3 (GP_SERV_COMMAND_TROPHY_SOLUTION): LootUniqueNo @4, EntryUniqueNo @8, EntryPoint @0x12,
     /// TrophyItemIndex @0x14, JudgeFlg @0x15, sLootName @0x16, sLootName2 @0x26.
-    TrophySolution { slot: u8, judge: u8, loot: u32, loot_point: i16, entry: u32, entry_point: i16, entry_flg: bool, loot_name: String, entry_name: String },
+    TrophySolution {
+        slot: u8,
+        judge: u8,
+        loot: u32,
+        loot_point: i16,
+        entry: u32,
+        entry_point: i16,
+        entry_flg: bool,
+        loot_name: String,
+        entry_name: String,
+    },
     Event(EventStart),
     /// 0x05D: the event's four string slots.
     EventStrings(Vec<String>),
     /// 0x05C: event params into Z2..Z9.
     EventParams([u32; 8]),
     /// 0x052: release mode (low byte) and, for mode 2, the event id.
-    EventRelease { mode: u8, event: u16 },
+    EventRelease {
+        mode: u8,
+        event: u16,
+    },
     /// 0x05B / 0x065: a position set by the server (WPOS), with its mode.
-    Wpos { id: u32, pos: [f32; 3], dir: u8, mode: u8 },
+    Wpos {
+        id: u32,
+        pos: [f32; 3],
+        dir: u8,
+        mode: u8,
+    },
     ZoneText(ZoneText),
     /// s2c 0x067 kind 2 (char sync): the character, the owner of the Mog House being visited (@0x20, our own client
     /// only; 0 = none / our own) and the 2F flag (@0x27 bit 0, the owner's when visiting).
     /// @0x25: the main job's level before any level restriction (player +0x40c42).
     /// `custom`: CustomProperties @0x18 / @0x1C, our own personal chocobo's look (FUN_1009ab40).
-    CharSync { id: u32, owner: u32, floors: bool, open: bool, level: u8, sync: u8, custom: [u32; 2] },
+    CharSync {
+        id: u32,
+        owner: u32,
+        floors: bool,
+        open: bool,
+        level: u8,
+        sync: u8,
+        custom: [u32; 2],
+    },
     /// s2c 0x067 kind 3 (FUN_1009b4xx, 2019 asm 0x1009b6ad): ActIndex @6, id @8, the master's ActIndex u16 @0x0C.
-    EntityMaster { index: u16, id: u32, master: u16 },
+    EntityMaster {
+        index: u16,
+        id: u32,
+        master: u16,
+    },
     /// s2c 0x11A (the answer to c2s 0x119): unlocked job emotes (u32 @4, bit job - 1) and chairs (u16 @8).
-    EmoteUnlocks { jobs: u32, chairs: u16 },
+    EmoteUnlocks {
+        jobs: u32,
+        chairs: u16,
+    },
     /// s2c 0x04B (GP_SERV_COMMAND_PBX_RESULT).
     Pbx(super::post::Pbx),
     /// s2c 0x01B (GP_MYROOM_DANCER): get_job_flag @0xc, job_lev @0x10 (jobs 0..15), job_lev2 @0x48 (16..23),
@@ -447,38 +606,89 @@ pub enum NetEvent {
     /// 0x01C: container sizes (ItemNum, 1 + size).
     ItemMax([u8; 18], [u16; 18]),
     /// 0x01E: count of a slot (0 = emptied).
-    ItemNum { container: u8, index: u8, count: u32 },
+    ItemNum {
+        container: u8,
+        index: u8,
+        count: u32,
+    },
     /// 0x01F / 0x020: item in a slot.
     /// 0x01F / 0x020; 0x020 carries the 24-byte extdata (Attr @0x11).
     /// LockFlg (0x01F @0xc, 0x020 @0x10): 0 free, 5 equipped, 0x0F in use, 0x13 linkshell, 0x19, 0x1B mannequin.
-    Item { container: u8, index: u8, id: u16, count: u32, ext: Option<[u8; 24]>, lock: u8, price: Option<u32> },
+    Item {
+        container: u8,
+        index: u8,
+        id: u16,
+        count: u32,
+        ext: Option<[u8; 24]>,
+        lock: u8,
+        price: Option<u32>,
+    },
     /// s2c 0x108 BAZAAR_SHOPPING: State @8, HideLevel @0xc, the customer's name @0x10.
-    BazaarShopper { state: u32, hide: u16, name: String },
+    BazaarShopper {
+        state: u32,
+        hide: u16,
+        name: String,
+    },
     /// s2c 0x10A BAZAAR_SALE: ItemNum @4, ItemNo @8, the buyer's name @0xa.
-    BazaarSale { count: u32, item: u16, name: String },
+    BazaarSale {
+        count: u32,
+        item: u16,
+        name: String,
+    },
     /// s2c 0x105 BAZAAR_LIST: Price @4, ItemNum @8, TaxRate @0xc, ItemNo @0xe, ItemIndex @0x10, Attr @0x11.
-    BazaarItem { price: u32, count: u32, tax: u16, item: u16, index: u8, attr: [u8; 24] },
+    BazaarItem {
+        price: u32,
+        count: u32,
+        tax: u16,
+        item: u16,
+        index: u8,
+        attr: [u8; 24],
+    },
     /// s2c 0x106 BAZAAR_BUY: State @4 (0 bought), the seller's name @8.
-    BazaarBuy { state: u32, name: String },
+    BazaarBuy {
+        state: u32,
+        name: String,
+    },
     /// s2c 0x107 BAZAAR_CLOSE: the seller's name @4.
-    BazaarClosed { name: String },
+    BazaarClosed {
+        name: String,
+    },
     /// s2c 0x109 BAZAAR_SELL (another customer bought): ItemNum @8, BazaarActIndex @0xe, the buyer's name @0x10,
     /// ItemIndex @0x20.
-    BazaarSold { count: u32, owner: u16, name: String, index: u8 },
+    BazaarSold {
+        count: u32,
+        owner: u16,
+        name: String,
+        index: u8,
+    },
     /// 0x050: equipment slot -> container slot (index 0 = removed).
-    Equip { slot: u8, index: u8, container: u8 },
+    Equip {
+        slot: u8,
+        index: u8,
+        container: u8,
+    },
     /// s2c 0x04F (LAB_100e5ac0): every equipment slot empties (G+0x19a54, 16 x 8 bytes), then the equipment hook.
     EquipClear,
     /// 0x061: our stats.
     CharStats(super::items::CharStats),
     /// 0x05F: a music slot changed.
-    Music { slot: u16, id: u16 },
+    Music {
+        slot: u16,
+        id: u16,
+    },
     /// Weather change (0x057): number @8, crossfade in Vana'diel minutes @0x0a.
     Weather(u16, u16),
     /// 0x058 (GP_SERV_COMMAND_ASSIST): UniqueNo @4, AssistNo @8 (the client reads only these).
-    Assist { player: u32, target: u32 },
+    Assist {
+        player: u32,
+        target: u32,
+    },
     /// s2c 0x055: key item table TableIndex @0x84, owned bits GetItemFlag[16] @4.
-    KeyItems { table: u16, bits: [u32; 16], seen: [u32; 16] },
+    KeyItems {
+        table: u16,
+        bits: [u32; 16],
+        seen: [u32; 16],
+    },
     /// Our own equipment changed (0x051).
     SelfLook([u16; 9]),
     /// The server is moving us to another zone; a ZoneIn follows.
@@ -492,7 +702,23 @@ pub enum NetEvent {
     /// `team`: the PvP team byte (+0x1ff, u32 @0x34 >> 21; LSB allegiance).
     /// `ride`: ChocoboIndex u32 @0x28 bits 13..15 and the mount id u8 @0x5B.
     /// `speed`: flags1 (u32 @0x2C) Speed bits 0..11 and SpeedBase bits 17..24 (FUN_1009d0f0 -> actor +0x15c / +0x9c).
-    SelfStatus { speed: (u8, u8), status: u8, hpp: u8, dead: (u32, u32), pet: u16, flags: u32, icons: [u16; 32], team: u8, fellow: u16, plate: SelfPlate, ride: (u8, u8), indi: u8, fish_timer: u16, gate: u8, costume: u16 },
+    SelfStatus {
+        speed: (u8, u8),
+        status: u8,
+        hpp: u8,
+        dead: (u32, u32),
+        pet: u16,
+        flags: u32,
+        icons: [u16; 32],
+        team: u8,
+        fellow: u16,
+        plate: SelfPlate,
+        ride: (u8, u8),
+        indi: u8,
+        fish_timer: u16,
+        gate: u8,
+        costume: u16,
+    },
     /// s2c 0x115: the hooked fish.
     Fish(super::fishing::FishParams),
     /// s2c 0x076: party members' status icons (UniqueNo, 32 icons), five rows (ourselves not included).
@@ -502,12 +728,21 @@ pub enum NetEvent {
     /// s2c 0x063 type 2 (FUN_10099270): limit points u16 @8, bits u16 @0xa (merits 0..6, bit 13 canUseMeritMode, 14
     /// EXP capped or merit mode), max merits @0xc; type 5 the job point access @8; types 3 / 4 (Monstrosity): type 3's
     /// u32 @0xc (gladiator rank bits 2..3) and u16 @0x14 (prestige).
-    Merits { limit: u16, bits: u16, max: u8 },
+    Merits {
+        limit: u16,
+        bits: u16,
+        max: u8,
+    },
     JobPoints(u8, [[u16; 3]; 24]),
     /// s2c 0x08C (0x100e4ca0): merit records {u16 id (index * 2, bit 0 = delete), u8 next cost, u8 level} from @8.
     MeritList(Vec<(u16, u8, u8)>),
     /// s2c 0x0B6 SET_GMMSG (LAB_101132b0): msgId u32 @4, seqId u16 @8, pktNum u16 @0xa (0 = the last), text @0xc (244).
-    GmMessage { id: u32, seq: u16, last: bool, text: Vec<u8> },
+    GmMessage {
+        id: u32,
+        seq: u16,
+        last: bool,
+        text: Vec<u8>,
+    },
     /// s2c 0x04C: the auction house.
     Auc(super::auction::AucPacket),
     /// s2c 0x08D (LAB_100e4fd0): 64 job point records @4 {u16 entry id, u16 next cost | level << 10}.
@@ -515,79 +750,173 @@ pub enum NetEvent {
     /// s2c 0x08E: u16 points @4, u8 upgrades[32] @8, u16 costs[32] @0x28.
     AlterEgo(super::aepoints::AeData),
     /// 0x063 types 3 / 4: the blocks from @8 (212 / 172 bytes).
-    Monstrosity { kind: u16, data: Vec<u8> },
+    Monstrosity {
+        kind: u16,
+        data: Vec<u8>,
+    },
     /// s2c 0x063 sub 9: the icons and their end times (1/60 s since the Vana'diel epoch; 0x7fffffff no timer).
-    StatusTimers { ids: [u16; 32], ends: [u32; 32] },
+    StatusTimers {
+        ids: [u16; 32],
+        ends: [u32; 32],
+    },
     /// Our own HP, MP and TP (0x0DF).
-    Vitals { hp: u32, mp: u32, tp: u32, hpp: u8, mpp: u8 },
+    Vitals {
+        hp: u32,
+        mp: u32,
+        tp: u32,
+        hpp: u8,
+        mpp: u8,
+    },
     /// s2c 0x0C8 GROUP_TBL (kind 0 party / 5 alliance), 0x0DD / 0x0E2 GROUP_LIST (0x0E2 creates), 0x0DF GROUP_ATTR.
     PartyTable(Vec<super::party::TableEntry>),
     PartyList(super::party::ListUpdate, bool),
     PartyAttr(super::party::AttrUpdate),
     /// s2c 0x05A MOTIONMES (LAB_100a06e0): caster @4, target @8 (0 none), emote u16 @0x10, Param @0x12, Mode @0x16.
-    Emote { caster: u32, target: u32, emote: u16, param: u16, mode: u8 },
+    Emote {
+        caster: u32,
+        target: u32,
+        emote: u16,
+        param: u16,
+        mode: u8,
+    },
     /// s2c 0x0BF REGISTRATION (battlefield registration NPCs): Result u16 @6, ActIndex u32 @0xC.
-    Registration { index: u32, result: u16 },
+    Registration {
+        index: u32,
+        result: u16,
+    },
     /// s2c 0x0A0 MAP_GROUP: a party member's position for the map.
-    MapGroup { id: u32, zone: u16, pos: [f32; 3] },
+    MapGroup {
+        id: u32,
+        zone: u16,
+        pos: [f32; 3],
+    },
     /// s2c 0x0F4 TRACKING_LIST: a Wide Scan result.
     TrackEntry(super::widescan::Entry),
     /// s2c 0x0F5 TRACKING_POS: the tracked target's position and state.
-    TrackPos { index: u16, level: u8, pos: [f32; 3], state: u32 },
+    TrackPos {
+        index: u16,
+        level: u8,
+        pos: [f32; 3],
+        state: u32,
+    },
     /// s2c 0x0F6 TRACKING_STATE: the list state (1 start, 2 end).
     TrackState(u32),
     /// s2c 0x031 RECIPE, 0x059 FRIENDPASS, 0x10E REQSUBMAPNUM: answers to event ops, whole packet with its header.
-    EventAnswer { id: u16, data: Vec<u8> },
+    EventAnswer {
+        id: u16,
+        data: Vec<u8>,
+    },
     /// s2c 0x0F9 RES {UniqueNo @4, ActIndex @8, u16 type @0xA}: 1 raise offered, 2 tractor (handler 0x100a2540 reads
     /// only the type).
-    ResOffer { kind: u16 },
+    ResOffer {
+        kind: u16,
+    },
     /// s2c 0x026: a mannequin look record (MODLOG "Mog House mannequins"): +0 is_used, +1 container, +2 slot, +4 u16
     /// the pose-8 item, +6 race / hair (unused), +8..+0x17 head, body, hands, legs, feet, main, sub, range (slot
     /// nibbles).
-    MannequinLook { rec: [u8; 24] },
+    MannequinLook {
+        rec: [u8; 24],
+    },
     /// s2c 0x110 (Sparks u24 @4, Deeds u16 @8, Plaudits u16 @0xa, 8 bytes @0xc: LSB's Unity Shared day and Leader
     /// week), 0x111 (64 objective records @4), 0x112 (Data[128] @4, Offset u16 @0x84): Records of Eminence.
-    RoeUnity { sparks: u32, deeds: u16, plaudits: u16, rot: [u8; 8] },
+    RoeUnity {
+        sparks: u32,
+        deeds: u16,
+        plaudits: u16,
+        rot: [u8; 8],
+    },
     RoeActive([u32; 64]),
-    RoeLog { offset: u16, data: [u8; 128] },
+    RoeLog {
+        offset: u16,
+        data: [u8; 128],
+    },
     /// s2c 0x056 (LAB_10098ad0): a quest / mission record, data u32[8] @4 and Port @0x24.
-    MissionLog { port: u16, data: [u32; 8] },
+    MissionLog {
+        port: u16,
+        data: [u32; 8],
+    },
     /// s2c 0x0B4 CONFIG (LAB_100e4f20): the 12 SAVE_CONF bytes @4 (flags, message filters).
     ConfSys([u8; 12]),
     /// s2c 0x0DC GROUP_SOLICIT_REQ (LAB_10203a50): AnonFlag @0xa, Kind @0xb (0 party, 5 alliance), the name @0xc,
     /// RaceNo @0x1c.
-    Invite { anon: u8, kind: u8, name: String, race: u16 },
+    Invite {
+        anon: u8,
+        kind: u8,
+        name: String,
+        race: u16,
+    },
     /// s2c 0x11D PARTYREQ (LAB_100a2610): Status @0xb (0 requesting, 1 stopped), sName @0xc (client/partyreq.rs).
-    PartyRequest { status: u8, name: String },
+    PartyRequest {
+        status: u8,
+        name: String,
+    },
     /// s2c 0x041 BLACK_LIST: List[12] {u32 ID, Name[16]} @4, Stat @0xf4 (bit 0 reset, bit 1 last), Num @0xf5.
-    Blacklist { stat: u8, entries: Vec<(u32, String)> },
+    Blacklist {
+        stat: u8,
+        entries: Vec<(u32, String)>,
+    },
     /// s2c 0x078 SWITCH_START: UniqueNo @4, AllNum @8, ActIndex @0xc, sName[15] @0xe, Kind @0x1d, Str @0x1e.
-    PollStart { name: String, kind: u8, text: String },
+    PollStart {
+        name: String,
+        kind: u8,
+        text: String,
+    },
     /// s2c 0x077 ENTITY_VIS (LAB_10098f30): with Flags @4 bit 0, UniqueNo[32] @8 (FUN_10087ae0; zeroes kept): the
     /// listed-only NPCs shown.
     EntityVis(Vec<u32>),
     /// s2c 0x079 SWITCH_PROC: AllNum @4, VoteNumTbl[9] u16 @8, Kind @0x1a, State @0x1b, QuestionNum @0x1c, sPropName[15]
     /// @0x1d, Str @0x2c.
-    PollState { votes: [u16; 9], kind: u8, state: u8, questions: u8, name: String, text: String },
+    PollState {
+        votes: [u16; 9],
+        kind: u8,
+        state: u8,
+        questions: u8,
+        name: String,
+        text: String,
+    },
     /// s2c 0x047 TRANSLATE: ItemNo u16 @4, From @6, To @7, FromString[64] @8, ToString[64] @0x48.
-    Translate { item: u16, from: u8, to: u8, from_text: String, to_text: String },
+    Translate {
+        item: u16,
+        from: u8,
+        to: u8,
+        from_text: String,
+        to_text: String,
+    },
     /// s2c 0x049 ITEMSEARCH: ItemNo u16 @4, Flag u8 @6, ItemName @8.
-    ItemSearch { item: u16, flag: u8 },
+    ItemSearch {
+        item: u16,
+        flag: u8,
+    },
     /// s2c 0x042 BLACK_EDIT: {u32 ID, Name[16]} @4, Mode @0x18 (0 added, 1 removed, 2 failed).
-    BlackEdit { id: u32, name: String, mode: u8 },
+    BlackEdit {
+        id: u32,
+        name: String,
+        mode: u8,
+    },
     /// s2c 0x0E1 GROUP_CHECKID (LAB_100ea7f0): GroupID @4, the answer to c2s 0x078.
     GroupId(u32),
     /// s2c 0x113 (mode 1) / 0x118 (mode 2): the currencies, the whole packet (MODLOG "Currencies and Currencies 2").
-    Currencies { mode: u8, data: Vec<u8> },
+    Currencies {
+        mode: u8,
+        data: Vec<u8>,
+    },
     /// s2c 0x116 EQUIPSET_VALID: the 16 slot entries at @4 (client/equipsets.rs).
     EquipSetValid([[u8; 4]; 16]),
     /// s2c 0x117 EQUIPSET_RES: Count @4, ItemsChanged @8 and ItemsEquipped @0x48 ({index, slot, container, 0}).
-    EquipSetRes { count: u8, changed: [[u8; 4]; 16], equipped: [[u8; 4]; 16] },
+    EquipSetRes {
+        count: u8,
+        changed: [[u8; 4]; 16],
+        equipped: [[u8; 4]; 16],
+    },
     /// s2c 0x11b (u8 @4): the lockstyle flag; s2c 0x11c LOCKSTYLE_ERROR: Count @4 item ids from @8.
     LockStyleFlag(u8),
     LockStyleError(Vec<u16>),
     /// s2c 0x063 type 7: week @8 (0 previous, 1 current), dataType @9, 0x80 bytes from @0xc.
-    UnityTable { week: u8, d: u8, data: [u8; 0x80] },
+    UnityTable {
+        week: u8,
+        d: u8,
+        data: [u8; 0x80],
+    },
     /// s2c 0x063 type 6 (0x10099330): the teleport point masks, 0x40 bytes from @8 (Home Points, Survival Guides,
     /// Waypoints, Telepoints, Atmos(S), Eschan portals).
     PointMasks([u8; 0x40]),
@@ -602,19 +931,45 @@ pub enum NetEvent {
     Dungeon(Vec<u8>),
     /// s2c 0x017: Kind @4, Attr @5 (bit 0 GM), Data @6 (the yell's zone; assist: mastery, mentor rank), name @8,
     /// text @0x17.
-    Chat { kind: u8, attr: u8, data: u16, from: String, text: String },
+    Chat {
+        kind: u8,
+        attr: u8,
+        data: u16,
+        from: String,
+        text: String,
+    },
     Battle(BattleMessage),
     Action(crate::net::action::Action),
     /// 0x038: run scheduler `name` (a 4cc such as "kesu") on an actor.
-    Scheduler { actor: u32, target: u32, name: [u8; 4] },
+    Scheduler {
+        actor: u32,
+        target: u32,
+        name: [u8; 4],
+    },
     /// s2c 0x039 (GP_SERV_COMMAND_MAPSCHEDULOR): a zone scheduler on (caster, target), ids and ActIndexes.
-    MapScheduler { ids: (u32, u32), indices: (u16, u16), name: [u8; 4] },
+    MapScheduler {
+        ids: (u32, u32),
+        indices: (u16, u16),
+        name: [u8; 4],
+    },
     /// s2c 0x03A (GP_SERV_COMMAND_MAGICSCHEDULOR): an action file on (caster, target) by type.
-    MagicScheduler { ids: (u32, u32), indices: (u16, u16), file: u16, kind: u8 },
+    MagicScheduler {
+        ids: (u32, u32),
+        indices: (u16, u16),
+        file: u16,
+        kind: u8,
+    },
     /// s2c 0x069 / 0x073 / 0x074: chocobo racing (client/racing.rs), the whole packet.
-    Racing { id: u16, data: Vec<u8> },
+    Racing {
+        id: u16,
+        data: Vec<u8>,
+    },
     /// s2c 0x02F (GP_SERV_COMMAND_DIG): TarUniqueNo, TarActIndex, Flags.
-    Dig { id: u32, index: u16, flags: u8 },
+    Dig {
+        id: u32,
+        index: u16,
+        flags: u8,
+    },
     /// s2c 0x11E: ActIndex @4 used /jump.
     Jump(u16),
     /// Ours: s2c 0x1F0, a page of the GM level and command list (client/gm.rs), the whole sub-packet.
@@ -622,11 +977,20 @@ pub enum NetEvent {
     /// Ours: s2c 0x1F1, a GM window command's result and output, the whole sub-packet.
     GmResult(Vec<u8>),
     /// s2c 0x030 (GP_SERV_COMMAND_EFFECT): UniqueNo @4, ActIndex @8, EffectNum @0xa, Type @0xc, Status @0xd, Timer @0xe.
-    SynthEffect { id: u32, index: u16, effect: i16, kind: i8, status: i8, timer: u16 },
+    SynthEffect {
+        id: u32,
+        index: u16,
+        effect: i16,
+        kind: i8,
+        status: i8,
+        timer: u16,
+    },
     /// s2c 0x06F / 0x070 (COMBINE_ANS / COMBINE_INF).
     SynthResult(super::synth::Answer),
     SynthOthers(super::synth::Answer),
-    Logout { state: u32 },
+    Logout {
+        state: u32,
+    },
     Status(String),
     Error(String),
 }
@@ -766,7 +1130,16 @@ pub fn event_start(p: &SubPacket) -> EventStart {
                 login: false,
             }
         }
-        _ => EventStart { target: p.u32(4), index: p.u16(8), zone: p.u16(0xa), event: p.u16(0xc), mode: p.u16(0xe), zone2: p.u16(0x10), para2: p.u16(0x12), ..Default::default() },
+        _ => EventStart {
+            target: p.u32(4),
+            index: p.u16(8),
+            zone: p.u16(0xa),
+            event: p.u16(0xc),
+            mode: p.u16(0xe),
+            zone2: p.u16(0x10),
+            para2: p.u16(0x12),
+            ..Default::default()
+        },
     }
 }
 
@@ -854,11 +1227,12 @@ fn add_position(queue: &mut Vec<Vec<u8>>, pos: Vec<u8>, moving: bool) {
 /// that depends on the caller, are left out, and so are chat and tells (0x0B5 / 0x0B6): their callers refuse before
 /// the echo, so they are gated there (`call_gate`).
 const GATED: &[u16] = &[
-    0x0C, 0x0F, 0x11, 0x17, 0x1B, 0x1C, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x32, 0x34, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3D, 0x41, 0x51, 0x52, 0x53, 0x58, 0x59,
-    0x5A, 0x5B, 0x5C, 0x5D, 0x60, 0x61, 0x63, 0x64, 0x66, 0x6E, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x77, 0x85, 0x8C, 0x8D, 0x96, 0x9B, 0xA0, 0xA1,
-    0xA2, 0xAA, 0xAB, 0xAC, 0xAD, 0xB7, 0xC3, 0xC4, 0xCD, 0xCE, 0xCF, 0xD0, 0xD2, 0xD4, 0xD5, 0xD8, 0xDD, 0xDE, 0xE0, 0xE2, 0xE4, 0xE7, 0xE9,
-    0xEA, 0xEB, 0xEC, 0xF0, 0xF1, 0xF5, 0xF6, 0x100, 0x102, 0x106, 0x109, 0x10A, 0x10B, 0x10C, 0x10D, 0x10F, 0x110, 0x112, 0x113, 0x114, 0x115, 0x117,
-    0x118, 0x119, 0x11A, 0x11B, 0x11C, 0x11D,
+    0x0C, 0x0F, 0x11, 0x17, 0x1B, 0x1C, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x32, 0x34, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3D,
+    0x41, 0x51, 0x52, 0x53, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x60, 0x61, 0x63, 0x64, 0x66, 0x6E, 0x6F, 0x70, 0x71,
+    0x72, 0x73, 0x74, 0x75, 0x77, 0x85, 0x8C, 0x8D, 0x96, 0x9B, 0xA0, 0xA1, 0xA2, 0xAA, 0xAB, 0xAC, 0xAD, 0xB7, 0xC3,
+    0xC4, 0xCD, 0xCE, 0xCF, 0xD0, 0xD2, 0xD4, 0xD5, 0xD8, 0xDD, 0xDE, 0xE0, 0xE2, 0xE4, 0xE7, 0xE9, 0xEA, 0xEB, 0xEC,
+    0xF0, 0xF1, 0xF5, 0xF6, 0x100, 0x102, 0x106, 0x109, 0x10A, 0x10B, 0x10C, 0x10D, 0x10F, 0x110, 0x112, 0x113, 0x114,
+    0x115, 0x117, 0x118, 0x119, 0x11A, 0x11B, 0x11C, 0x11D,
 ];
 
 /// Gated ids whose retail callers retry a refused send (batch 11 addendum): event ops 0x43 / 0xa7 / 0x47 and the event
@@ -961,11 +1335,16 @@ fn std_data(data: &str) -> (u32, [i32; 4], [String; 2]) {
     let after = |key: &str| data.find(key).map(|i| data[i + key.len()..].trim_start_matches([' ', '\t']));
     let num = |key: &str| {
         after(key).map_or(0, |v| {
-            let end = v.char_indices().find(|&(i, c)| !(c.is_ascii_digit() || (i == 0 && c == '-'))).map_or(v.len(), |(i, _)| i);
+            let end = v
+                .char_indices()
+                .find(|&(i, c)| !(c.is_ascii_digit() || (i == 0 && c == '-')))
+                .map_or(v.len(), |(i, _)| i);
             v[..end].parse::<i64>().unwrap_or(0) as i32
         })
     };
-    let word = |key: &str| after(key).map_or(String::new(), |v| v.split([' ', '\t', '\0']).next().unwrap_or("").chars().take(24).collect());
+    let word = |key: &str| {
+        after(key).map_or(String::new(), |v| v.split([' ', '\t', '\0']).next().unwrap_or("").chars().take(24).collect())
+    };
     let cas = if data.contains("TarUniqueNo") { num("TarUniqueNo") } else { num("CasUniqueNo") };
     (cas as u32, [num("Para0"), num("Para1"), num("Para2"), num("Para3")], [word("string2"), word("string3")])
 }
@@ -1054,7 +1433,9 @@ fn entity(p: &SubPacket, kind: EntityKind) -> EntityUpdate {
         name: (flags & 0x08 != 0 && p.data.len() > name_at)
             .then(|| match kind {
                 EntityKind::Npc if p.u16(8) >= 0x700 => Some(text(p, name_at, 16)),
-                EntityKind::Npc if p.u16(8) < 0x400 && p.u8(name_at) == 0x01 && p.u8(name_at + 1) > 0x20 => Some(text(p, name_at + 1, 15)),
+                EntityKind::Npc if p.u16(8) < 0x400 && p.u8(name_at) == 0x01 && p.u8(name_at + 1) > 0x20 => {
+                    Some(text(p, name_at + 1, 15))
+                }
                 EntityKind::Npc => None,
                 _ => Some(text(p, name_at, 16)),
             })
@@ -1066,7 +1447,10 @@ fn entity(p: &SubPacket, kind: EntityKind) -> EntityUpdate {
         // FUN_1009b550's look switch: a model id (kind 0) and doors / lifts / ships on every update, the slot looks
         // (kinds 1 / 7) only with 0x10. It reads @0x30 whatever the size: a server may trim the packet after the
         // model or the name (a "Moogle" ends near 0x3c), so the look is read zero-padded.
-        npc: (kind == EntityKind::Npc && flags & 0x20 == 0 && p.data.len() >= 0x34 && (!matches!(p.u8(0x30) & 7, 1 | 7) || flags & 0x10 != 0))
+        npc: (kind == EntityKind::Npc
+            && flags & 0x20 == 0
+            && p.data.len() >= 0x34
+            && (!matches!(p.u8(0x30) & 7, 1 | 7) || flags & 0x10 != 0))
             .then(|| crate::dat::npc::parse_look(&std::array::from_fn::<u8, 20, _>(|i| p.u8(0x30 + i))).ok())
             .flatten(),
         claim: (kind == EntityKind::Npc && flags & 0x02 != 0).then(|| p.u32(0x2C)),
@@ -1101,41 +1485,93 @@ fn entity(p: &SubPacket, kind: EntityKind) -> EntityUpdate {
         }),
         plate: (kind == EntityKind::Player && flags & 0x20 == 0 && p.data.len() >= 0x34).then(|| {
             let b = p.u8(0x33);
-            PlateExtra { ballista: p.u8(0x32), trial: b & 2 != 0, job_master: b & 0x40 != 0, ranks: (b >> 4 & 3) | (b >> 2 & 3) << 2 }
+            PlateExtra {
+                ballista: p.u8(0x32),
+                trial: b & 2 != 0,
+                job_master: b & 0x40 != 0,
+                ranks: (b >> 4 & 3) | (b >> 2 & 3) << 2,
+            }
         }),
-        name_flags: (flags & 0x04 != 0 && p.data.len() >= 0x28).then(|| (p.u32(0x24) >> 29 & 1 != 0, p.u32(0x24) >> 30 & 1 != 0)),
+        name_flags: (flags & 0x04 != 0 && p.data.len() >= 0x28)
+            .then(|| (p.u32(0x24) >> 29 & 1 != 0, p.u32(0x24) >> 30 & 1 != 0)),
         counter: p.u16(0x18) & 0x1fff,
         ground: p.u32(4) >> 24 == 1 && p.u32(0x18) & 0x8000 == 0 && !matches!(p.u8(0x30) & 7, 2 | 3),
-        no_snap: (flags & 0x04 != 0 && p.data.len() >= 0x24).then(|| p.u32(0x18) & 0x8000 != 0 || p.u32(0x20) >> 27 & 1 != 0),
+        no_snap: (flags & 0x04 != 0 && p.data.len() >= 0x24)
+            .then(|| p.u32(0x18) & 0x8000 != 0 || p.u32(0x20) >> 27 & 1 != 0),
         mask: flags,
         status: p.u8(0x20) & 7,
         look_kind: p.u8(0x30) & 7,
         costume: (kind == EntityKind::Player && flags & 0x20 == 0 && p.data.len() >= 0x32).then(|| p.u16(0x30)),
-        door: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 2 && p.data.len() >= 0x38).then(|| p.u32(0x34)).filter(|d| *d != 0),
-        lift: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 3 && p.data.len() >= 0x3e).then(|| (p.u32(0x34), p.u32(0x38), p.u32(0x38).wrapping_add(p.u16(0x3c) as u32))).filter(|l| l.0 != 0),
-        ship: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 4 && p.data.len() >= 0x3c).then(|| (p.u32(0x34), p.u32(0x38))),
-        untargetable: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C).then(|| p.u8(0x2B) & 0x08 != 0),
+        door: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 2 && p.data.len() >= 0x38)
+            .then(|| p.u32(0x34))
+            .filter(|d| *d != 0),
+        lift: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 3 && p.data.len() >= 0x3e)
+            .then(|| (p.u32(0x34), p.u32(0x38), p.u32(0x38).wrapping_add(p.u16(0x3c) as u32)))
+            .filter(|l| l.0 != 0),
+        ship: (kind == EntityKind::Npc && p.u8(0x30) & 7 == 4 && p.data.len() >= 0x3c)
+            .then(|| (p.u32(0x34), p.u32(0x38))),
+        untargetable: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C)
+            .then(|| p.u8(0x2B) & 0x08 != 0),
         target_off: (flags & 0x04 != 0 && p.data.len() >= 0x24).then(|| p.u32(0x20) >> 19 & 1 != 0),
-        listed_only: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x28).then(|| p.u32(0x24) >> 31 != 0),
+        listed_only: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x28)
+            .then(|| p.u32(0x24) >> 31 != 0),
         radar: (flags & 0x04 != 0 && p.data.len() >= 0x2C).then(|| {
             let npc = kind == EntityKind::Npc;
-            (p.u32(0x20) >> 29 & 1 != 0, npc && p.u8(0x2B) & 0x40 != 0, if !npc && p.data.len() >= 0x40 { p.u16(0x3E) } else { 0 })
+            (
+                p.u32(0x20) >> 29 & 1 != 0,
+                npc && p.u8(0x2B) & 0x40 != 0,
+                if !npc && p.data.len() >= 0x40 { p.u16(0x3E) } else { 0 },
+            )
         }),
-        mon_prefix: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x42).then(|| [p.u8(0x40), p.u8(0x41)]),
-        mon_form: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x40 && p.u16(0x3E) != 0).then(|| p.u8(0x2A) & 7),
-        sub_anim: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C && (p.u8(0x20) & 1 != 0 || p.u32(0x28) & (1 << 26) != 0)).then(|| p.u8(0x2A) & 7),
-        mon_stat: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C && p.u8(0x20) & 1 == 0 && p.u32(0x28) & (1 << 26) == 0).then(|| p.u8(0x2A) & 3),
-        half_fade: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C).then(|| p.u32(0x28) >> 31 != 0),
-        hp_bits: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C).then(|| (p.u8(0x22) & 1 != 0, p.u8(0x22) & 1 == 0 && p.u8(0x2B) & 0x20 != 0)),
+        mon_prefix: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x42)
+            .then(|| [p.u8(0x40), p.u8(0x41)]),
+        mon_form: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x40 && p.u16(0x3E) != 0)
+            .then(|| p.u8(0x2A) & 7),
+        sub_anim: (kind == EntityKind::Npc
+            && flags & 0x04 != 0
+            && p.data.len() >= 0x2C
+            && (p.u8(0x20) & 1 != 0 || p.u32(0x28) & (1 << 26) != 0))
+            .then(|| p.u8(0x2A) & 7),
+        mon_stat: (kind == EntityKind::Npc
+            && flags & 0x04 != 0
+            && p.data.len() >= 0x2C
+            && p.u8(0x20) & 1 == 0
+            && p.u32(0x28) & (1 << 26) == 0)
+            .then(|| p.u8(0x2A) & 3),
+        half_fade: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C)
+            .then(|| p.u32(0x28) >> 31 != 0),
+        hp_bits: (kind == EntityKind::Npc && flags & 0x04 != 0 && p.data.len() >= 0x2C)
+            .then(|| (p.u8(0x22) & 1 != 0, p.u8(0x22) & 1 == 0 && p.u8(0x2B) & 0x20 != 0)),
         face: (flags & 1 != 0).then(|| ((p.u32(0x18) >> 17) & 0x7fff) as u16),
         spawn_fx: (flags & 0x04 != 0 && p.data.len() > 0x28).then(|| p.u8(0x28) & 0x04 != 0),
         shadowless: (flags & 0x04 != 0 && p.data.len() > 0x27).then(|| p.u8(0x27) & 0x02 != 0),
         // Counted only with 0x04 (0x1009c739).
         king: kind == EntityKind::Npc && flags & 0x04 != 0 && p.u32(0x18) >> 16 & 1 != 0,
         indi: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() > 0x42).then(|| p.u8(0x42)),
-        gate: (flags & 0x04 != 0).then(|| if kind == EntityKind::Player { (p.data.len() > 0x44).then(|| p.u8(0x44) & 0xf) } else { (p.data.len() > 0x26).then(|| p.u8(0x26) >> 4) }).flatten(),
-        hitbox: (flags & 0x04 != 0).then(|| if kind == EntityKind::Player { (p.data.len() > 0x43).then(|| p.u8(0x43)) } else { (p.data.len() > 0x25).then(|| p.u8(0x25)) }).flatten().map(|h| h as f32 * 0.1),
-        ride: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x48).then(|| Ride { chocobo: (p.u32(0x20) >> 5 & 7) as u8, mount: (p.u32(0x44) >> 4) as u8, custom: [p.u32(0x34), p.u32(0x38)] }),
+        gate: (flags & 0x04 != 0)
+            .then(|| {
+                if kind == EntityKind::Player {
+                    (p.data.len() > 0x44).then(|| p.u8(0x44) & 0xf)
+                } else {
+                    (p.data.len() > 0x26).then(|| p.u8(0x26) >> 4)
+                }
+            })
+            .flatten(),
+        hitbox: (flags & 0x04 != 0)
+            .then(|| {
+                if kind == EntityKind::Player {
+                    (p.data.len() > 0x43).then(|| p.u8(0x43))
+                } else {
+                    (p.data.len() > 0x25).then(|| p.u8(0x25))
+                }
+            })
+            .flatten()
+            .map(|h| h as f32 * 0.1),
+        ride: (kind == EntityKind::Player && flags & 0x04 != 0 && p.data.len() >= 0x48).then(|| Ride {
+            chocobo: (p.u32(0x20) >> 5 & 7) as u8,
+            mount: (p.u32(0x44) >> 4) as u8,
+            custom: [p.u32(0x34), p.u32(0x38)],
+        }),
     }
 }
 
@@ -1181,7 +1617,16 @@ enum Outcome {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats, hooks: &AtomicU8) -> Result<()> {
+fn run(
+    mut login: MapLogin,
+    account: &str,
+    codec: &Codec,
+    tx: &Sender<NetEvent>,
+    rx: &Receiver<NetCommand>,
+    me: &Mutex<SelfState>,
+    stats: &NetStats,
+    hooks: &AtomicU8,
+) -> Result<()> {
     let mut addr = SocketAddr::from((login.map.0, login.map.1));
     let mut sess = 0u32;
     loop {
@@ -1200,7 +1645,18 @@ fn run(mut login: MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx: &Sender<NetEvent>, rx: &Receiver<NetCommand>, me: &Mutex<SelfState>, stats: &NetStats, hooks: &AtomicU8, sess: u32) -> Result<Outcome> {
+fn session(
+    addr: SocketAddr,
+    login: &MapLogin,
+    account: &str,
+    codec: &Codec,
+    tx: &Sender<NetEvent>,
+    rx: &Receiver<NetCommand>,
+    me: &Mutex<SelfState>,
+    stats: &NetStats,
+    hooks: &AtomicU8,
+    sess: u32,
+) -> Result<Outcome> {
     use std::sync::atomic::Ordering::Relaxed;
     let mut map = MapSession::connect(addr, &login.key, codec.clone())?.or_key(login.old_key);
     let (mut rx_seen, mut tx_seen) = (0u64, 0u64);
@@ -1271,8 +1727,41 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         // EventNum @0x62, EventPara @0x64, EventMode @0x66, EventNo @0x40: the client starts
                         // the login event itself, on the player (FUN_10094ea0).
                         let (event_num, event_para) = (p.u16(0x62), p.u16(0x64));
-                        let event = (event_num != 0).then(|| EventStart { target: p.u32(4), index: p.u16(8), zone: event_num, event: event_para, mode: p.u16(0x66), zone2: p.u16(0x40), login: true, ..Default::default() });
-                        tx.send(NetEvent::ZoneIn { zone: p.u32(48) as u16, pos, dir: p.u8(11), char_id: p.u32(4), index: p.u16(8), name: text(&p, 132, 16), look: look_at(&p, 68), motion: motion_state(&p), game_time: p.u32(0x3C), weather: p.u16(0x68), music: std::array::from_fn(|i| p.u16(0x56 + 2 * i)), event, area: area_line(&p), sub_map: if p.u16(0x60) != scene && myroom.is_none() { p.u16(0x60) } else { 0 }, scene, myroom, room_flag: matches!(p.u32(0x80), 1 | 4 | 5), dead_counter: p.u32(0xA4), play_time: p.u32(0xA0), mog_zone: p.u8(0xaf) & 1 != 0, send_count: p.u16(0xac), ship: ship_data(&p), monstrosity: p.u16(0x7E) != 0 })?;
+                        let event = (event_num != 0).then(|| EventStart {
+                            target: p.u32(4),
+                            index: p.u16(8),
+                            zone: event_num,
+                            event: event_para,
+                            mode: p.u16(0x66),
+                            zone2: p.u16(0x40),
+                            login: true,
+                            ..Default::default()
+                        });
+                        tx.send(NetEvent::ZoneIn {
+                            zone: p.u32(48) as u16,
+                            pos,
+                            dir: p.u8(11),
+                            char_id: p.u32(4),
+                            index: p.u16(8),
+                            name: text(&p, 132, 16),
+                            look: look_at(&p, 68),
+                            motion: motion_state(&p),
+                            game_time: p.u32(0x3C),
+                            weather: p.u16(0x68),
+                            music: std::array::from_fn(|i| p.u16(0x56 + 2 * i)),
+                            event,
+                            area: area_line(&p),
+                            sub_map: if p.u16(0x60) != scene && myroom.is_none() { p.u16(0x60) } else { 0 },
+                            scene,
+                            myroom,
+                            room_flag: matches!(p.u32(0x80), 1 | 4 | 5),
+                            dead_counter: p.u32(0xA4),
+                            play_time: p.u32(0xA0),
+                            mog_zone: p.u8(0xaf) & 1 != 0,
+                            send_count: p.u16(0xac),
+                            ship: ship_data(&p),
+                            monstrosity: p.u16(0x7E) != 0,
+                        })?;
                     }
                     // FUN_100fb730: 4 cancels a logout (nothing sent); otherwise 0x00D goes out with the old key, and 2
                     // (zone change) and 3 (Mog House) reconnect to @8 / @0xC, each kept when 0; the rest end the session.
@@ -1305,7 +1794,23 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                             if lo == 0xff && hi == 0 { 0xffff } else { hi << 8 | lo }
                         });
                         let speed = ((p.u32(0x2C) & 0xfff).min(255) as u8, (p.u32(0x2C) >> 17) as u8);
-                        tx.send(NetEvent::SelfStatus { speed, status, hpp: (p.u32(0x28) >> 16) as u8, dead: (p.u32(0x3C), p.u32(0x40)), pet: (p.u32(0x34) >> 3) as u16, flags: p.u32(0x28), icons, team: (p.u32(0x34) >> 21) as u8, fellow: p.u16(0x48), plate: self_plate(&p), ride: ((p.u32(0x28) >> 13 & 7) as u8, if p.data.len() > 0x5b { p.u8(0x5b) } else { 0 }), indi: if p.data.len() > 0x58 { p.u8(0x58) & 0x7f } else { 0x10 }, fish_timer: if p.data.len() > 0x4b { p.u16(0x4a) } else { 0 }, gate: if p.data.len() > 0x5a { p.u8(0x5a) >> 4 } else { 0 }, costume: if p.data.len() > 0x45 { p.u16(0x44) } else { 0 } })?;
+                        tx.send(NetEvent::SelfStatus {
+                            speed,
+                            status,
+                            hpp: (p.u32(0x28) >> 16) as u8,
+                            dead: (p.u32(0x3C), p.u32(0x40)),
+                            pet: (p.u32(0x34) >> 3) as u16,
+                            flags: p.u32(0x28),
+                            icons,
+                            team: (p.u32(0x34) >> 21) as u8,
+                            fellow: p.u16(0x48),
+                            plate: self_plate(&p),
+                            ride: ((p.u32(0x28) >> 13 & 7) as u8, if p.data.len() > 0x5b { p.u8(0x5b) } else { 0 }),
+                            indi: if p.data.len() > 0x58 { p.u8(0x58) & 0x7f } else { 0x10 },
+                            fish_timer: if p.data.len() > 0x4b { p.u16(0x4a) } else { 0 },
+                            gate: if p.data.len() > 0x5a { p.u8(0x5a) >> 4 } else { 0 },
+                            costume: if p.data.len() > 0x45 { p.u16(0x44) } else { 0 },
+                        })?;
                     }
                     // FUN_10098f90: 5 x {u32 UniqueNo, u16 ActIndex, pad, u64 bits, u8 icons[32]}; icon = (hi << 8 | lo) &
                     // 0x3ff, none when lo 0xff with hi 0.
@@ -1315,7 +1820,8 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                             .filter(|&o| p.u32(o) != 0)
                             .map(|o| {
                                 let icons = std::array::from_fn(|i| {
-                                    let (lo, hi) = (p.u8(o + 16 + i) as u16, (p.u8(o + 8 + i / 4) as u16 >> (2 * (i % 4))) & 3);
+                                    let (lo, hi) =
+                                        (p.u8(o + 16 + i) as u16, (p.u8(o + 8 + i / 4) as u16 >> (2 * (i % 4))) & 3);
                                     if lo == 0xff && hi == 0 { 0xffff } else { (hi << 8 | lo) & 0x3ff }
                                 });
                                 (p.u32(o), icons)
@@ -1324,7 +1830,9 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         tx.send(NetEvent::PartyEffects(rows))?;
                     }
                     0x075 => tx.send(NetEvent::Objective(p.data.to_vec()))?,
-                    0x063 if p.u16(4) == 2 => tx.send(NetEvent::Merits { limit: p.u16(8), bits: p.u16(0xa), max: p.u8(0xc) })?,
+                    0x063 if p.u16(4) == 2 => {
+                        tx.send(NetEvent::Merits { limit: p.u16(8), bits: p.u16(0xa), max: p.u8(0xc) })?
+                    }
                     // Type 5: access @8, then per job 0..23 {u16 capacity, u16 current, u16 spent} from @0xc.
                     0x063 if p.u16(4) == 5 => {
                         let jobs = std::array::from_fn(|j| [0, 2, 4].map(|k| p.u16(0xc + 6 * j + k)));
@@ -1338,7 +1846,9 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     }
                     0x08C => {
                         let n = (p.u16(4) as usize).min(p.data.len().saturating_sub(8) / 4);
-                        tx.send(NetEvent::MeritList((0..n).map(|i| (p.u16(8 + 4 * i), p.u8(10 + 4 * i), p.u8(11 + 4 * i))).collect()))?
+                        tx.send(NetEvent::MeritList(
+                            (0..n).map(|i| (p.u16(8 + 4 * i), p.u8(10 + 4 * i), p.u8(11 + 4 * i))).collect(),
+                        ))?
                     }
                     0x08E if p.data.len() >= 0x68 => tx.send(NetEvent::AlterEgo(super::aepoints::AeData {
                         points: p.u16(4),
@@ -1347,21 +1857,38 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     }))?,
                     0x08D => {
                         let n = (p.data.len().saturating_sub(4) / 4).min(64);
-                        let recs = (0..n).map(|i| (p.u16(4 + 4 * i), p.u16(6 + 4 * i))).filter(|r| r.0 != 0).map(|(id, v)| (id, (v >> 10) as u8, v & 0x3ff)).collect();
+                        let recs = (0..n)
+                            .map(|i| (p.u16(4 + 4 * i), p.u16(6 + 4 * i)))
+                            .filter(|r| r.0 != 0)
+                            .map(|(id, v)| (id, (v >> 10) as u8, v & 0x3ff))
+                            .collect();
                         tx.send(NetEvent::JobPointList(recs))?
                     }
-                    0x063 if p.u16(4) == 6 && p.data.len() >= 0x48 => tx.send(NetEvent::PointMasks(p.data[8..0x48].try_into().unwrap()))?,
-                    0x063 if p.u16(4) == 7 && p.data.len() >= 0x8c => {
-                        tx.send(NetEvent::UnityTable { week: p.u8(8), d: p.u8(9), data: p.data[0xc..0x8c].try_into().unwrap() })?
+                    0x063 if p.u16(4) == 6 && p.data.len() >= 0x48 => {
+                        tx.send(NetEvent::PointMasks(p.data[8..0x48].try_into().unwrap()))?
                     }
+                    0x063 if p.u16(4) == 7 && p.data.len() >= 0x8c => tx.send(NetEvent::UnityTable {
+                        week: p.u8(8),
+                        d: p.u8(9),
+                        data: p.data[0xc..0x8c].try_into().unwrap(),
+                    })?,
                     0x063 if matches!(p.u16(4), 3 | 4) => {
                         let n = if p.u16(4) == 3 { 212 } else { 172 };
                         tx.send(NetEvent::Monstrosity { kind: p.u16(4), data: (0..n).map(|i| p.u8(8 + i)).collect() })?
                     }
                     0x063 if p.u16(4) == 9 => {
-                        tx.send(NetEvent::StatusTimers { ids: std::array::from_fn(|i| p.u16(8 + 2 * i)), ends: std::array::from_fn(|i| p.u32(0x48 + 4 * i)) })?;
+                        tx.send(NetEvent::StatusTimers {
+                            ids: std::array::from_fn(|i| p.u16(8 + 2 * i)),
+                            ends: std::array::from_fn(|i| p.u32(0x48 + 4 * i)),
+                        })?;
                     }
-                    0x05A => tx.send(NetEvent::Emote { caster: p.u32(4), target: p.u32(8), emote: p.u16(0x10), param: p.u16(0x12), mode: p.u8(0x16) })?,
+                    0x05A => tx.send(NetEvent::Emote {
+                        caster: p.u32(4),
+                        target: p.u32(8),
+                        emote: p.u16(0x10),
+                        param: p.u16(0x12),
+                        mode: p.u8(0x16),
+                    })?,
                     0x031 | 0x059 | 0x10E => tx.send(NetEvent::EventAnswer { id: p.id, data: p.data.clone() })?,
                     0x0F4 => tx.send(NetEvent::TrackEntry(super::widescan::Entry {
                         index: p.u16(4),
@@ -1371,32 +1898,95 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         dz: p.u16(0xa) as i16,
                         name: text(&p, 0xc, 16),
                     }))?,
-                    0x0F5 => tx.send(NetEvent::TrackPos { index: p.u16(0x12), level: p.u8(0x10), pos: [p.f32(4), p.f32(8), p.f32(0xc)], state: p.u32(0x14) })?,
+                    0x0F5 => tx.send(NetEvent::TrackPos {
+                        index: p.u16(0x12),
+                        level: p.u8(0x10),
+                        pos: [p.f32(4), p.f32(8), p.f32(0xc)],
+                        state: p.u32(0x14),
+                    })?,
                     0x0F6 => tx.send(NetEvent::TrackState(p.u32(4)))?,
-                    0x0A0 => tx.send(NetEvent::MapGroup { id: p.u32(4), zone: p.u16(8), pos: [p.f32(0xc), p.f32(0x10), p.f32(0x14)] })?,
+                    0x0A0 => tx.send(NetEvent::MapGroup {
+                        id: p.u32(4),
+                        zone: p.u16(8),
+                        pos: [p.f32(0xc), p.f32(0x10), p.f32(0x14)],
+                    })?,
                     0x0BF => tx.send(NetEvent::Registration { index: p.u32(0xC), result: p.u16(6) })?,
                     0x0F9 => tx.send(NetEvent::ResOffer { kind: p.u16(0xA) })?,
-                    0x110 => tx.send(NetEvent::RoeUnity { sparks: p.u32(4) & 0xff_ffff, deeds: p.u16(8), plaudits: p.u16(0xa), rot: std::array::from_fn(|i| p.u8(0xc + i)) })?,
+                    0x110 => tx.send(NetEvent::RoeUnity {
+                        sparks: p.u32(4) & 0xff_ffff,
+                        deeds: p.u16(8),
+                        plaudits: p.u16(0xa),
+                        rot: std::array::from_fn(|i| p.u8(0xc + i)),
+                    })?,
                     0x111 => tx.send(NetEvent::RoeActive(std::array::from_fn(|i| p.u32(4 + 4 * i))))?,
-                    0x112 => tx.send(NetEvent::RoeLog { offset: p.u16(0x84), data: std::array::from_fn(|i| p.u8(4 + i)) })?,
-                    0x056 => tx.send(NetEvent::MissionLog { port: p.u16(0x24), data: std::array::from_fn(|i| p.u32(4 + 4 * i)) })?,
+                    0x112 => {
+                        tx.send(NetEvent::RoeLog { offset: p.u16(0x84), data: std::array::from_fn(|i| p.u8(4 + i)) })?
+                    }
+                    0x056 => tx.send(NetEvent::MissionLog {
+                        port: p.u16(0x24),
+                        data: std::array::from_fn(|i| p.u32(4 + 4 * i)),
+                    })?,
                     0x0B4 => tx.send(NetEvent::ConfSys(std::array::from_fn(|i| p.u8(4 + i))))?,
                     0x0E1 => tx.send(NetEvent::GroupId(p.u32(4)))?,
-                    0x108 => tx.send(NetEvent::BazaarShopper { state: p.u32(8), hide: p.u16(0xc), name: text(&p, 0x10, 16) })?,
-                    0x10A => tx.send(NetEvent::BazaarSale { count: p.u32(4), item: p.u16(8), name: text(&p, 0xa, 16) })?,
-                    0x105 => tx.send(NetEvent::BazaarItem { price: p.u32(4), count: p.u32(8), tax: p.u16(0xc), item: p.u16(0xe), index: p.u8(0x10), attr: std::array::from_fn(|i| p.u8(0x11 + i)) })?,
+                    0x108 => tx.send(NetEvent::BazaarShopper {
+                        state: p.u32(8),
+                        hide: p.u16(0xc),
+                        name: text(&p, 0x10, 16),
+                    })?,
+                    0x10A => {
+                        tx.send(NetEvent::BazaarSale { count: p.u32(4), item: p.u16(8), name: text(&p, 0xa, 16) })?
+                    }
+                    0x105 => tx.send(NetEvent::BazaarItem {
+                        price: p.u32(4),
+                        count: p.u32(8),
+                        tax: p.u16(0xc),
+                        item: p.u16(0xe),
+                        index: p.u8(0x10),
+                        attr: std::array::from_fn(|i| p.u8(0x11 + i)),
+                    })?,
                     0x106 => tx.send(NetEvent::BazaarBuy { state: p.u32(4), name: text(&p, 8, 16) })?,
                     0x107 => tx.send(NetEvent::BazaarClosed { name: text(&p, 4, 16) })?,
-                    0x109 => tx.send(NetEvent::BazaarSold { count: p.u32(8), owner: p.u16(0xe), name: text(&p, 0x10, 16), index: p.u8(0x20) })?,
-                    0x115 => tx.send(NetEvent::Fish(super::fishing::FishParams { stamina: p.u16(4), delay: p.u16(6), regen: p.u16(8), moves: p.u16(0xa), damage: p.u16(0xc), heal: p.u16(0xe), time: p.u16(0x10), sense: p.u8(0x12), special: p.u32(0x14) }))?,
-                    0x116 => tx.send(NetEvent::EquipSetValid(std::array::from_fn(|i| std::array::from_fn(|k| p.u8(4 + 4 * i + k)))))?,
-                    0x117 => tx.send(NetEvent::EquipSetRes { count: p.u8(4), changed: std::array::from_fn(|i| std::array::from_fn(|k| p.u8(8 + 4 * i + k))), equipped: std::array::from_fn(|i| std::array::from_fn(|k| p.u8(0x48 + 4 * i + k))) })?,
+                    0x109 => tx.send(NetEvent::BazaarSold {
+                        count: p.u32(8),
+                        owner: p.u16(0xe),
+                        name: text(&p, 0x10, 16),
+                        index: p.u8(0x20),
+                    })?,
+                    0x115 => tx.send(NetEvent::Fish(super::fishing::FishParams {
+                        stamina: p.u16(4),
+                        delay: p.u16(6),
+                        regen: p.u16(8),
+                        moves: p.u16(0xa),
+                        damage: p.u16(0xc),
+                        heal: p.u16(0xe),
+                        time: p.u16(0x10),
+                        sense: p.u8(0x12),
+                        special: p.u32(0x14),
+                    }))?,
+                    0x116 => tx.send(NetEvent::EquipSetValid(std::array::from_fn(|i| {
+                        std::array::from_fn(|k| p.u8(4 + 4 * i + k))
+                    })))?,
+                    0x117 => tx.send(NetEvent::EquipSetRes {
+                        count: p.u8(4),
+                        changed: std::array::from_fn(|i| std::array::from_fn(|k| p.u8(8 + 4 * i + k))),
+                        equipped: std::array::from_fn(|i| std::array::from_fn(|k| p.u8(0x48 + 4 * i + k))),
+                    })?,
                     0x11B => tx.send(NetEvent::LockStyleFlag(p.u8(4)))?,
-                    0x11C => tx.send(NetEvent::LockStyleError((0..p.u8(4).min(16) as usize).map(|i| p.u16(8 + 2 * i)).collect()))?,
-                    0x113 | 0x118 => tx.send(NetEvent::Currencies { mode: if p.id == 0x113 { 1 } else { 2 }, data: p.data.clone() })?,
+                    0x11C => tx.send(NetEvent::LockStyleError(
+                        (0..p.u8(4).min(16) as usize).map(|i| p.u16(8 + 2 * i)).collect(),
+                    ))?,
+                    0x113 | 0x118 => {
+                        tx.send(NetEvent::Currencies { mode: if p.id == 0x113 { 1 } else { 2 }, data: p.data.clone() })?
+                    }
                     0x11D => tx.send(NetEvent::PartyRequest { status: p.u8(0xb), name: text(&p, 0xc, 16) })?,
-                    0x077 if p.u8(4) & 1 != 0 => tx.send(NetEvent::EntityVis((0..32).map(|k| p.u32(8 + 4 * k)).collect()))?,
-                    0x078 => tx.send(NetEvent::PollStart { name: text(&p, 0xe, 15), kind: p.u8(0x1d), text: text(&p, 0x1e, p.data.len().saturating_sub(0x1e)) })?,
+                    0x077 if p.u8(4) & 1 != 0 => {
+                        tx.send(NetEvent::EntityVis((0..32).map(|k| p.u32(8 + 4 * k)).collect()))?
+                    }
+                    0x078 => tx.send(NetEvent::PollStart {
+                        name: text(&p, 0xe, 15),
+                        kind: p.u8(0x1d),
+                        text: text(&p, 0x1e, p.data.len().saturating_sub(0x1e)),
+                    })?,
                     0x079 => tx.send(NetEvent::PollState {
                         votes: std::array::from_fn(|i| p.u16(8 + 2 * i)),
                         kind: p.u8(0x1a),
@@ -1405,51 +1995,141 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         name: text(&p, 0x1d, 15),
                         text: text(&p, 0x2c, p.data.len().saturating_sub(0x2c)),
                     })?,
-                    0x047 => tx.send(NetEvent::Translate { item: p.u16(4), from: p.u8(6), to: p.u8(7), from_text: text(&p, 8, 64), to_text: text(&p, 0x48, 64) })?,
+                    0x047 => tx.send(NetEvent::Translate {
+                        item: p.u16(4),
+                        from: p.u8(6),
+                        to: p.u8(7),
+                        from_text: text(&p, 8, 64),
+                        to_text: text(&p, 0x48, 64),
+                    })?,
                     0x049 => tx.send(NetEvent::ItemSearch { item: p.u16(4), flag: p.u8(6) })?,
                     0x042 => tx.send(NetEvent::BlackEdit { id: p.u32(4), name: text(&p, 8, 16), mode: p.u8(0x18) })?,
-                    0x041 => tx.send(NetEvent::Blacklist { stat: p.u8(0xf4), entries: (0..p.u8(0xf5).min(12) as usize).map(|k| (p.u32(4 + 0x14 * k), text(&p, 8 + 0x14 * k, 16))).collect() })?,
+                    0x041 => tx.send(NetEvent::Blacklist {
+                        stat: p.u8(0xf4),
+                        entries: (0..p.u8(0xf5).min(12) as usize)
+                            .map(|k| (p.u32(4 + 0x14 * k), text(&p, 8 + 0x14 * k, 16)))
+                            .collect(),
+                    })?,
                     0x044 => tx.send(NetEvent::ExtJob((0..0x9c).map(|i| p.u8(4 + i)).collect()))?,
-                    0x0DC => tx.send(NetEvent::Invite { anon: p.u8(0xa), kind: p.u8(0xb), name: text(&p, 0xc, 16), race: p.u16(0x1c) })?,
+                    0x0DC => tx.send(NetEvent::Invite {
+                        anon: p.u8(0xa),
+                        kind: p.u8(0xb),
+                        name: text(&p, 0xc, 16),
+                        race: p.u16(0x1c),
+                    })?,
                     0x0AE => tx.send(NetEvent::Mounts(p.u32(4) as u64 | (p.u32(8) as u64) << 32))?,
-                    0x119 if { let _ = tx.send(NetEvent::MountRecast(p.u32(0xfc))); false } => {}
-                    0x068 if p.u8(4) & 0x3f == 4 => tx.send(NetEvent::PetSync((p.u16(0xc) != 0).then(|| PetSync { index: p.u16(0xc), hpp: p.u8(0xe), mpp: p.u8(0xf), tp: p.u16(0x10), target: p.u32(0x14) })))?,
-                    0x119 => tx.send(NetEvent::AbilityRecasts((0..31).map(|i| (p.u8(4 + 8 * i + 3) as u16, p.u16(4 + 8 * i), p.u8(4 + 8 * i + 2), p.u16(4 + 8 * i + 4) as i16)).collect()))?,
+                    0x119
+                        if {
+                            let _ = tx.send(NetEvent::MountRecast(p.u32(0xfc)));
+                            false
+                        } => {}
+                    0x068 if p.u8(4) & 0x3f == 4 => tx.send(NetEvent::PetSync((p.u16(0xc) != 0).then(|| PetSync {
+                        index: p.u16(0xc),
+                        hpp: p.u8(0xe),
+                        mpp: p.u8(0xf),
+                        tp: p.u16(0x10),
+                        target: p.u32(0x14),
+                    })))?,
+                    0x119 => tx.send(NetEvent::AbilityRecasts(
+                        (0..31)
+                            .map(|i| {
+                                (
+                                    p.u8(4 + 8 * i + 3) as u16,
+                                    p.u16(4 + 8 * i),
+                                    p.u8(4 + 8 * i + 2),
+                                    p.u16(4 + 8 * i + 4) as i16,
+                                )
+                            })
+                            .collect(),
+                    ))?,
                     0x0AA => tx.send(NetEvent::MagicKnown((0..128).map(|i| p.u8(4 + i)).collect()))?,
                     0x0AC => tx.send(NetEvent::CommandsKnown((0..224).map(|i| p.u8(4 + i)).collect()))?,
                     0x0AD => tx.send(NetEvent::Dungeon((0..0x80).map(|i| p.u8(4 + i)).collect()))?,
                     0x0DF => {
                         if p.u32(4) == login.char_id {
-                            tx.send(NetEvent::Vitals { hp: p.u32(8), mp: p.u32(12), tp: p.u32(16), hpp: p.u8(0x16), mpp: p.u8(0x17) })?;
+                            tx.send(NetEvent::Vitals {
+                                hp: p.u32(8),
+                                mp: p.u32(12),
+                                tp: p.u32(16),
+                                hpp: p.u8(0x16),
+                                mpp: p.u8(0x17),
+                            })?;
                         }
                         let jobs = std::array::from_fn(|i| p.u8(0x20 + i));
-                        tx.send(NetEvent::PartyAttr(super::party::AttrUpdate { id: p.u32(4), index: p.u16(0x14), hp: p.u32(8), mp: p.u32(12), tp: p.u32(16), hpp: p.u8(0x16), mpp: p.u8(0x17), jobs, mon: p.u16(0x1c), mon_ids: [p.u8(0x1e), p.u8(0x1f)] }))?;
+                        tx.send(NetEvent::PartyAttr(super::party::AttrUpdate {
+                            id: p.u32(4),
+                            index: p.u16(0x14),
+                            hp: p.u32(8),
+                            mp: p.u32(12),
+                            tp: p.u32(16),
+                            hpp: p.u8(0x16),
+                            mpp: p.u8(0x17),
+                            jobs,
+                            mon: p.u16(0x1c),
+                            mon_ids: [p.u8(0x1e), p.u8(0x1f)],
+                        }))?;
                     }
                     // Kinds 0 (party) and 5 (alliance) share list 0; LSB sends no others.
                     0x0C8 if matches!(p.u8(4), 0 | 5) => {
-                        let entries = (0..20).map(|k| (p.u32(8 + 12 * k), p.u16(12 + 12 * k), p.u8(14 + 12 * k), p.u16(16 + 12 * k))).collect();
+                        let entries = (0..20)
+                            .map(|k| (p.u32(8 + 12 * k), p.u16(12 + 12 * k), p.u8(14 + 12 * k), p.u16(16 + 12 * k)))
+                            .collect();
                         tx.send(NetEvent::PartyTable(entries))?;
                     }
                     0x0DD | 0x0E2 if matches!(p.u8(0x1C), 0 | 5) => {
                         let jobs = std::array::from_fn(|i| p.u8(0x22 + i));
-                        let u = super::party::ListUpdate { id: p.u32(4), index: p.u16(0x18), number: p.u8(0x1A), name: text(&p, 0x28, 16), hp: p.u32(8), mp: p.u32(12), tp: p.u32(16), hpp: p.u8(0x1D), mpp: p.u8(0x1E), zone: p.u16(0x20), flags: p.u32(0x14), jobs, moghouse: p.u8(0x1B) != 0 };
+                        let u = super::party::ListUpdate {
+                            id: p.u32(4),
+                            index: p.u16(0x18),
+                            number: p.u8(0x1A),
+                            name: text(&p, 0x28, 16),
+                            hp: p.u32(8),
+                            mp: p.u32(12),
+                            tp: p.u32(16),
+                            hpp: p.u8(0x1D),
+                            mpp: p.u8(0x1E),
+                            zone: p.u16(0x20),
+                            flags: p.u32(0x14),
+                            jobs,
+                            moghouse: p.u8(0x1B) != 0,
+                        };
                         tx.send(NetEvent::PartyList(u, p.id == 0x0E2))?;
                     }
                     0x029 => tx.send(NetEvent::Battle(battle_message(&p)))?,
                     0x02D => tx.send(NetEvent::Battle(battle_message2(&p)))?,
                     0x028 => tx.send(NetEvent::Action(crate::net::action::parse(&p.data)))?,
-                    0x038 => tx.send(NetEvent::Scheduler { actor: p.u32(4), target: p.u32(8), name: p.u32(12).to_le_bytes() })?,
+                    0x038 => tx.send(NetEvent::Scheduler {
+                        actor: p.u32(4),
+                        target: p.u32(8),
+                        name: p.u32(12).to_le_bytes(),
+                    })?,
                     0x069 | 0x073 | 0x074 => tx.send(NetEvent::Racing { id: p.id, data: p.data.to_vec() })?,
                     0x02F => tx.send(NetEvent::Dig { id: p.u32(4), index: p.u16(8), flags: p.u8(0xa) })?,
-                    0x03A => tx.send(NetEvent::MagicScheduler { ids: (p.u32(4), p.u32(8)), indices: (p.u16(0xc), p.u16(0xe)), file: p.u16(0x10), kind: p.u8(0x12) })?,
-                    0x039 => tx.send(NetEvent::MapScheduler { ids: (p.u32(4), p.u32(8)), indices: (p.u16(0x10), p.u16(0x12)), name: p.u32(12).to_le_bytes() })?,
+                    0x03A => tx.send(NetEvent::MagicScheduler {
+                        ids: (p.u32(4), p.u32(8)),
+                        indices: (p.u16(0xc), p.u16(0xe)),
+                        file: p.u16(0x10),
+                        kind: p.u8(0x12),
+                    })?,
+                    0x039 => tx.send(NetEvent::MapScheduler {
+                        ids: (p.u32(4), p.u32(8)),
+                        indices: (p.u16(0x10), p.u16(0x12)),
+                        name: p.u32(12).to_le_bytes(),
+                    })?,
                     0x051 => tx.send(NetEvent::SelfLook(look_at(&p, 4)))?,
                     0x00E => {
                         // The first NPC updates of a session, for comparing servers: index, id, mask, the look @0x30.
                         if npc_logged < 400 {
                             npc_logged += 1;
                             let look = p.data.get(0x30..p.data.len().min(0x44)).unwrap_or_default();
-                            log::info!("0x00E index {:#05x} id {:08x} mask {:02x} ({:#x} bytes): look {}", p.u16(8), p.u32(4), p.u8(10), p.data.len(), hex::encode(look));
+                            log::info!(
+                                "0x00E index {:#05x} id {:08x} mask {:02x} ({:#x} bytes): look {}",
+                                p.u16(8),
+                                p.u32(4),
+                                p.u8(10),
+                                p.data.len(),
+                                hex::encode(look)
+                            );
                         }
                         tx.send(NetEvent::Entity(entity(&p, EntityKind::Npc)))?
                     }
@@ -1464,37 +2144,61 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     0x03E => tx.send(NetEvent::ShopOpen { count: p.u16(4) })?,
                     0x03C => {
                         let n = p.data.len().saturating_sub(8) / 12;
-                        let entries = (0..n).map(|k| {
-                            let o = 8 + 12 * k;
-                            (p.u32(o), p.u16(o + 4), p.u8(o + 6), p.u16(o + 8), p.u16(o + 0xa))
-                        }).collect();
+                        let entries = (0..n)
+                            .map(|k| {
+                                let o = 8 + 12 * k;
+                                (p.u32(o), p.u16(o + 4), p.u8(o + 6), p.u16(o + 8), p.u16(o + 0xa))
+                            })
+                            .collect();
                         tx.send(NetEvent::ShopList { last: p.u8(6) & 1 != 0, entries })?
                     }
                     0x03F => tx.send(NetEvent::ShopBuy { index: p.u16(4), count: p.u32(8) })?,
-                    0x03D => tx.send(NetEvent::ShopSell { price: p.u32(4), slot: p.u8(8), kind: p.u8(9), count: p.u32(0xc) })?,
+                    0x03D => tx.send(NetEvent::ShopSell {
+                        price: p.u32(4),
+                        slot: p.u8(8),
+                        kind: p.u8(9),
+                        count: p.u32(0xc),
+                    })?,
                     0x086 => tx.send(NetEvent::GuildOpen { stat: p.u8(4), time: p.u32(8) })?,
                     0x01D => tx.send(NetEvent::ItemsSettled(p.u8(4), p.u32(8)))?,
                     0x062 => tx.send(NetEvent::SkillBase(std::array::from_fn(|i| p.u16(0x80 + 2 * i))))?,
                     0x083 | 0x085 => {
                         let n = (p.u8(0xf4) as usize).min(30);
-                        let entries = (0..n).map(|k| {
-                            let o = 4 + 8 * k;
-                            (p.u16(o), p.u8(o + 2), p.u8(o + 3), p.u32(o + 4))
-                        }).collect();
+                        let entries = (0..n)
+                            .map(|k| {
+                                let o = 4 + 8 * k;
+                                (p.u16(o), p.u8(o + 2), p.u8(o + 3), p.u32(o + 4))
+                            })
+                            .collect();
                         tx.send(NetEvent::GuildList { sell: p.id == 0x085, stat: p.u8(0xf5), entries })?
                     }
                     0x021 => tx.send(NetEvent::TradeRequest { id: p.u32(4), index: p.u16(8) })?,
                     0x022 => tx.send(NetEvent::TradeResponse { id: p.u32(4), kind: p.u32(8), index: p.u16(0xc) })?,
-                    0x023 => tx.send(NetEvent::TradeTheirs { n: p.u32(4), counter: p.u16(8), item: p.u16(0xa), slot: p.u8(0xd), attr: std::array::from_fn(|k| p.u8(0xe + k)) })?,
-                    0x025 => tx.send(NetEvent::TradeMine { n: p.u32(4), item: p.u16(8), slot: p.u8(0xa), inv: p.u8(0xb) })?,
-                    0x082 | 0x084 => tx.send(NetEvent::GuildResult { sell: p.id == 0x084, item: p.u16(4), count: p.u8(6), trade: p.u8(7) as i8 })?,
+                    0x023 => tx.send(NetEvent::TradeTheirs {
+                        n: p.u32(4),
+                        counter: p.u16(8),
+                        item: p.u16(0xa),
+                        slot: p.u8(0xd),
+                        attr: std::array::from_fn(|k| p.u8(0xe + k)),
+                    })?,
+                    0x025 => {
+                        tx.send(NetEvent::TradeMine { n: p.u32(4), item: p.u16(8), slot: p.u8(0xa), inv: p.u8(0xb) })?
+                    }
+                    0x082 | 0x084 => tx.send(NetEvent::GuildResult {
+                        sell: p.id == 0x084,
+                        item: p.u16(4),
+                        count: p.u8(6),
+                        trade: p.u8(7) as i8,
+                    })?,
                     0x0E0 => tx.send(NetEvent::LinkshellEquip { num: p.u8(4), index: p.u8(5), bag: p.u8(6) })?,
                     0x0CC => tx.send(NetEvent::LinkshellMessage(p.data.clone()))?,
                     0x048 => tx.send(NetEvent::Concierge(p.data.clone()))?,
                     0x05E => tx.send(NetEvent::Conquest(p.data.clone()))?,
                     0x071 => tx.send(NetEvent::Influence(p.data.clone()))?,
                     0x0C9 => tx.send(NetEvent::InspectEquip(p.data.clone()))?,
-                    0x008 if p.data.len() >= 4 + 0x30 => tx.send(NetEvent::KnownZones(p.data[4..4 + 0x30].try_into().unwrap()))?,
+                    0x008 if p.data.len() >= 4 + 0x30 => {
+                        tx.send(NetEvent::KnownZones(p.data[4..4 + 0x30].try_into().unwrap()))?
+                    }
                     0x0CA => tx.send(NetEvent::InspectMessage(p.data.clone()))?,
                     0x04D => tx.send(NetEvent::Fragments(p.data.clone()))?,
                     0x0D2 => tx.send(NetEvent::TrophyList(TrophyList {
@@ -1523,7 +2227,11 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         entry_name: text(&p, 0x26, 16),
                     })?,
                     0x058 => tx.send(NetEvent::Assist { player: p.u32(4), target: p.u32(8) })?,
-                    0x055 if p.data.len() >= 0x86 => tx.send(NetEvent::KeyItems { table: p.u16(0x84), bits: std::array::from_fn(|i| p.u32(4 + 4 * i)), seen: std::array::from_fn(|i| p.u32(0x44 + 4 * i)) })?,
+                    0x055 if p.data.len() >= 0x86 => tx.send(NetEvent::KeyItems {
+                        table: p.u16(0x84),
+                        bits: std::array::from_fn(|i| p.u32(4 + 4 * i)),
+                        seen: std::array::from_fn(|i| p.u32(0x44 + 4 * i)),
+                    })?,
                     0x05F => tx.send(NetEvent::Music { slot: p.u16(4), id: p.u16(6) })?,
                     0x017 => {
                         let (from, text) = chat_text(&p);
@@ -1533,8 +2241,20 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     0x05D => tx.send(NetEvent::EventStrings((0..4).map(|i| p.str(0x28 + 16 * i, 16)).collect()))?,
                     0x05C => tx.send(NetEvent::EventParams(std::array::from_fn(|i| p.u32(4 + 4 * i))))?,
                     0x052 => tx.send(NetEvent::EventRelease { mode: p.u8(4), event: (p.u32(4) >> 8) as u16 })?,
-                    0x05B | 0x065 => tx.send(NetEvent::Wpos { id: p.u32(0x10), pos: [p.f32(4), p.f32(8), p.f32(0xc)], dir: p.u8(0x17), mode: p.u8(0x16) })?,
-                    0x036 => tx.send(NetEvent::ZoneText(ZoneText { packet: 0x036, actor: p.u32(4), index: p.u16(8), mes: p.u16(0xa), kind: p.u8(0xc), ..Default::default() }))?,
+                    0x05B | 0x065 => tx.send(NetEvent::Wpos {
+                        id: p.u32(0x10),
+                        pos: [p.f32(4), p.f32(8), p.f32(0xc)],
+                        dir: p.u8(0x17),
+                        mode: p.u8(0x16),
+                    })?,
+                    0x036 => tx.send(NetEvent::ZoneText(ZoneText {
+                        packet: 0x036,
+                        actor: p.u32(4),
+                        index: p.u16(8),
+                        mes: p.u16(0xa),
+                        kind: p.u8(0xc),
+                        ..Default::default()
+                    }))?,
                     0x02A => tx.send(NetEvent::ZoneText(ZoneText {
                         packet: 0x02A,
                         actor: p.u32(4),
@@ -1554,7 +2274,9 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         mes: p.u16(0xa),
                         kind: p.u16(0xc).min(255) as u8,
                         flags: p.u8(0xe),
-                        num: std::array::from_fn(|i| if i < 4 { p.u32(0x10 + 4 * i) as i32 } else { p.u32(0x50 + 4 * i) as i32 }),
+                        num: std::array::from_fn(|i| {
+                            if i < 4 { p.u32(0x10 + 4 * i) as i32 } else { p.u32(0x50 + 4 * i) as i32 }
+                        }),
                         strings: vec![text(&p, 0x20, 32)],
                         name2: text(&p, 0x40, 16),
                         ..Default::default()
@@ -1569,14 +2291,31 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         strings: vec![text(&p, 0x10, 16)],
                         ..Default::default()
                     }))?,
-                    0x067 if p.u8(4) & 0x3f == 3 => tx.send(NetEvent::EntityMaster { index: p.u16(6), id: p.u32(8), master: p.u16(0xc) })?,
-                    0x067 if p.u8(4) == 2 => tx.send(NetEvent::CharSync { id: p.u32(8), owner: p.u32(0x20), floors: p.u8(0x27) & 1 != 0, open: p.u8(0x24) != 0, level: p.u8(0x25), sync: p.u8(0x10), custom: [p.u32(0x18), p.u32(0x1c)] })?,
+                    0x067 if p.u8(4) & 0x3f == 3 => {
+                        tx.send(NetEvent::EntityMaster { index: p.u16(6), id: p.u32(8), master: p.u16(0xc) })?
+                    }
+                    0x067 if p.u8(4) == 2 => tx.send(NetEvent::CharSync {
+                        id: p.u32(8),
+                        owner: p.u32(0x20),
+                        floors: p.u8(0x27) & 1 != 0,
+                        open: p.u8(0x24) != 0,
+                        level: p.u8(0x25),
+                        sync: p.u8(0x10),
+                        custom: [p.u32(0x18), p.u32(0x1c)],
+                    })?,
                     0x02E => tx.send(NetEvent::MogMenu)?,
                     0x11A => tx.send(NetEvent::EmoteUnlocks { jobs: p.u32(4), chairs: p.u16(8) })?,
                     0x11E => tx.send(NetEvent::Jump(p.u16(4)))?,
                     0x1F0 => tx.send(NetEvent::GmCatalog(p.data.clone()))?,
                     0x1F1 => tx.send(NetEvent::GmResult(p.data.clone()))?,
-                    0x030 => tx.send(NetEvent::SynthEffect { id: p.u32(4), index: p.u16(8), effect: p.u16(0xa) as i16, kind: p.u8(0xc) as i8, status: p.u8(0xd) as i8, timer: p.u16(0xe) })?,
+                    0x030 => tx.send(NetEvent::SynthEffect {
+                        id: p.u32(4),
+                        index: p.u16(8),
+                        effect: p.u16(0xa) as i16,
+                        kind: p.u8(0xc) as i8,
+                        status: p.u8(0xd) as i8,
+                        timer: p.u16(0xe),
+                    })?,
                     0x06F | 0x070 => {
                         let a = super::synth::Answer {
                             result: p.u8(4),
@@ -1597,7 +2336,14 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         post: p.u8(6) as i8,
                         result: p.u8(0xc) as i8,
                         res: [p.u8(0xd) as i8, p.u8(0xe) as i8, p.u8(0xf) as i8],
-                        slot: super::post::Slot { stat: p.u32(0x10), name: text(&p, 0x14, 16), work_no: p.u32(0x2c), item: p.u16(0x30), stack: p.u32(0x38), ext: std::array::from_fn(|i| p.u8(0x3c + i)) },
+                        slot: super::post::Slot {
+                            stat: p.u32(0x10),
+                            name: text(&p, 0x14, 16),
+                            work_no: p.u32(0x2c),
+                            item: p.u16(0x30),
+                            stack: p.u32(0x38),
+                            ext: std::array::from_fn(|i| p.u8(0x3c + i)),
+                        },
                     }))?,
                     0x01B => tx.send(NetEvent::JobInfo(super::moogle::JobInfo {
                         main: p.u8(8),
@@ -1612,12 +2358,31 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                         ml_jobs: p.u32(0x68),
                         ml_levels: std::array::from_fn(|n| p.u8(0x6c + n)),
                     }))?,
-                    0x01C => tx.send(NetEvent::ItemMax(std::array::from_fn(|i| p.u8(4 + i)), std::array::from_fn(|i| p.u16(0x24 + 2 * i))))?,
+                    0x01C => tx.send(NetEvent::ItemMax(
+                        std::array::from_fn(|i| p.u8(4 + i)),
+                        std::array::from_fn(|i| p.u16(0x24 + 2 * i)),
+                    ))?,
                     0x01E => tx.send(NetEvent::ItemNum { container: p.u8(8), index: p.u8(9), count: p.u32(4) })?,
-                    0x01F => tx.send(NetEvent::Item { container: p.u8(0xa), index: p.u8(0xb), id: p.u16(8), count: p.u32(4), ext: None, lock: p.u8(0xc), price: None })?,
+                    0x01F => tx.send(NetEvent::Item {
+                        container: p.u8(0xa),
+                        index: p.u8(0xb),
+                        id: p.u16(8),
+                        count: p.u32(4),
+                        ext: None,
+                        lock: p.u8(0xc),
+                        price: None,
+                    })?,
                     0x020 => {
                         let ext = std::array::from_fn(|k| p.u8(0x11 + k));
-                        tx.send(NetEvent::Item { container: p.u8(0xe), index: p.u8(0xf), id: p.u16(0xc), count: p.u32(4), ext: Some(ext), lock: p.u8(0x10), price: Some(p.u32(8)) })?
+                        tx.send(NetEvent::Item {
+                            container: p.u8(0xe),
+                            index: p.u8(0xf),
+                            id: p.u16(0xc),
+                            count: p.u32(4),
+                            ext: Some(ext),
+                            lock: p.u8(0x10),
+                            price: Some(p.u32(8)),
+                        })?
                     }
                     // GP_SERV_COMMAND_ITEM_SUBCONTAINER (LAB_100ec730): a mannequin's look, bytes 4..0x1b kept whole.
                     0x026 => tx.send(NetEvent::MannequinLook { rec: std::array::from_fn(|k| p.u8(4 + k)) })?,
@@ -1706,7 +2471,9 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     body[8..12].copy_from_slice(&status.to_le_bytes());
                     queue.push(build(0x01A, &body));
                 }
-                NetCommand::Act { target, index, action } => queue.push(build(0x01A, &action_body(target, index, action))),
+                NetCommand::Act { target, index, action } => {
+                    queue.push(build(0x01A, &action_body(target, index, action)))
+                }
                 NetCommand::Packet { id, body } => queue.push(build(id, &body)),
                 NetCommand::GroupListReq => queue.push(build(0x076, &[0u8; 4])),
                 NetCommand::CancelStatus(id) => queue.push(build(0x0F1, &[id as u8, (id >> 8) as u8, 0, 0])),
@@ -1727,7 +2494,9 @@ fn session(addr: SocketAddr, login: &MapLogin, account: &str, codec: &Codec, tx:
                     body.extend_from_slice(&[0, 0]);
                     queue.push(build(0x05E, &body));
                 }
-                NetCommand::EventEnd { target, index, option, zone, event, mode } => queue.push(build(0x05B, &event_end_body(target, index, option, zone, event, mode))),
+                NetCommand::EventEnd { target, index, option, zone, event, mode } => {
+                    queue.push(build(0x05B, &event_end_body(target, index, option, zone, event, mode)))
+                }
                 NetCommand::EventPos { pos, dir, target, index, option, zone, event } => {
                     let mut b = Vec::with_capacity(28);
                     for v in pos {
@@ -1854,7 +2623,13 @@ mod tests {
         let ms = |n| t0 + Duration::from_millis(n);
         let ids = |q: &[Vec<u8>]| q.iter().map(|p| packet_id(p)).collect::<Vec<_>>();
         let mut g = SendGate::default();
-        let mut q = vec![build(0x0DD, &[0; 12]), build(0x015, &[0; 28]), build(0x0DD, &[0; 12]), build(0x05B, &[1; 4]), build(0x05B, &[2; 4])];
+        let mut q = vec![
+            build(0x0DD, &[0; 12]),
+            build(0x015, &[0; 28]),
+            build(0x0DD, &[0; 12]),
+            build(0x05B, &[1; 4]),
+            build(0x05B, &[2; 4]),
+        ];
         g.admit(&mut q, 0, t0);
         assert_eq!(ids(&q), [0x0DD, 0x015, 0x05B]);
         g.release(&mut q, ms(999));
@@ -1929,9 +2704,23 @@ mod tests {
     /// A 0x00E trimmed after its name (0x3c bytes) still gives its model; a trimmed lift (kind 3) its lift data.
     #[test]
     fn trimmed_npc_update() {
-        let p = sub(0x00E, 0x3c, &[(4, &0x010f_3080u32.to_le_bytes()), (8, &0x80u16.to_le_bytes()), (10, &[0x0f]), (0x32, &0x52u16.to_le_bytes()), (0x34, b"Moogle")]);
+        let p = sub(
+            0x00E,
+            0x3c,
+            &[
+                (4, &0x010f_3080u32.to_le_bytes()),
+                (8, &0x80u16.to_le_bytes()),
+                (10, &[0x0f]),
+                (0x32, &0x52u16.to_le_bytes()),
+                (0x34, b"Moogle"),
+            ],
+        );
         assert!(matches!(entity(&p, EntityKind::Npc).npc, Some(crate::dat::npc::NpcLook::Model(0x52))));
-        let p = sub(0x00E, 0x40, &[(10, &[0x07]), (0x30, &[3]), (0x34, &7u32.to_le_bytes()), (0x38, &100u32.to_le_bytes())]);
+        let p = sub(
+            0x00E,
+            0x40,
+            &[(10, &[0x07]), (0x30, &[3]), (0x34, &7u32.to_le_bytes()), (0x38, &100u32.to_le_bytes())],
+        );
         assert_eq!(entity(&p, EntityKind::Npc).lift, Some((7, 100, 100)));
     }
 
@@ -1939,9 +2728,22 @@ mod tests {
     /// no start, no voyage; LSB's flags4 0x0100 is route 0.
     #[test]
     fn ship_data_parse() {
-        let p = sub(0x00A, 0x118, &[(0x78, &1_000_000u32.to_le_bytes()), (0x7c, &944u16.to_le_bytes()), (0x24, &0x0400_0000u32.to_le_bytes()), (0x28, &((2u32 << 19) | 0x100).to_le_bytes())]);
+        let p = sub(
+            0x00A,
+            0x118,
+            &[
+                (0x78, &1_000_000u32.to_le_bytes()),
+                (0x7c, &944u16.to_le_bytes()),
+                (0x24, &0x0400_0000u32.to_le_bytes()),
+                (0x28, &((2u32 << 19) | 0x100).to_le_bytes()),
+            ],
+        );
         assert_eq!(ship_data(&p), Some(ShipData { start: 1_000_000, end: 1_000_944, reverse: true, route: 2 }));
-        let p = sub(0x00A, 0x118, &[(0x78, &1_000_000u32.to_le_bytes()), (0x7c, &944u16.to_le_bytes()), (0x28, &0x100u32.to_le_bytes())]);
+        let p = sub(
+            0x00A,
+            0x118,
+            &[(0x78, &1_000_000u32.to_le_bytes()), (0x7c, &944u16.to_le_bytes()), (0x28, &0x100u32.to_le_bytes())],
+        );
         assert_eq!(ship_data(&p), Some(ShipData { start: 1_000_000, end: 1_000_944, reverse: false, route: 0 }));
         let p = sub(0x00A, 0x118, &[(0x7c, &944u16.to_le_bytes())]);
         assert_eq!(ship_data(&p), None);
@@ -1950,13 +2752,41 @@ mod tests {
     /// GP_SERV_COMMAND_EVENT / EVENTNUM / EVENTSTR as LSB lays them out.
     #[test]
     fn event_starts() {
-        let p = sub(0x032, 0x14, &[(4, &0x010e_607eu32.to_le_bytes()), (8, &0x7eu16.to_le_bytes()), (0xa, &230u16.to_le_bytes()), (0xc, &615u16.to_le_bytes()), (0xe, &8u16.to_le_bytes()), (0x10, &230u16.to_le_bytes())]);
+        let p = sub(
+            0x032,
+            0x14,
+            &[
+                (4, &0x010e_607eu32.to_le_bytes()),
+                (8, &0x7eu16.to_le_bytes()),
+                (0xa, &230u16.to_le_bytes()),
+                (0xc, &615u16.to_le_bytes()),
+                (0xe, &8u16.to_le_bytes()),
+                (0x10, &230u16.to_le_bytes()),
+            ],
+        );
         let s = event_start(&p);
         assert_eq!((s.target, s.index, s.zone, s.event, s.mode, s.zone2), (0x010e_607e, 0x7e, 230, 615, 8, 230));
-        let p = sub(0x034, 0x34, &[(4, &0x010e_601bu32.to_le_bytes()), (8, &1u32.to_le_bytes()), (0x24, &7u32.to_le_bytes()), (0x28, &0x1bu16.to_le_bytes()), (0x2a, &230u16.to_le_bytes()), (0x2c, &0x24au16.to_le_bytes()), (0x2e, &8u16.to_le_bytes()), (0x30, &230u16.to_le_bytes())]);
+        let p = sub(
+            0x034,
+            0x34,
+            &[
+                (4, &0x010e_601bu32.to_le_bytes()),
+                (8, &1u32.to_le_bytes()),
+                (0x24, &7u32.to_le_bytes()),
+                (0x28, &0x1bu16.to_le_bytes()),
+                (0x2a, &230u16.to_le_bytes()),
+                (0x2c, &0x24au16.to_le_bytes()),
+                (0x2e, &8u16.to_le_bytes()),
+                (0x30, &230u16.to_le_bytes()),
+            ],
+        );
         let s = event_start(&p);
         assert_eq!((s.index, s.event, s.params[0], s.params[7]), (0x1b, 0x24a, 1, 7));
-        let p = sub(0x033, 0x70, &[(0xc, &5u16.to_le_bytes()), (0xe, &8u16.to_le_bytes()), (0x10, b"Bastok"), (0x50, &3u32.to_le_bytes())]);
+        let p = sub(
+            0x033,
+            0x70,
+            &[(0xc, &5u16.to_le_bytes()), (0xe, &8u16.to_le_bytes()), (0x10, b"Bastok"), (0x50, &3u32.to_le_bytes())],
+        );
         let s = event_start(&p);
         assert_eq!((s.event, s.strings[0].as_str(), s.params[0]), (5, "Bastok", 3));
     }

@@ -72,7 +72,9 @@ pub fn open_list(w: &mut World) {
 fn rows(w: &World) -> Vec<Row> {
     let list = &w.friends.list;
     let mut order: Vec<usize> = (0..list.len()).collect();
-    order.sort_by(|&a, &b| (category(&list[a]), list[a].name.as_bytes()).cmp(&(category(&list[b]), list[b].name.as_bytes())));
+    order.sort_by(|&a, &b| {
+        (category(&list[a]), list[a].name.as_bytes()).cmp(&(category(&list[b]), list[b].name.as_bytes()))
+    });
     let mut out = Vec::new();
     let mut last = None;
     for k in order {
@@ -337,14 +339,22 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     }
     if let Some((rows, top, cursor)) = ui.list {
         let (Some((x, y)), Some(lay)) = (gu.window_xy(LIST, sw, sh), gu.layout(LIST)) else { return };
-        if gu.window_rect(LIST, sw, sh).is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh) {
+        if gu
+            .window_rect(LIST, sw, sh)
+            .is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh)
+        {
             gu.hover.set(true);
             if right {
                 key(w, egui::Key::Escape);
                 return;
             }
         }
-        let inside = |e: &crate::dat::ui::MenuElement| p.0 >= x + e.x as f32 && p.0 < x + e.x as f32 + e.w as f32 && p.1 >= y + e.y as f32 && p.1 < y + e.y as f32 + e.h as f32;
+        let inside = |e: &crate::dat::ui::MenuElement| {
+            p.0 >= x + e.x as f32
+                && p.0 < x + e.x as f32 + e.w as f32
+                && p.1 >= y + e.y as f32
+                && p.1 < y + e.y as f32 + e.h as f32
+        };
         let Some(e) = lay.elements.iter().skip(1).find(|e| inside(e)) else { return };
         let row = top + e.id as usize - 1;
         if row >= rows.len() {
@@ -426,7 +436,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                     Row::Entry(i) => {
                         let Some(f) = w.friends.list.get(i) else { continue };
                         let cat = category(f);
-                        let icon = if f.mail { Some(158) } else if cat == 0 { status_icon(f.status) } else { None };
+                        let icon = if f.mail {
+                            Some(158)
+                        } else if cat == 0 {
+                            status_icon(f.status)
+                        } else {
+                            None
+                        };
                         if let Some(s) = icon {
                             gu.sprite("menu    keytops3", s, cell(0), y + 2.0, WHITE);
                         }

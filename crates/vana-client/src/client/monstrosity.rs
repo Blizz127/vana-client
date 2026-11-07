@@ -93,8 +93,15 @@ pub fn species_type(code: u16) -> u8 {
 
 /// File 81's `mon_` chunk (DAT_1057829c, FUN_101671d0): 0x200 u16 species codes from +0x10, zeros skipped.
 pub fn order(file: &[u8]) -> Vec<u16> {
-    let Some(o) = (0..file.len().saturating_sub(16)).step_by(16).find(|&o| &file[o..o + 4] == b"mon_") else { return Vec::new() };
-    file.get(o + 16..o + 16 + 0x400).unwrap_or_default().chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).filter(|&v| v != 0).collect()
+    let Some(o) = (0..file.len().saturating_sub(16)).step_by(16).find(|&o| &file[o..o + 4] == b"mon_") else {
+        return Vec::new();
+    };
+    file.get(o + 16..o + 16 + 0x400)
+        .unwrap_or_default()
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .filter(|&v| v != 0)
+        .collect()
 }
 
 /// The Feretory (FUN_10141b80: zone 285), where Customization may change anything.
@@ -164,7 +171,9 @@ pub fn species_owned(w: &World, v: u16) -> bool {
 
 /// FUN_100fda90 over G1 +0x14: a family's 2-bit instinct count.
 fn instinct_count(g1: &[u8], s: u16) -> u8 {
-    let d = g1.get(0x14 + (s as usize >> 4) * 4..0x18 + (s as usize >> 4) * 4).map_or(0, |b| u32::from_le_bytes(b.try_into().unwrap()));
+    let d = g1
+        .get(0x14 + (s as usize >> 4) * 4..0x18 + (s as usize >> 4) * 4)
+        .map_or(0, |b| u32::from_le_bytes(b.try_into().unwrap()));
     if s < 0x100 { (d >> ((s & 15) * 2) & 3) as u8 } else { 0 }
 }
 
@@ -192,7 +201,8 @@ pub fn names(table: &[String], species: Option<&str>, ids: [u8; 2]) -> (String, 
     let (p1, p2) = (prefix(table, ids[0]), prefix(table, ids[1]));
     let mut full: Vec<&str> = [p1, p2].into_iter().flatten().collect();
     // An empty prefix's initial is the C string's end.
-    let mut short: Vec<char> = [p1, p2].into_iter().flatten().flat_map(|p| [p.chars().next().unwrap_or('\0'), '.']).collect();
+    let mut short: Vec<char> =
+        [p1, p2].into_iter().flatten().flat_map(|p| [p.chars().next().unwrap_or('\0'), '.']).collect();
     if let Some(s) = species {
         full.push(s);
         if p1.is_some() || p2.is_some() {
@@ -222,13 +232,25 @@ pub fn refresh(w: &mut World) {
         w.my_mon_key = key;
     }
     // FUN_10099730: the party records' short names.
-    let wanted: Vec<(usize, u16, [u8; 2])> = w.party.records_mut().iter().enumerate().filter(|(_, r)| r.id != 0 && r.mon != 0 && r.mon_short.is_empty()).map(|(i, r)| (i, r.mon, r.mon_ids)).collect();
+    let wanted: Vec<(usize, u16, [u8; 2])> = w
+        .party
+        .records_mut()
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.id != 0 && r.mon != 0 && r.mon_short.is_empty())
+        .map(|(i, r)| (i, r.mon, r.mon_ids))
+        .collect();
     for (i, word, ids) in wanted {
         if let Some(s) = species_name(w, word) {
             w.party.records_mut()[i].mon_short = names(prefixes(), s.as_deref(), ids).1;
         }
     }
-    let stale: Vec<(u32, u16, [u8; 2])> = w.entities.iter().filter(|(_, e)| e.monstrosity != 0 && e.mon_key != (e.monstrosity, e.mon_prefix)).map(|(id, e)| (*id, e.monstrosity, e.mon_prefix)).collect();
+    let stale: Vec<(u32, u16, [u8; 2])> = w
+        .entities
+        .iter()
+        .filter(|(_, e)| e.monstrosity != 0 && e.mon_key != (e.monstrosity, e.mon_prefix))
+        .map(|(id, e)| (*id, e.monstrosity, e.mon_prefix))
+        .collect();
     for (id, word, ids) in stale {
         if let Some(s) = species_name(w, word)
             && let Some(e) = w.entities.get_mut(&id)
@@ -288,7 +310,10 @@ mod tests {
         let o = order(&f);
         assert_eq!((o.len(), o.first(), o.get(1), o.get(3)), (160, Some(&1), Some(&0x100), Some(&0x102)));
         if !dll_tables().1.is_empty() {
-            assert_eq!((species_type(1), species_type(0xfe), species_type(0x100), species_type(0x1fc)), (13, 19, 13, 19));
+            assert_eq!(
+                (species_type(1), species_type(0xfe), species_type(0x100), species_type(0x1fc)),
+                (13, 19, 13, 19)
+            );
         }
     }
 

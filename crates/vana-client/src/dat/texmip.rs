@@ -158,7 +158,9 @@ pub mod reference {
             let idx = if three && p[3] < cut {
                 3
             } else {
-                (0..pal.len()).min_by_key(|&j| (0..3).map(|k| (p[k] as i32 - pal[j][k]).pow(2)).sum::<i32>()).unwrap_or(0) as u32
+                (0..pal.len())
+                    .min_by_key(|&j| (0..3).map(|k| (p[k] as i32 - pal[j][k]).pow(2)).sum::<i32>())
+                    .unwrap_or(0) as u32
             };
             bits |= idx << (2 * i);
         }
@@ -209,7 +211,8 @@ pub mod reference {
             Some((dxt3, data)) if w % 4 == 0 && h % 4 == 0 => {
                 let punch = !dxt3 && rgba.chunks_exact(4).any(|p| p[3] < 128);
                 let mut lv = Vec::with_capacity(chain.len());
-                let mut first = data[..data.len().min(((w / 4) * (h / 4) * if dxt3 { 16 } else { 8 }) as usize)].to_vec();
+                let mut first =
+                    data[..data.len().min(((w / 4) * (h / 4) * if dxt3 { 16 } else { 8 }) as usize)].to_vec();
                 if dxt3 {
                     double_bc2_alpha(&mut first);
                 }
@@ -222,7 +225,6 @@ pub mod reference {
             _ => Levels { format: Format::Rgba, data: chain.into_iter().map(|(p, _, _)| p).collect() },
         }
     }
-
 }
 
 #[cfg(test)]
@@ -242,11 +244,13 @@ mod tests {
         assert!(c0 > c1);
         let (w, h) = (16u32, 16u32);
         // Leaves: opaque 2x2 clumps on a 4-texel grid plus a fade, a quarter or so covered.
-        let img: Vec<u8> = (0..w * h).flat_map(|i| {
-            let (x, y) = (i % w, i / w);
-            let a = if x % 4 < 2 && y % 4 < 2 { 255 } else { (x * 8) as u8 };
-            [90, 120, 60, a]
-        }).collect();
+        let img: Vec<u8> = (0..w * h)
+            .flat_map(|i| {
+                let (x, y) = (i % w, i / w);
+                let a = if x % 4 < 2 && y % 4 < 2 { 255 } else { (x * 8) as u8 };
+                [90, 120, 60, a]
+            })
+            .collect();
         let chain = rgba_chain(&img, w, h);
         assert_eq!(chain.len(), 5);
         let c0 = coverage(&chain[0].0, 1.0);

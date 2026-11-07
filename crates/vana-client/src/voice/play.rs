@@ -27,7 +27,13 @@ pub struct Play {
 impl Play {
     pub fn push(&mut self, who: u64, seq: u32, pcm: Vec<i16>) {
         let now = Instant::now();
-        let s = self.streams.entry(who).or_insert_with(|| Stream { q: BTreeMap::new(), next: seq, buffering: true, since: now, last: now });
+        let s = self.streams.entry(who).or_insert_with(|| Stream {
+            q: BTreeMap::new(),
+            next: seq,
+            buffering: true,
+            since: now,
+            last: now,
+        });
         if !s.buffering && seq < s.next {
             return;
         }
@@ -107,8 +113,19 @@ pub struct Out {
 
 impl Out {
     pub fn new(shared: Arc<Shared>, rate: u32, rec: Option<std::ffi::OsString>) -> Self {
-        let rec = rec.and_then(|p| super::wav::Writer::create(std::path::Path::new(&p)).map_err(|e| log::warn!("voice: recording: {e}")).ok());
-        Self { shared, step: RATE as f64 / rate.max(1) as f64, frac: 1.0, a: 0.0, b: 0.0, buf: [0.0; FRAME], at: FRAME, rec }
+        let rec = rec.and_then(|p| {
+            super::wav::Writer::create(std::path::Path::new(&p)).map_err(|e| log::warn!("voice: recording: {e}")).ok()
+        });
+        Self {
+            shared,
+            step: RATE as f64 / rate.max(1) as f64,
+            frac: 1.0,
+            a: 0.0,
+            b: 0.0,
+            buf: [0.0; FRAME],
+            at: FRAME,
+            rec,
+        }
     }
 
     fn sample(&mut self) -> f32 {
@@ -128,7 +145,11 @@ impl Out {
 
 impl crate::audio::output::Render for Out {
     fn render(&mut self, out: &mut [f32]) {
-        let vol = if self.shared.deaf.load(Ordering::Relaxed) { 0.0 } else { self.shared.volume.load(Ordering::Relaxed) as f32 / 100.0 };
+        let vol = if self.shared.deaf.load(Ordering::Relaxed) {
+            0.0
+        } else {
+            self.shared.volume.load(Ordering::Relaxed) as f32 / 100.0
+        };
         for f in out.chunks_exact_mut(2) {
             while self.frac >= 1.0 {
                 self.a = self.b;

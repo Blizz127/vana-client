@@ -44,7 +44,12 @@ pub fn normal_map(w: usize, h: usize, hts: &[u8]) -> Vec<u8> {
             let gy = 2.0 * (at(x, yp) - at(x, yn)) + at(xp, yp) + at(xn, yp) - at(xp, yn) - at(xn, yn);
             let gx = 2.0 * (at(xp, y) - at(xn, y)) + at(xp, yp) + at(xp, yn) - at(xn, yp) - at(xn, yn);
             let s = 127.0 / (gx * gx + gy * gy + 255.0 * 255.0).sqrt();
-            out.extend([((gy * s) as i32 + 128) as u8, ((gx * s) as i32 + 128) as u8, (128 + (255.0 * s) as i32) as u8, 0]);
+            out.extend([
+                ((gy * s) as i32 + 128) as u8,
+                ((gx * s) as i32 + 128) as u8,
+                (128 + (255.0 * s) as i32) as u8,
+                0,
+            ]);
         }
     }
     out

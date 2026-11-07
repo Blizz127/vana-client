@@ -88,14 +88,24 @@ fn start_seq(w: &mut World, id: u32, start: u32) {
     let s = if start == 0 { now } else { start as i64 * 60 };
     let elapsed = now - s;
     let skip = if elapsed < 600 { 0.0 } else { elapsed as f32 };
-    log::debug!("ship {id:#x}: state {:#x} {}, elapsed {elapsed} ticks, skip {skip}", a.state, String::from_utf8_lossy(&name.to_le_bytes()));
+    log::debug!(
+        "ship {id:#x}: state {:#x} {}, elapsed {elapsed} ticks, skip {skip}",
+        a.state,
+        String::from_utf8_lossy(&name.to_le_bytes())
+    );
     w.effects.start_sequence(id, a.file, name, skip);
 }
 
 /// Per frame, after the net events and doors: models to load for new ship entities (and rebuilt ones), gone ones
 /// dropped, state changes played (FUN_1008c6c0 kind 5, quiet under event op 0xab 5).
 pub fn update(w: &mut World) -> Vec<Job> {
-    let gone: Vec<u32> = w.ships.actors.keys().copied().filter(|id| w.entities.get(id).is_none_or(|e| e.ship.is_none() || e.ship_rebuild)).collect();
+    let gone: Vec<u32> = w
+        .ships
+        .actors
+        .keys()
+        .copied()
+        .filter(|id| w.entities.get(id).is_none_or(|e| e.ship.is_none() || e.ship_rebuild))
+        .collect();
     for id in gone {
         drop_actor(w, id);
     }
@@ -109,7 +119,8 @@ pub fn update(w: &mut World) -> Vec<Job> {
             a.held = true;
         }
     }
-    let free: Vec<u32> = w.ships.actors.iter().filter(|(id, a)| a.held && !w.effects.driving(**id)).map(|(id, _)| *id).collect();
+    let free: Vec<u32> =
+        w.ships.actors.iter().filter(|(id, a)| a.held && !w.effects.driving(**id)).map(|(id, _)| *id).collect();
     for id in free {
         let Some(e) = w.entities.get(&id) else { continue };
         let (pos, yaw) = (e.pos, super::event::rad_of(e.dir));
@@ -118,7 +129,8 @@ pub fn update(w: &mut World) -> Vec<Job> {
             (a.pos, a.target, a.held) = (pos, Vec3::new(0.0, yaw, 0.0), false);
         }
     }
-    let ships: Vec<(u32, u32, u32)> = w.entities.iter().filter_map(|(id, e)| e.ship.map(|(ship, start)| (*id, ship, start))).collect();
+    let ships: Vec<(u32, u32, u32)> =
+        w.entities.iter().filter_map(|(id, e)| e.ship.map(|(ship, start)| (*id, ship, start))).collect();
     for (id, ship, start) in ships {
         if let Some(e) = w.entities.get_mut(&id) {
             e.ship_rebuild = false;
@@ -182,8 +194,28 @@ pub fn create(w: &mut World, l: &Loaded) -> Option<Mat4> {
     }
     let (pos, rot) = (e.pos, Vec3::new(0.0, super::event::rad_of(e.dir), 0.0));
     let matrix = model_matrix(pos, rot);
-    log::info!("ship {:#x}: id {ship}, file {}, mesh {}, state {state:#x} at {pos} yaw {:.3}", l.entity, l.file, l.mesh, rot.y);
-    w.ships.actors.insert(l.entity, ModelActor { file: l.file, pos, rot, target: rot, smooth, skip_draws: 4, state, matrix, shown: false, held: false });
+    log::info!(
+        "ship {:#x}: id {ship}, file {}, mesh {}, state {state:#x} at {pos} yaw {:.3}",
+        l.entity,
+        l.file,
+        l.mesh,
+        rot.y
+    );
+    w.ships.actors.insert(
+        l.entity,
+        ModelActor {
+            file: l.file,
+            pos,
+            rot,
+            target: rot,
+            smooth,
+            skip_draws: 4,
+            state,
+            matrix,
+            shown: false,
+            held: false,
+        },
+    );
     let bound = super::event::active(w) && w.doors.event.contains_key(&l.entity);
     start_seq(w, l.entity, if bound { 0 } else { start });
     // A prop (the generic MMB branch) plays its file's 'init' once *(ours at creation; retail the second update)*.
@@ -208,7 +240,10 @@ pub fn swap_model(w: &mut World, id: u32, model: u16) {
 
 /// FUN_100c4b50: identity, then RotZ(z), RotY(y), RotX(x) post-multiplied, then the position: T * Rx * Ry * Rz.
 fn model_matrix(pos: Vec3, rot: Vec3) -> Mat4 {
-    Mat4::from_translation(pos) * Mat4::from_rotation_x(rot.x) * Mat4::from_rotation_y(rot.y) * Mat4::from_rotation_z(rot.z)
+    Mat4::from_translation(pos)
+        * Mat4::from_rotation_x(rot.x)
+        * Mat4::from_rotation_y(rot.y)
+        * Mat4::from_rotation_z(rot.z)
 }
 
 fn wrap_pi(a: f32) -> f32 {
@@ -258,12 +293,20 @@ pub fn apply(w: &mut World, ticks: f32, hidden: &std::collections::HashSet<u32>)
 
 /// The ships for the effects: entity, model file, matrix, drawn rotation, hidden.
 pub fn fx_actors(ships: &Ships, entities: &HashMap<u32, super::Entity>) -> Vec<(u32, u32, Mat4, Vec3, bool)> {
-    ships.actors.iter().map(|(id, a)| (*id, a.file, a.matrix, a.rot, entities.get(id).is_none_or(|e| e.flags & 2 != 0))).collect()
+    ships
+        .actors
+        .iter()
+        .map(|(id, a)| (*id, a.file, a.matrix, a.rot, entities.get(id).is_none_or(|e| e.flags & 2 != 0)))
+        .collect()
 }
 
 /// FUN_100c4410's MMB: `fune`, else `_fun` (alpha tested), else the first.
 fn pick_mesh(names: &[String]) -> Option<usize> {
-    names.iter().position(|n| n == "fune").or_else(|| names.iter().position(|n| n == "_fun")).or((!names.is_empty()).then_some(0))
+    names
+        .iter()
+        .position(|n| n == "fune")
+        .or_else(|| names.iter().position(|n| n == "_fun"))
+        .or((!names.is_empty()).then_some(0))
 }
 
 /// The loader thread: the file's scene, its one MMB placed at the origin (the instance takes the actor's matrix).
@@ -275,7 +318,19 @@ pub fn load(index: &DatIndex, keys: &Keys, (entity, seq, file): Job) -> Result<L
     let mesh = scene.meshes.swap_remove(k);
     scene.meshes = vec![mesh];
     let name = scene.meshes[0].name.clone();
-    scene.placements = vec![Placement { name: name.clone(), translate: [0.0; 3], rotate: [0.0; 3], scale: [1.0; 3], lights: [0; 4], link: 0, area: 0, id: 0, lod: [0.0; 2], world: false, own_dist: None }];
+    scene.placements = vec![Placement {
+        name: name.clone(),
+        translate: [0.0; 3],
+        rotate: [0.0; 3],
+        scale: [1.0; 3],
+        lights: [0; 4],
+        link: 0,
+        area: 0,
+        id: 0,
+        lod: [0.0; 2],
+        world: false,
+        own_dist: None,
+    }];
     let geo = Arc::new(ZoneGeometry::build(&scene));
     let init = crate::dat::chunks(&bytes).is_ok_and(|c| c.iter().any(|c| c.kind == 0x07 && c.name() == "init"));
     Ok(Loaded { entity, seq, file, mesh: name, init, geo, textures: std::mem::take(&mut scene.textures) })

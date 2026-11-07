@@ -21,7 +21,11 @@ impl Op<'_> {
 pub fn ops(data: &[u8]) -> Vec<Op<'_>> {
     let mut out = Vec::new();
     // FUN_10055aa0: the offsets count from the chunk start (16 bytes before the data).
-    let Some(mut at) = data.get(0x14..0x18).map(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).saturating_sub(0x10)) else { return out };
+    let Some(mut at) =
+        data.get(0x14..0x18).map(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).saturating_sub(0x10))
+    else {
+        return out;
+    };
     while at + 8 <= data.len() {
         let (code, len) = (data[at], (data[at + 1] & 0x1f) as usize * 4);
         if code == 0 || len == 0 || at + len > data.len() {
@@ -37,7 +41,11 @@ pub fn ops(data: &[u8]) -> Vec<Op<'_>> {
 /// over at its end (FUN_10057c20).
 pub fn loops(data: &[u8]) -> bool {
     // An offset inside the chunk header (below 0x10) points at no stream: no loop.
-    let Some(mut at) = data.get(0x18..0x1c).and_then(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).checked_sub(0x10)) else { return false };
+    let Some(mut at) =
+        data.get(0x18..0x1c).and_then(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).checked_sub(0x10))
+    else {
+        return false;
+    };
     while at + 4 <= data.len() {
         let (code, len) = (data[at], (data[at + 1] & 0x1f) as usize * 4);
         if code == 1 {
@@ -60,7 +68,11 @@ pub fn auto_start(data: &[u8]) -> bool {
 
 /// FUN_10056ae0: max(start + dur) over the main stream, op 0 included (it overwrites the header's length).
 pub fn span(data: &[u8]) -> i32 {
-    let Some(mut at) = data.get(0x14..0x18).map(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).saturating_sub(0x10)) else { return 0 };
+    let Some(mut at) =
+        data.get(0x14..0x18).map(|b| (u32::from_le_bytes(b.try_into().unwrap()) as usize).saturating_sub(0x10))
+    else {
+        return 0;
+    };
     let (mut t, mut best) = (0i32, 0i32);
     while at + 8 <= data.len() {
         let (code, len) = (data[at], (data[at + 1] & 0x1f) as usize * 4);
@@ -119,7 +131,14 @@ pub fn plan(data: &[u8], hit: &[&str]) -> Plan {
                     let speed = op.raw.get(16..20).map_or(1.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
                     let u16_at = |o: usize| op.raw.get(o..o + 2).map_or(0, |b| u16::from_le_bytes([b[0], b[1]]));
                     let count = op.raw.get(0x1e).map_or(1, |b| b & 0x7f);
-                    p.motions.push(Motion { name: n.trim_end_matches('?').to_string(), at: t, speed, ticks: u16_at(6), count, blend: u16_at(0x18) });
+                    p.motions.push(Motion {
+                        name: n.trim_end_matches('?').to_string(),
+                        at: t,
+                        speed,
+                        ticks: u16_at(6),
+                        count,
+                        blend: u16_at(0x18),
+                    });
                 }
             }
             0x03 if op.name().is_some_and(|n| hit.contains(&n)) && p.hit_at.is_none() => p.hit_at = Some(t),

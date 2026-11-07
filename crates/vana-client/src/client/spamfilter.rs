@@ -130,7 +130,11 @@ pub(super) fn flush(w: &mut World) {
     let dir = w.spam.dir.display().to_string();
     for e in std::mem::take(&mut w.spam.pending) {
         let line = match &e {
-            LoadError::Missing(n) => bt.group9(0x15a).unwrap_or_else(|| "Could not open %s (%s).".into()).replacen("%s", n, 1).replacen("%s", &dir, 1),
+            LoadError::Missing(n) => bt
+                .group9(0x15a)
+                .unwrap_or_else(|| "Could not open %s (%s).".into())
+                .replacen("%s", n, 1)
+                .replacen("%s", &dir, 1),
             LoadError::Bad(n) => bt.group9(0x15b).unwrap_or_else(|| "Could not read %s.".into()).replacen("%s", n, 1),
         };
         super::push_chat_mode(w, line, 0x7b, 0);
@@ -534,10 +538,34 @@ fn pattern_find(s: &[u16], e: &Entry) -> bool {
                     bl = true;
                     L::C1
                 }
-                L::C1 => if ok { L::C8 } else { L::D6 },
-                L::C8 => if in_br { L::Cf } else { L::D6 },
-                L::Cf => if neg { L::Df } else { L::D6 },
-                L::D6 => if bl { L::Df } else { L::Skip },
+                L::C1 => {
+                    if ok {
+                        L::C8
+                    } else {
+                        L::D6
+                    }
+                }
+                L::C8 => {
+                    if in_br {
+                        L::Cf
+                    } else {
+                        L::D6
+                    }
+                }
+                L::Cf => {
+                    if neg {
+                        L::Df
+                    } else {
+                        L::D6
+                    }
+                }
+                L::D6 => {
+                    if bl {
+                        L::Df
+                    } else {
+                        L::Skip
+                    }
+                }
                 L::Df => {
                     p += 1;
                     if e.pc(p) != 0 { L::Next } else { L::Done }
@@ -609,7 +637,15 @@ mod tests {
             (
                 "gil\n(i)buy\n(s)w w w\n(n)Bob",
                 "",
-                &[("Ann", "cheap gil", 1), ("Ann", "BUY NOW", 1), ("Ann", "b u y", 0), ("Ann", "visit www.x", 1), ("Bob", "hi", 0), ("gilda", "hi", 1), ("Ann", "Gil", 0)],
+                &[
+                    ("Ann", "cheap gil", 1),
+                    ("Ann", "BUY NOW", 1),
+                    ("Ann", "b u y", 0),
+                    ("Ann", "visit www.x", 1),
+                    ("Bob", "hi", 0),
+                    ("gilda", "hi", 1),
+                    ("Ann", "Gil", 0),
+                ],
             ),
             (
                 "(is)ゴールド\n[a-c]x\n[^0-9]z9\n(i)[.]q\nr[ab]s\n\\[t\\]",
@@ -628,8 +664,16 @@ mod tests {
                     ("Ann", "t", 0),
                 ],
             ),
-            ("(i)rmt\nsell", "(i)sell[ ]?\nmog", &[("Ann", "RMT here", 1), ("Ann", "sell items", 1), ("Ann", "sell", 1), ("Ann", "mog sell", 2)]),
-            ("[ab\na-]\n[]x\n^y", "", &[("Ann", "[ab", 1), ("Ann", "a-]", 1), ("Ann", "[]x", 1), ("Ann", "^y", 1), ("Ann", "b", 0)]),
+            (
+                "(i)rmt\nsell",
+                "(i)sell[ ]?\nmog",
+                &[("Ann", "RMT here", 1), ("Ann", "sell items", 1), ("Ann", "sell", 1), ("Ann", "mog sell", 2)],
+            ),
+            (
+                "[ab\na-]\n[]x\n^y",
+                "",
+                &[("Ann", "[ab", 1), ("Ann", "a-]", 1), ("Ann", "[]x", 1), ("Ann", "^y", 1), ("Ann", "b", 0)],
+            ),
         ];
         for (p, a, cases) in sets {
             let f = filter(p, a);

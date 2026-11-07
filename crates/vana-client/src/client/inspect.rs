@@ -85,7 +85,17 @@ pub fn sent(w: &mut World, id: u32, index: u16, fresh: bool, typed: bool) {
 
 /// The main-window class (registry flag 0x20000, FUN_1015ecc0): while one is up the inspect window does not open.
 fn blocked(w: &World) -> bool {
-    w.win.is_some() || w.map.is_some() || w.config.is_some() || w.settings.is_some() || w.search.is_some() || w.magic.is_some() || w.ability.is_some() || w.moogle.is_some() || super::shop::active(w) || super::trade::active(w) || w.inspect.up()
+    w.win.is_some()
+        || w.map.is_some()
+        || w.config.is_some()
+        || w.settings.is_some()
+        || w.search.is_some()
+        || w.magic.is_some()
+        || w.ability.is_some()
+        || w.moogle.is_some()
+        || super::shop::active(w)
+        || super::trade::active(w)
+        || w.inspect.up()
 }
 
 /// s2c 0x0C9 (LAB_100e5af0): only for the pending check; the first opens the window (FUN_10134650).
@@ -179,7 +189,8 @@ pub fn on_message(w: &mut World, p: &[u8]) {
         }
     }
     let text = |a: usize, n: usize| -> String {
-        let b: Vec<u8> = p.get(a..(a + n).min(p.len())).unwrap_or(&[]).iter().copied().take_while(|&c| c != 0).collect();
+        let b: Vec<u8> =
+            p.get(a..(a + n).min(p.len())).unwrap_or(&[]).iter().copied().take_while(|&c| c != 0).collect();
         crate::dat::font::decode_sjis(&b)
     };
     let name = text(0x80, 16);
@@ -290,15 +301,27 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
         return;
     }
     let Some(cursor) = w.inspect.win.as_ref().map(|win| win.cursor) else { return };
-    super::winhits::generic(w, gu, WINDOW, cursor, 1..=VIEW, p, moved, clicked, right, |w, id| {
-        w.inspect.prev = id;
-        if let Some(win) = w.inspect.win.as_mut() {
-            if id != VIEW {
-                win.col = (id - 1) / 4;
+    super::winhits::generic(
+        w,
+        gu,
+        WINDOW,
+        cursor,
+        1..=VIEW,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            w.inspect.prev = id;
+            if let Some(win) = w.inspect.win.as_mut() {
+                if id != VIEW {
+                    win.col = (id - 1) / 4;
+                }
+                win.cursor = id;
             }
-            win.cursor = id;
-        }
-    }, key);
+        },
+        key,
+    );
 }
 
 /// The cursor slot's item for the item info window (mode 0): none on View Wares (the comment window shows there).
@@ -321,7 +344,13 @@ pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
         bars.help[2] = "？　？　？".into();
         return;
     }
-    let lv = |fmt: usize, level: u8, job: u8| gu.lobby_msg(10, fmt, "Lv.%d %s").replacen("%d", &level.to_string(), 1).replacen("%s", &gu.lobby_msg(0x12, job as usize, ""), 1);
+    let lv = |fmt: usize, level: u8, job: u8| {
+        gu.lobby_msg(10, fmt, "Lv.%d %s").replacen("%d", &level.to_string(), 1).replacen(
+            "%s",
+            &gu.lobby_msg(0x12, job as usize, ""),
+            1,
+        )
+    };
     let mut line = if g.levelling { lv(0x79, g.mlvl, g.jobs[0]) } else { lv(0x58, g.levels[0], g.jobs[0]) };
     if g.jobs[1] != 0 {
         line.push_str(" / ");
@@ -343,7 +372,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let enabled = w.inspect.view_enabled();
     let off: &[u16] = if enabled { &[] } else { &[VIEW] };
     let on_view = win.cursor == VIEW;
-    let Some(lw) = gu.lobby_window_off(WINDOW, sw, sh, (0.0, 0.0), Some(win.cursor), on_view && enabled, off) else { return rects };
+    let Some(lw) = gu.lobby_window_off(WINDOW, sw, sh, (0.0, 0.0), Some(win.cursor), on_view && enabled, off) else {
+        return rects;
+    };
     super::winhits::record(w, WINDOW, &lw);
     let [x0, y0, ..] = lw.frame;
     if !enabled {
@@ -356,8 +387,7 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
     }
     super::post::draw_slots(gu, &info, WINDOW, lw.frame, &by_child, None, Some(win.cursor), |_| [1.0; 4]);
-    if !on_view
-        && let Some(e) = gu.layout(WINDOW).and_then(|l| l.elements.iter().find(|e| e.id == win.cursor).cloned())
+    if !on_view && let Some(e) = gu.layout(WINDOW).and_then(|l| l.elements.iter().find(|e| e.id == win.cursor).cloned())
     {
         let n = gu.lib_len("anc     anc_equi").max(1);
         gu.sprite("anc     anc_equi", gu.cursor_frame() % n, x0 + e.x as f32, y0 + e.y as f32, WHITE);
@@ -381,7 +411,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     if on_view && let Some(cw) = gu.lobby_window_off(COMMENT, sw, sh, (0.0, 0.0), None, false, &[]) {
         for (k, line) in w.inspect.comment.iter().enumerate() {
             if !line.is_empty() {
-                gu.text(line, cw.frame[0] + 4.0, cw.frame[1] + 4.0 + 16.0 * k as f32, 0, crate::dat::battle::argb_bytes(WHITE));
+                gu.text(
+                    line,
+                    cw.frame[0] + 4.0,
+                    cw.frame[1] + 4.0 + 16.0 * k as f32,
+                    0,
+                    crate::dat::battle::argb_bytes(WHITE),
+                );
             }
         }
         rects.push(cw.frame);

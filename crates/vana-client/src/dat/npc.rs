@@ -1,8 +1,8 @@
 //! NPC and monster models. 0x00E SubKind 0 carries a model id naming one self-contained DAT
 //! (skeleton, meshes, textures, motions); SubKind 1/7 carry a GrapIDTbl for the character path.
 
-use super::{DatIndex, chunks};
 use super::character::{Character, Look, load_character, load_file};
+use super::{DatIndex, chunks};
 use anyhow::{Result, bail};
 use std::collections::HashMap;
 
@@ -38,8 +38,30 @@ pub fn parse_look(b: &[u8]) -> Result<NpcLook> {
         // s2c 0x00E (0x1009cd38 / 0x1009cda2): the word @0x32 | 0x9000; bits 0..11 the NPC-table model id, bits
         // 12..15 the look slot (9 = the whole model, FUN_100d0b50).
         5 | 6 => NpcLook::Model(w(1) & 0xfff),
-        1 => NpcLook::Equipped(Look { race: b[3], face: b[2] as u16, head: id(2), body: id(3), hands: id(4), legs: id(5), feet: id(6), main: id(7), sub: id(8), range: id(9) }),
-        7 => NpcLook::Equipped(Look { race: b[2], face: 0, head: id(2), body: id(3), hands: id(4), legs: id(5), feet: id(6), main: 0, sub: 0, range: 0 }),
+        1 => NpcLook::Equipped(Look {
+            race: b[3],
+            face: b[2] as u16,
+            head: id(2),
+            body: id(3),
+            hands: id(4),
+            legs: id(5),
+            feet: id(6),
+            main: id(7),
+            sub: id(8),
+            range: id(9),
+        }),
+        7 => NpcLook::Equipped(Look {
+            race: b[2],
+            face: 0,
+            head: id(2),
+            body: id(3),
+            hands: id(4),
+            legs: id(5),
+            feet: id(6),
+            main: 0,
+            sub: 0,
+            range: 0,
+        }),
         k => bail!("look kind {k} (door/elevator/ship) has no model"),
     })
 }
@@ -80,7 +102,8 @@ fn weapon_ops(chunks: &[super::Chunk], name: &str, depth: u32, hide: &mut HashMa
             0x75 | 0xa3 if len >= 14 => {
                 let n = i16::from_le_bytes([r[12], r[13]]);
                 if (0..10).contains(&n) {
-                    hide.entry(n as u8).or_default()[(op == 0xa3) as usize] = u32::from_le_bytes(r[8..12].try_into().unwrap()) == 1;
+                    hide.entry(n as u8).or_default()[(op == 0xa3) as usize] =
+                        u32::from_le_bytes(r[8..12].try_into().unwrap()) == 1;
                 }
             }
             _ => {}
@@ -112,7 +135,18 @@ pub fn init_scheduler(file: &[u8]) -> InitScheduler {
         }
         if let Some(race) = v[0] {
             let s = |i: usize| v[i].unwrap_or(0) as u16;
-            out.look = Some(Look { race: race as u8, face: s(1), head: s(2), body: s(3), hands: s(4), legs: s(5), feet: s(6), main: s(7), sub: s(8), range: 0 });
+            out.look = Some(Look {
+                race: race as u8,
+                face: s(1),
+                head: s(2),
+                body: s(3),
+                hands: s(4),
+                legs: s(5),
+                feet: s(6),
+                main: s(7),
+                sub: s(8),
+                range: 0,
+            });
         }
     }
     let mut hide = HashMap::new();
@@ -168,7 +202,13 @@ pub fn load_file_model(index: &DatIndex, id: u32) -> Result<Character> {
     Ok(self_contained(id, &file, f, skeleton, "riding model"))
 }
 
-fn self_contained(id: u32, file: &[u8], f: super::character::CharFile, skeleton: super::character::Skeleton, what: &str) -> Character {
+fn self_contained(
+    id: u32,
+    file: &[u8],
+    f: super::character::CharFile,
+    skeleton: super::character::Skeleton,
+    what: &str,
+) -> Character {
     let mut log = vec![format!(
         "{what} -> file {id}: skeleton {} ({} bones), {} mesh copies, {} textures, {} animations",
         skeleton.name,
@@ -179,8 +219,31 @@ fn self_contained(id: u32, file: &[u8], f: super::character::CharFile, skeleton:
     )];
     log.push(format!("attach points: {:?}", skeleton.points.iter().take(4).collect::<Vec<_>>()));
     log.extend(f.warnings);
-    let mount = f.moun.map(|moun| super::character::MountInfo { moun, rate: f.info.map_or(0xff, |i| i[15]), cam: f.info.map_or(0xff, |i| i[14]) });
-    let mut ch = Character { skeleton, parts: f.parts, textures: f.textures, animations: f.animations, size_info: [0xFF; 4], motions: Default::default(), schedulers: f.schedulers, pc: None, mount, log, packed: None, skin: None, files: vec![id], part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
+    let mount = f.moun.map(|moun| super::character::MountInfo {
+        moun,
+        rate: f.info.map_or(0xff, |i| i[15]),
+        cam: f.info.map_or(0xff, |i| i[14]),
+    });
+    let mut ch = Character {
+        skeleton,
+        parts: f.parts,
+        textures: f.textures,
+        animations: f.animations,
+        size_info: [0xFF; 4],
+        motions: Default::default(),
+        schedulers: f.schedulers,
+        pc: None,
+        mount,
+        log,
+        packed: None,
+        skin: None,
+        files: vec![id],
+        part_files: Vec::new(),
+        cib: [-1; 3],
+        ranged: -1,
+        init_hidden: Default::default(),
+        grips: [None; 2],
+    };
     ch.merge_size_info(f.info);
     let init = init_scheduler(file);
     apply_motion_ops(&mut ch, &init);
@@ -227,7 +290,18 @@ mod tests {
             let file = index.read(id).unwrap();
             println!("{id}: {:?}", init_scheduler(&file));
             for c in chunks(&file).unwrap().iter().filter(|c| c.kind == 0x07) {
-                let ops: Vec<String> = crate::dat::sched::ops(c.data).iter().map(|o| format!("{:02x}:{}", o.code, o.raw.get(8..12).map_or(String::new(), |b| u32::from_le_bytes(b.try_into().unwrap()).to_string()))).collect();
+                let ops: Vec<String> = crate::dat::sched::ops(c.data)
+                    .iter()
+                    .map(|o| {
+                        format!(
+                            "{:02x}:{}",
+                            o.code,
+                            o.raw
+                                .get(8..12)
+                                .map_or(String::new(), |b| u32::from_le_bytes(b.try_into().unwrap()).to_string())
+                        )
+                    })
+                    .collect();
                 println!("  {} {}", c.name(), ops.join(" "));
             }
         }
@@ -243,7 +317,11 @@ mod tests {
             let ch = load_npc(&index, &NpcLook::Model(m)).unwrap();
             let rest = crate::dat::character::pose(&ch.skeleton, &[]);
             let p = ch.skeleton.points.get(0x2b).map(|(b, off)| (b, rest.get(*b as usize).map(|x| x.at(*off))));
-            println!("model {m}: {} bones, {} points, point 0x2b {p:?}", ch.skeleton.bones.len(), ch.skeleton.points.len());
+            println!(
+                "model {m}: {} bones, {} points, point 0x2b {p:?}",
+                ch.skeleton.bones.len(),
+                ch.skeleton.points.len()
+            );
         }
         let hume = load_character(&index, &Look { race: 1, ..Default::default() }).unwrap();
         let rest = crate::dat::character::pose(&hume.skeleton, &[]);
@@ -263,7 +341,10 @@ mod tests {
         assert_eq!((tiger.variant(1), tiger.variant(2), tiger.rate()), (6, 3, 0.9));
         assert!((tiger.yaw(2) - 0x40 as f32 * 0.024_591_723).abs() < 1e-6);
         let moogle = load_file_model(&index, 102_716).unwrap();
-        assert_eq!((moogle.mount.unwrap().variant(8), moogle.mount.unwrap().rate(), moogle.size_info), (3, 0.5, [100; 4]));
+        assert_eq!(
+            (moogle.mount.unwrap().variant(8), moogle.mount.unwrap().rate(), moogle.size_info),
+            (3, 0.5, [100; 4])
+        );
         assert!(load_file_model(&index, 39_275).unwrap().mount.is_none());
         // The riding box (FUN_1001ee60 takes y1 - y0) stands up: y0 is its top.
         let hume = load_character(&index, &Look { race: 1, ..Default::default() }).unwrap();
@@ -284,7 +365,12 @@ mod tests {
                     let (p, q, m) = (t.sample(f as f32).0, t.sample(f as f32 + 1.0).0, t.sample(f as f32 + 0.5).0);
                     flips += (p.dot(q) < 0.0) as usize;
                     let gap = p.angle_between(q);
-                    assert!(p.angle_between(m).max(q.angle_between(m)) <= gap * 0.5 + 1e-3, "{} bone {} frame {f}", a.name, t.bone);
+                    assert!(
+                        p.angle_between(m).max(q.angle_between(m)) <= gap * 0.5 + 1e-3,
+                        "{} bone {} frame {f}",
+                        a.name,
+                        t.bone
+                    );
                 }
             }
         }
@@ -301,7 +387,11 @@ mod tests {
         want[4][0] = true;
         assert_eq!(init_scheduler(&file).hidden_weapons, want);
         let ch = load_model(&index, 64).unwrap();
-        assert!(ch.parts.iter().any(|p| p.name.starts_with("wep4")), "{:?}", ch.parts.iter().map(|p| p.name.as_str()).collect::<Vec<_>>());
+        assert!(
+            ch.parts.iter().any(|p| p.name.starts_with("wep4")),
+            "{:?}",
+            ch.parts.iter().map(|p| p.name.as_str()).collect::<Vec<_>>()
+        );
         assert_eq!(ch.init_hidden_mask(), 1 << 4);
         let idle: Vec<&str> = ch.find_animations("idl0").iter().map(|a| a.name.trim_end()).collect();
         assert!(idle.contains(&"idl0") && idle.contains(&"idl1"), "{idle:?}");
@@ -314,16 +404,47 @@ mod tests {
         // SubKind 5 / 6: only the low 12 bits name the model.
         assert!(matches!(parse_look(&hex("05008e9000000000000000000000000000000000")).unwrap(), NpcLook::Model(142)));
         assert!(matches!(parse_look(&hex("06008e1000000000000000000000000000000000")).unwrap(), NpcLook::Model(142)));
-        let NpcLook::Equipped(l) = parse_look(&hex("010002030c100c200c300c400c50006000700000")).unwrap() else { panic!() };
+        let NpcLook::Equipped(l) = parse_look(&hex("010002030c100c200c300c400c50006000700000")).unwrap() else {
+            panic!()
+        };
         assert_eq!((l.race, l.face, l.head, l.feet, l.main), (3, 2, 12, 12, 0));
-        let NpcLook::Equipped(c) = parse_look(&hex("0700200000000000000000000000000000000000")).unwrap() else { panic!() };
+        let NpcLook::Equipped(c) = parse_look(&hex("0700200000000000000000000000000000000000")).unwrap() else {
+            panic!()
+        };
         assert_eq!(c.race, 32);
     }
 
     #[test]
     fn size_info_order() {
-        let skel = super::super::character::Skeleton { name: String::new(), bones: Vec::new(), points: Vec::new(), point_rots: Vec::new(), look_limits: [[0.0; 3]; 2], boxes: Vec::new(), spheres: Vec::new() };
-        let mut ch = Character { skeleton: skel, parts: Vec::new(), textures: Vec::new(), animations: Vec::new(), size_info: [0xFF; 4], motions: Default::default(), schedulers: Vec::new(), pc: None, mount: None, log: Vec::new(), packed: None, skin: None, files: Vec::new(), part_files: Vec::new(), cib: [-1; 3], ranged: -1, init_hidden: Default::default(), grips: [None; 2] };
+        let skel = super::super::character::Skeleton {
+            name: String::new(),
+            bones: Vec::new(),
+            points: Vec::new(),
+            point_rots: Vec::new(),
+            look_limits: [[0.0; 3]; 2],
+            boxes: Vec::new(),
+            spheres: Vec::new(),
+        };
+        let mut ch = Character {
+            skeleton: skel,
+            parts: Vec::new(),
+            textures: Vec::new(),
+            animations: Vec::new(),
+            size_info: [0xFF; 4],
+            motions: Default::default(),
+            schedulers: Vec::new(),
+            pc: None,
+            mount: None,
+            log: Vec::new(),
+            packed: None,
+            skin: None,
+            files: Vec::new(),
+            part_files: Vec::new(),
+            cib: [-1; 3],
+            ranged: -1,
+            init_hidden: Default::default(),
+            grips: [None; 2],
+        };
         let mut later = [0xFFu8; 16];
         later[10..14].copy_from_slice(&[85, 100, 115, 140]);
         ch.merge_size_info(Some(later));

@@ -65,7 +65,16 @@ impl Portraits {
     /// Draws each wanted actor into a slot, a slot kept while its actor is wanted, and finishes it (backing, oval,
     /// frame). The ones drawn: entity -> (game UI image, modern UI texture).
     #[allow(clippy::too_many_arguments)]
-    pub fn draw(&mut self, gpu: &Gpu, egui: &mut egui_wgpu::Renderer, mut gu: Option<&mut GameUi>, r: &mut ZoneRenderer, encoder: &mut wgpu::CommandEncoder, format: wgpu::TextureFormat, want: &[(Wanted, Camera, &ActorGpu)]) -> HashMap<u32, (String, egui::TextureId)> {
+    pub fn draw(
+        &mut self,
+        gpu: &Gpu,
+        egui: &mut egui_wgpu::Renderer,
+        mut gu: Option<&mut GameUi>,
+        r: &mut ZoneRenderer,
+        encoder: &mut wgpu::CommandEncoder,
+        format: wgpu::TextureFormat,
+        want: &[(Wanted, Camera, &ActorGpu)],
+    ) -> HashMap<u32, (String, egui::TextureId)> {
         let mut out = HashMap::new();
         let wanted: Vec<u32> = want.iter().map(|w| w.0.entity).collect();
         for &(p, cam, a) in want.iter().take(SLOTS) {
@@ -95,11 +104,27 @@ impl Portraits {
                 s.in_ui = true;
             }
             let aspect = size[0] as f32 / size[1] as f32;
-            if !r.render_portrait(gpu, encoder, k, &s.view, &s.depth, &cam, aspect, p.look.bg.map_or([0.0; 4], premul), a) {
+            if !r.render_portrait(
+                gpu,
+                encoder,
+                k,
+                &s.view,
+                &s.depth,
+                &cam,
+                aspect,
+                p.look.bg.map_or([0.0; 4], premul),
+                a,
+            ) {
                 continue;
             }
-            let f = crate::render::portrait::Finish { oval: p.look.oval, frame: p.look.frame.map(premul), frame_px: p.look.frame_w * size[1] as f32 / p.size[1].max(1.0) };
-            self.finish.get_or_insert_with(|| crate::render::portrait::PortraitFinish::new(gpu, format)).run(gpu, encoder, k, &s.view, size, f);
+            let f = crate::render::portrait::Finish {
+                oval: p.look.oval,
+                frame: p.look.frame.map(premul),
+                frame_px: p.look.frame_w * size[1] as f32 / p.size[1].max(1.0),
+            };
+            self.finish
+                .get_or_insert_with(|| crate::render::portrait::PortraitFinish::new(gpu, format))
+                .run(gpu, encoder, k, &s.view, size, f);
             if s.in_ui {
                 out.insert(p.entity, (key(k), s.egui));
             }
@@ -111,12 +136,32 @@ impl Portraits {
 impl Slot {
     fn new(gpu: &Gpu, egui: &mut egui_wgpu::Renderer, format: wgpu::TextureFormat, entity: u32, px: [u32; 2]) -> Self {
         let size = wgpu::Extent3d { width: px[0], height: px[1], depth_or_array_layers: 1 };
-        let make = |label, format, usage| gpu.device.create_texture(&wgpu::TextureDescriptor { label: Some(label), size, mip_level_count: 1, sample_count: 1, dimension: wgpu::TextureDimension::D2, format, usage, view_formats: &[] });
-        let color = make("portrait", format, wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING);
+        let make = |label, format, usage| {
+            gpu.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(label),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage,
+                view_formats: &[],
+            })
+        };
+        let color =
+            make("portrait", format, wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING);
         let depth = make("portrait depth", crate::render::DEPTH_FORMAT, wgpu::TextureUsages::RENDER_ATTACHMENT);
         let view = color.create_view(&Default::default());
         // The target is gamma-encoded as the scene is, as egui's textures are.
         let id = egui.register_native_texture(&gpu.device, &view, wgpu::FilterMode::Linear);
-        Self { entity, size: px, tex: color, view, depth: depth.create_view(&Default::default()), egui: id, in_ui: false }
+        Self {
+            entity,
+            size: px,
+            tex: color,
+            view,
+            depth: depth.create_view(&Default::default()),
+            egui: id,
+            in_ui: false,
+        }
     }
 }

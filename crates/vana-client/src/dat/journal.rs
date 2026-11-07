@@ -8,7 +8,8 @@ use anyhow::Result;
 
 /// Mission logs 0..14 (DAT_10667a90 + log * 0x94): San d'Oria, Bastok, Windurst, Zilart, CoP, Assault, ToAU, Campaign,
 /// WotG, SoA, RoV, TVR, ACP, AMK, ASA.
-pub const MISSION_FILES: [u32; 15] = [55715, 55716, 55717, 55718, 55719, 55720, 55721, 55724, 55723, 55738, 55741, 55742, 55735, 55736, 55737];
+pub const MISSION_FILES: [u32; 15] =
+    [55715, 55716, 55717, 55718, 55719, 55720, 55721, 55724, 55723, 55738, 55741, 55742, 55735, 55736, 55737];
 /// Quest areas 0..10: San d'Oria, Bastok, Windurst, Jeuno, Other Areas, Outlands, Aht Urhgan, Crystal War, Abyssea,
 /// Adoulin, Coalition.
 pub const QUEST_FILES: [u32; 11] = [55706, 55707, 55708, 55709, 55710, 55711, 55712, 55722, 55713, 55739, 55740];
@@ -50,7 +51,14 @@ pub struct Logs {
 
 impl Logs {
     pub fn load(index: &DatIndex) -> Logs {
-        let load = |files: &[u32]| files.iter().map(|&f| LogFile::load(index, f).map_err(|e| log::warn!("journal file {f}: {e:#}")).unwrap_or_default()).collect();
+        let load = |files: &[u32]| {
+            files
+                .iter()
+                .map(|&f| {
+                    LogFile::load(index, f).map_err(|e| log::warn!("journal file {f}: {e:#}")).unwrap_or_default()
+                })
+                .collect()
+        };
         Logs { missions: load(&MISSION_FILES), quests: load(&QUEST_FILES) }
     }
 }
@@ -64,7 +72,10 @@ mod tests {
         let Ok(index) = DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let l = Logs::load(&index);
         assert_eq!(l.missions[0].entries.len(), 24);
-        assert_eq!((l.missions[0].entries[0].number, l.missions[0].entries[0].name.as_str()), (0, "Smash the Orcish Scouts"));
+        assert_eq!(
+            (l.missions[0].entries[0].number, l.missions[0].entries[0].name.as_str()),
+            (0, "Smash the Orcish Scouts")
+        );
         assert_eq!(l.missions[4].entries.len(), 65);
         assert!(l.quests.iter().all(|q| !q.entries.is_empty()));
     }

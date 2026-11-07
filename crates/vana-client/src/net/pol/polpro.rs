@@ -40,7 +40,14 @@ pub fn handshake(addr20: &[u8; 20], residue: &[u8; 12]) -> [u8; 0x28] {
 
 /// The request header (0x1001f5e0): 2, category, opcode, the body length (checksum included), and
 /// MD5(POL ID's 8 characters ‖ POL password ‖ the handshake's token).
-pub fn request_header(category: u8, opcode: u8, body_len: u32, pol_id: &str, pol_password: &str, token: [u8; 4]) -> [u8; 0x28] {
+pub fn request_header(
+    category: u8,
+    opcode: u8,
+    body_len: u32,
+    pol_id: &str,
+    pol_password: &str,
+    token: [u8; 4],
+) -> [u8; 0x28] {
     let mut h = [0u8; 0x28];
     h[..3].copy_from_slice(&[2, category, opcode]);
     h[4..8].copy_from_slice(&body_len.to_le_bytes());
@@ -122,7 +129,8 @@ pub fn change_my_status(cur: &Status, a: [i32; 6], slots: impl Fn(i32) -> [u8; 8
         b[0x10] = new.content as u8;
         b[0x16] = new.presence as u8 + 1;
     }
-    if let Some(slot) = slots(b[0x10] as i32).iter().position(|&s| s & 1 != 0 && (s >> 1 & 0x3f) as i32 == new.service) {
+    if let Some(slot) = slots(b[0x10] as i32).iter().position(|&s| s & 1 != 0 && (s >> 1 & 0x3f) as i32 == new.service)
+    {
         b[0x11] = 1;
         b[0x12] = slot as u8;
     }
@@ -207,7 +215,15 @@ pub enum ReplyBody {
 /// One transaction on its own connection (0x1001f0f0's states): the plain handshake and its token, the header
 /// (keystream reset) and body (continued), the reply header (reset) and body (continued). `server` is the address a
 /// reply cached, else the host is resolved.
-pub fn transact<S: Stream>(cipher: &mut S, member: &mut Member, server: &mut Option<SocketAddr>, category: u8, opcode: u8, payload: Option<&[u8]>, reply: ReplyBody) -> Result<Vec<u8>> {
+pub fn transact<S: Stream>(
+    cipher: &mut S,
+    member: &mut Member,
+    server: &mut Option<SocketAddr>,
+    category: u8,
+    opcode: u8,
+    payload: Option<&[u8]>,
+    reply: ReplyBody,
+) -> Result<Vec<u8>> {
     let mut sock = match member.fixed.as_ref().or(server.as_ref()) {
         Some(a) => TcpStream::connect_timeout(a, Duration::from_secs(15)),
         None => TcpStream::connect((host(member.host_byte).as_str(), PORT)),
@@ -222,7 +238,14 @@ pub fn transact<S: Stream>(cipher: &mut S, member: &mut Member, server: &mut Opt
     }
     let token: [u8; 4] = hs[0x14..0x18].try_into().unwrap();
     let body = payload.map(body);
-    let mut head = request_header(category, opcode, body.as_ref().map_or(0, |b| b.len() as u32), &member.pol_id, &member.pol_password, token);
+    let mut head = request_header(
+        category,
+        opcode,
+        body.as_ref().map_or(0, |b| b.len() as u32),
+        &member.pol_id,
+        &member.pol_password,
+        token,
+    );
     cipher.apply(&mut head, true);
     member.residue.copy_from_slice(&head[12..24]);
     sock.write_all(&head)?;
@@ -265,7 +288,14 @@ pub fn transact<S: Stream>(cipher: &mut S, member: &mut Member, server: &mut Opt
         let mut more = vec![0u8; 0x4000];
         sock.set_read_timeout(Some(Duration::from_secs(3)))?;
         let n = sock.read(&mut more).unwrap_or(0);
-        log::warn!("PlayOnline {category}/{opcode}: checksum {:08x}, sent {}; body {} ({} bytes), {n} more: {}", checksum(payload), hex::encode(sum), hex::encode(&data), data.len(), hex::encode(&more[..n]));
+        log::warn!(
+            "PlayOnline {category}/{opcode}: checksum {:08x}, sent {}; body {} ({} bytes), {n} more: {}",
+            checksum(payload),
+            hex::encode(sum),
+            hex::encode(&data),
+            data.len(),
+            hex::encode(&more[..n])
+        );
         bail!("a PlayOnline reply failed its checksum (POL-{})", 0x140f);
     }
     Ok(payload.to_vec())
@@ -379,7 +409,10 @@ mod tests {
         let data = h("808386898c8f9295989b9ea1a4a7aaadb0b3b6b9bcbfc2c5c8cbced1d4d7dadde0e3e6e9");
         assert_eq!(checksum(&data).to_le_bytes().to_vec(), h("30516c87"));
         let addr: [u8; 20] = h("010039300900000a000000000000000000000000").try_into().unwrap();
-        assert_eq!(handshake(&addr, &[0xaa; 12]).to_vec(), h("00000000010039300900000aaaaaaaaaaaaaaaaaaaaaaaaa00000000000000000000000000000000"));
+        assert_eq!(
+            handshake(&addr, &[0xaa; 12]).to_vec(),
+            h("00000000010039300900000aaaaaaaaaaaaaaaaaaaaaaaaa00000000000000000000000000000000")
+        );
         let hd = request_header(4, 5, 0x28, "EFKAOYMJ", "hunter2", [0xde, 0xad, 0xbe, 0xef]);
         assert_eq!(hd.to_vec(), h("0204050028000000000000000000000000000000000000004d69ecd7efcce1cc96148c6d7aadd09f"));
     }
@@ -390,15 +423,28 @@ mod tests {
         let s: [u8; 20] = [0x11; 20];
         let now = 0x6543_210f;
         let b = member_login("TESTMEMBER", &s, None, now);
-        assert_eq!(b.to_vec(), h("01544553544d454d42455200000000000000000000000000000000000000000099175d8367ac6b3a30588ff9f6f716697e7e5e6d0000000000000000")[..0x3c]);
+        assert_eq!(
+            b.to_vec(),
+            h(
+                "01544553544d454d42455200000000000000000000000000000000000000000099175d8367ac6b3a30588ff9f6f716697e7e5e6d0000000000000000"
+            )[..0x3c]
+        );
         let b = member_login("SIXTEENCHARSXYZ0", &s, Some("123456"), now);
-        assert_eq!(b.to_vec(), h("025349585445454e434841525358595a3000313233343536000000000000000099175d8367ac6b3a30588ff9f6f716697e7e5e6d0000000000000000")[..0x3c]);
+        assert_eq!(
+            b.to_vec(),
+            h(
+                "025349585445454e434841525358595a3000313233343536000000000000000099175d8367ac6b3a30588ff9f6f716697e7e5e6d0000000000000000"
+            )[..0x3c]
+        );
     }
 
     #[test]
     fn auth_code_matches_polcore() {
         let c = C5::encrypt(AUTH_KEY, &(0..0x28).collect::<Vec<u8>>());
-        assert_eq!(c, h("41f9fdc5809ab6926b49ee2d4acccd2dcdb0cbfad809d59f1712f0d7d25596d7700405419bf3b2e8b8b15ec730836d17"));
+        assert_eq!(
+            c,
+            h("41f9fdc5809ab6926b49ee2d4acccd2dcdb0cbfad809d59f1712f0d7d25596d7700405419bf3b2e8b8b15ec730836d17")
+        );
         let a = auth_code(
             &h("112233445566778899aabbccddeeff01").try_into().unwrap(),
             &h("202122232425262728292a2b2c2d2e2f30313233").try_into().unwrap(),
@@ -406,7 +452,12 @@ mod tests {
             &h("0102030405060708").try_into().unwrap(),
             7,
         );
-        assert_eq!(a.to_vec(), h("3c7d2e21ad948588c390edb7f8b13b2e7044adf8d1994e940051c877c82d5bc8afebe654639dea5eb7a4b246574cb8d54f66a11c"));
+        assert_eq!(
+            a.to_vec(),
+            h(
+                "3c7d2e21ad948588c390edb7f8b13b2e7044adf8d1994e940051c877c82d5bc8afebe654639dea5eb7a4b246574cb8d54f66a11c"
+            )
+        );
         let a = auth_code(
             &h("40454a4f54595e63686d72777c81868b").try_into().unwrap(),
             &h("010039300900000a000000000000000000000000").try_into().unwrap(),
@@ -414,7 +465,12 @@ mod tests {
             &h("3141592653589793").try_into().unwrap(),
             7,
         );
-        assert_eq!(a.to_vec(), h("6da82e084cb56f9ee487caa0c78f6a3902b6f569b0fb21e71305f93851955ad8988c94c807cf8f2ead3020b44cbea3275494baee"));
+        assert_eq!(
+            a.to_vec(),
+            h(
+                "6da82e084cb56f9ee487caa0c78f6a3902b6f569b0fb21e71305f93851955ad8988c94c807cf8f2ead3020b44cbea3275494baee"
+            )
+        );
     }
 
     /// polcore's bodies for FFXiMain's (-2,-1,0,-2,-1,1), then app.dll's (3,-2,1,2,0,-2), after a LoadMyStatus of

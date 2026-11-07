@@ -9,7 +9,8 @@ use egui::{Align2, FontFamily, FontId, Rect, Sense, Ui, pos2, vec2};
 const W: f32 = 300.0;
 const LINE: f32 = 24.0;
 /// framesus 73 / 75 / 74 / 94 / 93 (region.rs LABELS).
-const NATIONS: [(usize, &str); 5] = [(73, "San d'Oria"), (75, "Bastok"), (74, "Windurst"), (94, "Beastmen"), (93, "Neutral")];
+const NATIONS: [(usize, &str); 5] =
+    [(73, "San d'Oria"), (75, "Bastok"), (74, "Windurst"), (94, "Beastmen"), (93, "Neutral")];
 /// keytops3 81 / 80 / 78 / 77 / 79 (region.rs LEVELS).
 const LEVELS: [(usize, &str); 5] = [(81, "Minimal"), (80, "Minor"), (78, "Major"), (77, "Dominant"), (79, "Equal")];
 const LEGENDS: [&str; 4] = ["Conquest Points", "Imperial Standing", "Allied Notes", "Bayld"];
@@ -17,26 +18,57 @@ const LEGENDS: [&str; 4] = ["Conquest Points", "Imperial Standing", "Allied Note
 const COALITIONS: [&str; 6] = ["Pioneers", "Mummers", "Inventors", "Peacekeepers", "Scouts", "Couriers"];
 
 fn caption(p: &Panels, lib: &str, index: usize, fallback: &str) -> String {
-    p.gu.and_then(|gu| p.m.caption(gu, lib, index)).filter(|s| !s.trim().is_empty()).unwrap_or_else(|| fallback.to_string())
+    p.gu.and_then(|gu| p.m.caption(gu, lib, index))
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| fallback.to_string())
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
     ui.add_space(6.0);
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
 }
 
 fn pair(ui: &mut Ui, m: &super::Modern, label: &str, value: &str) {
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
-    ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), m.theme.color("muted"));
-    ui.painter().text(pos2(r.max.x - 4.0, r.center().y), Align2::RIGHT_CENTER, value, FontId::monospace(m.theme.small), m.theme.color("text"));
+    ui.painter().text(
+        pos2(r.min.x + 4.0, r.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        FontId::proportional(m.theme.small),
+        m.theme.color("muted"),
+    );
+    ui.painter().text(
+        pos2(r.max.x - 4.0, r.center().y),
+        Align2::RIGHT_CENTER,
+        value,
+        FontId::monospace(m.theme.small),
+        m.theme.color("text"),
+    );
 }
 
 /// A labelled bar (0..1), `lit` the one ahead.
 fn gauge(ui: &mut Ui, m: &super::Modern, label: &str, f: f32, lit: bool, value: &str) {
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), LINE + 8.0), Sense::hover());
     let c = if lit { m.theme.color("gold") } else { m.theme.color("text") };
-    ui.painter().text(pos2(r.min.x + 4.0, r.min.y + 8.0), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), c);
-    ui.painter().text(pos2(r.max.x - 4.0, r.min.y + 8.0), Align2::RIGHT_CENTER, value, FontId::monospace(m.theme.small), c);
+    ui.painter().text(
+        pos2(r.min.x + 4.0, r.min.y + 8.0),
+        Align2::LEFT_CENTER,
+        label,
+        FontId::proportional(m.theme.small),
+        c,
+    );
+    ui.painter().text(
+        pos2(r.max.x - 4.0, r.min.y + 8.0),
+        Align2::RIGHT_CENTER,
+        value,
+        FontId::monospace(m.theme.small),
+        c,
+    );
     let track = Rect::from_min_max(pos2(r.min.x + 4.0, r.max.y - 10.0), pos2(r.max.x - 4.0, r.max.y - 4.0));
     ui.painter().rect_filled(track, 3.0, m.theme.color("charcoal"));
     let fill = Rect::from_min_max(track.min, pos2(track.min.x + track.width() * f.clamp(0.0, 1.0), track.max.y));
@@ -48,14 +80,25 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         return;
     }
     let (Some(v), Some(gu)) = (region::info_view(w), p.gu) else { return };
-    if v.region.is_none() && v.ranking.is_none() && v.besieged.is_none() && v.stronghold.is_none() && v.colony.is_none() && v.coalitions.is_none() && v.legend.is_none() {
+    if v.region.is_none()
+        && v.ranking.is_none()
+        && v.besieged.is_none()
+        && v.stronghold.is_none()
+        && v.colony.is_none()
+        && v.coalitions.is_none()
+        && v.legend.is_none()
+    {
         return;
     }
     let m = p.m;
     let nation = |k: usize| caption(p, "menu    framesus", NATIONS[k.min(4)].0, NATIONS[k.min(4)].1);
     let level = |k: usize| caption(p, "menu    keytops3", LEVELS[k.min(4)].0, LEVELS[k.min(4)].1);
-    let army = |k: usize| caption(p, "menu    keytops3", 367 + k, ["Mamool Ja Savages", "Troll Mercenaries", "Undead Swarm"][k.min(2)]);
-    let orders = |o: u32| if o < 6 { caption(p, "menu    keytops3", 377 + o as usize, &format!("Orders {o}")) } else { String::new() };
+    let army = |k: usize| {
+        caption(p, "menu    keytops3", 367 + k, ["Mamool Ja Savages", "Troll Mercenaries", "Undead Swarm"][k.min(2)])
+    };
+    let orders = |o: u32| {
+        if o < 6 { caption(p, "menu    keytops3", 377 + o as usize, &format!("Orders {o}")) } else { String::new() }
+    };
     let title = region::map_title(gu, v.mode);
     // Built before the panel borrows p.
     let mut lines: Vec<Box<dyn Fn(&mut Ui)>> = Vec::new();
@@ -78,7 +121,8 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 })
                 .collect()
         };
-        let dominant = (r.beast_flag && !r.precise).then(|| caption(p, "menu    framesus", 95, "The beastmen are dominant."));
+        let dominant =
+            (r.beast_flag && !r.precise).then(|| caption(p, "menu    framesus", 95, "The beastmen are dominant."));
         lines.push(Box::new(move |ui: &mut Ui| {
             heading(ui, m, "Region");
             pair(ui, m, "Controlled by", &owner);
@@ -106,7 +150,8 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     }
     if let Some((zahbi, armies)) = v.besieged {
         let own = caption(p, "menu    keytops3", 370 + zahbi as usize, "Al Zahbi");
-        let rows: Vec<(String, u32, String)> = armies.iter().enumerate().map(|(k, &(lv, o))| (army(k), lv, orders(o))).collect();
+        let rows: Vec<(String, u32, String)> =
+            armies.iter().enumerate().map(|(k, &(lv, o))| (army(k), lv, orders(o))).collect();
         lines.push(Box::new(move |ui: &mut Ui| {
             heading(ui, m, "Besieged");
             pair(ui, m, "Al Zahbi", &own);
@@ -157,10 +202,16 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     }
     let screen = p.ctx.content_rect();
     let x = if v.left { 16.0 } else { screen.width() - W - 44.0 - 16.0 };
-    p.panel_at("region info", Some(Title { icon: Some("icons/map"), text: &title, note: None, name: false }), W + 44.0, pos2(x, screen.height() * 0.12), |ui| {
-        ui.set_width(W);
-        for f in &lines {
-            f(ui);
-        }
-    });
+    p.panel_at(
+        "region info",
+        Some(Title { icon: Some("icons/map"), text: &title, note: None, name: false }),
+        W + 44.0,
+        pos2(x, screen.height() * 0.12),
+        |ui| {
+            ui.set_width(W);
+            for f in &lines {
+                f(ui);
+            }
+        },
+    );
 }

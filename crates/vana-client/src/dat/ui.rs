@@ -303,7 +303,8 @@ impl UiFile {
         for c in &s.cells {
             let Some(img) = self.images.get(&c.texture) else { continue };
             let (l, t) = (c.corners[0][0] as i32 - x0, c.corners[0][1] as i32 - y0);
-            let (cw, ch) = ((c.corners[3][0] - c.corners[0][0]).max(1) as i32, (c.corners[3][1] - c.corners[0][1]).max(1) as i32);
+            let (cw, ch) =
+                ((c.corners[3][0] - c.corners[0][0]).max(1) as i32, (c.corners[3][1] - c.corners[0][1]).max(1) as i32);
             let k = c.colors[0].map(|v| v as f32 / 128.0);
             for py in 0..ch {
                 for px in 0..cw {
@@ -316,7 +317,15 @@ impl UiFile {
                     }
                     let (u, v) = (c.uv[0] as i32 + u, c.uv[1] as i32 + v);
                     let (ox, oy) = (l + px, t + py);
-                    if u < 0 || v < 0 || u >= img.width as i32 || v >= img.height as i32 || ox < 0 || oy < 0 || ox >= w as i32 || oy >= h as i32 {
+                    if u < 0
+                        || v < 0
+                        || u >= img.width as i32
+                        || v >= img.height as i32
+                        || ox < 0
+                        || oy < 0
+                        || ox >= w as i32
+                        || oy >= h as i32
+                    {
                         continue;
                     }
                     let si = (v as usize * img.width as usize + u as usize) * 4;

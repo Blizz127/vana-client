@@ -27,8 +27,16 @@ impl Info {
 }
 
 /// DAT valid-target bits (spell +6, ability +0xa) by the kinds target::SUB_FLAGS maps them to.
-const TARGETS: [(u16, &str); 8] =
-    [(1, "Self"), (4, "Party"), (8, "Alliance"), (0x10, "Player"), (2, "Ally NPC"), (0x40, "NPC"), (0x80, "NPC"), (0x20, "Enemy")];
+const TARGETS: [(u16, &str); 8] = [
+    (1, "Self"),
+    (4, "Party"),
+    (8, "Alliance"),
+    (0x10, "Player"),
+    (2, "Ally NPC"),
+    (0x40, "NPC"),
+    (0x80, "NPC"),
+    (0x20, "Enemy"),
+];
 
 fn target_names(bits: u16) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
@@ -57,7 +65,12 @@ fn effect_reason(w: &World, magic: bool) -> Option<&'static str> {
 
 /// A refusal id's group 7 line, or a short line of ours when the DAT has none (a silent refusal).
 fn line(w: &World, id: usize) -> String {
-    w.battle.as_ref().and_then(|bt| bt.group7(id)).map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).unwrap_or_else(|| "Can't be used now.".into())
+    w.battle
+        .as_ref()
+        .and_then(|bt| bt.group7(id))
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .unwrap_or_else(|| "Can't be used now.".into())
 }
 
 /// The current target's flat distance when `bits` may take it (target::takes).

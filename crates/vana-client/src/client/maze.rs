@@ -103,7 +103,11 @@ pub fn on_store(w: &mut World, data: &[u8]) {
     let mut b = Box::new([0u8; 0x80]);
     let n = data.len().min(0x80);
     b[..n].copy_from_slice(&data[..n]);
-    log::debug!("maze: 0x0AD vouchers {:02x?} runes {} learned", &b[..8], (0..512).filter(|&n| bit(&b[8..0x48], n)).count());
+    log::debug!(
+        "maze: 0x0AD vouchers {:02x?} runes {} learned",
+        &b[..8],
+        (0..512).filter(|&n| bit(&b[8..0x48], n)).count()
+    );
     w.maze.store = Some(b);
 }
 
@@ -159,12 +163,20 @@ fn occupied(w: &World, s: &Screen) -> u32 {
 pub(super) fn rows(w: &World, s: &Screen) -> Vec<Row> {
     let store = w.maze.store.as_deref();
     match s.mode {
-        Mode::Vouchers => store.map_or_else(Vec::new, |b| (0..64u16).filter(|&n| bit(&b[..8], n as usize)).map(|n| Row::Item(VOUCHER_BASE + n)).collect()),
+        Mode::Vouchers => store.map_or_else(Vec::new, |b| {
+            (0..64u16).filter(|&n| bit(&b[..8], n as usize)).map(|n| Row::Item(VOUCHER_BASE + n)).collect()
+        }),
         Mode::Runes => {
             let mut v = vec![Row::Type];
             if let Some(b) = store {
                 // FUN_101fe540: under a filter only runes whose shape is known and matches.
-                v.extend((0..512u16).filter(|&n| bit(&b[8..0x48], n as usize) && s.filter.is_none_or(|f| shape(w, RUNE_BASE + n) == Some(f))).map(|n| Row::Item(RUNE_BASE + n)));
+                v.extend(
+                    (0..512u16)
+                        .filter(|&n| {
+                            bit(&b[8..0x48], n as usize) && s.filter.is_none_or(|f| shape(w, RUNE_BASE + n) == Some(f))
+                        })
+                        .map(|n| Row::Item(RUNE_BASE + n)),
+                );
             }
             v
         }
@@ -209,7 +221,11 @@ pub fn open(w: &mut World, edit: bool, slot: Option<u8>, tabula: u16, ext: [u8; 
     for (e, p) in placed.iter_mut().zip(runes) {
         *e = Some(p);
     }
-    log::info!("maze: tabula {tabula:#x} slot {slot:?} {} voucher {voucher:#x}, {} runes", if edit { "edit" } else { "view" }, placed.iter().flatten().count());
+    log::info!(
+        "maze: tabula {tabula:#x} slot {slot:?} {} voucher {voucher:#x}, {} runes",
+        if edit { "edit" } else { "view" },
+        placed.iter().flatten().count()
+    );
     w.maze.screen = Some(Screen {
         edit,
         slot,
@@ -355,7 +371,8 @@ fn list_to(s: &mut Screen, r: usize) {
 fn fix(w: &World, s: &mut Screen) {
     let n = rows(w, s).len();
     if s.reset {
-        let r = if s.mode == Mode::Vouchers { rows(w, s).iter().position(|r| *r == Row::Item(s.voucher)) } else { None };
+        let r =
+            if s.mode == Mode::Vouchers { rows(w, s).iter().position(|r| *r == Row::Item(s.voucher)) } else { None };
         s.list = (0, 0);
         list_to(s, r.unwrap_or(0));
         s.reset = false;
@@ -395,7 +412,13 @@ fn keys(w: &mut World, s: &mut Screen, key: egui::Key) -> Then {
     if let Some(r) = s.sibo {
         match key {
             K::ArrowDown | K::ArrowUp => {
-                s.sibo = Some(if key == K::ArrowDown { r % 11 + 1 } else if r <= 1 { 11 } else { r - 1 });
+                s.sibo = Some(if key == K::ArrowDown {
+                    r % 11 + 1
+                } else if r <= 1 {
+                    11
+                } else {
+                    r - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             K::Enter => {
@@ -515,7 +538,10 @@ pub fn tick(w: &mut World, dt: f32) {
     if w.maze.texts.is_none()
         && let (Some(index), Some(file)) = (w.index.clone(), w.point_files[5])
     {
-        w.maze.texts = crate::dat::names::DMsg::load(&index, file).map_err(|e| log::warn!("maze rune texts {file}: {e:#}")).ok().map(Arc::new);
+        w.maze.texts = crate::dat::names::DMsg::load(&index, file)
+            .map_err(|e| log::warn!("maze rune texts {file}: {e:#}"))
+            .ok()
+            .map(Arc::new);
     }
     let Some(mut s) = w.maze.screen.take() else { return };
     s.clock += dt;
@@ -644,7 +670,8 @@ fn draw_grid(gu: &mut GameUi, w: &World, s: &Screen, x0: f32, y0: f32) {
     }
     let g = grid(w, s.tabula);
     let at = |c: i8, r: i8| (x0 + 40.0 + 24.0 * c as f32, y0 + 56.0 + 24.0 * r as f32);
-    let placed: Vec<(Placed, u8, u8)> = s.placed.iter().flatten().filter_map(|p| rune(w, p.rune).map(|(e, sh)| (*p, e, sh))).collect();
+    let placed: Vec<(Placed, u8, u8)> =
+        s.placed.iter().flatten().filter_map(|p| rune(w, p.rune).map(|(e, sh)| (*p, e, sh))).collect();
     for &(p, e, sh) in &placed {
         let (x, y) = at(p.col, p.row);
         rune_sprite(gu, e, sh, x, y, p.rot, Look::Plain, s.pulse.0, s.glint);
@@ -659,7 +686,17 @@ fn draw_grid(gu: &mut GameUi, w: &World, s: &Screen, x0: f32, y0: f32) {
     }
     for &(p, e, sh) in &placed {
         let (x, y) = at(p.col, p.row);
-        rune_sprite(gu, e, sh, x, y, p.rot, if bonus(w, &g, &p) { Look::Glint } else { Look::Faded }, s.pulse.0, s.glint);
+        rune_sprite(
+            gu,
+            e,
+            sh,
+            x,
+            y,
+            p.rot,
+            if bonus(w, &g, &p) { Look::Glint } else { Look::Faded },
+            s.pulse.0,
+            s.glint,
+        );
     }
     if let Some((r, carry)) = s.held
         && let Some((e, sh)) = rune(w, r)
@@ -703,7 +740,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     gu.set_group(HELP, Some(8));
     let Some(info) = w.item_info.clone() else { return rects };
     let list = rows(w, s);
-    let shown = list.iter().skip(s.list.1).take(VISIBLE).filter_map(|r| if let Row::Item(id) = r { Some(*id) } else { None });
+    let shown =
+        list.iter().skip(s.list.1).take(VISIBLE).filter_map(|r| if let Row::Item(id) = r { Some(*id) } else { None });
     super::items::upload_icons(gu, &info, std::iter::once(s.voucher).filter(|&v| v != 0).chain(shown));
     if let Some(win) = gu.lobby_window_off(GRID, sw, sh, (0.0, 0.0), None, false, &[]) {
         draw_grid(gu, w, s, win.frame[0], win.frame[1]);
@@ -788,7 +826,11 @@ fn hit(gu: &GameUi, sw: f32, sh: f32, p: (f32, f32)) -> Option<Hit> {
     let child = |name: &str, off: (f32, f32)| -> Option<u16> {
         let (x, y) = gu.window_xy(name, sw, sh)?;
         let m = gu.layout(name)?;
-        m.elements.iter().skip(1).find(|e| inside([x + off.0 + e.x as f32, y + off.1 + e.y as f32, e.w as f32, e.h as f32])).map(|e| e.id)
+        m.elements
+            .iter()
+            .skip(1)
+            .find(|e| inside([x + off.0 + e.x as f32, y + off.1 + e.y as f32, e.w as f32, e.h as f32]))
+            .map(|e| e.id)
     };
     if let Some(c) = child(SIBO, (0.0, 0.0)) {
         return Some(Hit::Sibo(c));
@@ -805,7 +847,17 @@ fn hit(gu: &GameUi, sw: f32, sh: f32, p: (f32, f32)) -> Option<Hit> {
 /// carried a cell moves it there (message 9), a click places it, a right click drops it, a middle click turns it; the
 /// list's rows move the cursor, a click on the cursor's row is Enter, a right click Escape.
 #[allow(clippy::too_many_arguments)]
-pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), moved: bool, clicked: bool, right: bool, middle: bool) {
+pub fn pointer(
+    w: &mut World,
+    gu: &GameUi,
+    sw: f32,
+    sh: f32,
+    p: (f32, f32),
+    moved: bool,
+    clicked: bool,
+    right: bool,
+    middle: bool,
+) {
     let Some(s) = w.maze.screen.as_ref().filter(|_| !w.modern) else { return };
     let (sibo, focus, list) = (s.sibo, s.focus, s.list);
     let Some(h) = hit(gu, sw, sh, p) else { return };
@@ -874,7 +926,14 @@ pub(super) struct View {
 pub(super) fn view(gu: &GameUi, w: &World) -> Option<View> {
     let s = w.maze.screen.as_ref()?;
     let g = grid(w, s.tabula);
-    let placed = s.placed.iter().flatten().filter_map(|p| rune(w, p.rune).map(|(e, _)| (p.rune, e, cells_at(w, p.rune, p.col, p.row, p.rot), bonus(w, &g, p)))).collect();
+    let placed = s
+        .placed
+        .iter()
+        .flatten()
+        .filter_map(|p| {
+            rune(w, p.rune).map(|(e, _)| (p.rune, e, cells_at(w, p.rune, p.col, p.row, p.rot), bonus(w, &g, p)))
+        })
+        .collect();
     let held = s.held.and_then(|(r, carry)| {
         let (e, _) = rune(w, r)?;
         let cells = cells_at(w, r, s.at.0, s.at.1, s.rot);
@@ -932,7 +991,10 @@ pub(super) fn set_cell(w: &mut World, col: i8, row: i8) {
 
 /// prvdunsi's cursor onto child `c` (1..11). True when it moved.
 pub(super) fn set_sibo(w: &mut World, c: u16) -> bool {
-    let Some(cur) = w.maze.screen.as_mut().and_then(|s| s.sibo.as_mut()).filter(|r| **r != c && (1..=11).contains(&c)) else { return false };
+    let Some(cur) = w.maze.screen.as_mut().and_then(|s| s.sibo.as_mut()).filter(|r| **r != c && (1..=11).contains(&c))
+    else {
+        return false;
+    };
     *cur = c;
     true
 }

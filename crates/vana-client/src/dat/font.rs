@@ -3,8 +3,8 @@
 //! settings), advance widths from FFXiMain, and the "font    usgaiji" shapes for SJIS 0xEF1F..0xEF2F.
 //! Text is Shift-JIS bytes; `encode_sjis` / `decode_sjis` convert from / to UTF-8.
 
-use super::{DatIndex, chunks};
 use super::zone::{Texture, parse_img};
+use super::{DatIndex, chunks};
 use anyhow::{Context, Result, bail};
 use md5::{Digest, Md5};
 use std::collections::HashMap;
@@ -21,7 +21,11 @@ pub fn set_code_tables(ids: [[u8; 4]; 256], modes: [[u8; 4]; 256]) {
 /// An entry of those tables: `k` 0 the colour ids (`1e` from 0x11), 1 the modes (`1f xx`); 0x80808080 before they
 /// are set.
 pub fn code_table(k: usize, xx: usize) -> [u8; 4] {
-    CODE_TABLES.read().ok().and_then(|t| t.as_ref().map(|t| if k == 0 { t.0[xx & 0xff] } else { t.1[xx & 0xff] })).unwrap_or([0x80; 4])
+    CODE_TABLES
+        .read()
+        .ok()
+        .and_then(|t| t.as_ref().map(|t| if k == 0 { t.0[xx & 0xff] } else { t.1[xx & 0xff] }))
+        .unwrap_or([0x80; 4])
 }
 
 /// Glyph cell size in screen pixels (and in atlas texels for the 1024x2048 atlases).
@@ -265,7 +269,9 @@ impl Font {
         let mut gaiji = Vec::new();
         for c in chunks(&menu)? {
             match c.kind {
-                0x20 if c.data.get(1..17).is_some_and(|n| n.starts_with(b"font    moji")) => moji = Some(parse_img(c.data)?),
+                0x20 if c.data.get(1..17).is_some_and(|n| n.starts_with(b"font    moji")) => {
+                    moji = Some(parse_img(c.data)?)
+                }
                 0x20 => {
                     if let Ok(t) = parse_img(c.data) {
                         textures.insert(t.name.clone(), t);
@@ -305,7 +311,9 @@ impl Font {
     /// The colour a `1e xx` (kind 0) or `1f xx` (kind 1) code sets, keeping `base`'s alpha (layout_line's rule).
     pub fn code_colour(&self, kind: u8, xx: u8, base: [u8; 4]) -> [u8; 4] {
         let tables = CODE_TABLES.read().ok();
-        let table = |k: usize, xx: usize| tables.as_ref().and_then(|t| t.as_ref()).map_or([0x80; 4], |t| if k == 0 { t.0[xx] } else { t.1[xx] });
+        let table = |k: usize, xx: usize| {
+            tables.as_ref().and_then(|t| t.as_ref()).map_or([0x80; 4], |t| if k == 0 { t.0[xx] } else { t.1[xx] })
+        };
         let xx = xx as usize;
         let c = match kind {
             0 if xx < 0x11 => self.codes[xx].to_le_bytes(),
@@ -317,12 +325,22 @@ impl Font {
 
     /// One line at pen (x, y), as FUN_10118d60: 16 px cells, pen += round(advance * scale).
     /// `color` is BGRA with 0x80 = 1.0; gaiji shapes ignore it (drawn with 0x80808080).
-    pub fn layout_line(&self, sjis: &[u8], x: i32, y: i32, color: [u8; 4], scale: [f32; 2], out: &mut Vec<Quad>) -> i32 {
+    pub fn layout_line(
+        &self,
+        sjis: &[u8],
+        x: i32,
+        y: i32,
+        color: [u8; 4],
+        scale: [f32; 2],
+        out: &mut Vec<Quad>,
+    ) -> i32 {
         let mut pen = x;
         let mut color = color;
         let base = color;
         let tables = CODE_TABLES.read().ok();
-        let table = |k: usize, xx: usize| tables.as_ref().and_then(|t| t.as_ref()).map_or([0x80; 4], |t| if k == 0 { t.0[xx] } else { t.1[xx] });
+        let table = |k: usize, xx: usize| {
+            tables.as_ref().and_then(|t| t.as_ref()).map_or([0x80; 4], |t| if k == 0 { t.0[xx] } else { t.1[xx] })
+        };
         for g in glyphs(sjis) {
             // FUN_10162140: `1e xx` replaces the colour, keeping the draw's alpha: below 0x11 the 17-entry table (0 = the
             // line's own), from 0x11 the colour-id table (FUN_10129d00, 0x80808080 when absent); `1f xx` mode xx's
@@ -349,12 +367,19 @@ impl Font {
                     y: y as f32,
                     w: CELL as f32 * scale[0],
                     h: CELL as f32 * scale[1],
-                    uv: [col / COLUMNS as f32, row / ROWS as f32, (col + 1.0) / COLUMNS as f32, (row + 1.0) / ROWS as f32],
+                    uv: [
+                        col / COLUMNS as f32,
+                        row / ROWS as f32,
+                        (col + 1.0) / COLUMNS as f32,
+                        (row + 1.0) / ROWS as f32,
+                    ],
                     color,
                     source: Source::Atlas,
                     blend: BLEND_ADD,
                 });
-            } else if let Some(shape) = (GAIJI_FIRST..GAIJI_END).contains(&g).then(|| self.gaiji.get((g - GAIJI_FIRST) as usize)).flatten() {
+            } else if let Some(shape) =
+                (GAIJI_FIRST..GAIJI_END).contains(&g).then(|| self.gaiji.get((g - GAIJI_FIRST) as usize)).flatten()
+            {
                 for part in &shape.parts {
                     let Some(tex) = self.textures.get(&part.texture) else { continue };
                     let [w, h, u, v] = part.rect.map(|c| c as f32);
@@ -365,7 +390,12 @@ impl Font {
                         y: y as f32 + y0,
                         w: x1 - x0,
                         h: y1 - y0,
-                        uv: [u / tex.width as f32, v / tex.height as f32, (u + w) / tex.width as f32, (v + h) / tex.height as f32],
+                        uv: [
+                            u / tex.width as f32,
+                            v / tex.height as f32,
+                            (u + w) / tex.width as f32,
+                            (v + h) / tex.height as f32,
+                        ],
                         color: part.colors[0],
                         source: Source::Texture(part.texture.clone()),
                         blend: part.blend,
@@ -416,7 +446,8 @@ impl Font {
             // MODULATE2X: texture * diffuse * 2.
             let vc = [q.color[2], q.color[1], q.color[0], q.color[3]].map(|c| c as f32 * 2.0 / 255.0);
             let (x0, y0) = (q.x.floor().max(0.0) as u32, q.y.floor().max(0.0) as u32);
-            let (x1, y1) = (((q.x + q.w).ceil().max(0.0) as u32).min(width), ((q.y + q.h).ceil().max(0.0) as u32).min(height));
+            let (x1, y1) =
+                (((q.x + q.w).ceil().max(0.0) as u32).min(width), ((q.y + q.h).ceil().max(0.0) as u32).min(height));
             for py in y0..y1 {
                 for px in x0..x1 {
                     let s = (px as f32 + 0.5 - q.x) / q.w;

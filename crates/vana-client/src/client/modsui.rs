@@ -88,13 +88,39 @@ impl Mods {
         std::thread::spawn(move || {
             let _ = dtx.send(catalogue::fetch(catalogue::List::Dats).map(statuses));
         });
-        Self { packs: Vec::new(), scan: Some(rx), entries: Vec::new(), list: Some(lrx), dat_list: Some(drx), list_error: None, dat_error: None, installing: None, held: None, error: None, top: 0, browse: None }
+        Self {
+            packs: Vec::new(),
+            scan: Some(rx),
+            entries: Vec::new(),
+            list: Some(lrx),
+            dat_list: Some(drx),
+            list_error: None,
+            dat_error: None,
+            installing: None,
+            held: None,
+            error: None,
+            top: 0,
+            browse: None,
+        }
     }
 
     /// No archives and no scan (tests).
     #[cfg(test)]
     pub fn empty() -> Self {
-        Self { packs: Vec::new(), scan: None, entries: Vec::new(), list: None, dat_list: None, list_error: None, dat_error: None, installing: None, held: None, error: None, top: 0, browse: None }
+        Self {
+            packs: Vec::new(),
+            scan: None,
+            entries: Vec::new(),
+            list: None,
+            dat_list: None,
+            list_error: None,
+            dat_error: None,
+            installing: None,
+            held: None,
+            error: None,
+            top: 0,
+            browse: None,
+        }
     }
 
     /// Waits for the scan and the catalogue (offscreen shots).
@@ -128,7 +154,8 @@ impl Mods {
     /// The archives found of Lua mods (`lua`) or DAT packs, then (DAT packs) the catalogue's packs not installed as they
     /// are; the standard Lua mods are listed apart (`standard`).
     pub fn offers(&self, lua: bool) -> Vec<Offer> {
-        let pct = |slug: &str, name: String| self.progress(slug).map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
+        let pct =
+            |slug: &str, name: String| self.progress(slug).map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
         let archives = self.packs.iter().enumerate().filter(|p| p.1.lua.is_some() == lua).map(|(at, p)| {
             let name = p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
             let help = match &p.lua {
@@ -142,14 +169,30 @@ impl Mods {
             Offer { label: pct(&p.slug, name), button: "Install", help, catalogue: false, at }
         });
         let n = self.packs.len();
-        let listed = self.entries.iter().enumerate().filter(|e| !lua && e.1.0.kind != "lua").filter_map(|(k, (e, st))| st.map(|u| (k, e, u))).map(|(k, e, update)| {
-            let by = if e.authors.is_empty() { String::new() } else { format!(" By {}.", e.authors.join(", ")) };
-            let size = if e.size() > 0 { format!(" {}.", bytes(e.size())) } else { String::new() };
-            let what = if e.kind == "lua" { "It starts at the next login." } else { "Takes effect on restart." };
-            let verb = if update { "Update" } else { "Install" };
-            let help = format!("{}{by}{size} {verb} downloads version {} from GitHub into the mods folder. {what}", e.description.trim(), e.version);
-            Offer { label: pct(&e.id, format!("{} {}", e.name, e.version)), button: verb, help: help.trim().to_string(), catalogue: true, at: n + k }
-        });
+        let listed = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|e| !lua && e.1.0.kind != "lua")
+            .filter_map(|(k, (e, st))| st.map(|u| (k, e, u)))
+            .map(|(k, e, update)| {
+                let by = if e.authors.is_empty() { String::new() } else { format!(" By {}.", e.authors.join(", ")) };
+                let size = if e.size() > 0 { format!(" {}.", bytes(e.size())) } else { String::new() };
+                let what = if e.kind == "lua" { "It starts at the next login." } else { "Takes effect on restart." };
+                let verb = if update { "Update" } else { "Install" };
+                let help = format!(
+                    "{}{by}{size} {verb} downloads version {} from GitHub into the mods folder. {what}",
+                    e.description.trim(),
+                    e.version
+                );
+                Offer {
+                    label: pct(&e.id, format!("{} {}", e.name, e.version)),
+                    button: verb,
+                    help: help.trim().to_string(),
+                    catalogue: true,
+                    at: n + k,
+                }
+            });
         archives.chain(listed).collect()
     }
 
@@ -168,7 +211,9 @@ impl Mods {
     /// Standard mod `k` (of `standard`) installed or updated off the UI thread; false when it is installed as it is or
     /// another install runs.
     pub fn install_standard(&mut self, k: usize) -> bool {
-        let Some(at) = self.standard_at().get(k).copied().filter(|&at| self.entries[at].1.is_some()) else { return false };
+        let Some(at) = self.standard_at().get(k).copied().filter(|&at| self.entries[at].1.is_some()) else {
+            return false;
+        };
         self.install_entry(at)
     }
 
@@ -309,7 +354,12 @@ impl Mods {
 pub fn remove_folder(name: &str) -> bool {
     let root = crate::config::mods_dir();
     let dir = root.join(name);
-    if name.is_empty() || name.contains(['/', '\\']) || name.starts_with('.') || dir.parent() != Some(root.as_path()) || !dir.is_dir() {
+    if name.is_empty()
+        || name.contains(['/', '\\'])
+        || name.starts_with('.')
+        || dir.parent() != Some(root.as_path())
+        || !dir.is_dir()
+    {
         return false;
     }
     std::thread::spawn(move || {
@@ -367,7 +417,8 @@ impl Browse {
         }
         dirs.sort_by_key(|n| n.0.to_lowercase());
         files.sort_by_key(|n| n.0.to_lowercase());
-        self.entries = self.dir.parent().map(|_| ("..".to_string(), Pick::Folder)).into_iter().chain(dirs).chain(files).collect();
+        self.entries =
+            self.dir.parent().map(|_| ("..".to_string(), Pick::Folder)).into_iter().chain(dirs).chain(files).collect();
         self.cursor = 0;
     }
 

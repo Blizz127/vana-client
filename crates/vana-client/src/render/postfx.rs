@@ -43,33 +43,84 @@ impl PostFx {
     /// Passes drawing into views of `format` (the scene's plain view).
     pub fn new(gpu: &Gpu, format: wgpu::TextureFormat) -> Self {
         let d = &gpu.device;
-        let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::FRAGMENT, ty, count: None };
+        let entry = |binding, ty| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty,
+            count: None,
+        };
         let layout = d.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("mod post"),
             entries: &[
-                entry(0, wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }),
+                entry(
+                    0,
+                    wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                ),
                 entry(1, wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)),
-                entry(2, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }),
-                entry(3, wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Depth, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false }),
+                entry(
+                    2,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                ),
+                entry(
+                    3,
+                    wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                ),
             ],
         });
-        let pl_layout = d.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("mod post"), bind_group_layouts: &[Some(&layout)], immediate_size: 0 });
-        let sampler = d.create_sampler(&wgpu::SamplerDescriptor { mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
+        let pl_layout = d.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("mod post"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let sampler = d.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
         Self { format, layout, pl_layout, sampler, copy: None, passes: Vec::new() }
     }
 
     /// A pass's pipeline from its source, or the WGSL / validation error.
     fn build(&self, gpu: &Gpu, src: &str) -> Result<wgpu::RenderPipeline, String> {
         let scope = gpu.device.push_error_scope(wgpu::ErrorFilter::Validation);
-        let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("mod post"), source: wgpu::ShaderSource::Wgsl(format!("{HEADER}\n{src}").into()) });
+        let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("mod post"),
+            source: wgpu::ShaderSource::Wgsl(format!("{HEADER}\n{src}").into()),
+        });
         let pipeline = gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("mod post"),
             layout: Some(&self.pl_layout),
-            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_main"), compilation_options: Default::default(), buffers: &[] },
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
             primitive: Default::default(),
             depth_stencil: None,
             multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState { module: &module, entry_point: Some("fs_main"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format: self.format, blend: None, write_mask: wgpu::ColorWrites::ALL })] }),
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.format,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
             multiview_mask: None,
             cache: None,
         });
@@ -96,7 +147,12 @@ impl PostFx {
                     None
                 }
             };
-            let uniform = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("mod post"), size: 80, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let uniform = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("mod post"),
+                size: 80,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             next.push(Pass { key, pipeline, uniform });
         }
         self.passes = next;
@@ -104,7 +160,16 @@ impl PostFx {
     }
 
     /// Each pass over `view` (the scene's plain view of `tex`), reading a copy of what is drawn so far.
-    pub fn draw(&mut self, gpu: &Gpu, enc: &mut wgpu::CommandEncoder, tex: &wgpu::Texture, view: &wgpu::TextureView, depth: &wgpu::TextureView, time: f32, want: &[Want]) {
+    pub fn draw(
+        &mut self,
+        gpu: &Gpu,
+        enc: &mut wgpu::CommandEncoder,
+        tex: &wgpu::Texture,
+        view: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        time: f32,
+        want: &[Want],
+    ) {
         let (w, h) = (tex.width(), tex.height());
         if self.copy.as_ref().is_none_or(|(t, _)| t.width() != w || t.height() != h || t.format() != tex.format()) {
             let t = gpu.device.create_texture(&wgpu::TextureDescriptor {
@@ -126,7 +191,11 @@ impl PostFx {
             let mut u = vec![w as f32, h as f32, time, 0.0];
             u.extend(params.iter().flatten());
             gpu.queue.write_buffer(&pass.uniform, 0, bytemuck::cast_slice(&u));
-            enc.copy_texture_to_texture(tex.as_image_copy(), copy.as_image_copy(), wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 });
+            enc.copy_texture_to_texture(
+                tex.as_image_copy(),
+                copy.as_image_copy(),
+                wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            );
             let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("mod post"),
                 layout: &self.layout,
@@ -139,7 +208,12 @@ impl PostFx {
             });
             let mut rp = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("mod post"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,

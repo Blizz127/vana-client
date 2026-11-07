@@ -38,8 +38,21 @@ pub enum Step {
 }
 
 impl SubArea {
-    pub fn new(regions: Vec<Region>, collision: Option<Collision>, keys: Vec<u32>, areas: Vec<u32>, textures: Vec<String>) -> Self {
-        SubArea { regions, zone_collision: collision.map(Arc::new), zone_keys: keys, zone_areas: areas, zone_textures: textures, ..Default::default() }
+    pub fn new(
+        regions: Vec<Region>,
+        collision: Option<Collision>,
+        keys: Vec<u32>,
+        areas: Vec<u32>,
+        textures: Vec<String>,
+    ) -> Self {
+        SubArea {
+            regions,
+            zone_collision: collision.map(Arc::new),
+            zone_keys: keys,
+            zone_areas: areas,
+            zone_textures: textures,
+            ..Default::default()
+        }
     }
 
     /// FUN_10178a20 (slot 1): nothing while a load runs or for the loaded id; 0 unloads; another id loads when a
@@ -77,7 +90,15 @@ pub struct Loaded {
 /// FUN_10178d90 and the chunk handlers: the file of `id` (the zone file id mapping, asm 1017894d), its collision
 /// merged into the zone's (FUN_10167be0) with the stand-ins for `id` dropped, its light refs remapped into the
 /// zone's table (FUN_1017a5e0).
-pub fn load(index: &crate::dat::DatIndex, keys: &zone::Keys, id: u32, zone_collision: Option<Arc<Collision>>, zone_keys: &[u32], zone_areas: &[u32], zone_textures: &[String]) -> anyhow::Result<Loaded> {
+pub fn load(
+    index: &crate::dat::DatIndex,
+    keys: &zone::Keys,
+    id: u32,
+    zone_collision: Option<Arc<Collision>>,
+    zone_keys: &[u32],
+    zone_areas: &[u32],
+    zone_textures: &[String],
+) -> anyhow::Result<Loaded> {
     let file_id = zone::file_id(id);
     let file = index.read(file_id)?;
     let mut scene = zone::load_scene(keys, &file)?;
@@ -95,10 +116,13 @@ pub fn load(index: &crate::dat::DatIndex, keys: &zone::Keys, id: u32, zone_colli
     };
     let geometry = crate::render::ZoneGeometry::build_keyed(&scene, &all, zone_areas, zone_textures);
     let weather = ZoneWeather::parse(&file).map_err(|e| log::warn!("sub-area {id} weather: {e:#}")).ok();
-    let fx = crate::fx::lib::Library::load(file_id, file).map_err(|e| log::warn!("effects: sub-area {id}: {e:#}")).ok().map(|mut l| {
-        l.prewarm(keys);
-        l
-    });
+    let fx = crate::fx::lib::Library::load(file_id, file)
+        .map_err(|e| log::warn!("effects: sub-area {id}: {e:#}"))
+        .ok()
+        .map(|mut l| {
+            l.prewarm(keys);
+            l
+        });
     Ok(Loaded { geometry, textures: std::mem::take(&mut scene.textures), ground, keys: all, fx, weather })
 }
 
@@ -111,7 +135,12 @@ mod tests {
     fn southern_sandoria_house() {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
-        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).map_err(anyhow::Error::from).and_then(|d| zone::Keys::from_ffximain(&d)) else { return };
+        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))
+            .map_err(anyhow::Error::from)
+            .and_then(|d| zone::Keys::from_ffximain(&d))
+        else {
+            return;
+        };
         let scene = zone::load_scene(&keys, &index.read(zone::file_id(230)).unwrap()).unwrap();
         let m = scene.regions.iter().find(|r| r.name.starts_with("m6eb")).unwrap();
         assert_eq!((m.class, m.param), (0, 335));
@@ -121,7 +150,8 @@ mod tests {
         let zc = scene.collision.as_ref().unwrap();
         let stand_ins = zc.object.iter().filter(|&&o| zc.objects[o as usize].link == 335).count();
         assert!(stand_ins > 0);
-        let l = load(&index, &keys, 335, Some(Arc::new(Collision::empty(zc.grid))), &scene.light_keys, &[], &[]).unwrap();
+        let l =
+            load(&index, &keys, 335, Some(Arc::new(Collision::empty(zc.grid))), &scene.light_keys, &[], &[]).unwrap();
         assert!(l.geometry.area_keys.contains(&u32::from_le_bytes(*b"ev10")));
         assert!(l.textures.len() > 10);
         let sub = zone::load_scene(&keys, &index.read(zone::file_id(335)).unwrap()).unwrap();

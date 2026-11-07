@@ -83,7 +83,12 @@ pub fn start_in(w: &mut World, id: u32) {
 /// own model hide +0x120 bits 14 / 15 not modelled): a PC after its `init`, not bound by an event. Shown: `!in?`
 /// and FUN_100cf100; invisible: `!kl?` and every glow off. Then the model colour ([`colour`]).
 pub fn frame(w: &mut World) {
-    let mut ids: Vec<u32> = w.entities.iter().filter(|(id, e)| **id >> 24 == 0 && e.init_done && !e.no_plate && !e.untargetable).map(|(id, _)| *id).collect();
+    let mut ids: Vec<u32> = w
+        .entities
+        .iter()
+        .filter(|(id, e)| **id >> 24 == 0 && e.init_done && !e.no_plate && !e.untargetable)
+        .map(|(id, _)| *id)
+        .collect();
     if w.my_init_done {
         ids.push(w.my_id);
     }

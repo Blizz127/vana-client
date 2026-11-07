@@ -62,14 +62,18 @@ pub fn render(index: &DatIndex, shot: &Shot, out: &std::path::Path) -> Result<()
     let load = |id: u32, tag: &str| -> Result<dancer::Model> {
         dancer::load_model(&index.read(id)?, &index.read(id + 1)?, tag).with_context(|| format!("dancer model {id}"))
     };
-    let chan = |id: u32| -> Result<dancer::Channels> { dancer::parse_channels(&index.read(id)?).with_context(|| format!("channels {id}")) };
+    let chan = |id: u32| -> Result<dancer::Channels> {
+        dancer::parse_channels(&index.read(id)?).with_context(|| format!("channels {id}"))
+    };
     let body = load(mg + 2, "b:")?;
     let mut head = load(mg + 4 + 2 * shot.face as u32, "h:")?;
     apply_hair(&mut head, shot.hair);
     let idle = shot.view == 2;
-    let (bm, hm) = if idle { (mo + 9, mo + 0xf + 6 * shot.face as u32) } else { (mo + 8, mo + 0xe + 6 * shot.face as u32) };
+    let (bm, hm) =
+        if idle { (mo + 9, mo + 0xf + 6 * shot.face as u32) } else { (mo + 8, mo + 0xe + 6 * shot.face as u32) };
     let (bc, hc) = (chan(bm)?, chan(hm)?);
-    let fr = |c: &dancer::Channels| if idle { shot.frame % c.frames as f32 } else { shot.frame.min(c.frames as f32 - 1.0) };
+    let fr =
+        |c: &dancer::Channels| if idle { shot.frame % c.frames as f32 } else { shot.frame.min(c.frames as f32 - 1.0) };
     let (bf, hf) = (bc.sample(fr(&bc)), hc.sample(fr(&hc)));
     let mut mesh = PosedMesh { batches: Vec::new(), min: Vec3::splat(f32::MAX), max: Vec3::splat(f32::MIN) };
     dancer::skin_model(&body, Some(&bf), &mut mesh);
@@ -84,7 +88,9 @@ pub fn render(index: &DatIndex, shot: &Shot, out: &std::path::Path) -> Result<()
         let f = shot.frame.min(cc.frames as f32 - 1.0);
         let fov = fc.sample(f)[0];
         let m = cc.sample(f);
-        let cam = Mat4::from_cols_array(&[m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]]);
+        let cam = Mat4::from_cols_array(&[
+            m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15],
+        ]);
         println!("camera {k}: pos {} fov {fov:.2}", cam.w_axis.truncate());
         (cam, glam::camera::rh::proj::directx::perspective(fov.to_radians(), aspect, 0.5, 4000.0))
     } else {
@@ -103,7 +109,11 @@ pub fn render(index: &DatIndex, shot: &Shot, out: &std::path::Path) -> Result<()
             textures.push(t.clone());
             textures.push(o);
         }
-        let opts = ShotOptions { cull: false, clear: [0.02, 0.025, 0.05, if shot.transparent { 0.0 } else { 1.0 }], light: [0.3, 0.6, 0.75, 0.45] };
+        let opts = ShotOptions {
+            cull: false,
+            clear: [0.02, 0.025, 0.05, if shot.transparent { 0.0 } else { 1.0 }],
+            light: [0.3, 0.6, 0.75, 0.45],
+        };
         render_batches_png(&textures, &mesh, view_proj, &opts, shot.width, shot.height, out)?;
     } else {
         // Lights ride on the camera: node = camera q x light q (FUN_10266820; the camera is identity at attach, FUN_102637f0).

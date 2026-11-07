@@ -66,7 +66,10 @@ pub fn lua_info() -> std::collections::HashMap<String, LuaInfo> {
     lua_folders()
         .into_iter()
         .map(|f| {
-            let mut i = std::fs::read_to_string(root.join(&f).join("mod.toml")).ok().and_then(|t| toml::from_str::<LuaInfo>(&t).ok()).unwrap_or_default();
+            let mut i = std::fs::read_to_string(root.join(&f).join("mod.toml"))
+                .ok()
+                .and_then(|t| toml::from_str::<LuaInfo>(&t).ok())
+                .unwrap_or_default();
             if i.name.is_empty() {
                 i.name = f.clone();
             }
@@ -220,7 +223,13 @@ pub fn lua_manifest(text: &str, folder: &str) -> Result<(String, String)> {
 /// A folder's name as a mod id: a release's version suffix ("-1.0.0", "-v2") dropped, other characters as '-'.
 fn folder_id(name: &str) -> String {
     let base = match name.rsplit_once('-') {
-        Some((b, v)) if !b.is_empty() && v.trim_start_matches(['v', 'V']).starts_with(|c: char| c.is_ascii_digit()) && v.trim_start_matches(['v', 'V']).chars().all(|c| c.is_ascii_digit() || c == '.') => b,
+        Some((b, v))
+            if !b.is_empty()
+                && v.trim_start_matches(['v', 'V']).starts_with(|c: char| c.is_ascii_digit())
+                && v.trim_start_matches(['v', 'V']).chars().all(|c| c.is_ascii_digit() || c == '.') =>
+        {
+            b
+        }
         _ => name,
     };
     base.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' }).collect()
@@ -232,7 +241,12 @@ fn lua_pack(path: &Path, all: &[(String, u64)], id: Option<&str>) -> Result<Opti
     let text = String::from_utf8(read_member(path, &member)?).context("mod.toml is not UTF-8")?;
     let folder = match id {
         Some(id) => id.to_string(),
-        None => prefix.trim_end_matches('/').rsplit('/').next().filter(|f| !f.is_empty()).map_or_else(|| slug(path), folder_id),
+        None => prefix
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .filter(|f| !f.is_empty())
+            .map_or_else(|| slug(path), folder_id),
     };
     let (id, version) = lua_manifest(&text, &folder)?;
     let files = all.iter().filter(|(m, _)| lua_target(m, &prefix).is_some()).count();
@@ -247,7 +261,8 @@ fn read_member(path: &Path, name: &str) -> Result<Vec<u8>> {
             zip::ZipArchive::new(std::fs::File::open(path)?)?.by_name(name)?.read_to_end(&mut out)?;
         }
         Kind::SevenZ => {
-            let mut r = sevenz_rust2::ArchiveReader::new(std::fs::File::open(path)?, sevenz_rust2::Password::empty()).map_err(|e| anyhow!("{e}"))?;
+            let mut r = sevenz_rust2::ArchiveReader::new(std::fs::File::open(path)?, sevenz_rust2::Password::empty())
+                .map_err(|e| anyhow!("{e}"))?;
             r.for_each_entries(|entry, rd| {
                 if entry.name() == name {
                     rd.read_to_end(&mut out)?;
@@ -335,7 +350,10 @@ fn size_at(dir: &Path, rel: &str) -> Option<u64> {
     }
     let mut at = dir.to_path_buf();
     for part in rel.split('/') {
-        let e = std::fs::read_dir(&at).ok()?.flatten().find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(part))?;
+        let e = std::fs::read_dir(&at)
+            .ok()?
+            .flatten()
+            .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(part))?;
         at = e.path();
     }
     std::fs::metadata(at).ok().map(|m| m.len())
@@ -345,15 +363,24 @@ fn size_at(dir: &Path, rel: &str) -> Option<u64> {
 /// its files at the same sizes (a sample of 16; folders installed by hand carry no mark).
 pub fn scan(dirs: &[PathBuf], root: &Path) -> Vec<Pack> {
     let installed = folders_in(root);
-    let marks: Vec<String> = installed.iter().filter_map(|f| std::fs::read_to_string(root.join(f).join(SOURCE)).ok()).map(|s| s.trim().to_string()).collect();
+    let marks: Vec<String> = installed
+        .iter()
+        .filter_map(|f| std::fs::read_to_string(root.join(f).join(SOURCE)).ok())
+        .map(|s| s.trim().to_string())
+        .collect();
     let mut out = Vec::new();
     for d in dirs {
         let Ok(rd) = std::fs::read_dir(d) else { continue };
-        let mut paths: Vec<PathBuf> = rd.flatten().map(|e| e.path()).filter(|p| p.is_file() && kind(p).is_some()).collect();
+        let mut paths: Vec<PathBuf> =
+            rd.flatten().map(|e| e.path()).filter(|p| p.is_file() && kind(p).is_some()).collect();
         paths.sort();
         for p in paths {
             let (slug, name) = (slug(&p), p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
-            if slug.is_empty() || installed.contains(&slug) || marks.contains(&name) || out.iter().any(|o: &Pack| o.slug == slug) {
+            if slug.is_empty()
+                || installed.contains(&slug)
+                || marks.contains(&name)
+                || out.iter().any(|o: &Pack| o.slug == slug)
+            {
                 continue;
             }
             let m = match members(&p) {
@@ -408,7 +435,8 @@ fn put(dest: &Path, to: &str, r: &mut dyn Read) -> Result<()> {
 fn targets(pack: &Pack, all: &[(String, u64)]) -> (HashMap<String, String>, u64) {
     match &pack.lua {
         Some(l) => {
-            let t: HashMap<String, String> = all.iter().filter_map(|(m, _)| lua_target(m, &l.prefix).map(|to| (m.clone(), to))).collect();
+            let t: HashMap<String, String> =
+                all.iter().filter_map(|(m, _)| lua_target(m, &l.prefix).map(|to| (m.clone(), to))).collect();
             let total = all.iter().filter(|(m, _)| t.contains_key(m)).map(|(_, s)| s).sum();
             (t, total)
         }
@@ -444,7 +472,9 @@ pub fn unpack(pack: &Pack, work: &Path, step: &mut dyn FnMut(u64, u64)) -> Resul
             }
         }
         Kind::SevenZ => {
-            let mut r = sevenz_rust2::ArchiveReader::new(std::fs::File::open(&pack.path)?, sevenz_rust2::Password::empty()).map_err(|e| anyhow!("{e}"))?;
+            let mut r =
+                sevenz_rust2::ArchiveReader::new(std::fs::File::open(&pack.path)?, sevenz_rust2::Password::empty())
+                    .map_err(|e| anyhow!("{e}"))?;
             let mut failed = None;
             r.for_each_entries(|entry, rd| {
                 match wanted.get(entry.name()) {
@@ -526,14 +556,19 @@ pub fn install(pack: &Pack, root: &Path, progress: &AtomicU32) -> Result<usize> 
         return Err(anyhow!("{} is already installed", pack.slug));
     }
     let work = work_dir(root, &pack.slug)?;
-    let n = match unpack(pack, &work, &mut |done, total| progress.store((done * 1000 / total.max(1)).min(1000) as u32, Ordering::Relaxed)) {
+    let n = match unpack(pack, &work, &mut |done, total| {
+        progress.store((done * 1000 / total.max(1)).min(1000) as u32, Ordering::Relaxed)
+    }) {
         Ok(n) => n,
         Err(e) => {
             let _ = std::fs::remove_dir_all(&work);
             return Err(e);
         }
     };
-    std::fs::write(work.join(SOURCE), pack.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())?;
+    std::fs::write(
+        work.join(SOURCE),
+        pack.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+    )?;
     place(&work, &dest)?;
     progress.store(1000, Ordering::Relaxed);
     log::info!("mods: installed {} from {} ({n} files)", pack.slug, pack.path.display());
@@ -543,7 +578,8 @@ pub fn install(pack: &Pack, root: &Path, progress: &AtomicU32) -> Result<usize> 
 /// A Lua mod's folder (one holding mod.toml) copied into `root`, hidden files left out; replaces an older copy.
 /// Returns its id.
 pub fn install_dir(src: &Path, root: &Path) -> Result<String> {
-    let text = std::fs::read_to_string(src.join("mod.toml")).with_context(|| format!("no mod.toml in {}", src.display()))?;
+    let text =
+        std::fs::read_to_string(src.join("mod.toml")).with_context(|| format!("no mod.toml in {}", src.display()))?;
     let folder = src.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let (id, _) = lua_manifest(&text, &folder)?;
     let dest = root.join(&id);
@@ -622,7 +658,9 @@ mod tests {
         // Against the real mods folder: the hand-installed packs count as there (same files, same sizes).
         let there = scan(&[home.join("Downloads/FFXI")], &crate::config::mods_dir());
         println!("not installed yet: {:?}", there.iter().map(|p| &p.slug).collect::<Vec<_>>());
-        let root = std::path::PathBuf::from(std::env::var_os("VANA_SCRATCH").expect("VANA_SCRATCH: a scratch folder on disk")).join("modtest");
+        let root =
+            std::path::PathBuf::from(std::env::var_os("VANA_SCRATCH").expect("VANA_SCRATCH: a scratch folder on disk"))
+                .join("modtest");
         let packs = scan(&[home.join("Downloads/FFXI")], &root);
         for p in &packs {
             println!("{} -> {} ({} files)", p.path.display(), p.slug, p.files);
@@ -630,7 +668,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         for ext in ["zip", "7z", "rar"] {
-            let Some(p) = packs.iter().filter(|p| kind(&p.path) == kind(Path::new(&format!("x.{ext}"))) && std::fs::metadata(&p.path).is_ok_and(|m| m.len() < 2 << 30)).min_by_key(|p| std::fs::metadata(&p.path).map(|m| m.len()).unwrap_or(u64::MAX)) else { continue };
+            let Some(p) = packs
+                .iter()
+                .filter(|p| {
+                    kind(&p.path) == kind(Path::new(&format!("x.{ext}")))
+                        && std::fs::metadata(&p.path).is_ok_and(|m| m.len() < 2 << 30)
+                })
+                .min_by_key(|p| std::fs::metadata(&p.path).map(|m| m.len()).unwrap_or(u64::MAX))
+            else {
+                continue;
+            };
             let progress = AtomicU32::new(0);
             let n = install(p, &root, &progress).unwrap();
             println!("installed {} ({n} files, progress {})", p.slug, progress.load(Ordering::Relaxed));
@@ -663,20 +710,25 @@ mod tests {
     fn lua_mod_archives() {
         let d = scratch("modpack-lua-test");
         let (root, zip) = (d.join("mods"), d.join("hello-v1.zip"));
-        zip_of(&zip, &[
-            ("hello-1.0/mod.toml", "id = \"hello\"\nversion = \"1.0.0\"\n"),
-            ("hello-1.0/init.lua", "-- one"),
-            ("hello-1.0/src/a.lua", "return 1"),
-            ("hello-1.0/.git/config", "x"),
-            ("hello-1.0/../evil.lua", "x"),
-            ("hello-1.0/examples/mod.toml", "id = \"other\""),
-        ]);
+        zip_of(
+            &zip,
+            &[
+                ("hello-1.0/mod.toml", "id = \"hello\"\nversion = \"1.0.0\"\n"),
+                ("hello-1.0/init.lua", "-- one"),
+                ("hello-1.0/src/a.lua", "return 1"),
+                ("hello-1.0/.git/config", "x"),
+                ("hello-1.0/../evil.lua", "x"),
+                ("hello-1.0/examples/mod.toml", "id = \"other\""),
+            ],
+        );
         let p = pack_of(&zip).unwrap();
         assert_eq!((p.slug.as_str(), p.files), ("hello", 4));
         assert_eq!(p.lua, Some(LuaMod { prefix: "hello-1.0/".into(), version: "1.0.0".into() }));
         assert_eq!(install(&p, &root, &AtomicU32::new(0)).unwrap(), 4);
         assert_eq!(std::fs::read_to_string(root.join("hello/init.lua")).unwrap(), "-- one");
-        assert!(root.join("hello/src/a.lua").is_file() && !root.join("hello/.git").exists() && !d.join("evil.lua").exists());
+        assert!(
+            root.join("hello/src/a.lua").is_file() && !root.join("hello/.git").exists() && !d.join("evil.lua").exists()
+        );
         zip_of(&zip, &[("mod.toml", "id = \"hello\"\nversion = \"1.1.0\""), ("init.lua", "-- two")]);
         install(&pack_of(&zip).unwrap(), &root, &AtomicU32::new(0)).unwrap();
         assert_eq!(std::fs::read_to_string(root.join("hello/init.lua")).unwrap(), "-- two");
@@ -693,13 +745,20 @@ mod tests {
         zip_of(&zip, &[("greeter-v2.0.1/mod.toml", "name = \"G\""), ("greeter-v2.0.1/init.lua", "")]);
         assert_eq!(pack_of(&zip).unwrap().slug, "greeter");
         assert_eq!(pack_named(&zip, Some("from-list")).unwrap().slug, "from-list");
-        assert_eq!((folder_id("My Mod-1.2"), folder_id("x-ray"), folder_id("hud-v2")), ("My-Mod".into(), "x-ray".into(), "hud".into()));
+        assert_eq!(
+            (folder_id("My Mod-1.2"), folder_id("x-ray"), folder_id("hud-v2")),
+            ("My-Mod".into(), "x-ray".into(), "hud".into())
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
     fn merged_order() {
-        let cfg = vec![ModRef { name: "b".into(), enabled: true }, ModRef { name: "gone".into(), enabled: true }, ModRef { name: "a".into(), enabled: false }];
+        let cfg = vec![
+            ModRef { name: "b".into(), enabled: true },
+            ModRef { name: "gone".into(), enabled: true },
+            ModRef { name: "a".into(), enabled: false },
+        ];
         let got = merged(&cfg, &["a".into(), "b".into(), "c".into()]);
         let names: Vec<(&str, bool)> = got.iter().map(|m| (m.name.as_str(), m.enabled)).collect();
         assert_eq!(names, [("b", true), ("a", false), ("c", false)]);

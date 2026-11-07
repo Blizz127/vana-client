@@ -215,7 +215,13 @@ pub fn update(w: &mut World, gu: Option<&GameUi>, input: &mut super::input::Inpu
         w.sounds.push(Ui::Cancel as u32);
         send_key(w, egui::Key::Escape);
     }
-    for (f, key) in [(0x86, egui::Key::ArrowLeft), (0x85, egui::Key::ArrowRight), (0x22, egui::Key::Enter), (0x14, egui::Key::Tab), (0x1f, egui::Key::Backspace)] {
+    for (f, key) in [
+        (0x86, egui::Key::ArrowLeft),
+        (0x85, egui::Key::ArrowRight),
+        (0x22, egui::Key::Enter),
+        (0x14, egui::Key::Tab),
+        (0x1f, egui::Key::Backspace),
+    ] {
         if input.test(f, PRESS) {
             send_key(w, key);
         }
@@ -333,11 +339,24 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Option<[f32; 4]> {
     let hide: Vec<u16> = (1..=5).chain(8..=82).chain([0x54]).collect();
     let sel = SPECIAL.contains(&k.cursor).then_some(k.cursor);
     let win = gu.window_scaled(NAME, at, s, sel, &hide)?;
-    let kids: Vec<(u16, [f32; 4])> = gu.menu_def(NAME)?.elements.iter().skip(1).filter(|e| !matches!(e.id, 1..=5 | 0x54)).map(|e| (e.id, [at.0 + e.x as f32 * s, at.1 + e.y as f32 * s, e.w as f32 * s, e.h as f32 * s])).collect();
+    let kids: Vec<(u16, [f32; 4])> = gu
+        .menu_def(NAME)?
+        .elements
+        .iter()
+        .skip(1)
+        .filter(|e| !matches!(e.id, 1..=5 | 0x54))
+        .map(|e| (e.id, [at.0 + e.x as f32 * s, at.1 + e.y as f32 * s, e.w as f32 * s, e.h as f32 * s]))
+        .collect();
     let p = page(k.page);
     for (id, r) in kids.iter().filter(|(id, _)| (8..=82).contains(id)) {
         let cap = p.caps[(*id - 8) as usize];
-        let tint = if *id == k.cursor { 0x8080_5020 } else if dim(cap) { 0x4040_2810 } else { 0x8080_8080 };
+        let tint = if *id == k.cursor {
+            0x8080_5020
+        } else if dim(cap) {
+            0x4040_2810
+        } else {
+            0x8080_8080
+        };
         gu.sprite_scaled(CAPS, cap as usize, r[0] + s, r[1] + s, s, s, tint);
     }
     // The hand at the cursor child + the window header's (14, 14) *(inf)*.

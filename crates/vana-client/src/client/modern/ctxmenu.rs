@@ -63,12 +63,20 @@ type Row = (String, Act, bool);
 /// whether it should close (a pick, a press outside it, Escape). The keys: Up / Down move the highlight over the usable
 /// rows (the first to start), Enter picks it, Escape closes; while a menu is open they reach no game key
 /// (World::ctx_menu_open: the key chain skips them, typing_elsewhere stops the key functions).
-pub fn popup(ctx: &egui::Context, m: &Modern, at: Pos2, title: Option<&str>, rows: &[(&str, bool)]) -> (Option<usize>, bool) {
+pub fn popup(
+    ctx: &egui::Context,
+    m: &Modern,
+    at: Pos2,
+    title: Option<&str>,
+    rows: &[(&str, bool)],
+) -> (Option<usize>, bool) {
     let mut picked = None;
     let sel_id = Id::new("modern context menu sel").with((title, at.x as i32, at.y as i32));
     let usable: Vec<usize> = rows.iter().enumerate().filter(|(_, r)| r.1).map(|(k, _)| k).collect();
     let mut sel = ctx.data(|d| d.get_temp::<usize>(sel_id)).filter(|k| usable.contains(k)).or(usable.first().copied());
-    let (down, up, enter) = ctx.input(|i| (i.key_pressed(egui::Key::ArrowDown), i.key_pressed(egui::Key::ArrowUp), i.key_pressed(egui::Key::Enter)));
+    let (down, up, enter) = ctx.input(|i| {
+        (i.key_pressed(egui::Key::ArrowDown), i.key_pressed(egui::Key::ArrowUp), i.key_pressed(egui::Key::Enter))
+    });
     if let Some(at) = sel.and_then(|s| usable.iter().position(|&k| k == s)) {
         if down {
             sel = Some(usable[(at + 1) % usable.len()]);
@@ -84,42 +92,74 @@ pub fn popup(ctx: &egui::Context, m: &Modern, at: Pos2, title: Option<&str>, row
     }
     let font = FontId::proportional(m.theme.ui);
     let head = FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into()));
-    let width = |s: &str, f: &FontId| ctx.fonts_mut(|fo| fo.layout_no_wrap(s.to_string(), f.clone(), Color32::WHITE).size().x);
-    let wide = rows.iter().map(|(l, _)| width(l, &font)).chain(title.map(|t| width(t, &head))).fold(110.0f32, f32::max) + 16.0;
-    let shown = egui::Area::new(Id::unique("modern context menu").with((title, rows.len()))).order(Order::Foreground).fixed_pos(at + vec2(2.0, 2.0)).constrain(true).show(ctx, |ui| {
-        let bg = ui.painter().add(egui::Shape::Noop);
-        let inner = egui::Frame::NONE.inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 0.0;
-            if let Some(t) = title {
-                let (r, _) = ui.allocate_exact_size(vec2(wide, m.theme.small + 10.0), Sense::hover());
-                ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, t, head.clone(), m.theme.color("gold"));
-                ui.painter().hline(r.min.x..=r.max.x, r.max.y - 1.0, egui::Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.6)));
-                ui.add_space(3.0);
-            }
-            for (k, (label, usable)) in rows.iter().enumerate() {
-                let (r, resp) = ui.allocate_exact_size(vec2(wide, m.theme.ui + 12.0), if *usable { Sense::click() } else { Sense::hover() });
-                let lit = *usable && (resp.hovered() || sel == Some(k));
-                if lit {
-                    ui.painter().rect_filled(r.expand2(vec2(4.0, 0.0)), 4.0, m.theme.color("focus").gamma_multiply(0.35));
+    let width =
+        |s: &str, f: &FontId| ctx.fonts_mut(|fo| fo.layout_no_wrap(s.to_string(), f.clone(), Color32::WHITE).size().x);
+    let wide =
+        rows.iter().map(|(l, _)| width(l, &font)).chain(title.map(|t| width(t, &head))).fold(110.0f32, f32::max) + 16.0;
+    let shown = egui::Area::new(Id::unique("modern context menu").with((title, rows.len())))
+        .order(Order::Foreground)
+        .fixed_pos(at + vec2(2.0, 2.0))
+        .constrain(true)
+        .show(ctx, |ui| {
+            let bg = ui.painter().add(egui::Shape::Noop);
+            let inner = egui::Frame::NONE.inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 0.0;
+                if let Some(t) = title {
+                    let (r, _) = ui.allocate_exact_size(vec2(wide, m.theme.small + 10.0), Sense::hover());
+                    ui.painter().text(
+                        pos2(r.min.x + 4.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        t,
+                        head.clone(),
+                        m.theme.color("gold"),
+                    );
+                    ui.painter().hline(
+                        r.min.x..=r.max.x,
+                        r.max.y - 1.0,
+                        egui::Stroke::new(1.0, m.theme.color("bronze").gamma_multiply(0.6)),
+                    );
+                    ui.add_space(3.0);
                 }
-                let colour = if !*usable {
-                    m.theme.color("muted")
-                } else if lit {
-                    m.theme.color("gold")
-                } else {
-                    m.theme.color("text")
-                };
-                ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, *label, font.clone(), colour);
-                if resp.clicked() {
-                    picked = Some(k);
+                for (k, (label, usable)) in rows.iter().enumerate() {
+                    let (r, resp) = ui.allocate_exact_size(
+                        vec2(wide, m.theme.ui + 12.0),
+                        if *usable { Sense::click() } else { Sense::hover() },
+                    );
+                    let lit = *usable && (resp.hovered() || sel == Some(k));
+                    if lit {
+                        ui.painter().rect_filled(
+                            r.expand2(vec2(4.0, 0.0)),
+                            4.0,
+                            m.theme.color("focus").gamma_multiply(0.35),
+                        );
+                    }
+                    let colour = if !*usable {
+                        m.theme.color("muted")
+                    } else if lit {
+                        m.theme.color("gold")
+                    } else {
+                        m.theme.color("text")
+                    };
+                    ui.painter().text(
+                        pos2(r.min.x + 4.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        *label,
+                        font.clone(),
+                        colour,
+                    );
+                    if resp.clicked() {
+                        picked = Some(k);
+                    }
                 }
-            }
+            });
+            let r = inner.response.rect;
+            ui.painter().set(bg, super::borders::window(m, "window_normal", r));
+            r
         });
-        let r = inner.response.rect;
-        ui.painter().set(bg, super::borders::window(m, "window_normal", r));
-        r
+    let away = ctx.input(|i| {
+        (i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !shown.inner.contains(p)))
+            || i.key_pressed(egui::Key::Escape)
     });
-    let away = ctx.input(|i| (i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !shown.inner.contains(p))) || i.key_pressed(egui::Key::Escape));
     (picked, picked.is_some() || away)
 }
 
@@ -160,7 +200,8 @@ pub fn draw(m: &Modern, ctx: &egui::Context, w: &mut World) {
     let act = picked.and_then(|k| rows.get(k)).map(|r| r.1);
     // Move to and Back swap the rows in place.
     if let (Some(a @ (Act::MoveTo | Act::Back)), Menu::Item { at, bag, index, id, .. }) = (act, &menu) {
-        *m.ctx_menu.borrow_mut() = Some(Menu::Item { at: *at, bag: *bag, index: *index, id: *id, moving: a == Act::MoveTo });
+        *m.ctx_menu.borrow_mut() =
+            Some(Menu::Item { at: *at, bag: *bag, index: *index, id: *id, moving: a == Act::MoveTo });
         return;
     }
     if closing {
@@ -196,20 +237,47 @@ fn item_row(w: &World, bag: u8, index: u8, id: u16) -> Option<usize> {
 /// A storage view state for the item rules (gitems::usable / tint): `bank` against the inventory, away from the
 /// moogle.
 fn away(bank: u8) -> Storage {
-    Storage { bank, side: gitems::INVENTORY, scroll: 0, cursor: 0, on_bank: false, qty: None, from_menu: false, at_moogle: false, nomad: false, read_only: false, sortw: None, manual: None, stora: None, pending: None, note: None }
+    Storage {
+        bank,
+        side: gitems::INVENTORY,
+        scroll: 0,
+        cursor: 0,
+        on_bank: false,
+        qty: None,
+        from_menu: false,
+        at_moogle: false,
+        nomad: false,
+        read_only: false,
+        sortw: None,
+        manual: None,
+        stora: None,
+        pending: None,
+        note: None,
+    }
 }
 
 /// The bags the slot may move to now: open to us, with room, and taking the item (retail's storage colours).
 fn destinations(w: &World, index: u8) -> Vec<(u8, &'static str)> {
-    let (Some(info), Some(slot)) = (w.item_info.as_ref(), gitems::store_rows(w, gitems::INVENTORY).into_iter().find(|s| s.index == index)) else { return Vec::new() };
-    BAGS.iter().copied().filter(|&(c, _)| gitems::usable(w, &away(0xff), c) && gitems::tint(w, info, &away(c), false, &slot) != crate::inventory::TINT_DIM).collect()
+    let (Some(info), Some(slot)) =
+        (w.item_info.as_ref(), gitems::store_rows(w, gitems::INVENTORY).into_iter().find(|s| s.index == index))
+    else {
+        return Vec::new();
+    };
+    BAGS.iter()
+        .copied()
+        .filter(|&(c, _)| {
+            gitems::usable(w, &away(0xff), c)
+                && gitems::tint(w, info, &away(c), false, &slot) != crate::inventory::TINT_DIM
+        })
+        .collect()
 }
 
 fn item_rows(w: &World, bag: u8, index: u8, id: u16, moving: bool) -> Option<Vec<Row>> {
     let direct = items_list(w)?;
     item_row(w, bag, index, id)?;
     if moving {
-        let mut rows: Vec<Row> = destinations(w, index).into_iter().map(|(c, name)| (name.to_string(), Act::Move(c), true)).collect();
+        let mut rows: Vec<Row> =
+            destinations(w, index).into_iter().map(|(c, name)| (name.to_string(), Act::Move(c), true)).collect();
         if rows.is_empty() {
             rows.push(("No bag takes it here".into(), Act::Back, false));
         }
@@ -240,7 +308,10 @@ fn member(w: &World, slot: usize) -> Option<(String, Option<u32>)> {
 fn party_rows(w: &World, slot: usize) -> Option<(Option<String>, Vec<Row>)> {
     let (name, here) = member(w, slot)?;
     let me = slot == 0;
-    let mut rows: Vec<Row> = vec![("Target".into(), Act::Target, here.is_some() && target::picks_allowed(w)), ("Check".into(), Act::Check, here.is_some())];
+    let mut rows: Vec<Row> = vec![
+        ("Target".into(), Act::Target, here.is_some() && target::picks_allowed(w)),
+        ("Check".into(), Act::Check, here.is_some()),
+    ];
     if !me {
         rows.push(("Tell".into(), Act::Tell, !name.is_empty()));
     }
@@ -262,7 +333,11 @@ fn actor_rows(w: &World, id: u32) -> Option<(Option<String>, Vec<Row>)> {
     let name = textcmd::display_name(w, id);
     let name = if name.is_empty() { e.name.clone() } else { name };
     let rows: Vec<Row> = if e.mob {
-        vec![("Target".into(), Act::Target, pick), ("Attack".into(), Act::Attack, e.hpp > 0), ("Check".into(), Act::Check, true)]
+        vec![
+            ("Target".into(), Act::Target, pick),
+            ("Attack".into(), Act::Attack, e.hpp > 0),
+            ("Check".into(), Act::Check, true),
+        ]
     } else if player(e) {
         let in_party = w.party.members().any(|m| m.id == id);
         vec![
@@ -273,7 +348,11 @@ fn actor_rows(w: &World, id: u32) -> Option<(Option<String>, Vec<Row>)> {
             ("Trade".into(), Act::Trade, true),
         ]
     } else {
-        vec![("Talk".into(), Act::Talk, pick), ("Target".into(), Act::Target, pick), ("Trade".into(), Act::Trade, id >> 24 != 0)]
+        vec![
+            ("Talk".into(), Act::Talk, pick),
+            ("Target".into(), Act::Target, pick),
+            ("Trade".into(), Act::Trade, id >> 24 != 0),
+        ]
     };
     Some(((!name.is_empty()).then_some(name), rows))
 }
@@ -329,7 +408,10 @@ fn run(w: &mut World, menu: &Menu, act: Act) {
 /// and Enter (Drop and Sort still ask first).
 fn item_act(w: &mut World, bag: u8, index: u8, id: u16, act: Act) {
     if let Act::Move(c) = act {
-        let n = gitems::store_rows(w, gitems::INVENTORY).into_iter().find(|s| s.index == index && s.id == id).map_or(0, |s| s.count.max(1));
+        let n = gitems::store_rows(w, gitems::INVENTORY)
+            .into_iter()
+            .find(|s| s.index == index && s.id == id)
+            .map_or(0, |s| s.count.max(1));
         if n > 0 && destinations(w, index).iter().any(|d| d.0 == c) {
             gitems::send_move(w, gitems::INVENTORY, c, index, n);
             w.sounds.push(crate::audio::Ui::Select as u32);

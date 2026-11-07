@@ -11,7 +11,13 @@ pub(super) type Answer = (u64, Result<(i64, Vec<u8>, Vec<(String, String)>), Str
 /// A body larger than this is cut (16 MB).
 const MAX_BODY: u64 = 16 << 20;
 
-fn fetch(method: &str, url: &str, headers: &[(String, String)], body: Option<Vec<u8>>, timeout: Duration) -> Result<(i64, Vec<u8>, Vec<(String, String)>), String> {
+fn fetch(
+    method: &str,
+    url: &str,
+    headers: &[(String, String)],
+    body: Option<Vec<u8>>,
+    timeout: Duration,
+) -> Result<(i64, Vec<u8>, Vec<(String, String)>), String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .user_agent(concat!("vana-client/", env!("CARGO_PKG_VERSION")))
         .timeout_global(Some(timeout))
@@ -53,7 +59,8 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
                 Some(h) => h.pairs::<String, String>().collect::<mlua::Result<_>>()?,
                 None => Vec::new(),
             };
-            let timeout = Duration::from_secs_f64(spec.get::<Option<f64>>("timeout")?.unwrap_or(30.0).clamp(1.0, 300.0));
+            let timeout =
+                Duration::from_secs_f64(spec.get::<Option<f64>>("timeout")?.unwrap_or(30.0).clamp(1.0, 300.0));
             let st = state(lua);
             let id = next_id(&st);
             let key = lua.create_registry_value(callback)?;

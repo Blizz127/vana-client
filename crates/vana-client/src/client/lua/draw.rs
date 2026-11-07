@@ -14,10 +14,23 @@ pub(super) enum Kind {
     /// Centre and size (an axis-aligned wire box).
     Box(Vec3, Vec3),
     /// Text at a point, drawn with the HUD (centred, behind what stands in front).
-    Text { at: Vec3, text: String, size: f32, outline: Option<[u8; 4]> },
+    Text {
+        at: Vec3,
+        text: String,
+        size: f32,
+        outline: Option<[u8; 4]>,
+    },
     /// A PNG of the mod's on a quad `w` x `h` centred at a point: on the ground, upright or turned to the camera,
     /// turned by `yaw` (radians, 0 east as entity headings).
-    Image { at: Vec3, w: f32, h: f32, yaw: f32, facing: Facing, key: String, img: std::sync::Arc<(u32, u32, Vec<u8>)> },
+    Image {
+        at: Vec3,
+        w: f32,
+        h: f32,
+        yaw: f32,
+        facing: Facing,
+        key: String,
+        img: std::sync::Arc<(u32, u32, Vec<u8>)>,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -37,7 +50,11 @@ pub(super) struct Shape {
 
 fn vec3(v: Value) -> mlua::Result<Vec3> {
     match v {
-        Value::Table(t) => Ok(Vec3::new(t.get::<Option<f32>>("x")?.or(t.get(1)?).unwrap_or(0.0), t.get::<Option<f32>>("y")?.or(t.get(2)?).unwrap_or(0.0), t.get::<Option<f32>>("z")?.or(t.get(3)?).unwrap_or(0.0))),
+        Value::Table(t) => Ok(Vec3::new(
+            t.get::<Option<f32>>("x")?.or(t.get(1)?).unwrap_or(0.0),
+            t.get::<Option<f32>>("y")?.or(t.get(2)?).unwrap_or(0.0),
+            t.get::<Option<f32>>("z")?.or(t.get(3)?).unwrap_or(0.0),
+        )),
         _ => Err(mlua::Error::runtime("a point is {x, y, z}")),
     }
 }
@@ -63,7 +80,12 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     t.set(
         "text",
         lua.create_function(|lua, (id, s): (String, Table)| {
-            let kind = Kind::Text { at: vec3(s.get("at")?)?, text: s.get::<Option<String>>("text")?.unwrap_or_default(), size: s.get::<Option<f32>>("size")?.unwrap_or(1.0).clamp(0.25, 8.0), outline: super::hud::colour(s.get("outline")?)? };
+            let kind = Kind::Text {
+                at: vec3(s.get("at")?)?,
+                text: s.get::<Option<String>>("text")?.unwrap_or_default(),
+                size: s.get::<Option<f32>>("size")?.unwrap_or(1.0).clamp(0.25, 8.0),
+                outline: super::hud::colour(s.get("outline")?)?,
+            };
             put(lua, id, kind, colour(&s)?)
         })?,
     )?;
@@ -78,21 +100,47 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
                 Some("camera") => Facing::Camera,
                 _ => Facing::Ground,
             };
-            let (w, h) = (s.get::<Option<f32>>("w")?.unwrap_or(2.0).max(0.01), s.get::<Option<f32>>("h")?.unwrap_or(2.0).max(0.01));
-            let kind = Kind::Image { at: vec3(s.get("at")?)?, w, h, yaw: s.get::<Option<f32>>("yaw")?.unwrap_or(0.0), facing, key, img };
+            let (w, h) = (
+                s.get::<Option<f32>>("w")?.unwrap_or(2.0).max(0.01),
+                s.get::<Option<f32>>("h")?.unwrap_or(2.0).max(0.01),
+            );
+            let kind = Kind::Image {
+                at: vec3(s.get("at")?)?,
+                w,
+                h,
+                yaw: s.get::<Option<f32>>("yaw")?.unwrap_or(0.0),
+                facing,
+                key,
+                img,
+            };
             put(lua, id, kind, colour(&s)?)
         })?,
     )?;
-    t.set("line", lua.create_function(|lua, (id, s): (String, Table)| put(lua, id, Kind::Line(vec3(s.get("from")?)?, vec3(s.get("to")?)?), colour(&s)?))?)?;
+    t.set(
+        "line",
+        lua.create_function(|lua, (id, s): (String, Table)| {
+            put(lua, id, Kind::Line(vec3(s.get("from")?)?, vec3(s.get("to")?)?), colour(&s)?)
+        })?,
+    )?;
     t.set(
         "ring",
         lua.create_function(|lua, (id, s): (String, Table)| {
             let segments = s.get::<Option<u32>>("segments")?.unwrap_or(48).clamp(3, 360);
-            let kind = Kind::Ring(vec3(s.get("at")?)?, s.get::<Option<f32>>("radius")?.unwrap_or(1.0).max(0.0), segments, s.get::<Option<bool>>("filled")?.unwrap_or(false));
+            let kind = Kind::Ring(
+                vec3(s.get("at")?)?,
+                s.get::<Option<f32>>("radius")?.unwrap_or(1.0).max(0.0),
+                segments,
+                s.get::<Option<bool>>("filled")?.unwrap_or(false),
+            );
             put(lua, id, kind, colour(&s)?)
         })?,
     )?;
-    t.set("box", lua.create_function(|lua, (id, s): (String, Table)| put(lua, id, Kind::Box(vec3(s.get("at")?)?, vec3(s.get("size")?)?), colour(&s)?))?)?;
+    t.set(
+        "box",
+        lua.create_function(|lua, (id, s): (String, Table)| {
+            put(lua, id, Kind::Box(vec3(s.get("at")?)?, vec3(s.get("size")?)?), colour(&s)?)
+        })?,
+    )?;
     t.set(
         "remove",
         lua.create_function(|lua, id: String| {
@@ -114,7 +162,10 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             if super::lobby::in_lobby(lua) {
                 return Err(mlua::Error::runtime("not available in the lobby (before login)"));
             }
-            let info = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default();
+            let info = lua
+                .app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+                .map(|f| f.clone())
+                .unwrap_or_default();
             let f = info.borrow();
             let clip = f.view_proj * p.extend(1.0);
             if clip.w <= 1e-4 {
@@ -158,8 +209,16 @@ pub(super) fn vertices(w: &World) -> [Vec<LineVertex>; 2] {
                 Kind::Text { .. } | Kind::Image { .. } => {}
                 Kind::Box(c, size) => {
                     let h = size * 0.5;
-                    let corner = |i: u32| c + Vec3::new(if i & 1 != 0 { h.x } else { -h.x }, if i & 2 != 0 { h.y } else { -h.y }, if i & 4 != 0 { h.z } else { -h.z });
-                    for (a, b) in [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)] {
+                    let corner = |i: u32| {
+                        c + Vec3::new(
+                            if i & 1 != 0 { h.x } else { -h.x },
+                            if i & 2 != 0 { h.y } else { -h.y },
+                            if i & 4 != 0 { h.z } else { -h.z },
+                        )
+                    };
+                    for (a, b) in
+                        [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
+                    {
                         out[0].extend([v(corner(a)), v(corner(b))]);
                     }
                 }
@@ -195,7 +254,16 @@ pub(super) fn draw_overlay(gu: &mut super::super::game_ui::GameUi, w: &World) {
                     let tw = gu.width_in(text, None) * size;
                     let (x, y) = (x - tw / 2.0, y - 8.0 * size);
                     if let Some(o) = outline {
-                        for (dx, dy) in [(-1.0, -1.0), (0.0, -1.0), (1.0, -1.0), (-1.0, 0.0), (1.0, 0.0), (-1.0, 1.0), (0.0, 1.0), (1.0, 1.0)] {
+                        for (dx, dy) in [
+                            (-1.0, -1.0),
+                            (0.0, -1.0),
+                            (1.0, -1.0),
+                            (-1.0, 0.0),
+                            (1.0, 0.0),
+                            (-1.0, 1.0),
+                            (0.0, 1.0),
+                            (1.0, 1.0),
+                        ] {
                             gu.text_in(text, x + dx, y + dy, super::hud::tint(*o), *size, None);
                         }
                     }
@@ -221,7 +289,12 @@ pub(super) fn draw_overlay(gu: &mut super::super::game_ui::GameUi, w: &World) {
                     let colour = s.colour.map(|c| c as f32 / 255.0);
                     for j in 0..N {
                         for i in 0..N {
-                            let (a0, a1, b0, b1) = (i as f32 / N as f32, (i + 1) as f32 / N as f32, j as f32 / N as f32, (j + 1) as f32 / N as f32);
+                            let (a0, a1, b0, b1) = (
+                                i as f32 / N as f32,
+                                (i + 1) as f32 / N as f32,
+                                j as f32 / N as f32,
+                                (j + 1) as f32 / N as f32,
+                            );
                             let c = [point(a0, b0), point(a1, b0), point(a0, b1), point(a1, b1)].map(project);
                             let [Some(p0), Some(p1), Some(p2), Some(p3)] = c else { continue };
                             let z = (p0.1 + p1.1 + p2.1 + p3.1) / 4.0;
@@ -229,7 +302,12 @@ pub(super) fn draw_overlay(gu: &mut super::super::game_ui::GameUi, w: &World) {
                                 continue;
                             }
                             gu.depth(Some(z));
-                            gu.image_corners(key, [p0.0, p1.0, p2.0, p3.0], [[a0, b0], [a1, b0], [a0, b1], [a1, b1]], colour);
+                            gu.image_corners(
+                                key,
+                                [p0.0, p1.0, p2.0, p3.0],
+                                [[a0, b0], [a1, b0], [a0, b1], [a1, b1]],
+                                colour,
+                            );
                         }
                     }
                     gu.depth(None);

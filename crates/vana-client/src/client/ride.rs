@@ -44,7 +44,12 @@ pub enum Phase {
     Riding,
     Stopping,
     /// The animal's place, its op 0x6e run (ticks left, units a tick), and ticks since.
-    Leaving { pos: Vec3, forward: Vec3, run: Option<(f32, f32)>, ticks: f32 },
+    Leaving {
+        pos: Vec3,
+        forward: Vec3,
+        run: Option<(f32, f32)>,
+        ticks: f32,
+    },
 }
 
 /// A rider's state.
@@ -77,14 +82,24 @@ pub fn choco_look(cp: [u32; 2]) -> Look {
         return Look { race: 0x20, head: 3, body: 3, hands: 3, legs: 1, feet: 3, ..Default::default() };
     }
     let c = cp[0];
-    Look { race: 0x20 + (c >> 9 & 7) as u8, head: (c & 7) as u16, body: 7, hands: (c >> 6 & 7) as u16, legs: 0, feet: (c >> 3 & 7) as u16, ..Default::default() }
+    Look {
+        race: 0x20 + (c >> 9 & 7) as u8,
+        head: (c & 7) as u16,
+        body: 7,
+        hands: (c >> 6 & 7) as u16,
+        legs: 0,
+        feet: (c >> 3 & 7) as u16,
+        ..Default::default()
+    }
 }
 
 /// FUN_1008f740's gates: status 5 a chocobo (a personal one only once its look is a chocobo race), 0x55 a mount by
 /// its id (none: no animal).
 pub fn model(status: u8, ride: Ride, zone: u16, in_event: bool) -> Option<Model> {
     match status {
-        5 if (2..=4).contains(&ride.chocobo) => Some(choco_look(ride.custom)).filter(|l| (0x20..=0x24).contains(&l.race)).map(Model::Custom),
+        5 if (2..=4).contains(&ride.chocobo) => {
+            Some(choco_look(ride.custom)).filter(|l| (0x20..=0x24).contains(&l.race)).map(Model::Custom)
+        }
         5 => Some(Model::Chocobo(if past(zone) && !in_event { 39_276 } else { 39_275 })),
         0x55 if ride.mount != 0 => Some(Model::Mount(ride.mount)),
         _ => None,
@@ -94,7 +109,10 @@ pub fn model(status: u8, ride: Ride, zone: u16, in_event: bool) -> Option<Model>
 /// DAT_1035f5ac by race: legs and upper body.
 const FILES: [u32; 9] = [38603, 38603, 38699, 38795, 38891, 38987, 38987, 39083, 39179];
 /// DAT_1035f5c0 by race * 2 + (skirt set 1 ? 0 : 1).
-const SKIRT: [u32; 18] = [38635, 38667, 38635, 38667, 38731, 38763, 38827, 38859, 38923, 38955, 39019, 39051, 39019, 39051, 39115, 39147, 39211, 39243];
+const SKIRT: [u32; 18] = [
+    38635, 38667, 38635, 38667, 38731, 38763, 38827, 38859, 38923, 38955, 39019, 39051, 39019, 39051, 39115, 39147,
+    39211, 39243,
+];
 
 /// FUN_100d2800: the rider's riding files (tag 7).
 pub fn files(w: &World, id: u32, pc: &PcMotion) -> Vec<u32> {
@@ -136,7 +154,12 @@ pub fn names(k: u8) -> MotionNames {
 /// animal's names, size and rate; a rider no longer riding leaves through `coff`.
 pub fn update(w: &mut World, dt: f32) {
     let zone = w.zone.unwrap_or(0);
-    let mut riders: Vec<(u32, u8, Ride)> = w.entities.iter().filter(|(id, e)| **id != w.my_id && e.kind == EntityKind::Player).map(|(id, e)| (*id, e.motion.status, e.ride)).collect();
+    let mut riders: Vec<(u32, u8, Ride)> = w
+        .entities
+        .iter()
+        .filter(|(id, e)| **id != w.my_id && e.kind == EntityKind::Player)
+        .map(|(id, e)| (*id, e.motion.status, e.ride))
+        .collect();
     riders.push((w.my_id, w.my_motion.status, w.my_ride));
     // Bound actors an event put on a chocobo or mount (op 0x7e, op 0xac sub 1).
     for id in super::event::riding(w) {
@@ -169,20 +192,34 @@ pub fn update(w: &mut World, dt: f32) {
         if let Some(r) = w.rides.get_mut(&id).filter(|r| r.phase == Phase::Stopping) {
             r.phase = Phase::Riding;
         }
-        let Some(rider) = w.actors.get(&id).filter(|a| a.character.as_ref().is_some_and(|c| c.pc.is_some())) else { continue };
+        let Some(rider) = w.actors.get(&id).filter(|a| a.character.as_ref().is_some_and(|c| c.pc.is_some())) else {
+            continue;
+        };
         let (ch, rider_scale) = (rider.character.clone().unwrap(), rider.scale);
         let pc = ch.pc.unwrap();
         keep.insert(id);
         let animal_id = ANIMAL | id;
         let src = m.source();
-        if w.actors.get(&animal_id).is_none_or(|a| a.key != format!("{src:?}")) && !w.event_looks.iter().any(|(i, _)| *i == animal_id) {
+        if w.actors.get(&animal_id).is_none_or(|a| a.key != format!("{src:?}"))
+            && !w.event_looks.iter().any(|(i, _)| *i == animal_id)
+        {
             w.event_looks.push((animal_id, src));
         }
         let animal = w.actors.get(&animal_id).filter(|a| a.key == format!("{src:?}")).and_then(|a| a.character.clone());
         let mi = animal.as_ref().and_then(|c| c.mount);
         let mount = matches!(m, Model::Mount(_));
         let weps = rider.wep_hide;
-        let fresh = |weps: [bool; 9]| Riding { model: m, phase: if mount { Phase::Mounting(0.0) } else { Phase::Riding }, race: pc.race, v: 0, offset: Vec3::ZERO, yaw: 0.0, points: [None; 2], weps, begun: Some(std::time::Instant::now()) };
+        let fresh = |weps: [bool; 9]| Riding {
+            model: m,
+            phase: if mount { Phase::Mounting(0.0) } else { Phase::Riding },
+            race: pc.race,
+            v: 0,
+            offset: Vec3::ZERO,
+            yaw: 0.0,
+            points: [None; 2],
+            weps,
+            begun: Some(std::time::Instant::now()),
+        };
         let r = w.rides.entry(id).or_insert_with(|| fresh(std::array::from_fn(|n| weps[n][0])));
         if r.model != m || r.race != pc.race {
             *r = fresh(r.weps);
@@ -201,7 +238,13 @@ pub fn update(w: &mut World, dt: f32) {
                 (r.phase, shown) = (Phase::Riding, true);
             }
         }
-        r.v = if mount { 5 } else if past(zone) && !bound { 3 } else { 0 };
+        r.v = if mount {
+            5
+        } else if past(zone) && !bound {
+            3
+        } else {
+            0
+        };
         r.yaw = mi.map_or(0.0, |mi| mi.yaw(pc.race));
         if let Some(a) = w.actors.get_mut(&id) {
             if shown {
@@ -222,7 +265,12 @@ pub fn update(w: &mut World, dt: f32) {
             a.rate_scale = mi.map_or(1.0, |mi| mi.rate());
         }
     }
-    let gone: Vec<u32> = w.rides.iter().filter(|(id, r)| !keep.contains(id) && !matches!(r.phase, Phase::Leaving { .. })).map(|(id, _)| *id).collect();
+    let gone: Vec<u32> = w
+        .rides
+        .iter()
+        .filter(|(id, r)| !keep.contains(id) && !matches!(r.phase, Phase::Leaving { .. }))
+        .map(|(id, _)| *id)
+        .collect();
     for id in gone {
         // Into state 0xf our own actor gets FUN_100a6070(0): autorun and /follow end (the "Follow canceled." line), so
         // the stand comes even with no key held *(inf: +0xee, which must not be 3 / 4 / 5, read as the status)*.
@@ -239,16 +287,23 @@ pub fn update(w: &mut World, dt: f32) {
             leave(w, id);
         }
     }
-    let stopped: Vec<u32> = w.rides.iter().filter(|(id, r)| r.phase == Phase::Stopping && keep.contains(id) && standing(w, **id)).map(|(id, _)| *id).collect();
+    let stopped: Vec<u32> = w
+        .rides
+        .iter()
+        .filter(|(id, r)| r.phase == Phase::Stopping && keep.contains(id) && standing(w, **id))
+        .map(|(id, _)| *id)
+        .collect();
     for id in stopped {
         leave(w, id);
     }
-    let leaving: Vec<u32> = w.rides.iter().filter(|(_, r)| matches!(r.phase, Phase::Leaving { .. })).map(|(id, _)| *id).collect();
+    let leaving: Vec<u32> =
+        w.rides.iter().filter(|(_, r)| matches!(r.phase, Phase::Leaving { .. })).map(|(id, _)| *id).collect();
     for id in leaving {
         step_leave(w, id, dt);
     }
     // An animal whose rider stopped riding before it loaded.
-    let stray: Vec<u32> = w.actors.keys().filter(|id| **id & ANIMAL != 0 && !w.rides.contains_key(&(**id & !ANIMAL))).copied().collect();
+    let stray: Vec<u32> =
+        w.actors.keys().filter(|id| **id & ANIMAL != 0 && !w.rides.contains_key(&(**id & !ANIMAL))).copied().collect();
     for id in stray {
         w.actors.remove(&id);
     }
@@ -261,13 +316,18 @@ fn leave(w: &mut World, id: u32) {
     let animal_id = ANIMAL | id;
     let my_dir = w.net.me.lock().map(|m| m.dir).unwrap_or(0);
     let place = super::base_place(w, id, my_dir);
-    let (Some(rch), Some(ach), Some(p)) = (w.actors.get(&id).and_then(|a| a.character.clone()), w.actors.get(&animal_id).and_then(|a| a.character.clone()), place) else {
+    let (Some(rch), Some(ach), Some(p)) = (
+        w.actors.get(&id).and_then(|a| a.character.clone()),
+        w.actors.get(&animal_id).and_then(|a| a.character.clone()),
+        place,
+    ) else {
         finish(w, id);
         return;
     };
     let Some(r) = w.rides.get_mut(&id) else { return };
     let mount = matches!(r.model, Model::Mount(_));
-    (r.phase, r.offset, r.yaw, r.points) = (Phase::Leaving { pos: p.pos, forward: p.forward, run: None, ticks: 0.0 }, Vec3::ZERO, 0.0, [None; 2]);
+    (r.phase, r.offset, r.yaw, r.points) =
+        (Phase::Leaving { pos: p.pos, forward: p.forward, run: None, ticks: 0.0 }, Vec3::ZERO, 0.0, [None; 2]);
     if let Some(a) = w.actors.get_mut(&id) {
         (a.motion_names, a.rebase) = (None, true);
     }
@@ -465,7 +525,11 @@ pub fn points(w: &mut World, pts: Vec<(u64, Vec3)>) {
             r.points[(k & 1) as usize] = Some(p);
             if let [Some(rp), Some(mp)] = r.points {
                 if r.offset == Vec3::ZERO {
-                    log::info!("rider {:#x}: saddle offset {:?} (point 0x6b {rp:?}, saddle {mp:?})", k >> 8 & 0xffff_ffff, mp - rp);
+                    log::info!(
+                        "rider {:#x}: saddle offset {:?} (point 0x6b {rp:?}, saddle {mp:?})",
+                        k >> 8 & 0xffff_ffff,
+                        mp - rp
+                    );
                 }
                 r.offset = mp - rp;
             }
@@ -578,7 +642,10 @@ mod tests {
         assert_eq!(model(5, ride(1, 0), 87, false), Some(Model::Chocobo(39_276)));
         assert_eq!(model(5, ride(1, 0), 87, true), Some(Model::Chocobo(39_275)));
         assert_eq!(model(0x55, ride(3, 0), 100, false), None);
-        assert_eq!(model(0x55, ride(3, 2), 100, false).map(|m| format!("{:?}", m.source())), Some("File(102706)".into()));
+        assert_eq!(
+            model(0x55, ride(3, 2), 100, false).map(|m| format!("{:?}", m.source())),
+            Some("File(102706)".into())
+        );
         // A personal chocobo's colour 7 is no chocobo race: nothing until its look comes.
         assert_eq!(model(5, Ride { chocobo: 2, mount: 0, custom: [7 << 9, 0] }, 100, false), None);
         assert_eq!((names(6).idle, names(3).run, names(0).walk), ("6hi", "3un", "wlk"));

@@ -75,7 +75,12 @@ impl ItemInfo for Placeholder {
                 let p = &mut px[(y * 32 + x) * 4..][..4];
                 if inside {
                     let k = if edge { 0.45 } else { shade };
-                    p.copy_from_slice(&[(c[0] as f32 * k) as u8, (c[1] as f32 * k) as u8, (c[2] as f32 * k) as u8, 255]);
+                    p.copy_from_slice(&[
+                        (c[0] as f32 * k) as u8,
+                        (c[1] as f32 * k) as u8,
+                        (c[2] as f32 * k) as u8,
+                        255,
+                    ]);
                 }
             }
         }
@@ -165,7 +170,8 @@ pub fn equipment_shot(out: &Path, cursor: usize, frame: usize, width: u32, heigh
     let by_id = |id: u16| all.iter().find(|x| x.id == id).cloned();
     let mut eq = Equipment { fields: [12, -3, 0, 5, 7, 0, 2, -1, 312, 287], ..Default::default() };
     // main, ammo, head, body, hands, legs, feet, ring1
-    for (slot, id) in [(0, 16465), (3, 17307), (4, 12448), (5, 12576), (6, 12704), (7, 12832), (8, 12960), (13, 13469)] {
+    for (slot, id) in [(0, 16465), (3, 17307), (4, 12448), (5, 12576), (6, 12704), (7, 12832), (8, 12960), (13, 13469)]
+    {
         eq.slots[slot] = by_id(id);
     }
     let p = Persona::build(&Stats {

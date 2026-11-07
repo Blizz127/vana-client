@@ -19,11 +19,18 @@ pub enum Ask {
 pub enum Step {
     Menu,
     /// The URI's QR modules (dark true, `side` a row) and the key under it.
-    Scan { qr: Vec<bool>, side: usize, key: String },
+    Scan {
+        qr: Vec<bool>,
+        side: usize,
+        key: String,
+    },
     /// A code to turn it off or to make a new recovery code.
     Code(Ask),
     /// The outcome, and a recovery code to keep.
-    Done { text: &'static str, code: Option<String> },
+    Done {
+        text: &'static str,
+        code: Option<String>,
+    },
 }
 
 pub struct TwoFa {
@@ -75,8 +82,12 @@ impl TwoFa {
 
     fn text(&self) -> &'static str {
         match &self.step {
-            Step::Menu => "With two-factor sign-in on, logging in also asks for a code from an authenticator app on your phone.",
-            Step::Scan { .. } => "Scan this with an authenticator app (or type in the key under it), then enter the 6-digit code it shows.",
+            Step::Menu => {
+                "With two-factor sign-in on, logging in also asks for a code from an authenticator app on your phone."
+            }
+            Step::Scan { .. } => {
+                "Scan this with an authenticator app (or type in the key under it), then enter the 6-digit code it shows."
+            }
             Step::Code(_) => "Enter the code your authenticator app shows now, or your recovery code.",
             Step::Done { text, .. } => text,
         }
@@ -102,7 +113,12 @@ impl TwoFa {
             Ok(Reply::TotpCreated { uri }) => match qr(&uri) {
                 Some((qr, side)) => {
                     let key = uri.split(['?', '&']).find_map(|p| p.strip_prefix("secret=")).unwrap_or_default();
-                    let key = key.as_bytes().chunks(4).map(|c| String::from_utf8_lossy(c).into_owned()).collect::<Vec<_>>().join(" ");
+                    let key = key
+                        .as_bytes()
+                        .chunks(4)
+                        .map(|c| String::from_utf8_lossy(c).into_owned())
+                        .collect::<Vec<_>>()
+                        .join(" ");
                     (self.step, self.focus, self.code) = (Step::Scan { qr, side, key }, 0, String::new());
                 }
                 None => self.error = Some("The server's key could not be shown as a QR code.".into()),
@@ -115,14 +131,19 @@ impl TwoFa {
                 };
                 (self.step, self.focus, self.code) = (Step::Done { text, code: recovery_code }, 0, String::new());
             }
-            Ok(Reply::TotpRemoved) => (self.step, self.focus, self.code) = (Step::Done { text: "Two-factor sign-in is off.", code: None }, 0, String::new()),
+            Ok(Reply::TotpRemoved) => {
+                (self.step, self.focus, self.code) =
+                    (Step::Done { text: "Two-factor sign-in is off.", code: None }, 0, String::new())
+            }
             Ok(_) => self.error = Some("Unexpected reply from the login server.".into()),
             // LSB answers every refusal with "Failed to validate credentials".
             Err(e) => {
                 let e = format!("{e:#}");
                 self.error = Some(match &self.step {
                     _ if !e.contains("validate credentials") => e,
-                    Step::Menu => "Refused: check the password. If two-factor sign-in is on already, turn it off first.".into(),
+                    Step::Menu => {
+                        "Refused: check the password. If two-factor sign-in is on already, turn it off first.".into()
+                    }
                     _ => "That code was not accepted (or the password is wrong).".into(),
                 });
             }
@@ -159,7 +180,8 @@ fn layout(lu: &GameUi, size: [u32; 2], st: &TwoFa, busy: bool, f: f32) -> Lay {
     let cw = ww - 32.0 * f;
     let mut lines = Vec::new();
     let mut y = 12.0 * f;
-    let line = |lines: &mut Vec<Line>, y: &mut f32, text: String, colour, centre| push(lines, y, f, cw, text, colour, centre);
+    let line =
+        |lines: &mut Vec<Line>, y: &mut f32, text: String, colour, centre| push(lines, y, f, cw, text, colour, centre);
     line(&mut lines, &mut y, TITLE.into(), YELLOW, true);
     y += 4.0 * f;
     for l in lu.wrap(st.text(), cw / f) {
@@ -229,7 +251,15 @@ fn layout(lu: &GameUi, size: [u32; 2], st: &TwoFa, busy: bool, f: f32) -> Lay {
 /// The window over the login form: keys and mouse (none while `busy`), then drawn here (classic) or handed to the
 /// modern layer through `modern`. Focus 0 is the code field where there is one, then the buttons.
 #[allow(clippy::too_many_arguments)]
-pub fn window(lu: &mut GameUi, input: &UiInput, size: [u32; 2], st: &mut TwoFa, busy: bool, sounds: &mut Vec<crate::audio::Ui>, modern: Option<&mut Option<View>>) -> Option<Act> {
+pub fn window(
+    lu: &mut GameUi,
+    input: &UiInput,
+    size: [u32; 2],
+    st: &mut TwoFa,
+    busy: bool,
+    sounds: &mut Vec<crate::audio::Ui>,
+    modern: Option<&mut Option<View>>,
+) -> Option<Act> {
     let f = if modern.is_some() { 1.5 } else { 1.0 };
     // The modern layer's rule: hovering only lights a button.
     let hover_moves = modern.is_none();
@@ -266,7 +296,9 @@ pub fn window(lu: &mut GameUi, input: &UiInput, size: [u32; 2], st: &mut TwoFa, 
                     egui::Key::ArrowUp if first == 0 => st.focus = (st.focus + items - 1) % items,
                     egui::Key::ArrowUp => st.focus = 0,
                     egui::Key::ArrowRight if first == 1 && st.focus > 0 => st.focus = (st.focus % (items - 1)) + 1,
-                    egui::Key::ArrowLeft if first == 1 && st.focus > 0 => st.focus = if st.focus == 1 { items - 1 } else { st.focus - 1 },
+                    egui::Key::ArrowLeft if first == 1 && st.focus > 0 => {
+                        st.focus = if st.focus == 1 { items - 1 } else { st.focus - 1 }
+                    }
                     egui::Key::Backspace if first == 1 && st.focus == 0 => {
                         st.code.pop();
                     }
@@ -284,7 +316,13 @@ pub fn window(lu: &mut GameUi, input: &UiInput, size: [u32; 2], st: &mut TwoFa, 
         st.focus = i;
         let k = i - first;
         let needs_code = first == 1 && k == 0 && st.code.is_empty();
-        sounds.push(if needs_code { crate::audio::Ui::Error } else if k + 1 == lay.buttons.len() && first == 1 { crate::audio::Ui::Cancel } else { crate::audio::Ui::Select });
+        sounds.push(if needs_code {
+            crate::audio::Ui::Error
+        } else if k + 1 == lay.buttons.len() && first == 1 {
+            crate::audio::Ui::Cancel
+        } else {
+            crate::audio::Ui::Select
+        });
         st.error = None;
         match (&st.step, k) {
             (Step::Menu, 0) => act = Some(Act::Send(Command::CreateTotp, String::new())),
@@ -348,7 +386,13 @@ pub fn window(lu: &mut GameUi, input: &UiInput, size: [u32; 2], st: &mut TwoFa, 
     for (k, (r, name)) in lay.buttons.iter().zip(names).enumerate() {
         let on = st.focus == first + k && !busy;
         let d = if on { -1.0 } else { 0.0 };
-        let tint = if busy { 0x8040_4040 } else if on { 0x8080_5020 } else { 0x8080_8080 };
+        let tint = if busy {
+            0x8040_4040
+        } else if on {
+            0x8080_5020
+        } else {
+            0x8080_8080
+        };
         super::settings::button(lu, [r[0] + d, r[1] + d, r[2], r[3]], tint);
         let lx = r[0] + ((r[2] - lu.label_width(name)) / 2.0).round();
         lu.label(name, lx + d, r[1] + 1.0 + d, tint, true);

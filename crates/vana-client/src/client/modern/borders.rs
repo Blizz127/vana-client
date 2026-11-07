@@ -57,7 +57,11 @@ fn accent(m: &Modern, frame: &str) -> Color32 {
 
 /// The pack frame's interior colour (its gradient's middle), for the styles that fill a rounded rect.
 fn fill(m: &Modern, frame: &str) -> Color32 {
-    m.bg(m.art.frame(frame).or_else(|| m.art.frame("window_normal")).map_or(m.theme.color("surface"), |f| f.gradient[f.gradient.len() / 2]))
+    m.bg(m
+        .art
+        .frame(frame)
+        .or_else(|| m.art.frame("window_normal"))
+        .map_or(m.theme.color("surface"), |f| f.gradient[f.gradient.len() / 2]))
 }
 
 /// A horizontal line from `a` to `b` at `y`, clear at both ends and `c` over its middle half.
@@ -82,7 +86,12 @@ fn rule(v: &mut Vec<Shape>, a: f32, b: f32, y: f32, c: Color32) {
 fn corner_marks(v: &mut Vec<Shape>, r: Rect, c: Color32) {
     let (l, s) = (11.0, Stroke::new(1.5, c));
     let r = r.shrink(0.75);
-    for (p, dx, dy) in [(r.left_top(), 1.0, 1.0), (r.right_top(), -1.0, 1.0), (r.left_bottom(), 1.0, -1.0), (r.right_bottom(), -1.0, -1.0)] {
+    for (p, dx, dy) in [
+        (r.left_top(), 1.0, 1.0),
+        (r.right_top(), -1.0, 1.0),
+        (r.left_bottom(), 1.0, -1.0),
+        (r.right_bottom(), -1.0, -1.0),
+    ] {
         v.push(Shape::line_segment([p, p + vec2(l * dx, 0.0)], s));
         v.push(Shape::line_segment([p, p + vec2(0.0, l * dy)], s));
     }
@@ -96,28 +105,56 @@ fn shapes(m: &Modern, frame: &str, body: Rect, round: CornerRadius, style: Style
         Style::Pack => {}
         Style::Hairline => {
             v.push(Shape::Rect(RectShape::filled(body, round, fill(m, frame))));
-            v.push(Shape::Rect(RectShape::stroke(body.shrink(1.0), round, Stroke::new(1.0, Color32::from_white_alpha(12)), StrokeKind::Inside)));
-            v.push(Shape::Rect(RectShape::stroke(body, round, Stroke::new(1.0, line(m, frame).gamma_multiply(0.85)), StrokeKind::Inside)));
+            v.push(Shape::Rect(RectShape::stroke(
+                body.shrink(1.0),
+                round,
+                Stroke::new(1.0, Color32::from_white_alpha(12)),
+                StrokeKind::Inside,
+            )));
+            v.push(Shape::Rect(RectShape::stroke(
+                body,
+                round,
+                Stroke::new(1.0, line(m, frame).gamma_multiply(0.85)),
+                StrokeKind::Inside,
+            )));
         }
         Style::Gilt => {
             v.push(Shape::Rect(RectShape::filled(body, round, fill(m, frame))));
-            v.push(Shape::Rect(RectShape::stroke(body, round, Stroke::new(1.0, line(m, frame).gamma_multiply(0.35)), StrokeKind::Inside)));
+            v.push(Shape::Rect(RectShape::stroke(
+                body,
+                round,
+                Stroke::new(1.0, line(m, frame).gamma_multiply(0.35)),
+                StrokeKind::Inside,
+            )));
             let c = accent(m, frame).gamma_multiply(0.9);
             rule(&mut v, body.min.x, body.max.x, body.min.y + 0.5, c);
             rule(&mut v, body.min.x, body.max.x, body.max.y - 0.5, c);
         }
         Style::Corners => {
             v.push(Shape::Rect(RectShape::filled(body, round, fill(m, frame))));
-            v.push(Shape::Rect(RectShape::stroke(body, round, Stroke::new(1.0, line(m, frame).gamma_multiply(0.45)), StrokeKind::Inside)));
+            v.push(Shape::Rect(RectShape::stroke(
+                body,
+                round,
+                Stroke::new(1.0, line(m, frame).gamma_multiply(0.45)),
+                StrokeKind::Inside,
+            )));
             corner_marks(&mut v, body, accent(m, frame));
         }
         Style::Shadow => {
-            let shadow = egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(150) };
+            let shadow =
+                egui::epaint::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(150) };
             v.push(Shape::Rect(shadow.as_shape(body, round)));
             v.push(Shape::Rect(RectShape::filled(body, round, fill(m, frame))));
-            let edge = if frame == "window_normal" || frame == "window_tooltip" { Color32::from_black_alpha(120) } else { line(m, frame) };
+            let edge = if frame == "window_normal" || frame == "window_tooltip" {
+                Color32::from_black_alpha(120)
+            } else {
+                line(m, frame)
+            };
             v.push(Shape::Rect(RectShape::stroke(body, round, Stroke::new(1.0, edge), StrokeKind::Inside)));
-            v.push(Shape::line_segment([pos2(body.min.x + 6.0, body.min.y + 1.0), pos2(body.max.x - 6.0, body.min.y + 1.0)], Stroke::new(1.0, Color32::from_white_alpha(26))));
+            v.push(Shape::line_segment(
+                [pos2(body.min.x + 6.0, body.min.y + 1.0), pos2(body.max.x - 6.0, body.min.y + 1.0)],
+                Stroke::new(1.0, Color32::from_white_alpha(26)),
+            ));
         }
     }
     v

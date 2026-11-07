@@ -123,7 +123,8 @@ pub fn encode(voucher: u16, runes: &[Placed], shape_of: impl Fn(u16) -> Option<u
         return ext;
     }
     put(&mut ext, 0, 7, (voucher - VOUCHER_BASE + 1) as u32 & 0x7f);
-    let covers: Vec<u32> = runes.iter().map(|p| shape_of(p.rune).map_or(0, |s| cells(mask(s, p.rot), p.col, p.row))).collect();
+    let covers: Vec<u32> =
+        runes.iter().map(|p| shape_of(p.rune).map_or(0, |s| cells(mask(s, p.rot), p.col, p.row))).collect();
     let mut used = vec![false; runes.len()];
     let mut k = 0;
     for c in 0..25 {
@@ -158,7 +159,8 @@ mod tests {
     /// The test vector of MODLOG "Moblin Maze Mongers" (voucher 01; runes 21, 106, 109) both ways.
     #[test]
     fn vector() {
-        let ext: [u8; 24] = [0x01, 0x80, 0x00, 0x90, 0x15, 0xd4, 0xb4, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10, 0x01, 0, 0, 0, 0, 0];
+        let ext: [u8; 24] =
+            [0x01, 0x80, 0x00, 0x90, 0x15, 0xd4, 0xb4, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10, 0x01, 0, 0, 0, 0, 0];
         let (v, runes) = decode(&ext, shape, 0);
         assert_eq!(v, VOUCHER_BASE);
         let rune = |n: u16, col, row, rot| Placed { rune: RUNE_BASE - 1 + n, col, row, rot };

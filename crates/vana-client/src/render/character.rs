@@ -38,7 +38,11 @@ pub fn pose_character(ch: &Character, anims: &[(&crate::dat::character::Animatio
 }
 
 /// `pose_character` with drawn weapons on their grips.
-pub fn pose_character_held(ch: &Character, anims: &[(&crate::dat::character::Animation, f32)], grips: &[(u16, u16)]) -> PosedMesh {
+pub fn pose_character_held(
+    ch: &Character,
+    anims: &[(&crate::dat::character::Animation, f32)],
+    grips: &[(u16, u16)],
+) -> PosedMesh {
     skin_character(ch, &pose_held(&ch.skeleton, anims, grips))
 }
 
@@ -55,7 +59,13 @@ pub fn pose_character_blend(
 }
 
 /// The bone transforms of a cross-fade from one motion to another (t = 0 all `from`).
-pub fn pose_blend(ch: &Character, from: &[(&crate::dat::character::Animation, f32)], to: &[(&crate::dat::character::Animation, f32)], t: f32, grips: &[(u16, u16)]) -> Vec<BoneXf> {
+pub fn pose_blend(
+    ch: &Character,
+    from: &[(&crate::dat::character::Animation, f32)],
+    to: &[(&crate::dat::character::Animation, f32)],
+    t: f32,
+    grips: &[(u16, u16)],
+) -> Vec<BoneXf> {
     let (a, b) = (pose_held(&ch.skeleton, from, grips), pose_held(&ch.skeleton, to, grips));
     a.iter().zip(&b).map(|(x, y)| x.lerp(y, t)).collect()
 }
@@ -97,7 +107,14 @@ fn skin_character(ch: &Character, world: &[BoneXf]) -> PosedMesh {
     PosedMesh { batches, min, max }
 }
 
-pub fn render_png(ch: &Character, mesh: &PosedMesh, camera: &Camera, width: u32, height: u32, path: &std::path::Path) -> Result<()> {
+pub fn render_png(
+    ch: &Character,
+    mesh: &PosedMesh,
+    camera: &Camera,
+    width: u32,
+    height: u32,
+    path: &std::path::Path,
+) -> Result<()> {
     let view_proj = camera.view_proj(width as f32 / height as f32);
     let opts = ShotOptions { cull: true, clear: [0.25, 0.3, 0.38, 1.0], light: [0.4, -0.8, -0.5, 0.45] };
     render_batches_png(&ch.textures, mesh, view_proj, &opts, width, height, path)
@@ -134,7 +151,11 @@ pub fn render_batches_png(
         entries: &[wgpu::BindGroupLayoutEntry {
             binding: 0,
             visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
             count: None,
         }],
     });
@@ -151,7 +172,12 @@ pub fn render_batches_png(
                 },
                 count: None,
             },
-            wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
         ],
     });
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -167,9 +193,18 @@ pub fn render_batches_png(
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("character"),
         layout: Some(&layout),
-        vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs_main"), compilation_options: Default::default(), buffers: &vertex_layouts },
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &vertex_layouts,
+        },
         // File triangles (and the swapped mirrored copies) are clockwise from the front.
-        primitive: wgpu::PrimitiveState { front_face: wgpu::FrontFace::Cw, cull_mode: opts.cull.then_some(wgpu::Face::Back), ..Default::default() },
+        primitive: wgpu::PrimitiveState {
+            front_face: wgpu::FrontFace::Cw,
+            cull_mode: opts.cull.then_some(wgpu::Face::Back),
+            ..Default::default()
+        },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: super::DEPTH_FORMAT,
             depth_write_enabled: Some(true),
@@ -178,13 +213,22 @@ pub fn render_batches_png(
             bias: Default::default(),
         }),
         multisample: Default::default(),
-        fragment: Some(wgpu::FragmentState { module: &shader, entry_point: Some("fs_main"), compilation_options: Default::default(), targets: &[Some(format.into())] }),
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            compilation_options: Default::default(),
+            targets: &[Some(format.into())],
+        }),
         multiview_mask: None,
         cache: None,
     });
 
     let u = Uniforms { view_proj: view_proj.to_cols_array_2d(), light: opts.light, misc: [0.0; 4] };
-    let uniforms = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("uniforms"), contents: bytemuck::bytes_of(&u), usage: wgpu::BufferUsages::UNIFORM });
+    let uniforms = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("uniforms"),
+        contents: bytemuck::bytes_of(&u),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
     let globals = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("globals"),
         layout: &globals_layout,
@@ -234,13 +278,21 @@ pub fn render_batches_png(
     let mut draws = Vec::new();
     for (tex, _, tris) in &mesh.batches {
         let start = verts.len() as u32;
-        verts.extend(tris.iter().map(|v| CharVertex { pos: [v[0], v[1], v[2]], normal: [v[3], v[4], v[5]], uv: [v[6], v[7]] }));
+        verts.extend(tris.iter().map(|v| CharVertex {
+            pos: [v[0], v[1], v[2]],
+            normal: [v[3], v[4], v[5]],
+            uv: [v[6], v[7]],
+        }));
         draws.push((slot.get(tex.as_str()).copied().unwrap_or(0), start..verts.len() as u32));
     }
     if verts.is_empty() {
         anyhow::bail!("nothing to draw");
     }
-    let vbuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some("char"), contents: bytemuck::cast_slice(&verts), usage: wgpu::BufferUsages::VERTEX });
+    let vbuf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("char"),
+        contents: bytemuck::cast_slice(&verts),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
 
     let target = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("target"),
@@ -269,7 +321,15 @@ pub fn render_batches_png(
                 view: &view,
                 depth_slice: None,
                 resolve_target: None,
-                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color { r: opts.clear[0], g: opts.clear[1], b: opts.clear[2], a: opts.clear[3] }), store: wgpu::StoreOp::Store },
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: opts.clear[0],
+                        g: opts.clear[1],
+                        b: opts.clear[2],
+                        a: opts.clear[3],
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &depth,
@@ -289,8 +349,16 @@ pub fn render_batches_png(
         }
     }
     encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-        wgpu::TexelCopyBufferInfo { buffer: &readback, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(height) } },
+        wgpu::TexelCopyTextureInfo {
+            texture: &target,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &readback,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(height) },
+        },
         wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
     );
     gpu.queue.submit([encoder.finish()]);

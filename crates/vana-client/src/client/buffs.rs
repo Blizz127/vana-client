@@ -142,7 +142,11 @@ pub fn draw_party(gu: &mut GameUi, w: &World, sw: f32, sh: f32, log: [f32; 4]) {
     let (id, bracketed) = match super::target::focus_member(w) {
         Some(f) => (f, true),
         None => {
-            let t = if w.party_cursor.is_some() { super::target::party_hand(w).and_then(|(_, _, id)| id) } else { w.target };
+            let t = if w.party_cursor.is_some() {
+                super::target::party_hand(w).and_then(|(_, _, id)| id)
+            } else {
+                w.target
+            };
             match t.filter(|&t| valid(t)) {
                 Some(t) => (t, false),
                 None => return,
@@ -183,6 +187,18 @@ mod tests {
     /// The user's retail labels: 25m, 1m, 5h, 2m, 16; 1h59m is 1h; none at 5 s.
     #[test]
     fn labels() {
-        assert_eq!([1500, 60, 18000, 150, 16, 7140, 5, 400_000].map(super::label), [Some("25m".into()), Some("1m".into()), Some("5h".into()), Some("2m".into()), Some("16".into()), Some("1h".into()), None, Some("99h".into())]);
+        assert_eq!(
+            [1500, 60, 18000, 150, 16, 7140, 5, 400_000].map(super::label),
+            [
+                Some("25m".into()),
+                Some("1m".into()),
+                Some("5h".into()),
+                Some("2m".into()),
+                Some("16".into()),
+                Some("1h".into()),
+                None,
+                Some("99h".into())
+            ]
+        );
     }
 }

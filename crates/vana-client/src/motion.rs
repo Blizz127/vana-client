@@ -217,7 +217,10 @@ mod tests {
         // Diagonals forward of 45 degrees stay forward.
         assert_eq!(strafe_dir(f, f + r * 0.9), 1);
         assert_eq!(strafe_dir(f, Vec3::ZERO), 0);
-        assert_eq!((strafe(2, false), strafe(3, true), strafe(4, true), strafe(1, false)), (Some("mvr"), Some("mvb"), Some("wlk"), None));
+        assert_eq!(
+            (strafe(2, false), strafe(3, true), strafe(4, true), strafe(1, false)),
+            (Some("mvr"), Some("mvb"), Some("wlk"), None)
+        );
         // Only over the walk / run: seated (47) keeps si1, standing keeps idl.
         let n = MotionNames::default();
         assert_eq!(choose_strafed(&n, 0, 0.5, 4, false).0, "mvl");
@@ -275,7 +278,9 @@ mod loop_tests {
         let skel = f.skeleton.as_ref().unwrap();
         let run = f.animations.iter().find(|a| a.name == "run0").unwrap();
         let pose = |frame: f32| crate::dat::character::pose(skel, &[(run, frame)]);
-        let diff = |a: &[crate::dat::character::BoneXf], b: &[crate::dat::character::BoneXf]| a.iter().zip(b).map(|(x, y)| x.q.angle_between(y.q)).fold(0f32, f32::max);
+        let diff = |a: &[crate::dat::character::BoneXf], b: &[crate::dat::character::BoneXf]| {
+            a.iter().zip(b).map(|(x, y)| x.q.angle_between(y.q)).fold(0f32, f32::max)
+        };
         assert!(diff(&pose(super::loop_frame(run.frames as f32 - 1e-4, run.frames)), &pose(0.0)) < 1e-2);
         // One tick at rate 1: frames += speed * 0.5.
         let step = run.speed * 0.5;

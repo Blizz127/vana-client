@@ -31,7 +31,12 @@ impl Writer {
 
     fn settle(&mut self) {
         let h = header(self.n);
-        let _ = self.f.seek(SeekFrom::Start(0)).and_then(|_| self.f.write_all(&h)).and_then(|_| self.f.seek(SeekFrom::End(0))).and_then(|_| self.f.flush());
+        let _ = self
+            .f
+            .seek(SeekFrom::Start(0))
+            .and_then(|_| self.f.write_all(&h))
+            .and_then(|_| self.f.seek(SeekFrom::End(0)))
+            .and_then(|_| self.f.flush());
     }
 }
 
@@ -74,7 +79,13 @@ pub fn read(path: &Path) -> anyhow::Result<(Vec<f32>, u32)> {
         }
         if id == b"data" {
             let Some((1, ch, rate, 16)) = fmt else { anyhow::bail!("only 16-bit PCM WAV files") };
-            let s: Vec<f32> = body.chunks_exact(2 * ch).map(|f| f.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).sum::<f32>() / ch as f32).collect();
+            let s: Vec<f32> = body
+                .chunks_exact(2 * ch)
+                .map(|f| {
+                    f.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).sum::<f32>()
+                        / ch as f32
+                })
+                .collect();
             return Ok((s, rate));
         }
         at += 8 + len + (len & 1);

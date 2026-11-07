@@ -28,8 +28,12 @@ pub struct Block {
 /// Header: u32 count (low 30 bits), count x u32 block sizes, then the blocks (FUN_100ad460).
 /// Block: u32 actor, u32 n, u16 offsets[n], u16 ids[n], u32 nconst, u32 consts[nconst], u32 code length, code.
 pub fn parse(file: &[u8]) -> Result<Vec<Block>> {
-    let u32_at = |b: &[u8], o: usize| -> Result<u32> { Ok(u32::from_le_bytes(b.get(o..o + 4).context("event data truncated")?.try_into().unwrap())) };
-    let u16_at = |b: &[u8], o: usize| -> Result<u16> { Ok(u16::from_le_bytes(b.get(o..o + 2).context("event data truncated")?.try_into().unwrap())) };
+    let u32_at = |b: &[u8], o: usize| -> Result<u32> {
+        Ok(u32::from_le_bytes(b.get(o..o + 4).context("event data truncated")?.try_into().unwrap()))
+    };
+    let u16_at = |b: &[u8], o: usize| -> Result<u16> {
+        Ok(u16::from_le_bytes(b.get(o..o + 2).context("event data truncated")?.try_into().unwrap()))
+    };
     let n = (u32_at(file, 0)? & 0x3fff_ffff) as usize;
     // The size table alone must fit, or a bad count would reserve gigabytes below.
     ensure!(n <= file.len().saturating_sub(4) / 4, "event data: {n} blocks overrun the size table");
@@ -40,7 +44,8 @@ pub fn parse(file: &[u8]) -> Result<Vec<Block>> {
         let b = file.get(p..p + size).context("block past end")?;
         p += size;
         let (actor, ne) = (u32_at(b, 0)?, u16_at(b, 4)? as usize);
-        let events = (0..ne).map(|k| Ok((u16_at(b, 8 + 2 * ne + 2 * k)?, u16_at(b, 8 + 2 * k)?))).collect::<Result<Vec<_>>>()?;
+        let events =
+            (0..ne).map(|k| Ok((u16_at(b, 8 + 2 * ne + 2 * k)?, u16_at(b, 8 + 2 * k)?))).collect::<Result<Vec<_>>>()?;
         let q = 8 + 4 * ne;
         let nc = u16_at(b, q)? as usize;
         let consts = (0..nc).map(|k| u32_at(b, q + 4 + 4 * k)).collect::<Result<Vec<_>>>()?;
@@ -84,7 +89,11 @@ pub enum Kind {
 pub enum Len {
     Fixed(u8),
     /// The byte at pc + by selects the length; 0 = the handler does not advance (stall).
-    Sub { by: u8, map: &'static [(u8, u8)], default: u8 },
+    Sub {
+        by: u8,
+        map: &'static [(u8, u8)],
+        default: u8,
+    },
 }
 
 type Args = &'static [(Kind, i8)];
@@ -157,7 +166,9 @@ pub fn walk(b: &Block) -> (Vec<(usize, &'static Op, usize, Option<u8>)>, Vec<usi
             };
             seen.insert(pc, (op, n, sub));
             let jumps = match sub {
-                Some(s) if !op.sub_jumps.is_empty() => op.sub_jumps.iter().find(|(k, _)| *k == s).map(|(_, j)| *j).unwrap_or(&[]),
+                Some(s) if !op.sub_jumps.is_empty() => {
+                    op.sub_jumps.iter().find(|(k, _)| *k == s).map(|(_, j)| *j).unwrap_or(&[])
+                }
                 _ => op.jumps,
             };
             for &j in jumps {
@@ -185,7 +196,10 @@ pub fn disasm(b: &Block, text: &dyn Fn(u32) -> Option<String>) -> Vec<String> {
     let mut last = 0;
     for (pc, op, n, sub) in ins {
         if pc > last {
-            out.push(format!("  {last:04x}: data {}", code[last..pc].iter().map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(" ")));
+            out.push(format!(
+                "  {last:04x}: data {}",
+                code[last..pc].iter().map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(" ")
+            ));
         }
         last = pc + n;
         for (id, at) in &b.events {
@@ -201,11 +215,15 @@ pub fn disasm(b: &Block, text: &dyn Fn(u32) -> Option<String>) -> Vec<String> {
         let u16a = |o: i8| at(o, 2).map(|x| u16::from_le_bytes([x[0], x[1]])).unwrap_or(0);
         let u32a = |o: i8| at(o, 4).map(|x| u32::from_le_bytes(x.try_into().unwrap())).unwrap_or(0);
         let args = match sub {
-            Some(s) if !op.sub_args.is_empty() => op.sub_args.iter().find(|(k, _)| *k == s).map(|(_, a)| *a).unwrap_or(op.args),
+            Some(s) if !op.sub_args.is_empty() => {
+                op.sub_args.iter().find(|(k, _)| *k == s).map(|(_, a)| *a).unwrap_or(op.args)
+            }
             _ => op.args,
         };
         let jumps = match sub {
-            Some(s) if !op.sub_jumps.is_empty() => op.sub_jumps.iter().find(|(k, _)| *k == s).map(|(_, j)| *j).unwrap_or(&[]),
+            Some(s) if !op.sub_jumps.is_empty() => {
+                op.sub_jumps.iter().find(|(k, _)| *k == s).map(|(_, j)| *j).unwrap_or(&[])
+            }
             _ => op.jumps,
         };
         let mut parts = Vec::new();
@@ -233,14 +251,21 @@ pub fn disasm(b: &Block, text: &dyn Fn(u32) -> Option<String>) -> Vec<String> {
                 Kind::U32 => format!("{:#x}", u32a(o)),
                 Kind::Motion => format!("'{}'", String::from_utf8_lossy(&u32a(o).to_le_bytes()).trim_end_matches('\0')),
                 Kind::Actor => actor_name(u32a(o)),
-                Kind::Lit16 => format!("\"{}\"", String::from_utf8_lossy(at(o, 16).unwrap_or(&[])).trim_end_matches('\0')),
+                Kind::Lit16 => {
+                    format!("\"{}\"", String::from_utf8_lossy(at(o, 16).unwrap_or(&[])).trim_end_matches('\0'))
+                }
             });
         }
         for &j in jumps {
             parts.push(format!("->{:04x}", u16a(j as i8)));
         }
         let hex = raw.iter().take(12).map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(" ");
-        out.push(format!("  {pc:04x}: {hex:<36} {}{}{}", op.name, if parts.is_empty() { String::new() } else { format!(" {}", parts.join(", ")) }, note));
+        out.push(format!(
+            "  {pc:04x}: {hex:<36} {}{}{}",
+            op.name,
+            if parts.is_empty() { String::new() } else { format!(" {}", parts.join(", ")) },
+            note
+        ));
     }
     if last < code.len() {
         out.push(format!("  {last:04x}: data ({} bytes)", code.len() - last));

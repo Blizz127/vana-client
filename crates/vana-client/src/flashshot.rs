@@ -14,7 +14,21 @@ pub fn run(zone: u32, hour: f32, pos: [f32; 3], out_dir: &std::path::Path) -> Re
     let scene = dat::zone::load_scene(&keys, &file)?;
     let weather = dat::weather::ZoneWeather::parse(&file)?;
     let lighting = weather.at("suny", hour * 60.0).map(|e| dat::weather::Lighting::from_env(&e, hour * 60.0));
-    let ch = std::sync::Arc::new(dat::character::load_character(&index, &dat::character::Look { race: 1, face: 0, head: 0, body: 8, hands: 8, legs: 8, feet: 8, main: 0, sub: 0, range: 0 })?);
+    let ch = std::sync::Arc::new(dat::character::load_character(
+        &index,
+        &dat::character::Look {
+            race: 1,
+            face: 0,
+            head: 0,
+            body: 8,
+            hands: 8,
+            legs: 8,
+            feet: 8,
+            main: 0,
+            sub: 0,
+            range: 0,
+        },
+    )?);
     let gpu = render::Gpu::headless()?;
     // A plain target, written and blended in gamma space as the client's.
     let format = wgpu::TextureFormat::Rgba8Unorm;
@@ -22,7 +36,12 @@ pub fn run(zone: u32, hour: f32, pos: [f32; 3], out_dir: &std::path::Path) -> Re
     r.lighting = lighting;
     let p = Vec3::from(pos);
     let (w, h) = (800u32, 600u32);
-    let camera = render::Camera { eye: p + Vec3::new(2.2, -1.6, 2.2), target: p + Vec3::new(0.0, -0.9, 0.0), up: Vec3::NEG_Y, fov_y: 40f32.to_radians() };
+    let camera = render::Camera {
+        eye: p + Vec3::new(2.2, -1.6, 2.2),
+        target: p + Vec3::new(0.0, -0.9, 0.0),
+        up: Vec3::NEG_Y,
+        fov_y: 40f32.to_radians(),
+    };
     let target = gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: None,
         size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
@@ -58,7 +77,10 @@ pub fn run(zone: u32, hour: f32, pos: [f32; 3], out_dir: &std::path::Path) -> Re
             let f = a as f32 / 128.0;
             if f >= 0.8 { 1.0 } else { f * 1.25 }
         });
-        actor.refract = refract.filter(|(level, _)| *level > 0.0).map(|(level, a)| render::Refract { level, r: render::Refract::tf_alpha(a) }).filter(|r| r.r > 0.0);
+        actor.refract = refract
+            .filter(|(level, _)| *level > 0.0)
+            .map(|(level, a)| render::Refract { level, r: render::Refract::tf_alpha(a) })
+            .filter(|r| r.r > 0.0);
         r.begin_poses();
         r.pose_actor_gpu(&mut actor, &ch, &[], &idle, &[], 1.0, model, None, None, &[]);
         let mut enc = gpu.device.create_command_encoder(&Default::default());
@@ -66,10 +88,18 @@ pub fn run(zone: u32, hour: f32, pos: [f32; 3], out_dir: &std::path::Path) -> Re
         r.render(&gpu, &mut enc, &view, &depth, &camera, w as f32 / h as f32, &[&actor]);
         r.render_refraction(&gpu, &mut enc, &view, Some(&target), &depth, &camera, w as f32 / h as f32, &[&actor]);
         let row = (w * 4).div_ceil(256) * 256;
-        let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (row * h) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+        let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: (row * h) as u64,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
         enc.copy_texture_to_buffer(
             target.as_image_copy(),
-            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(h) } },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buf,
+                layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(h) },
+            },
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
         );
         gpu.queue.submit([enc.finish()]);

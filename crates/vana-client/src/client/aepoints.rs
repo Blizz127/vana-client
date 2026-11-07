@@ -206,7 +206,13 @@ pub(super) fn look(w: &World) -> Option<Look> {
                 let level = w.ae_data.map_or(0, |d| d.upgrades[i]);
                 let max = t.max.get(e as usize).copied().unwrap_or(0);
                 let next = w.ae_data.map_or(0, |d| d.costs[i]);
-                PointRow { name: t.name(e), tint: c, level: Some((format!("{level}/{max}"), lc)), cost: cost.map(|cc| (format!("{next} P"), cc)), ..Default::default() }
+                PointRow {
+                    name: t.name(e),
+                    tint: c,
+                    level: Some((format!("{level}/{max}"), lc)),
+                    cost: cost.map(|cc| (format!("{next} P"), cc)),
+                    ..Default::default()
+                }
             })
             .collect();
         let help = es.get(cursor).map_or((String::new(), String::new()), |&e| (t.name(e), t.desc(e)));
@@ -244,19 +250,43 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
     let keys = |w: &mut World, _: &GameUi, k: egui::Key| key(w, k, false);
     match u.attrs {
         Some((k, cursor, top)) => {
-            super::winhits::generic(w, gu, ATTRS, (cursor - top + 1) as u16, 1..=ROWS as u16, p, moved, clicked, right, |w, id| {
-                if let Some(u) = w.ae_ui.as_mut() {
-                    u.attrs = Some((k, top + id as usize - 1, top));
-                }
-            }, keys);
+            super::winhits::generic(
+                w,
+                gu,
+                ATTRS,
+                (cursor - top + 1) as u16,
+                1..=ROWS as u16,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(u) = w.ae_ui.as_mut() {
+                        u.attrs = Some((k, top + id as usize - 1, top));
+                    }
+                },
+                keys,
+            );
         }
         None if !t.cats.is_empty() => {
             let (top, cursor) = (u.top, u.cursor);
-            super::winhits::generic(w, gu, CATS, (cursor - top + 1) as u16, 1..=ROWS as u16, p, moved, clicked, right, |w, id| {
-                if let Some(u) = w.ae_ui.as_mut() {
-                    u.cursor = top + id as usize - 1;
-                }
-            }, keys);
+            super::winhits::generic(
+                w,
+                gu,
+                CATS,
+                (cursor - top + 1) as u16,
+                1..=ROWS as u16,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(u) = w.ae_ui.as_mut() {
+                        u.cursor = top + id as usize - 1;
+                    }
+                },
+                keys,
+            );
         }
         None => {}
     }
@@ -323,7 +353,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 let level = w.ae_data.map_or(0, |d| d.upgrades[e as usize % 32]);
                 gu.text(&t.name(e), x0 + COLS[1], y + 2.0, 0, if i == cursor { CURSOR } else { c }.to_le_bytes());
                 right(gu, &level.to_string(), x0 + COLS[2], y + 4.0, lc);
-                gu.shape_text(&format!("/{}", t.max.get(e as usize).copied().unwrap_or(0)), x0 + COLS[3], y + 4.0, lc, false);
+                gu.shape_text(
+                    &format!("/{}", t.max.get(e as usize).copied().unwrap_or(0)),
+                    x0 + COLS[3],
+                    y + 4.0,
+                    lc,
+                    false,
+                );
                 if let Some(cc) = cost {
                     let next = w.ae_data.map_or(0, |d| d.costs[e as usize % 32]);
                     gu.shape_text(&gu.lobby_msg(0xc, 0x5a, "NEXT"), x0 + COLS[4], y + 4.0, cc, false);

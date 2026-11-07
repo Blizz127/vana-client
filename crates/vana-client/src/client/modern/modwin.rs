@@ -32,9 +32,18 @@ fn rgba(c: [u8; 4]) -> Color32 {
 
 /// A canvas's commands in `r`, clipped to it.
 /// A mod's icon as an egui texture and its UV: an item's, a status's, or a spell's or an ability's list sprite.
-pub(super) fn icon_tex(m: &super::Modern, ctx: &egui::Context, gu: Option<&super::super::game_ui::GameUi>, world: Option<&super::super::World>, i: model::Icon) -> Option<(egui::TextureId, Rect)> {
+pub(super) fn icon_tex(
+    m: &super::Modern,
+    ctx: &egui::Context,
+    gu: Option<&super::super::game_ui::GameUi>,
+    world: Option<&super::super::World>,
+    i: model::Icon,
+) -> Option<(egui::TextureId, Rect)> {
     match i {
-        model::Icon::Item(id) => world.and_then(|w| w.item_info.as_deref()).and_then(|c| m.item_icon(ctx, c, id)).map(|t| (t, super::FULL_UV)),
+        model::Icon::Item(id) => world
+            .and_then(|w| w.item_info.as_deref())
+            .and_then(|c| m.item_icon(ctx, c, id))
+            .map(|t| (t, super::FULL_UV)),
         model::Icon::Status(id) => gu.and_then(|g| m.status_icon(ctx, g, false, id)),
         model::Icon::Spell(_) | model::Icon::Ability(_) => {
             let w = world?;
@@ -44,7 +53,15 @@ pub(super) fn icon_tex(m: &super::Modern, ctx: &egui::Context, gu: Option<&super
     }
 }
 
-fn canvas(ui: &egui::Ui, m: &super::Modern, ctx: &egui::Context, gu: Option<&super::super::game_ui::GameUi>, world: Option<&super::super::World>, r: Rect, cmds: &[model::Cmd]) {
+fn canvas(
+    ui: &egui::Ui,
+    m: &super::Modern,
+    ctx: &egui::Context,
+    gu: Option<&super::super::game_ui::GameUi>,
+    world: Option<&super::super::World>,
+    r: Rect,
+    cmds: &[model::Cmd],
+) {
     use model::Cmd;
     let p = ui.painter().with_clip_rect(r.intersect(ui.clip_rect()));
     let at = |q: [f32; 2]| pos2(r.min.x + q[0], r.min.y + q[1]);
@@ -62,7 +79,9 @@ fn canvas(ui: &egui::Ui, m: &super::Modern, ctx: &egui::Context, gu: Option<&sup
                     (None, Some(to)) => {
                         let mut mesh = egui::Mesh::default();
                         let (t, b) = (rgba(*colour), rgba(*to));
-                        for (pt, c) in [(rr.left_top(), t), (rr.right_top(), t), (rr.left_bottom(), b), (rr.right_bottom(), b)] {
+                        for (pt, c) in
+                            [(rr.left_top(), t), (rr.right_top(), t), (rr.left_bottom(), b), (rr.right_bottom(), b)]
+                        {
                             mesh.colored_vertex(pt, c);
                         }
                         mesh.add_triangle(0, 1, 2);
@@ -99,7 +118,11 @@ fn canvas(ui: &egui::Ui, m: &super::Modern, ctx: &egui::Context, gu: Option<&sup
 
 /// A fold arrow: pointing down when open, right when folded.
 fn arrow(p: &egui::Painter, c: egui::Pos2, open: bool, colour: Color32) {
-    let pts = if open { vec![pos2(c.x - 5.0, c.y - 3.0), pos2(c.x + 5.0, c.y - 3.0), pos2(c.x, c.y + 4.0)] } else { vec![pos2(c.x - 3.0, c.y - 5.0), pos2(c.x + 4.0, c.y), pos2(c.x - 3.0, c.y + 5.0)] };
+    let pts = if open {
+        vec![pos2(c.x - 5.0, c.y - 3.0), pos2(c.x + 5.0, c.y - 3.0), pos2(c.x, c.y + 4.0)]
+    } else {
+        vec![pos2(c.x - 3.0, c.y - 5.0), pos2(c.x + 4.0, c.y), pos2(c.x - 3.0, c.y + 5.0)]
+    };
     p.add(Shape::convex_polygon(pts, colour, Stroke::NONE));
 }
 
@@ -155,7 +178,12 @@ pub fn draw(p: &mut Panels, w: &mut World) {
 }
 
 /// One window as a panel: the clicks on it and its rect.
-fn panel(p: &mut Panels, world: Option<&super::super::World>, pid: &str, win: &model::Window) -> (Vec<Click>, Option<Rect>) {
+fn panel(
+    p: &mut Panels,
+    world: Option<&super::super::World>,
+    pid: &str,
+    win: &model::Window,
+) -> (Vec<Click>, Option<Rect>) {
     let m = p.m;
     let (ctx, gu) = (p.ctx, p.gu);
     {
@@ -173,7 +201,9 @@ fn panel(p: &mut Panels, world: Option<&super::super::World>, pid: &str, win: &m
         } else {
             None
         };
-        let shown = p.show(pid, Show { title, size: vec2(width, 0.0), frame, at, ..Default::default() }, |ui, _| body(ui, m, ctx, gu, world, pid, win, &mut clicks));
+        let shown = p.show(pid, Show { title, size: vec2(width, 0.0), frame, at, ..Default::default() }, |ui, _| {
+            body(ui, m, ctx, gu, world, pid, win, &mut clicks)
+        });
         if let Some(r) = shown
             && win.modal
         {
@@ -185,7 +215,16 @@ fn panel(p: &mut Panels, world: Option<&super::super::World>, pid: &str, win: &m
 
 /// A window's elements and its help line (in its panel, or an edge window's body); clicks into `clicks`.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu: Option<&super::super::game_ui::GameUi>, world: Option<&super::super::World>, pid: &str, win: &model::Window, clicks: &mut Vec<Click>) {
+pub(super) fn body(
+    ui: &mut egui::Ui,
+    m: &super::Modern,
+    ctx: &egui::Context,
+    gu: Option<&super::super::game_ui::GameUi>,
+    world: Option<&super::super::World>,
+    pid: &str,
+    win: &model::Window,
+    clicks: &mut Vec<Click>,
+) {
     let small = FontId::proportional(m.theme.small);
     let (text_c, muted) = (m.theme.color("text"), m.theme.color("muted"));
     let mut hover_tip: Option<&str> = None;
@@ -208,14 +247,19 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
                 }
             }
             Elem::Text { text, dim, colour, .. } => {
-                ui.label(RichText::new(text).size(m.theme.small).color(colour.map_or(if *dim { muted } else { text_c }, rgba)));
+                ui.label(
+                    RichText::new(text)
+                        .size(m.theme.small)
+                        .color(colour.map_or(if *dim { muted } else { text_c }, rgba)),
+                );
                 ui.add_space(4.0);
             }
             Elem::Buttons { label, items, marked, .. } => {
                 let labels: Vec<&str> = items.iter().map(String::as_str).collect();
                 let lit = marked.map_or(0, |k| 1u64 << k.min(63));
                 let cursor = (here && !win.edit).then_some(win.col);
-                let (hit, _) = kit::setting(ui, m, label, here, false, here, |ui| kit::buttons(ui, m, &labels, cursor, lit, 0));
+                let (hit, _) =
+                    kit::setting(ui, m, label, here, false, here, |ui| kit::buttons(ui, m, &labels, cursor, lit, 0));
                 if let Some(c) = hit {
                     clicks.push(Click::Button(i, c));
                 }
@@ -237,41 +281,73 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
                         let ink = if resp.hovered() { text_c } else { muted };
                         let p = ui.painter().with_clip_rect(cr);
                         if right {
-                            p.text(pos2(cr.max.x - 6.0, cr.center().y), Align2::RIGHT_CENTER, &columns[c].title, small.clone(), ink);
+                            p.text(
+                                pos2(cr.max.x - 6.0, cr.center().y),
+                                Align2::RIGHT_CENTER,
+                                &columns[c].title,
+                                small.clone(),
+                                ink,
+                            );
                         } else {
-                            p.text(pos2(cr.min.x, cr.center().y), Align2::LEFT_CENTER, &columns[c].title, small.clone(), ink);
+                            p.text(
+                                pos2(cr.min.x, cr.center().y),
+                                Align2::LEFT_CENTER,
+                                &columns[c].title,
+                                small.clone(),
+                                ink,
+                            );
                         }
                         if resp.clicked() {
                             clicks.push(Click::Sort(i, c));
                         }
                     }
                 }
-                let out = kit::list(ui, m, ("mod list", &win.id, id), rows.len(), Some(*at), here, here, h, kit::list_height(ui, h, *height), |_| false, |ui, row| {
-                    let r = &rows[row.index];
-                    let ink = r.colour.map_or_else(|| kit::ink(m, row), rgba);
-                    let cy = row.rect.center().y;
-                    let mut x = row.rect.min.x + 10.0;
-                    if let Some(i) = r.icon {
-                        if let Some((t, uv)) = icon_tex(m, ctx, gu, world, i) {
-                            ui.painter().image(t, Rect::from_center_size(pos2(x + 9.0, cy), vec2(18.0, 18.0)), uv, Color32::WHITE);
+                let out = kit::list(
+                    ui,
+                    m,
+                    ("mod list", &win.id, id),
+                    rows.len(),
+                    Some(*at),
+                    here,
+                    here,
+                    h,
+                    kit::list_height(ui, h, *height),
+                    |_| false,
+                    |ui, row| {
+                        let r = &rows[row.index];
+                        let ink = r.colour.map_or_else(|| kit::ink(m, row), rgba);
+                        let cy = row.rect.center().y;
+                        let mut x = row.rect.min.x + 10.0;
+                        if let Some(i) = r.icon {
+                            if let Some((t, uv)) = icon_tex(m, ctx, gu, world, i) {
+                                ui.painter().image(
+                                    t,
+                                    Rect::from_center_size(pos2(x + 9.0, cy), vec2(18.0, 18.0)),
+                                    uv,
+                                    Color32::WHITE,
+                                );
+                            }
+                            x += 24.0;
                         }
-                        x += 24.0;
-                    }
-                    if cols.is_empty() {
-                        ui.painter().text(pos2(x, cy), Align2::LEFT_CENTER, r.cells.join("  "), small.clone(), ink);
-                    }
-                    for (c, &(cx, cw, right)) in cols.iter().enumerate() {
-                        let Some(cell) = r.cells.get(c) else { continue };
-                        let left = if c == 0 { x } else { row.rect.min.x + 10.0 + cx };
-                        let cr = Rect::from_min_max(pos2(left, row.rect.min.y), pos2(row.rect.min.x + 10.0 + cx + cw - 4.0, row.rect.max.y));
-                        let p = ui.painter().with_clip_rect(cr.intersect(row.rect));
-                        if right {
-                            p.text(pos2(cr.max.x - 2.0, cy), Align2::RIGHT_CENTER, cell, small.clone(), ink);
-                        } else {
-                            p.text(pos2(cr.min.x, cy), Align2::LEFT_CENTER, cell, small.clone(), ink);
+                        if cols.is_empty() {
+                            ui.painter().text(pos2(x, cy), Align2::LEFT_CENTER, r.cells.join("  "), small.clone(), ink);
                         }
-                    }
-                });
+                        for (c, &(cx, cw, right)) in cols.iter().enumerate() {
+                            let Some(cell) = r.cells.get(c) else { continue };
+                            let left = if c == 0 { x } else { row.rect.min.x + 10.0 + cx };
+                            let cr = Rect::from_min_max(
+                                pos2(left, row.rect.min.y),
+                                pos2(row.rect.min.x + 10.0 + cx + cw - 4.0, row.rect.max.y),
+                            );
+                            let p = ui.painter().with_clip_rect(cr.intersect(row.rect));
+                            if right {
+                                p.text(pos2(cr.max.x - 2.0, cy), Align2::RIGHT_CENTER, cell, small.clone(), ink);
+                            } else {
+                                p.text(pos2(cr.min.x, cy), Align2::LEFT_CENTER, cell, small.clone(), ink);
+                            }
+                        }
+                    },
+                );
                 if let Some(k) = out.clicked {
                     clicks.push(Click::Row(i, k));
                 }
@@ -281,8 +357,20 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
             Elem::Gauge { label, value, text, row: true, dim, .. } => {
                 let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
                 let colour = if *dim { muted } else { text_c };
-                ui.painter().text(pos2(rect.min.x, rect.min.y + 2.0), Align2::LEFT_TOP, label, FontId::proportional(m.theme.small), colour);
-                ui.painter().text(pos2(rect.max.x, rect.min.y + 2.0), Align2::RIGHT_TOP, text, FontId::monospace(m.theme.small), colour);
+                ui.painter().text(
+                    pos2(rect.min.x, rect.min.y + 2.0),
+                    Align2::LEFT_TOP,
+                    label,
+                    FontId::proportional(m.theme.small),
+                    colour,
+                );
+                ui.painter().text(
+                    pos2(rect.max.x, rect.min.y + 2.0),
+                    Align2::RIGHT_TOP,
+                    text,
+                    FontId::monospace(m.theme.small),
+                    colour,
+                );
                 let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 6.0), pos2(rect.max.x, rect.max.y - 2.0));
                 ui.painter().rect_filled(bar, 2.0, m.theme.color("charcoal"));
                 if *value > 0.0 {
@@ -306,7 +394,9 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
             }
             Elem::Input { label, text, .. } => {
                 let caret = (here && win.edit).then_some(win.caret);
-                let (field, _) = kit::setting(ui, m, label, here, false, here, |ui| kit::field(ui, m, text, caret, ui.available_width(), small.clone(), None));
+                let (field, _) = kit::setting(ui, m, label, here, false, here, |ui| {
+                    kit::field(ui, m, text, caret, ui.available_width(), small.clone(), None)
+                });
                 if ui.interact(field, ui.scope_id().with(("mod input", &win.id, i)), Sense::click()).clicked() {
                     clicks.push(Click::Button(i, 0));
                 }
@@ -320,9 +410,16 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
                         if kit::clicked(&kit::button(ui, m, "‹", 34.0, s), s) {
                             hit = Some(-1);
                         }
-                        let (r, resp) = ui.allocate_exact_size(vec2((ui.available_width() - 42.0).max(40.0), 30.0), Sense::click());
+                        let (r, resp) =
+                            ui.allocate_exact_size(vec2((ui.available_width() - 42.0).max(40.0), 30.0), Sense::click());
                         let v = kit::elide(ui, v, &small, r.width() - 8.0);
-                        ui.painter().with_clip_rect(r).text(r.center(), Align2::CENTER_CENTER, v, small.clone(), if here { text_c } else { muted });
+                        ui.painter().with_clip_rect(r).text(
+                            r.center(),
+                            Align2::CENTER_CENTER,
+                            v,
+                            small.clone(),
+                            if here { text_c } else { muted },
+                        );
                         if resp.clicked() {
                             hit = Some(1);
                         }
@@ -352,11 +449,22 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
                         }
                     });
                     if open {
-                        if let Some(rgb) = kit::colour_picker(ui, m, [value[0], value[1], value[2]], ui.available_width()) {
+                        if let Some(rgb) =
+                            kit::colour_picker(ui, m, [value[0], value[1], value[2]], ui.available_width())
+                        {
                             clicks.push(Click::Colour(i, rgb));
                         }
                         if *alpha {
-                            let (hit, _) = kit::slider_setting(ui, m, "A", false, false, model::STEPS, model::to_step(value[3]), &value[3].to_string());
+                            let (hit, _) = kit::slider_setting(
+                                ui,
+                                m,
+                                "A",
+                                false,
+                                false,
+                                model::STEPS,
+                                model::to_step(value[3]),
+                                &value[3].to_string(),
+                            );
                             if let Some(s) = hit {
                                 clicks.push(Click::Alpha(i, s));
                             }
@@ -367,7 +475,10 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
             Elem::Canvas { w: cw, h: ch, cmds, .. } => {
                 let (r, resp) = ui.allocate_exact_size(vec2(*cw, *ch), Sense::click_and_drag());
                 canvas(ui, m, ctx, gu, world, r, cmds);
-                let at = resp.interact_pointer_pos().or_else(|| ctx.input(|inp| inp.pointer.latest_pos())).map(|q| (q.x - r.min.x, q.y - r.min.y));
+                let at = resp
+                    .interact_pointer_pos()
+                    .or_else(|| ctx.input(|inp| inp.pointer.latest_pos()))
+                    .map(|q| (q.x - r.min.x, q.y - r.min.y));
                 if resp.clicked()
                     && let Some(q) = resp.interact_pointer_pos()
                 {

@@ -56,7 +56,9 @@ fn forget_map<T>(map: &mut BTreeMap<String, Vec<(String, T)>>, m: &str) -> bool 
 }
 
 fn info(lua: &Lua) -> std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>> {
-    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default()
+    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+        .map(|f| f.clone())
+        .unwrap_or_default()
 }
 
 /// Sets or (None) clears a mod's own change for a name; other mods' changes are left alone. The newest change is the
@@ -103,7 +105,11 @@ pub(super) fn install(lua: &Lua, ui: &Table, vm: &super::vm::Vm) -> mlua::Result
                     Some(Image { key, img })
                 }
                 Value::Nil | Value::Boolean(false) => None,
-                _ => return Err(mlua::Error::runtime("a sprite is a PNG path in the mod's folder, or false to give it back")),
+                _ => {
+                    return Err(mlua::Error::runtime(
+                        "a sprite is a PNG path in the mod's folder, or false to give it back",
+                    ));
+                }
             };
             let f = info(lua);
             let mut f = f.borrow_mut();
@@ -147,7 +153,11 @@ pub(super) fn install(lua: &Lua, ui: &Table, vm: &super::vm::Vm) -> mlua::Result
                         }
                         None => None,
                     };
-                    Some(Frame { border, top: super::hud::colour(s.get("top")?)?, bottom: super::hud::colour(s.get("bottom")?)? })
+                    Some(Frame {
+                        border,
+                        top: super::hud::colour(s.get("top")?)?,
+                        bottom: super::hud::colour(s.get("bottom")?)?,
+                    })
                 }
                 Value::Nil | Value::Boolean(false) => None,
                 _ => return Err(mlua::Error::runtime("a frame is {path, top, bottom}, or false to give it back")),

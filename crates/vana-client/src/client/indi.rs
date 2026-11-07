@@ -111,7 +111,12 @@ fn remove(w: &mut World, id: u32) {
 pub fn update(w: &mut World, dt: f32) {
     let (cfg, battle) = w.effects.filter;
     let party: Vec<u32> = w.party.party().map(|m| m.id).collect();
-    let mut owners: Vec<u32> = w.entities.iter().filter(|(id, e)| **id != w.my_id && e.kind == super::EntityKind::Player).map(|(id, _)| *id).collect();
+    let mut owners: Vec<u32> = w
+        .entities
+        .iter()
+        .filter(|(id, e)| **id != w.my_id && e.kind == super::EntityKind::Player)
+        .map(|(id, _)| *id)
+        .collect();
     owners.push(w.my_id);
     for owner in owners {
         let me = owner == w.my_id;
@@ -141,7 +146,12 @@ pub fn update(w: &mut World, dt: f32) {
         }
     }
     // Owners that left (FUN_10092900): their auras go with them.
-    let gone: Vec<u32> = w.actors.keys().filter(|&&id| id & AURA != 0 && id & !AURA != w.my_id && !w.entities.contains_key(&(id & !AURA))).copied().collect();
+    let gone: Vec<u32> = w
+        .actors
+        .keys()
+        .filter(|&&id| id & AURA != 0 && id & !AURA != w.my_id && !w.entities.contains_key(&(id & !AURA)))
+        .copied()
+        .collect();
     for id in gone {
         remove(w, id);
     }
@@ -217,13 +227,21 @@ mod tests {
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let Ok(bytes) = index.read(52211) else { return };
         let lib = crate::fx::lib::Library::load(52211, bytes.clone()).unwrap();
-        let mut loops: Vec<String> = lib.gens.iter().filter(|g| g.flags & 0x1000 != 0).map(|g| String::from_utf8_lossy(&g.name).into_owned()).collect();
+        let mut loops: Vec<String> = lib
+            .gens
+            .iter()
+            .filter(|g| g.flags & 0x1000 != 0)
+            .map(|g| String::from_utf8_lossy(&g.name).into_owned())
+            .collect();
         loops.sort();
         assert_eq!(loops, ["gl01", "hk01", "sen8", "sen9", "yr01", "yr02"]);
         assert!(lib.gens.iter().all(|g| g.attach_mode() == 2));
         let ops = |name: &[u8; 4]| {
             let n = lib.find_global(crate::dat::generator::kind::SCHEDULER, u32::from_le_bytes(*name)).unwrap();
-            crate::dat::sched::ops(&bytes[lib.tree.nodes[n].data.clone()]).iter().map(|o| (o.code, o.name().unwrap_or("").to_string())).collect::<Vec<_>>()
+            crate::dat::sched::ops(&bytes[lib.tree.nodes[n].data.clone()])
+                .iter()
+                .map(|o| (o.code, o.name().unwrap_or("").to_string()))
+                .collect::<Vec<_>>()
         };
         assert!(ops(b"init").contains(&(0x57, "star".to_string())));
         assert!(ops(b"star").contains(&(0x0b, "7195".to_string())));

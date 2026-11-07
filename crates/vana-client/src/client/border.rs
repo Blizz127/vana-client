@@ -82,7 +82,8 @@ pub fn update(w: &mut World) {
         }
         w.border.file = Some(f);
     }
-    let ready: Vec<bool> = (0..PARTS as u32).map(|k| w.actors.get(&(BORDER | k)).is_some_and(|a| a.character.is_some())).collect();
+    let ready: Vec<bool> =
+        (0..PARTS as u32).map(|k| w.actors.get(&(BORDER | k)).is_some_and(|a| a.character.is_some())).collect();
     for (k, &r) in ready.iter().enumerate() {
         if r && !w.border.init[k] {
             w.effects.on_scheduler_quiet(BORDER | k as u32, u32::from_le_bytes(*b"init"));
@@ -98,7 +99,12 @@ pub fn update(w: &mut World) {
     let d = Vec3::new(me.x - b.x, 0.0, me.z - b.z).length();
     let near = (b.radius - d).abs() < b.render;
     if near != w.border.near[0] {
-        log::debug!("border: {} at {me:?}, parts {:?} .. {:?}", if near { "efon" } else { "efof" }, places[0], places[7]);
+        log::debug!(
+            "border: {} at {me:?}, parts {:?} .. {:?}",
+            if near { "efon" } else { "efof" },
+            places[0],
+            places[7]
+        );
     }
     for (k, p) in places.into_iter().enumerate() {
         w.border.place[k] = Some(p);

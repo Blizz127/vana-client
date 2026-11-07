@@ -2,9 +2,9 @@
 //! locked and first-person views. The free branch runs in whole 1/60 s ticks and is drawn between the last two tick
 //! states. MODLOG "Free camera", "Camera collision as retail" (the collision).
 
+use super::World;
 use super::ground::Ground;
 use super::target::LockCam;
-use super::World;
 use crate::render::Camera;
 use glam::Vec3;
 
@@ -246,7 +246,13 @@ pub fn shake_step(w: &mut World, dt: f32) {
         }
         sh.step(2.0);
         if !w.effects.quakes.is_empty() {
-            log::debug!("camera shake: kicks {:?} x {:.4} speed {:.4} scale {:.2}", w.effects.quakes, sh.x, sh.speed, sh.scale);
+            log::debug!(
+                "camera shake: kicks {:?} x {:.4} speed {:.4} scale {:.2}",
+                w.effects.quakes,
+                sh.x,
+                sh.speed,
+                sh.scale
+            );
         }
     }
 }
@@ -255,7 +261,6 @@ impl State {
     pub fn new() -> Self {
         Self { self_alpha: 1.0, ..Default::default() }
     }
-
 }
 
 /// This frame's camera input.
@@ -312,7 +317,11 @@ pub fn face(w: &mut World, yaw: f32) {
 /// FUN_10021680: the eye at `o` in the player's frame (x forward, y down, z to the side *(inf: its sense)*).
 pub fn face_at(w: &mut World, yaw: f32, o: Vec3) {
     // Without a model yet (a login's zone-in) the look is 1 above the feet, not the old look's height.
-    let look = if w.actors.get(&w.my_id).is_some_and(|a| -a.top > 0.1) { look_target(w) } else { super::drawn_pos(w) + Vec3::new(0.0, -1.0, 0.0) };
+    let look = if w.actors.get(&w.my_id).is_some_and(|a| -a.top > 0.1) {
+        look_target(w)
+    } else {
+        super::drawn_pos(w) + Vec3::new(0.0, -1.0, 0.0)
+    };
     let f = Vec3::new(yaw.sin(), 0.0, yaw.cos());
     let side = Vec3::new(f.z, 0.0, -f.x);
     let mut eye = super::drawn_pos(w) + f * o.x + side * o.z + Vec3::new(0.0, o.y, 0.0);
@@ -560,7 +569,10 @@ fn tick(w: &mut World, target: Vec3, player: Vec3, facing: Vec3, chase: bool, in
             // 2019 0x1001eb4a: with chase cam on and the eye 1..3 out horizontally, a wall within 3.1 out from the look
             // stops the spring's push this tick.
             let h = Vec3::new(c.eye.x - c.look.x, 0.0, c.eye.z - c.look.z);
-            let push = !(chase && h.length() > 1.0 && h.length() < REST_NEAR * k && ground.is_some_and(|g| g.cam_ray(c.look, c.look + h.normalize() * 3.1 * k).is_some()));
+            let push = !(chase
+                && h.length() > 1.0
+                && h.length() < REST_NEAR * k
+                && ground.is_some_and(|g| g.cam_ray(c.look, c.look + h.normalize() * 3.1 * k).is_some()));
             if spring(c, d_vec, push, k) {
                 st.hold = MANUAL_HOLD;
             }
@@ -577,7 +589,13 @@ fn tick(w: &mut World, target: Vec3, player: Vec3, facing: Vec3, chase: bool, in
         // look has moved on (4 points recorded) and no camera input, path mode instead. An unblocked view records the
         // look's trail.
         // During the unlock hold the ray is skipped and the trail still recorded (all.asm 1001fefc..1001ff3f).
-        let hit = if st.path_mode { None } else if unlocked { ground.map(|g| g.cam_ray(c.look, c.eye)) } else { Some(None) };
+        let hit = if st.path_mode {
+            None
+        } else if unlocked {
+            ground.map(|g| g.cam_ray(c.look, c.eye))
+        } else {
+            Some(None)
+        };
         match hit {
             Some(Some(_)) if st.hold == 0 && st.path_n >= 4 => (st.path_mode, st.hold) = (true, 0),
             Some(Some(h)) => c.eye = h + (h - c.eye).normalize_or_zero() * 0.5,
@@ -591,8 +609,11 @@ fn tick(w: &mut World, target: Vec3, player: Vec3, facing: Vec3, chase: bool, in
     }
     // Home (0x51): eases 1/8 a tick toward 3 behind the player at its look height, until the view is behind.
     if st.home > 0 {
-        let behind = player - Vec3::new(facing.x, 0.0, facing.z).normalize_or_zero() * 3.0 * k + Vec3::new(0.0, target.y - player.y, 0.0);
-        let off = view_yaw(c).zip(Some(facing.x.atan2(facing.z))).map_or(0.0, |(a, b)| (a - b + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI);
+        let behind = player - Vec3::new(facing.x, 0.0, facing.z).normalize_or_zero() * 3.0 * k
+            + Vec3::new(0.0, target.y - player.y, 0.0);
+        let off = view_yaw(c).zip(Some(facing.x.atan2(facing.z))).map_or(0.0, |(a, b)| {
+            (a - b + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+        });
         if off.abs() >= 0.05 {
             c.eye += (behind - c.eye) * 0.125;
             st.home -= 1;
@@ -634,7 +655,15 @@ fn path_tick(st: &mut State, c: &mut LockCam) {
 /// 0.0001 snaps back. Nothing refuses a move: the eye always lands where the look can see it.
 /// `ticks` the movement it covers: retail runs it a 30 fps frame (2 ticks), the free branch here a tick, the locked one
 /// a frame of any length.
-pub(super) fn tail(g: &Ground, mut eye: Vec3, look: Vec3, start: Vec3, zone_in: bool, final_ray: bool, ticks: f32) -> Vec3 {
+pub(super) fn tail(
+    g: &Ground,
+    mut eye: Vec3,
+    look: Vec3,
+    start: Vec3,
+    zone_in: bool,
+    final_ray: bool,
+    ticks: f32,
+) -> Vec3 {
     // 30261006 FUN_1001ee60 (all.c 23493): |eye - start| > 0.01 a frame (_DAT_10329a18) *(inf: 0.005 a tick)*.
     if (eye - start).length() > 0.005 * ticks || zone_in {
         let floor = g.floor(eye.x, eye.z, eye.y, 0.0).filter(|f| f - eye.y <= 10.0);
@@ -792,10 +821,15 @@ fn first_person(w: &mut World, ticks: f32, inp: &Inputs) {
     }
     // Locked, the look is the target with the lock's height (FUN_10020ba0, all.c 23720..23729), no stick look.
     super::target::refresh_lock_height(w);
-    let lock_look = w.target.filter(|_| w.locked).and_then(|t| w.entities.get(&t)).map(|e| e.pos + Vec3::new(0.0, w.lock_height, 0.0));
+    let lock_look = w
+        .target
+        .filter(|_| w.locked)
+        .and_then(|t| w.entities.get(&t))
+        .map(|e| e.pos + Vec3::new(0.0, w.lock_height, 0.0));
     let st = &mut w.camst;
     let fwd = Vec3::new(yaw.sin(), 0.0, yaw.cos());
-    let look = lock_look.unwrap_or_else(|| eye + fwd * 5.0 * pitch.cos() + Vec3::new(0.0, 5.0 * pitch.sin() + 0.25, 0.0));
+    let look =
+        lock_look.unwrap_or_else(|| eye + fwd * 5.0 * pitch.cos() + Vec3::new(0.0, 5.0 * pitch.sin() + 0.25, 0.0));
     w.unlock_ticks = 8.0;
     st.chase_hold = 0;
     // The camera eases 0.125 a tick toward the head.
@@ -863,11 +897,22 @@ mod tests {
     #[test]
     fn shake_follows_retail_frames() {
         let mut sh = Shake::default();
-        let want = [(239, 0.0538, 0.0090), (239, 0.0359, 0.0090), (239, 0.0179, 0.0090), (224, 0.0011, 0.0084), (197, -0.0117, 0.0015)];
+        let want = [
+            (239, 0.0538, 0.0090),
+            (239, 0.0359, 0.0090),
+            (239, 0.0179, 0.0090),
+            (224, 0.0011, 0.0084),
+            (197, -0.0117, 0.0015),
+        ];
         for (v, x, speed) in want {
             sh.kick(v as f32 * 0.0003);
             sh.step(2.0);
-            assert!((sh.x - x).abs() < 2e-4 && (sh.speed - speed).abs() < 2e-4, "{} {} want {x} {speed}", sh.x, sh.speed);
+            assert!(
+                (sh.x - x).abs() < 2e-4 && (sh.speed - speed).abs() < 2e-4,
+                "{} {} want {x} {speed}",
+                sh.x,
+                sh.speed
+            );
         }
     }
 

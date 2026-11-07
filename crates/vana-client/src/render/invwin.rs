@@ -15,10 +15,25 @@ pub fn icon_texture(id: u16) -> String {
 /// Game-font text; `tint` is the ARGB word (quads take BGRA).
 fn text(b: &mut UiBatch, font: &Font, atlas: &str, s: &str, x: f32, y: f32, tint: u32) -> f32 {
     if b.ttf_text() {
-        return b.push_mtext(s, super::mtext::Face::Regular, super::mtext::TEXT_EM, x, y + super::mtext::TEXT_DY, super::screens::argb(tint), false);
+        return b.push_mtext(
+            s,
+            super::mtext::Face::Regular,
+            super::mtext::TEXT_EM,
+            x,
+            y + super::mtext::TEXT_DY,
+            super::screens::argb(tint),
+            false,
+        );
     }
     let mut quads = Vec::new();
-    let end = font.layout_line(&encode_sjis(s), x.round() as i32, y.round() as i32, tint.to_le_bytes(), [1.0, 1.0], &mut quads);
+    let end = font.layout_line(
+        &encode_sjis(s),
+        x.round() as i32,
+        y.round() as i32,
+        tint.to_le_bytes(),
+        [1.0, 1.0],
+        &mut quads,
+    );
     b.push_text(&quads, atlas);
     end as f32
 }
@@ -38,13 +53,34 @@ pub fn push_children(b: &mut UiBatch, ui: &UiFile, m: &Menu, wx: f32, wy: f32) {
 pub fn push_cursor(b: &mut UiBatch, ui: &UiFile, m: &Menu, wx: f32, wy: f32, child: usize, frame: usize) {
     let Some(r) = m.elements[0].refs.iter().find(|r| r.kind == 6) else { return };
     let (Some(lib), Some(e)) = (ui.lib(&r.lib), m.elements.get(child)) else { return };
-    b.push_sprite(ui, lib, frame % lib.sprites.len().max(1), wx + e.x as f32, wy + e.y as f32, 1.0, 1.0, 0x8080_8080, 0);
+    b.push_sprite(
+        ui,
+        lib,
+        frame % lib.sprites.len().max(1),
+        wx + e.x as f32,
+        wy + e.y as f32,
+        1.0,
+        1.0,
+        0x8080_8080,
+        0,
+    );
 }
 
 /// The item list (FUN_101edb70 with FUN_101ebda0 cells). Rows start at window + (3, 4), 18 px
 /// apart; US columns (0x10375ee4) put the icon at 0 (32x32 at 0.5), the name at 18 (y + 2) and the
 /// count right-aligned at 16 (y + 4, over the icon).
-pub fn push_inventory(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &Font, atlas: &str, m: &Menu, list: &ItemList, w: f32, h: f32, frame: usize) -> [f32; 3] {
+pub fn push_inventory(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    font: &Font,
+    atlas: &str,
+    m: &Menu,
+    list: &ItemList,
+    w: f32,
+    h: f32,
+    frame: usize,
+) -> [f32; 3] {
     push_item_list(b, ui, style, font, atlas, m, list, w, h, frame, 3.0, true, INVENTOR_BAR)
 }
 
@@ -56,7 +92,21 @@ pub const LIST_BAR: f32 = 8.0;
 /// An item list window with its rows `inset` px in ("menu    bank" rows sit at x 4) and the cursor only when focused.
 /// Returns its scroll bar's (x, y, h).
 #[allow(clippy::too_many_arguments)]
-pub fn push_item_list(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &Font, atlas: &str, m: &Menu, list: &ItemList, w: f32, h: f32, frame: usize, inset: f32, focused: bool, bar_inset: f32) -> [f32; 3] {
+pub fn push_item_list(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    font: &Font,
+    atlas: &str,
+    m: &Menu,
+    list: &ItemList,
+    w: f32,
+    h: f32,
+    frame: usize,
+    inset: f32,
+    focused: bool,
+    bar_inset: f32,
+) -> [f32; 3] {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     let (fx, fy, fw, fh) = super::screens::frame_rect(m, w, h, 1.0, 1.0);
     let (ox, oy) = (wx + inset, wy + 4.0);
@@ -75,13 +125,33 @@ pub fn push_item_list(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &Fo
         push_cursor(b, ui, m, wx, wy, list.cursor + 1, frame);
     }
     // 10 rows (FUN_101f6700), total and top from the list every frame (FUN_101f69d0); drawn focused or not.
-    super::screens::push_scroll_bar(b, ui, fx + fw - bar_inset, fy, fh, list.rows.len(), crate::inventory::VISIBLE_ROWS, list.scroll);
+    super::screens::push_scroll_bar(
+        b,
+        ui,
+        fx + fw - bar_inset,
+        fy,
+        fh,
+        list.rows.len(),
+        crate::inventory::VISIBLE_ROWS,
+        list.scroll,
+    );
     [fx + fw - bar_inset, fy, fh]
 }
 
 /// The equipment grid (FUN_1012ea90): slot labels from the children, 32x32 icons at the child of
 /// each slot, counts "%2d" right-aligned at (+30, +22); then the ten number fields (FUN_1012d0f0).
-pub fn push_equipment(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, eq: &Equipment, info: &dyn crate::inventory::ItemInfo, w: f32, h: f32, cursor: Option<usize>, frame: usize) {
+pub fn push_equipment(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    eq: &Equipment,
+    info: &dyn crate::inventory::ItemInfo,
+    w: f32,
+    h: f32,
+    cursor: Option<usize>,
+    frame: usize,
+) {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     push_children(b, ui, m, wx, wy);
     for (child, id, count) in eq.icons(info) {
@@ -169,7 +239,17 @@ pub fn push_persona(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, p
 /// (no job sprite); the rank {Mon, NM, HNM} and infamy right-aligned at (0x67, 0x2a) / (0x67, 0x3a); HP / MP at 0x4b /
 /// 0x57 with persona's columns; TP right-aligned at (0x4b, 99); STR..CHR from 0x74, 13 apart. Contents only with
 /// party record 0, the 0x119 and the Monstrosity data in.
-pub fn push_mon_stat(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, p: &Persona, rank: Option<&str>, infamy: &str, w: f32, h: f32) {
+pub fn push_mon_stat(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    p: &Persona,
+    rank: Option<&str>,
+    infamy: &str,
+    w: f32,
+    h: f32,
+) {
     let (x, y) = push_window(b, ui, style, m, w, h);
     let (white, red) = (0x8080_8080, 0x8080_4040);
     if !p.ready {
@@ -229,7 +309,21 @@ pub struct ActionRow {
 /// `bar`: the whole list's (total, top) for its 12-row scroll bar (FUN_10221920), at x1 - 8 on the stacked frame;
 /// returns the bar's (x, y, h).
 #[allow(clippy::too_many_arguments)]
-pub fn push_action_list(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &Font, atlas: &str, m: &Menu, rows: &[ActionRow], cursor: usize, empty: &str, w: f32, h: f32, frame: usize, bar: (usize, usize)) -> [f32; 3] {
+pub fn push_action_list(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    font: &Font,
+    atlas: &str,
+    m: &Menu,
+    rows: &[ActionRow],
+    cursor: usize,
+    empty: &str,
+    w: f32,
+    h: f32,
+    frame: usize,
+    bar: (usize, usize),
+) -> [f32; 3] {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     let (fx, fy, fw, fh) = super::screens::frame_rect(m, w, h, 1.0, 1.0);
     if rows.is_empty() {
@@ -255,7 +349,16 @@ pub fn push_action_list(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, font: &
 
 /// A category window (mgcmenu, abiselec ...): its children's label sprites and the hand.
 #[allow(clippy::too_many_arguments)]
-pub fn push_category(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, cursor_child: usize, w: f32, h: f32, frame: usize) {
+pub fn push_category(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    cursor_child: usize,
+    w: f32,
+    h: f32,
+    frame: usize,
+) {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     push_children(b, ui, m, wx, wy);
     push_cursor(b, ui, m, wx, wy, cursor_child, frame);
@@ -273,7 +376,15 @@ pub fn push_tp_cost_box(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Men
     push_shape_text_right(b, ui, cost.to_string().as_bytes(), wx + 105.0, wy + 26.0, 0x8080_8080);
 }
 
-pub fn push_cost_box(b: &mut UiBatch, ui: &UiFile, style: &SpriteLib, m: &Menu, lines: &[(String, String)], w: f32, h: f32) {
+pub fn push_cost_box(
+    b: &mut UiBatch,
+    ui: &UiFile,
+    style: &SpriteLib,
+    m: &Menu,
+    lines: &[(String, String)],
+    w: f32,
+    h: f32,
+) {
     let (wx, wy) = push_window(b, ui, style, m, w, h);
     for ((label, value), dy) in lines.iter().zip([8.0, 26.0]) {
         super::screens::push_shape_text(b, ui, &crate::dat::font::encode_sjis(label), wx + 5.0, wy + dy, 0x8080_8080);

@@ -204,7 +204,11 @@ fn command(extra: &HashMap<&'static str, Extra>, name: String, level: u8, types:
             if !(types == "b" || types == "s") {
                 fields.truncate(types.len());
                 for (i, t) in types.bytes().enumerate().skip(fields.len()) {
-                    fields.push(Field { label: format!("field {}", i + 1), pick: if t == b'i' { Pick::Number } else { Pick::Text }, optional: true });
+                    fields.push(Field {
+                        label: format!("field {}", i + 1),
+                        pick: if t == b'i' { Pick::Number } else { Pick::Text },
+                        optional: true,
+                    });
                 }
             }
             Command { name, level, types, group: e.group, danger: e.danger, fields }
@@ -212,7 +216,15 @@ fn command(extra: &HashMap<&'static str, Extra>, name: String, level: u8, types:
         None => {
             let fields = match types.as_str() {
                 "b" | "s" => vec![Field { label: "arguments".into(), pick: Pick::Text, optional: true }],
-                _ => types.bytes().enumerate().map(|(i, t)| Field { label: format!("field {}", i + 1), pick: if t == b'i' { Pick::Number } else { Pick::Text }, optional: true }).collect(),
+                _ => types
+                    .bytes()
+                    .enumerate()
+                    .map(|(i, t)| Field {
+                        label: format!("field {}", i + 1),
+                        pick: if t == b'i' { Pick::Number } else { Pick::Text },
+                        optional: true,
+                    })
+                    .collect(),
             };
             Command { name, level, types, group: "debug", danger: false, fields }
         }
@@ -277,13 +289,125 @@ pub struct Gm {
 }
 
 /// lsb's xi.job names, by id from 1.
-const JOBS: [&str; 22] = ["WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP", "DNC", "SCH", "GEO", "RUN"];
+const JOBS: [&str; 22] = [
+    "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU",
+    "COR", "PUP", "DNC", "SCH", "GEO", "RUN",
+];
 /// lsb's xi.weather names.
-const WEATHER: [&str; 20] = ["NONE", "SUNSHINE", "CLOUDS", "FOG", "HOT_SPELL", "HEAT_WAVE", "RAIN", "SQUALL", "DUST_STORM", "SAND_STORM", "WIND", "GALES", "SNOW", "BLIZZARDS", "THUNDER", "THUNDERSTORMS", "AURORAS", "STELLAR_GLARE", "GLOOM", "DARKNESS"];
+const WEATHER: [&str; 20] = [
+    "NONE",
+    "SUNSHINE",
+    "CLOUDS",
+    "FOG",
+    "HOT_SPELL",
+    "HEAT_WAVE",
+    "RAIN",
+    "SQUALL",
+    "DUST_STORM",
+    "SAND_STORM",
+    "WIND",
+    "GALES",
+    "SNOW",
+    "BLIZZARDS",
+    "THUNDER",
+    "THUNDERSTORMS",
+    "AURORAS",
+    "STELLAR_GLARE",
+    "GLOOM",
+    "DARKNESS",
+];
 /// lsb's xi.skill names (the commands take them as well as ids).
-const SKILLS: [&str; 48] = ["HAND_TO_HAND", "DAGGER", "SWORD", "GREAT_SWORD", "AXE", "GREAT_AXE", "SCYTHE", "POLEARM", "KATANA", "GREAT_KATANA", "CLUB", "STAFF", "AUTOMATON_MELEE", "AUTOMATON_RANGED", "AUTOMATON_MAGIC", "ARCHERY", "MARKSMANSHIP", "THROWING", "GUARD", "EVASION", "SHIELD", "PARRY", "DIVINE_MAGIC", "HEALING_MAGIC", "ENHANCING_MAGIC", "ENFEEBLING_MAGIC", "ELEMENTAL_MAGIC", "DARK_MAGIC", "SUMMONING_MAGIC", "NINJUTSU", "SINGING", "STRING_INSTRUMENT", "WIND_INSTRUMENT", "BLUE_MAGIC", "GEOMANCY", "HANDBELL", "FISHING", "WOODWORKING", "SMITHING", "GOLDSMITHING", "CLOTHCRAFT", "LEATHERCRAFT", "BONECRAFT", "ALCHEMY", "COOKING", "SYNERGY", "RID", "DIG"];
+const SKILLS: [&str; 48] = [
+    "HAND_TO_HAND",
+    "DAGGER",
+    "SWORD",
+    "GREAT_SWORD",
+    "AXE",
+    "GREAT_AXE",
+    "SCYTHE",
+    "POLEARM",
+    "KATANA",
+    "GREAT_KATANA",
+    "CLUB",
+    "STAFF",
+    "AUTOMATON_MELEE",
+    "AUTOMATON_RANGED",
+    "AUTOMATON_MAGIC",
+    "ARCHERY",
+    "MARKSMANSHIP",
+    "THROWING",
+    "GUARD",
+    "EVASION",
+    "SHIELD",
+    "PARRY",
+    "DIVINE_MAGIC",
+    "HEALING_MAGIC",
+    "ENHANCING_MAGIC",
+    "ENFEEBLING_MAGIC",
+    "ELEMENTAL_MAGIC",
+    "DARK_MAGIC",
+    "SUMMONING_MAGIC",
+    "NINJUTSU",
+    "SINGING",
+    "STRING_INSTRUMENT",
+    "WIND_INSTRUMENT",
+    "BLUE_MAGIC",
+    "GEOMANCY",
+    "HANDBELL",
+    "FISHING",
+    "WOODWORKING",
+    "SMITHING",
+    "GOLDSMITHING",
+    "CLOTHCRAFT",
+    "LEATHERCRAFT",
+    "BONECRAFT",
+    "ALCHEMY",
+    "COOKING",
+    "SYNERGY",
+    "RID",
+    "DIG",
+];
 /// globals/log_ids.lua's keys (quest and mission logs) and names.
-const LOGS: &[(&str, &str)] = &[("SANDORIA", "San d'Oria"), ("BASTOK", "Bastok"), ("WINDURST", "Windurst"), ("JEUNO", "Jeuno"), ("SELBINA", "Selbina"), ("MHAURA", "Mhaura"), ("RABAO", "Rabao"), ("KAZHAM", "Kazham"), ("NORG", "Norg"), ("OTHER_AREAS_LOG", "Other Areas"), ("TAVNAZIA", "Tavnazian Safehold"), ("OUTLANDS", "Outlands"), ("ZILART", "Rise of the Zilart"), ("COP", "Chains of Promathia"), ("TOAU", "Treasures of Aht Urhgan"), ("AHT_URHGAN", "Aht Urhgan"), ("WOTG", "Wings of the Goddess"), ("CRYSTAL_WAR", "Crystal War"), ("ABYSSEA", "Abyssea"), ("ABYSSEA_KONSCHTAT", "Abyssea - Konschtat"), ("ABYSSEA_TAHRONGI", "Abyssea - Tahrongi"), ("ABYSSEA_LATHEINE", "Abyssea - La'Theine"), ("ABYSSEA_MISAREAUX", "Abyssea - Misareaux"), ("ABYSSEA_VUNKERL", "Abyssea - Vunkerl"), ("ABYSSEA_ATTOHWA", "Abyssea - Attohwa"), ("ABYSSEA_ALTEPA", "Abyssea - Altepa"), ("ABYSSEA_GRAUBERG", "Abyssea - Grauberg"), ("ABYSSEA_ULEGUERAND", "Abyssea - Uleguerand"), ("SOA", "Seekers of Adoulin"), ("ADOULIN", "Adoulin"), ("COALITION", "Coalition"), ("ASSAULT", "Assault"), ("CAMPAIGN", "Campaign"), ("ACP", "A Crystalline Prophecy"), ("AMK", "A Moogle Kupo d'Etat"), ("ASA", "A Shantotto Ascension"), ("ROV", "Rhapsodies of Vana'diel"), ("TVR", "The Voracious Resurgence")];
+const LOGS: &[(&str, &str)] = &[
+    ("SANDORIA", "San d'Oria"),
+    ("BASTOK", "Bastok"),
+    ("WINDURST", "Windurst"),
+    ("JEUNO", "Jeuno"),
+    ("SELBINA", "Selbina"),
+    ("MHAURA", "Mhaura"),
+    ("RABAO", "Rabao"),
+    ("KAZHAM", "Kazham"),
+    ("NORG", "Norg"),
+    ("OTHER_AREAS_LOG", "Other Areas"),
+    ("TAVNAZIA", "Tavnazian Safehold"),
+    ("OUTLANDS", "Outlands"),
+    ("ZILART", "Rise of the Zilart"),
+    ("COP", "Chains of Promathia"),
+    ("TOAU", "Treasures of Aht Urhgan"),
+    ("AHT_URHGAN", "Aht Urhgan"),
+    ("WOTG", "Wings of the Goddess"),
+    ("CRYSTAL_WAR", "Crystal War"),
+    ("ABYSSEA", "Abyssea"),
+    ("ABYSSEA_KONSCHTAT", "Abyssea - Konschtat"),
+    ("ABYSSEA_TAHRONGI", "Abyssea - Tahrongi"),
+    ("ABYSSEA_LATHEINE", "Abyssea - La'Theine"),
+    ("ABYSSEA_MISAREAUX", "Abyssea - Misareaux"),
+    ("ABYSSEA_VUNKERL", "Abyssea - Vunkerl"),
+    ("ABYSSEA_ATTOHWA", "Abyssea - Attohwa"),
+    ("ABYSSEA_ALTEPA", "Abyssea - Altepa"),
+    ("ABYSSEA_GRAUBERG", "Abyssea - Grauberg"),
+    ("ABYSSEA_ULEGUERAND", "Abyssea - Uleguerand"),
+    ("SOA", "Seekers of Adoulin"),
+    ("ADOULIN", "Adoulin"),
+    ("COALITION", "Coalition"),
+    ("ASSAULT", "Assault"),
+    ("CAMPAIGN", "Campaign"),
+    ("ACP", "A Crystalline Prophecy"),
+    ("AMK", "A Moogle Kupo d'Etat"),
+    ("ASA", "A Shantotto Ascension"),
+    ("ROV", "Rhapsodies of Vana'diel"),
+    ("TVR", "The Voracious Resurgence"),
+];
 
 /// A picker's choices: (what the field sends, what the list shows).
 pub type Choices = Vec<(String, String)>;
@@ -297,7 +421,9 @@ fn fixed(pick: Pick) -> Option<Choices> {
         Pick::Skill => named(&SKILLS),
         Pick::Log => LOGS.iter().map(|(k, n)| (k.to_string(), n.to_string())).collect(),
         Pick::Toggle => vec![("true".into(), "true".into()), ("false".into(), "false".into())],
-        Pick::Nation => vec![("0".into(), "San d'Oria".into()), ("1".into(), "Bastok".into()), ("2".into(), "Windurst".into())],
+        Pick::Nation => {
+            vec![("0".into(), "San d'Oria".into()), ("1".into(), "Bastok".into()), ("2".into(), "Windurst".into())]
+        }
         _ => return None,
     })
 }
@@ -305,12 +431,16 @@ fn fixed(pick: Pick) -> Option<Choices> {
 /// The choices read from the game's name tables, once: zones, items, spells, key items and titles by id.
 pub fn from_names(pick: Pick, n: &crate::dat::names::Names) -> Option<Choices> {
     use crate::dat::names::NameSource;
-    let keep = |id: u32, s: Option<String>| s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s != ".").map(|s| (id.to_string(), s));
+    let keep = |id: u32, s: Option<String>| {
+        s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s != ".").map(|s| (id.to_string(), s))
+    };
     Some(match pick {
         Pick::Zone => (0..0x300).filter_map(|i| keep(i, n.place(i))).collect(),
         Pick::Item => (1..0x10000).filter_map(|i| keep(i, n.items.item(i).map(|it| it.name))).collect(),
         Pick::Spell => (1..0x400).filter_map(|i| keep(i, n.spell(i))).collect(),
-        Pick::KeyItem => n.key_item_list().into_iter().filter(|(id, _)| *id != 0).filter_map(|(id, s)| keep(id, Some(s))).collect(),
+        Pick::KeyItem => {
+            n.key_item_list().into_iter().filter(|(id, _)| *id != 0).filter_map(|(id, s)| keep(id, Some(s))).collect()
+        }
         Pick::Title => (1..0x800).filter_map(|i| keep(i, n.title(i))).collect(),
         _ => return None,
     })
@@ -355,7 +485,8 @@ impl Gm {
         if p.len() < 12 || p[4] != 1 {
             return;
         }
-        let (level, first, count, last) = (p[5], u16::from_le_bytes([p[8], p[9]]) as usize, p[10] as usize, p[11] & 1 != 0);
+        let (level, first, count, last) =
+            (p[5], u16::from_le_bytes([p[8], p[9]]) as usize, p[10] as usize, p[11] & 1 != 0);
         if first == 0 {
             self.incoming.clear();
         }
@@ -365,13 +496,21 @@ impl Gm {
             let (nl, tl) = (nl as usize, tl as usize);
             let Some(name) = p.get(o + 3..o + 3 + nl) else { break };
             let Some(types) = p.get(o + 3 + nl..o + 3 + nl + tl) else { break };
-            self.incoming.push((String::from_utf8_lossy(name).into_owned(), perm, String::from_utf8_lossy(types).into_owned()));
+            self.incoming.push((
+                String::from_utf8_lossy(name).into_owned(),
+                perm,
+                String::from_utf8_lossy(types).into_owned(),
+            ));
             o += 3 + nl + tl;
         }
         if last {
             let extra = extras();
             self.level = level;
-            self.commands = std::mem::take(&mut self.incoming).into_iter().filter(|c| c.1 >= 1).map(|(n, l, t)| command(&extra, n, l, t)).collect();
+            self.commands = std::mem::take(&mut self.incoming)
+                .into_iter()
+                .filter(|c| c.1 >= 1)
+                .map(|(n, l, t)| command(&extra, n, l, t))
+                .collect();
             if self.level == 0 {
                 self.open = false;
             }
@@ -418,7 +557,9 @@ impl Gm {
             return f.clone();
         }
         let t = typed.trim();
-        let known = (!t.is_empty()).then(|| list.iter().find(|(id, n)| id == t || n.eq_ignore_ascii_case(t)).cloned()).flatten();
+        let known = (!t.is_empty())
+            .then(|| list.iter().find(|(id, n)| id == t || n.eq_ignore_ascii_case(t)).cloned())
+            .flatten();
         let f = Found { hits: suggest(list, typed, max).into_iter().cloned().collect(), known };
         *self.found.borrow_mut() = Some((key, f.clone()));
         f
@@ -426,7 +567,12 @@ impl Gm {
 
     /// Builds the choices the chosen command's pickers need: fixed lists, the name tables, the party and the
     /// people and things in the zone (those two every time, as they change).
-    pub fn fill_lists(&mut self, names: Option<&std::sync::Arc<crate::dat::names::Names>>, people: Choices, around: Choices) {
+    pub fn fill_lists(
+        &mut self,
+        names: Option<&std::sync::Arc<crate::dat::names::Names>>,
+        people: Choices,
+        around: Choices,
+    ) {
         // Lists read from the DATs on a worker (items are 65535 reads), taken here once ready.
         self.loading.retain(|(pick, rx)| match rx.try_recv() {
             Ok(c) => {
@@ -455,7 +601,9 @@ impl Gm {
                 _ => {
                     if let Some(c) = fixed(pick) {
                         self.lists.insert(pick, c);
-                    } else if let Some(n) = names.filter(|_| matches!(pick, Pick::Zone | Pick::Item | Pick::Spell | Pick::KeyItem | Pick::Title)) {
+                    } else if let Some(n) = names
+                        .filter(|_| matches!(pick, Pick::Zone | Pick::Item | Pick::Spell | Pick::KeyItem | Pick::Title))
+                    {
                         let (tx, rx) = std::sync::mpsc::channel();
                         let n = n.clone();
                         std::thread::spawn(move || {
@@ -510,15 +658,46 @@ pub fn sample() -> Gm {
     let mut names: Vec<&&str> = extra.keys().collect();
     names.sort();
     let mut g = Gm { level: 5, open: true, ..Default::default() };
-    g.commands = names.into_iter().map(|n| command(&extra, n.to_string(), if n.starts_with("reload") { 5 } else { 1 }, "s".repeat(extra[*n].fields.len()))).collect();
+    g.commands = names
+        .into_iter()
+        .map(|n| {
+            command(
+                &extra,
+                n.to_string(),
+                if n.starts_with("reload") { 5 } else { 1 },
+                "s".repeat(extra[*n].fields.len()),
+            )
+        })
+        .collect();
     if let Some(c) = g.commands.iter_mut().find(|c| c.name == "additem") {
         c.types = "siiiiiiiiii".into();
     }
     (g.group, g.selected, g.typing) = (Some(2), Some("additem".into()), Some(0));
     g.values.insert(("additem".into(), 0), "crystal".into());
     g.values.insert(("additem".into(), 1), "12".into());
-    g.lists.insert(Pick::Item, [(4096, "Fire Crystal"), (4097, "Ice Crystal"), (4098, "Wind Crystal"), (4238, "Inferno Crystal"), (4100, "Lightning Crystal"), (4101, "Water Crystal"), (12, "Fire Cluster")].map(|(i, n)| (i.to_string(), n.to_string())).to_vec());
-    g.replies.push((1, Reply { line: "additem 4096 12".into(), result: Some(0), output: vec!["Gave player item 4096 (Fire Crystal) x12.".into()], cut: false }));
+    g.lists.insert(
+        Pick::Item,
+        [
+            (4096, "Fire Crystal"),
+            (4097, "Ice Crystal"),
+            (4098, "Wind Crystal"),
+            (4238, "Inferno Crystal"),
+            (4100, "Lightning Crystal"),
+            (4101, "Water Crystal"),
+            (12, "Fire Cluster"),
+        ]
+        .map(|(i, n)| (i.to_string(), n.to_string()))
+        .to_vec(),
+    );
+    g.replies.push((
+        1,
+        Reply {
+            line: "additem 4096 12".into(),
+            result: Some(0),
+            output: vec!["Gave player item 4096 (Fire Crystal) x12.".into()],
+            cut: false,
+        },
+    ));
     g
 }
 
@@ -571,7 +750,11 @@ mod tests {
 
     #[test]
     fn suggestions_match_ids_and_names() {
-        let c: Choices = vec![("4096".into(), "Fire Crystal".into()), ("4097".into(), "Ice Crystal".into()), ("4112".into(), "Potion".into())];
+        let c: Choices = vec![
+            ("4096".into(), "Fire Crystal".into()),
+            ("4097".into(), "Ice Crystal".into()),
+            ("4112".into(), "Potion".into()),
+        ];
         fn names<'a>(v: Vec<&'a (String, String)>) -> Vec<&'a str> {
             v.into_iter().map(|c| c.1.as_str()).collect()
         }

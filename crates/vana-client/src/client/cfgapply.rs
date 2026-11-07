@@ -74,7 +74,8 @@ pub fn chat_colour(v: &Values, kind: u8) -> [u8; 4] {
 
 /// The local time (hour, minute, second).
 pub fn local_hms() -> [u8; 3] {
-    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64) + utc_offset();
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
+        + utc_offset();
     [(secs / 3600).rem_euclid(24) as u8, (secs / 60).rem_euclid(60) as u8, secs.rem_euclid(60) as u8]
 }
 
@@ -141,7 +142,10 @@ mod tests {
         assert_eq!(chat_colour(&v, 3), [0xa0, 0x40, 0xa0, 0x80]);
         assert_eq!(v.get(0xb5), 0);
         // 12-hour (FUN_101bf740): 00:05 is 12:05, 13:07:09 is 01:07:09.
-        assert_eq!((stamp_text(0, [0, 5, 0]), stamp_text(1, [0, 5, 0]), stamp_text(2, [13, 7, 9])), (String::new(), "[12:05] ".into(), "[01:07:09] ".into()));
+        assert_eq!(
+            (stamp_text(0, [0, 5, 0]), stamp_text(1, [0, 5, 0]), stamp_text(2, [13, 7, 9])),
+            (String::new(), "[12:05] ".into(), "[01:07:09] ".into())
+        );
         assert!((aspect([1600, 900], false, 0) - 16.0 / 9.0).abs() < 1e-6);
         assert!((aspect([1600, 900], true, 0) - 1.0 / 0.791).abs() < 1e-5);
     }

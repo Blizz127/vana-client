@@ -92,17 +92,19 @@ fn asked_version(msg: &str) -> Option<[u8; 3]> {
         }
         msg[start..*at].parse().ok()
     };
-    (0..b.len()).filter(|&i| b[i].is_ascii_digit() && (i == 0 || !b[i - 1].is_ascii_digit() && b[i - 1] != b'.')).find_map(|i| {
-        let mut at = i;
-        let major = num(&mut at)?;
-        (b.get(at) == Some(&b'.')).then_some(())?;
-        at += 1;
-        let minor = num(&mut at)?;
-        (b.get(at) == Some(&b'.')).then_some(())?;
-        at += 1;
-        let patch = if matches!(b.get(at), Some(b'x' | b'X')) { 0 } else { num(&mut at)? };
-        ([major, minor] != LOADER_VERSION[..2]).then_some([major, minor, patch])
-    })
+    (0..b.len())
+        .filter(|&i| b[i].is_ascii_digit() && (i == 0 || !b[i - 1].is_ascii_digit() && b[i - 1] != b'.'))
+        .find_map(|i| {
+            let mut at = i;
+            let major = num(&mut at)?;
+            (b.get(at) == Some(&b'.')).then_some(())?;
+            at += 1;
+            let minor = num(&mut at)?;
+            (b.get(at) == Some(&b'.')).then_some(())?;
+            at += 1;
+            let patch = if matches!(b.get(at), Some(b'x' | b'X')) { 0 } else { num(&mut at)? };
+            ([major, minor] != LOADER_VERSION[..2]).then_some([major, minor, patch])
+        })
 }
 
 fn exchange(host: &str, port: u16, body: &Value) -> Result<Value> {

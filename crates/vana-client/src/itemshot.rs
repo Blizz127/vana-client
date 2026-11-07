@@ -10,7 +10,8 @@ fn open(lang: &str) -> Result<Items> {
 }
 
 const JOBS: [&str; 23] = [
-    "-", "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP", "DNC", "SCH", "GEO", "RUN",
+    "-", "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN",
+    "BLU", "COR", "PUP", "DNC", "SCH", "GEO", "RUN",
 ];
 
 pub fn dump(lang: &str, key: bool, ids: &[u32]) -> Result<()> {
@@ -20,7 +21,9 @@ pub fn dump(lang: &str, key: bool, ids: &[u32]) -> Result<()> {
         let names = Names::load(&index, Lang::parse(lang).context("lang: ja, en, de or fr")?)?;
         for &id in ids {
             match names.key_item(id) {
-                Some(n) => println!("key item {id}: \"{}\" / \"{}\" (mode {}, an {})", n.singular, n.plural, n.mode, n.an),
+                Some(n) => {
+                    println!("key item {id}: \"{}\" / \"{}\" (mode {}, an {})", n.singular, n.plural, n.mode, n.an)
+                }
                 None => println!("key item {id}: none"),
             }
             for l in names.key_item_description(id).unwrap_or_default().lines() {
@@ -37,15 +40,28 @@ pub fn dump(lang: &str, key: bool, ids: &[u32]) -> Result<()> {
         };
         let jobs: Vec<&str> = (1..23).filter(|&j| it.jobs & (1 << j) != 0).map(|j| JOBS[j]).collect();
         println!("{id:#06x} {:?} \"{}\"", it.kind.unwrap(), it.name);
-        println!("  flags {:#06x} stack {} type {} resource {:#06x} targets {:#x}", it.flags, it.stack, it.item_type, it.resource, it.targets);
+        println!(
+            "  flags {:#06x} stack {} type {} resource {:#06x} targets {:#x}",
+            it.flags, it.stack, it.item_type, it.resource, it.targets
+        );
         if it.level != 0 || it.slots != 0 {
-            println!("  level {} slots {:?} races {:#x} jobs {} superior {}", it.level, it.slot_names(), it.races, jobs.join("/"), it.superior_level);
+            println!(
+                "  level {} slots {:?} races {:#x} jobs {} superior {}",
+                it.level,
+                it.slot_names(),
+                it.races,
+                jobs.join("/"),
+                it.superior_level
+            );
         }
         if it.damage != 0 || it.delay != 0 {
             println!("  damage {} delay {} dps {} skill {}", it.damage, it.delay, it.dps, it.skill);
         }
         if it.max_charges != 0 {
-            println!("  charges {} cast {} use delay {} reuse {}", it.max_charges, it.cast_time, it.use_delay, it.reuse_delay);
+            println!(
+                "  charges {} cast {} use delay {} reuse {}",
+                it.max_charges, it.cast_time, it.use_delay, it.reuse_delay
+            );
         }
         if !it.singular.is_empty() {
             println!("  log: article {} \"{}\" / \"{}\"", it.article, it.singular, it.plural);
