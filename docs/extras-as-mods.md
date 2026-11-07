@@ -286,6 +286,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   2m, commas in the answer); `//calc` alone opens a window that answers as Enter ends the line. Parsed by hand, never
   run as Lua; a Rust test covers it. Seen live in chat and in the window. (The emote picker add-on is the game's own
   Emotes list, so it has no port.)
+- **Attendance** (assets/mods/attendance; Att, Attendance, EventTracker): `//attend [note]` writes the party, the
+  alliance and players within 50 yalms with the time, zone and note to `attendance/<date>.txt`. Seen live. Not yet:
+  DKP bids.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
