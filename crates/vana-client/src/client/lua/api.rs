@@ -296,16 +296,26 @@ pub(super) fn install(
             if super::controls_mods(&line) {
                 need(lua, "mods")?;
             }
-            let mods = state(lua).borrow().granted.iter().any(|g| g == "mods");
-            push_op(lua, Op::Run(line, mods))?;
+            let (mods, input) = {
+                let s = state(lua);
+                let s = s.borrow();
+                (s.granted.iter().any(|g| g == "mods"), s.input)
+            };
+            push_op(lua, Op::Run(line, mods, input))?;
             Ok(())
+        })?,
+    )?;
+    commands.set(
+        "is_game",
+        lua.create_function(|_, name: String| {
+            Ok(super::super::textcmd::is_game_command(&name.trim_start_matches('/').to_ascii_lowercase()))
         })?,
     )?;
     g.set("commands", commands)?;
 
-    // filters.chat(fn) / filters.typed(fn) -> id; filters.off(id). Run inline: no sleeping; chat filters have no game state.
+    // filters.chat / typed / battle(fn) -> id; filters.off(id). Run inline: no sleeping; chat filters have no game state.
     let filters = lua.create_table()?;
-    for (name, typed) in [("chat", false), ("typed", true)] {
+    for (name, kind) in [("chat", 0), ("typed", 1), ("battle", 2)] {
         filters.set(
             name,
             lua.create_function(move |lua, func: Function| {
@@ -313,10 +323,10 @@ pub(super) fn install(
                 let id = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if typed {
-                    s.typed_filters.push((id, key))
-                } else {
-                    s.chat_filters.push((id, key))
+                match kind {
+                    0 => s.chat_filters.push((id, key)),
+                    1 => s.typed_filters.push((id, key)),
+                    _ => s.battle_filters.push((id, key)),
                 }
                 s.filters_dirty = true;
                 Ok(id)
@@ -331,7 +341,7 @@ pub(super) fn install(
                 let mut guard = st.borrow_mut();
                 let s: &mut ModState = &mut guard;
                 let mut gone = Vec::new();
-                for list in [&mut s.chat_filters, &mut s.typed_filters] {
+                for list in [&mut s.chat_filters, &mut s.typed_filters, &mut s.battle_filters] {
                     let (g, keep): (Vec<_>, Vec<_>) = std::mem::take(list).into_iter().partition(|(i, _)| *i == id);
                     *list = keep;
                     gone.extend(g.into_iter().map(|(_, k)| k));
@@ -371,10 +381,32 @@ pub(super) fn install(
                 (Some(x), Some(y)) => Some((x, y)),
                 _ => None,
             };
+            // An edge window is a HUD one: it never takes the keys.
+            w.edge = spec.get::<Option<bool>>("edge")?.unwrap_or(false);
+            w.hud |= w.edge;
+            w.heading = spec.get::<Option<String>>("heading")?.unwrap_or_default();
+            w.resize = spec.get::<Option<bool>>("resize")?.unwrap_or(false);
+            w.panel = spec.get::<Option<String>>("panel")?;
+            if let Some(p) = w.panel.as_deref() {
+                let (list, kind) = if w.edge {
+                    (&super::EDGE_PANELS[..], "edge panel")
+                } else {
+                    (&super::STAND_IN_PANELS[..], "panel")
+                };
+                if !list.contains(&p) {
+                    return Err(mlua::Error::runtime(format!("no {kind} {p:?} ({})", list.join(", "))));
+                }
+            }
             w.popup = spec.get::<Option<bool>>("popup")?.unwrap_or(false);
             w.modal = w.popup || spec.get::<Option<bool>>("modal")?.unwrap_or(false);
             // A popup opens at the pointer.
             w.anchor = w.popup.then(|| super::input::cursor(lua));
+            // Its opacity (per-window opacity), kept with the window's key.
+            let opacity = spec.get::<Option<f32>>("opacity")?;
+            drop(s);
+            set_opacity(lua, &format!("mod:{}:{id}", mod_id(lua)?), opacity);
+            let mut s = st.borrow_mut();
+            let w = &mut s.windows[k];
             let elems: Option<Table> = spec.get("elements")?;
             let parsed: Vec<(super::window::Elem, super::window::Meta)> = match elems {
                 Some(t) => {
@@ -432,6 +464,9 @@ pub(super) fn install(
                 .ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
             let t = lua.create_table()?;
             match e {
+                Elem::Timers { builtin, .. } => t.set("builtin", *builtin)?,
+                Elem::Targets { rows, .. } => t.set("count", rows.len())?,
+                Elem::Chip { text, .. } => t.set("text", text.as_str())?,
                 Elem::Text { text, .. } | Elem::Input { text, .. } => t.set("text", text.as_str())?,
                 Elem::Buttons { marked, .. } => t.set("at", marked.map(|m| m + 1))?,
                 Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => {
@@ -531,6 +566,13 @@ pub(super) fn install(
     ui.set(
         "is_open",
         lua.create_function(|lua, id: String| Ok(state(lua).borrow().windows.iter().any(|w| w.id == id && w.open)))?,
+    )?;
+    ui.set(
+        "opacity",
+        lua.create_function(|lua, (id, opacity): (String, Option<f32>)| {
+            set_opacity(lua, &format!("mod:{}:{id}", mod_id(lua)?), opacity);
+            Ok(())
+        })?,
     )?;
     ui.set(
         "on",
@@ -901,6 +943,141 @@ pub(super) fn install(
             Ok(out)
         })?,
     )?;
+    // Held items by name (the short name or the long log name, any case), in the bags given or all, bag by bag.
+    game.set(
+        "find_items",
+        lua.create_function(|lua, (name, bags): (String, Option<Vec<u8>>)| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            let Some(info) = w.item_info.as_ref() else { return Ok(out) };
+            let named = |id: u16| {
+                info.item(id)
+                    .is_some_and(|it| it.name.eq_ignore_ascii_case(&name) || it.singular.eq_ignore_ascii_case(&name))
+            };
+            for (&(bag, slot), &(id, count)) in
+                w.inv.slots.iter().filter(|((b, s), _)| *s != 0 && bags.as_ref().is_none_or(|bs| bs.contains(b)))
+            {
+                if !named(id) {
+                    continue;
+                }
+                let t = lua.create_table()?;
+                t.set("bag", bag)?;
+                t.set("slot", slot)?;
+                t.set("id", id)?;
+                t.set("count", count)?;
+                if let Some(x) = w.inv.ext.get(&(bag, slot)) {
+                    t.set("extdata", lua.create_string(x)?)?;
+                }
+                t.set("locked", w.inv.locks.get(&(bag, slot)).copied().unwrap_or(0))?;
+                out.push(t)?;
+            }
+            Ok(out)
+        })?,
+    )?;
+    // Every quest area's quests in the journal's order, with ours current or completed (s2c 0x056).
+    game.set(
+        "quests",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            let Some(logs) = super::super::quests::names(w) else { return Ok(out) };
+            for (area, file) in logs.quests.iter().enumerate().take(11) {
+                let list = lua.create_table()?;
+                for e in &file.entries {
+                    let t = lua.create_table()?;
+                    let repeatable = e.name.starts_with('+');
+                    t.set("number", e.number)?;
+                    t.set("name", crate::dat::font::plain(e.name.trim_start_matches('+')))?;
+                    t.set("repeatable", repeatable)?;
+                    t.set("current", super::super::quests::has(&w.journal, area, e.number, false))?;
+                    t.set("completed", super::super::quests::has(&w.journal, area, e.number, true))?;
+                    list.push(t)?;
+                }
+                out.set(area, list)?;
+            }
+            Ok(out)
+        })?,
+    )?;
+    // The zone's zone lines (its 'z' boxes with 8-character names): centre, size, yaw and the four corners of the
+    // floor they stand on (y down: the box's bottom is its centre's y plus half its height).
+    game.set(
+        "zone_lines",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let out = lua.create_table()?;
+            for r in &w.zone_lines {
+                let t = lua.create_table()?;
+                t.set("name", r.name.as_str())?;
+                let v = |x: f32, y: f32, z: f32| -> mlua::Result<Table> {
+                    let p = lua.create_table()?;
+                    p.set("x", x)?;
+                    p.set("y", y)?;
+                    p.set("z", z)?;
+                    Ok(p)
+                };
+                let [sx, sy, sz] = r.scale.map(f32::abs);
+                t.set("centre", v(r.pos[0], r.pos[1], r.pos[2])?)?;
+                t.set("size", v(sx, sy, sz)?)?;
+                t.set("yaw", r.rot[1])?;
+                let floor = r.pos[1] + sy / 2.0;
+                let corners = lua.create_table()?;
+                for c in r.corners() {
+                    corners.push(v(c[0], floor, c[1])?)?;
+                }
+                t.set("corners", corners)?;
+                out.push(t)?;
+            }
+            Ok(out)
+        })?,
+    )?;
+    // Records of Eminence: the sparks and the objectives set, with their progress (s2c 0x110 / 0x111).
+    game.set(
+        "roe",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let t = lua.create_table()?;
+            t.set("sparks", w.roe.sparks)?;
+            let list = lua.create_table()?;
+            for (slot, n, progress) in super::super::roe::mod_active(w) {
+                let r = lua.create_table()?;
+                r.set("slot", slot)?;
+                r.set("id", n)?;
+                r.set("progress", progress)?;
+                list.push(r)?;
+            }
+            t.set("active", list)?;
+            Ok(t)
+        })?,
+    )?;
+    // Our auction slots while the auction house is open.
+    game.set(
+        "auction",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let Some(slots) = super::super::auction::mod_slots(w) else { return Ok(None) };
+            let t = lua.create_table()?;
+            let list = lua.create_table()?;
+            for (slot, item, count, price, state) in slots {
+                let r = lua.create_table()?;
+                r.set("slot", slot)?;
+                r.set("item", item)?;
+                r.set("count", count)?;
+                r.set("price", price)?;
+                r.set("state", state)?;
+                list.push(r)?;
+            }
+            t.set("slots", list)?;
+            Ok(Some(t))
+        })?,
+    )?;
+    // The client's wear rule (the shops' yellow): race, main job and level, superior level, encumbrance.
+    game.set(
+        "can_wear",
+        lua.create_function(|lua, id: u16| {
+            let w = world(lua)?;
+            Ok(w.item_info.as_ref().and_then(|c| c.item(id)).is_some_and(|it| super::super::shop::can_wear(w, &it, id)))
+        })?,
+    )?;
     game.set(
         "bag_size",
         lua.create_function(|lua, bag: u8| {
@@ -994,7 +1171,18 @@ pub(super) fn install(
         })?,
     )?;
     game.set("weather", lua.create_function(|lua, ()| Ok(world(lua)?.weather))?)?;
-    game.set("key_items", lua.create_function(|lua, ()| Ok(world(lua)?.key_items.clone()))?)?;
+    // The held key items' ids, from the server's bit table (one bit per id, 32 to a word).
+    game.set(
+        "key_items",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            Ok(w.key_items
+                .iter()
+                .enumerate()
+                .flat_map(|(k, &word)| (0..32u32).filter(move |b| word & (1 << b) != 0).map(move |b| k as u32 * 32 + b))
+                .collect::<Vec<u32>>())
+        })?,
+    )?;
     // The treasure pool: each item in it by slot (0..9, as actions.lot / pass take them).
     game.set(
         "treasure",
@@ -1017,6 +1205,21 @@ pub(super) fn install(
             Ok(out)
         })?,
     )?;
+    // The content countdown the client shows (s2c 0x075's cnttime): seconds left and its whole length; nil when none.
+    game.set(
+        "countdown",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let o = &w.objective;
+            if !o.counting() {
+                return Ok(None);
+            }
+            let t = lua.create_table()?;
+            t.set("left", o.left(super::super::vana_now(w) as u32))?;
+            t.set("length", o.duration)?;
+            Ok(Some(t))
+        })?,
+    )?;
     // An event (cutscene or NPC talk) under way: nil when none; its open menu (question, options, cursor from 1).
     game.set(
         "event",
@@ -1028,10 +1231,21 @@ pub(super) fn install(
             let t = lua.create_table()?;
             if let Some(c) = super::super::event::choice(w) {
                 let m = lua.create_table()?;
-                m.set("question", c.question.as_str())?;
-                m.set("options", c.options.iter().map(|o| o.1.as_str()).collect::<Vec<_>>())?;
+                // As the window reads: the game's quotes and full-width forms as characters, in-line codes dropped.
+                m.set("question", crate::dat::font::plain(&c.question))?;
+                m.set("options", c.options.iter().map(|o| crate::dat::font::plain(&o.1)).collect::<Vec<_>>())?;
                 m.set("cursor", c.cursor + 1)?;
                 t.set("menu", m)?;
+            }
+            if let Some((waiting, open)) = super::super::event::message_wait(w) {
+                let m = lua.create_table()?;
+                m.set("waiting", waiting)?;
+                m.set("open", open)?;
+                if let Some((page, actor)) = super::super::event::message_page(w) {
+                    m.set("lines", page.iter().map(|l| crate::dat::font::plain(l)).collect::<Vec<_>>())?;
+                    m.set("actor", actor)?;
+                }
+                t.set("text", m)?;
             }
             Ok(Some(t))
         })?,
@@ -1041,6 +1255,22 @@ pub(super) fn install(
 
     // res: the game's static data from its DATs (docs/lua-mods.md 4.9).
     let res = lua.create_table()?;
+    // A zone's dialogue entry as the file holds it (Shift-JIS with its codes), and the first entry starting with bytes.
+    res.set(
+        "zone_text",
+        lua.create_function(|lua, (zone, id): (u16, u32)| {
+            let Some(d) = zone_dialog(world(lua)?, zone) else { return Ok(None) };
+            d.raw(id).map(|b| lua.create_string(&b)).transpose()
+        })?,
+    )?;
+    res.set(
+        "zone_text_find",
+        lua.create_function(|lua, (zone, prefix): (u16, mlua::LuaString)| {
+            let Some(d) = zone_dialog(world(lua)?, zone) else { return Ok(None) };
+            let p = prefix.as_bytes();
+            Ok((0..d.len() as u32).find(|&i| d.raw(i).is_some_and(|r| r.starts_with(&p))))
+        })?,
+    )?;
     res.set(
         "item",
         lua.create_function(|lua, id: u32| {
@@ -1054,6 +1284,8 @@ pub(super) fn install(
             let t = lua.create_table()?;
             t.set("id", id)?;
             t.set("name", it.name.as_str())?;
+            // The long name the log uses ("Hachiman Domaru +1" for "Hachi. Domaru +1").
+            t.set("log_name", it.singular.as_str())?;
             t.set("description", it.description.as_str())?;
             t.set("kind", it.kind.map(item_kind))?;
             t.set("flags", it.flags)?;
@@ -1497,6 +1729,14 @@ const WEATHER: [(&str, Option<u8>); 20] = [
     ("Darkness", Some(7)),
 ];
 
+/// A zone's dialogue: the one loaded for this zone, or read for another.
+fn zone_dialog(w: &World, zone: u16) -> Option<std::sync::Arc<crate::dat::dialog::Dialog>> {
+    match &w.zone_text {
+        Some((z, d)) if *z == zone => Some(d.clone()),
+        _ => crate::dat::dialog::Dialog::load(w.index.as_ref()?, zone).ok().map(std::sync::Arc::new),
+    }
+}
+
 const ELEMENTS: [&str; 8] = ["Fire", "Ice", "Wind", "Earth", "Lightning", "Water", "Light", "Dark"];
 
 /// An entity as a table: who, where, how it stands.
@@ -1514,6 +1754,8 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     t.set("heading", e.yaw)?;
     t.set("distance", e.pos.distance(w.pos))?;
     t.set("hpp", e.hpp)?;
+    // It has an HP gauge (the target window shows one).
+    t.set("gauge", !e.no_gauge)?;
     t.set("status", e.motion.status)?;
     t.set("speed", f32::from(e.motion.speed) / 10.0)?;
     t.set("claim", e.claim)?;
@@ -1522,6 +1764,7 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     t.set("hidden", e.flags & 2 != 0)?;
     t.set("race", e.race.or(e.appearance.map(|l| l.race)))?;
     t.set("model", e.model)?;
+    t.set("height", model_height(w, id))?;
     if let Some(l) = e.appearance {
         let look = lua.create_table()?;
         for (k, v) in [
@@ -1558,8 +1801,16 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
         t.set("mpp", p.mpp)?;
         t.set("tp", p.tp)?;
         t.set("pet", true)?;
+        if p.target != 0 {
+            t.set("pet_target", p.target)?;
+        }
     }
     Ok(t)
+}
+
+/// An actor's model height in yalms (its top at rest, scaled), once its model is in.
+fn model_height(w: &World, id: u32) -> Option<f32> {
+    w.actors.get(&id).filter(|a| a.character.is_some()).map(|a| -a.top)
 }
 
 /// Our own character as an entity (the entity map holds the others only).
@@ -1581,7 +1832,9 @@ pub(super) fn self_entity(lua: &Lua, w: &World) -> mlua::Result<Table> {
     t.set("pos", pos)?;
     t.set("heading", my_heading(w))?;
     t.set("distance", 0.0)?;
+    t.set("height", model_height(w, w.my_id))?;
     t.set("hpp", w.vitals.map_or(100, |v| v.3))?;
+    t.set("gauge", true)?;
     t.set("status", w.my_motion.status)?;
     t.set("speed", f32::from(w.my_motion.speed) / 10.0)?;
     t.set("claim", 0)?;
@@ -1592,6 +1845,25 @@ pub(super) fn self_entity(lua: &Lua, w: &World) -> mlua::Result<Table> {
     t.set("in_alliance", true)?;
     t.set("race", w.my_race)?;
     t.set("me", true)?;
+    // Our look (0x00A / 0x051): the last one our model was built from, before the mods' (render.look).
+    t.set("model", 0)?;
+    if let Some(l) = w.look_base.get(&w.my_id) {
+        let look = lua.create_table()?;
+        for (k, v) in [
+            ("face", l.face),
+            ("head", l.head),
+            ("body", l.body),
+            ("hands", l.hands),
+            ("legs", l.legs),
+            ("feet", l.feet),
+            ("main", l.main),
+            ("sub", l.sub),
+            ("range", l.range),
+        ] {
+            look.set(k, v)?;
+        }
+        t.set("look", look)?;
+    }
     // Ours from s2c 0x037 @0x59 (actor +0x208).
     t.set("hitbox", w.my_plate.hitbox)?;
     if let Some((tid, e)) = w.target.and_then(|id| w.entities.get(&id).map(|e| (id, e))) {
@@ -1652,6 +1924,10 @@ fn player(lua: &Lua) -> mlua::Result<Table> {
     t.set("pos", pos)?;
     t.set("heading", my_heading(w))?;
     t.set("status", w.my_motion.status)?;
+    // Our 0x037 flags word: bit 4 seeking a party, 5 anonymous, 7 away.
+    t.set("seeking", w.self_flags >> 4 & 1 != 0)?;
+    t.set("anonymous", w.self_flags >> 5 & 1 != 0)?;
+    t.set("away", w.self_flags >> 7 & 1 != 0)?;
     if let Some((hp, mp, tp, hpp, mpp)) = w.vitals {
         t.set("hp", hp)?;
         t.set("mp", mp)?;
@@ -1668,6 +1944,9 @@ fn player(lua: &Lua) -> mlua::Result<Table> {
         t.set("sub_level", s.sub.1)?;
     }
     t.set("target", w.target)?;
+    // The focus target (/focustarget, one of our six) and the target before the current one, while here.
+    t.set("focus_target", super::super::target::focus_member(w))?;
+    t.set("last_target", super::super::target::last_target(w).map(|t| t.0))?;
     Ok(t)
 }
 
@@ -1879,16 +2158,67 @@ fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
             label: t.get::<Option<String>>("label")?.unwrap_or_default(),
             open: t.get::<Option<bool>>("open")?.unwrap_or(true),
         },
+        "timers" => Elem::Timers {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            section: match t.get::<Option<String>>("section")?.as_deref() {
+                None | Some("recasts") => 0,
+                Some("buffs") => 1,
+                Some("debuffs") => 2,
+                Some(s) => {
+                    return Err(mlua::Error::runtime(format!("timers section {s:?}: recasts, buffs or debuffs")));
+                }
+            },
+            builtin: t.get::<Option<bool>>("builtin")?.unwrap_or(true),
+        },
         "gauge" => Elem::Gauge {
             id: t.get::<Option<String>>("id")?.unwrap_or_default(),
             label: t.get::<Option<String>>("label")?.unwrap_or_default(),
             value: t.get::<Option<f32>>("value")?.unwrap_or(0.0),
             text: t.get::<Option<String>>("text")?.unwrap_or_default(),
             kind: t.get::<Option<String>>("kind")?.unwrap_or_else(|| "hp".into()),
+            row: t.get::<Option<String>>("style")?.as_deref() == Some("row"),
+            dim: t.get::<Option<bool>>("dim")?.unwrap_or(false),
         },
         "separator" => Elem::Separator,
+        "chip" => Elem::Chip {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            note: t.get::<Option<String>>("note")?.unwrap_or_default(),
+            tone: tone(t.get::<Option<String>>("tone")?.as_deref())?,
+            detail: t.get::<Option<String>>("detail")?.unwrap_or_default(),
+        },
+        "targets" => {
+            Elem::Targets { id: t.get::<Option<String>>("id")?.unwrap_or_default(), rows: target_rows(t.get("rows")?)? }
+        }
         other => return Err(mlua::Error::runtime(format!("unknown element type {other:?}"))),
     })
+}
+
+/// A `chip` element's tone.
+fn tone(v: Option<&str>) -> mlua::Result<u8> {
+    match v {
+        None | Some("waiting") => Ok(0),
+        Some("refused") => Ok(1),
+        Some("quiet") => Ok(2),
+        Some(o) => Err(mlua::Error::runtime(format!("chip tone {o:?}: waiting, refused or quiet"))),
+    }
+}
+
+/// A `targets` element's rows: {entity, label, tag} each.
+fn target_rows(v: Option<Table>) -> mlua::Result<Vec<super::window::TargetRow>> {
+    let Some(t) = v else { return Ok(Vec::new()) };
+    t.sequence_values::<Table>()
+        .map(|r| {
+            let r = r?;
+            Ok(super::window::TargetRow {
+                entity: r
+                    .get::<Option<u32>>("entity")?
+                    .ok_or_else(|| mlua::Error::runtime("a targets row needs entity (a server id)"))?,
+                label: r.get::<Option<String>>("label")?.unwrap_or_default(),
+                tag: r.get::<Option<String>>("tag")?.unwrap_or_default(),
+            })
+        })
+        .collect()
 }
 
 /// ui.update: the fields given replace the element's.
@@ -1962,7 +2292,34 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
                 *height = v.max(1);
             }
         }
-        Elem::Gauge { label, value, text, kind, .. } => {
+        Elem::Timers { builtin, .. } => {
+            if let Some(v) = t.get::<Option<bool>>("builtin")? {
+                *builtin = v;
+            }
+        }
+        Elem::Targets { rows, .. } => {
+            if t.contains_key("rows")? {
+                *rows = target_rows(t.get("rows")?)?;
+            }
+        }
+        Elem::Chip { text, note, tone: k, detail, .. } => {
+            if let Some(v) = t.get::<Option<String>>("text")? {
+                *text = v;
+            }
+            if let Some(v) = t.get::<Option<String>>("note")? {
+                *note = v;
+            }
+            if let Some(v) = t.get::<Option<String>>("detail")? {
+                *detail = v;
+            }
+            if t.contains_key("tone")? {
+                *k = tone(t.get::<Option<String>>("tone")?.as_deref())?;
+            }
+        }
+        Elem::Gauge { label, value, text, kind, dim, .. } => {
+            if let Some(v) = t.get::<Option<bool>>("dim")? {
+                *dim = v;
+            }
             if let Some(v) = t.get::<Option<String>>("label")? {
                 *label = v;
             }
@@ -2089,4 +2446,29 @@ pub(super) fn build_packet(id: i64, body: &[u8]) -> mlua::Result<Vec<u8>> {
         )));
     }
     Ok(crate::net::map::session::build(id as u16, body))
+}
+
+/// The running mod's id.
+pub(super) fn mod_id(lua: &Lua) -> mlua::Result<String> {
+    lua.globals().get::<Table>("mod")?.get::<String>("id")
+}
+
+/// Sets or (None) clears a window's opacity from this mod (per-window opacity); the key is the mod's own window.
+pub(super) fn set_opacity(lua: &Lua, key: &str, opacity: Option<f32>) {
+    let Some(info) = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone())
+    else {
+        return;
+    };
+    let me = mod_id(lua).unwrap_or_default();
+    let mut f = info.borrow_mut();
+    match opacity {
+        Some(o) => {
+            f.opacity.insert(key.to_string(), (me, o.clamp(0.0, 1.0)));
+        }
+        None => {
+            if f.opacity.get(key).is_some_and(|o| o.0 == me) {
+                f.opacity.remove(key);
+            }
+        }
+    }
 }

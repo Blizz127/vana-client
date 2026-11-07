@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="24" cy="21" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#95dfa4"/>
+      <stop offset="0.5" stop-color="#3fc45a"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="24" y1="13" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="31.239" y1="21.432" x2="31.239" y2="44.255" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+  </defs>
+  <title>white_wind</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="27.7" fill="#0a1118"/>
+      <circle id="orb" cx="32" cy="32" r="25.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <path id="sheen" d="M34.253 13.406 C36.067 16.31 33.172 21.392 27.785 24.758 C22.399 28.124 16.562 28.498 14.747 25.594 C12.933 22.69 15.828 17.608 21.215 14.242 C26.601 10.876 32.438 10.502 34.253 13.406 Z" fill="url(#linear-gradient-1)" opacity="0.42"/>
+      <path id="gusts" d="M34.274 31.476 L20.158 31.476 C19.378 31.476 18.746 30.843 18.746 30.064 C18.746 29.284 19.378 28.652 20.158 28.652 L34.274 28.652 C37.057 28.652 38.816 27.075 37.623 24.966 C37.058 24.045 35.47 23.868 35.254 25.293 C35.138 26.064 34.418 26.594 33.647 26.478 C32.876 26.36 32.346 25.641 32.463 24.87 C33.076 20.824 38.125 20.315 40.051 23.525 C40.057 23.534 40.061 23.542 40.066 23.551 C42.228 27.334 39.617 31.476 34.274 31.476 Z M18.912 34.465 L39.256 34.465 C44.599 34.465 46.5 39.172 43.671 42.582 C41.173 45.685 36.183 44.264 36.183 40.029 C36.183 39.249 36.816 38.616 37.595 38.616 C38.375 38.616 39.007 39.249 39.007 40.029 C39.007 41.6 40.648 41.841 41.475 40.807 C41.481 40.8 41.487 40.793 41.493 40.786 C42.842 39.166 42.135 37.288 39.256 37.288 L18.912 37.288 C18.132 37.288 17.5 36.656 17.5 35.876 C17.5 35.097 18.132 34.465 18.912 34.465 Z M21.818 40.278 L30.537 40.278 C31.317 40.278 31.949 40.909 31.949 41.689 C31.949 42.469 31.317 43.1 30.537 43.1 L21.818 43.1 C21.038 43.1 20.407 42.469 20.407 41.689 C20.407 40.909 21.038 40.278 21.818 40.278 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

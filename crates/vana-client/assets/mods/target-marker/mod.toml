@@ -1,0 +1,24 @@
+name = "Target Marker"
+version = "1.0.0"
+description = "A ring on the ground under your target, in a colour you choose (the target marker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Target Marker"
+help = "Draws a ring on the ground under your target."
+
+[settings.colour]
+type = "colour"
+default = [255, 200, 80, 200]
+label = "Ring Colour"
+
+[settings.size]
+type = "number"
+default = 1.2
+min = 0.5
+max = 5.0
+step = 0.1
+label = "Ring Size"
+help = "The ring's radius in yalms."

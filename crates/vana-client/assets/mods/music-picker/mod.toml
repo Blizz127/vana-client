@@ -1,0 +1,24 @@
+name = "Music Picker"
+version = "1.0.0"
+description = "Plays any of the game's tracks, keeps the zone's music in battle or silences it while mounted (the music add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Music Picker"
+help = "//music <track number> plays that track until //music off. The settings below change the battle and mount music."
+
+[settings.battle]
+type = "enum"
+default = "The Game's"
+options = ["The Game's", "The Zone's", "Silence"]
+label = "Battle Music"
+help = "What plays while you fight: the game's battle music, the zone's own music, or nothing."
+
+[settings.mount]
+type = "enum"
+default = "The Game's"
+options = ["The Game's", "Silence"]
+label = "Mount Music"
+help = "What plays while you ride: the game's mount music or nothing."

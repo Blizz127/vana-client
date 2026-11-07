@@ -39,8 +39,15 @@ pub const SECTIONS: [&str; 3] = ["Recasts", "Buffs", "Debuffs"];
 pub enum Icon {
     None,
     Status(u16),
-    /// A magic / ability list icon (library, sprite).
-    List(&'static str, usize),
+    /// A magic / ability list icon (library, sprite) and the record's picture (magic::picture, the modern UI's art).
+    List(&'static str, usize, Option<u16>),
+}
+
+/// A spell's or ability record's list icon.
+pub fn list_icon(w: &World, spell: bool, id: u16) -> Icon {
+    let kind = if spell { super::magic::Kind::Magic } else { super::magic::Kind::Ability };
+    super::magic::row_icon(w, kind, id)
+        .map_or(Icon::None, |(l, k)| Icon::List(l, k, super::magic::picture(w, kind, id)))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -853,7 +860,7 @@ fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, 
             continue;
         }
         let Some(a) = ability_for_timer(w, timer) else { continue };
-        let icon = super::magic::list_icon_of(w, false, a.id).map_or(Icon::None, |(l, k)| Icon::List(l, k));
+        let icon = list_icon(w, false, a.id);
         let mut name = name_of(a.id as u32, false);
         let calc = w.ability_calc.get(&timer).copied().unwrap_or((0, 0));
         let rule = charge_rule(w, charge_kind(w, a)).and_then(|(n, full)| charges(left.ceil() as i32, n, full, calc));
@@ -872,7 +879,7 @@ fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, 
         if left <= 0.0 {
             continue;
         }
-        let icon = super::magic::list_icon_of(w, true, spell).map_or(Icon::None, |(l, k)| Icon::List(l, k));
+        let icon = list_icon(w, true, spell);
         let total = t.total((1, spell as u32), left, seen);
         rows.push(Row { icon, name: name_of(spell as u32, true), left, total, fills: true });
     }
@@ -931,7 +938,9 @@ fn applied_rows(b: &Bearer, now: Instant) -> Vec<Row> {
 }
 
 /// The sections' groups: recasts; us, then others by party order, then the rest; monsters, ours targeted first.
-pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
+/// The sections as their panels show them: `builtin` per section the client's own rows, the mods' rows always; a
+/// section whose panel is not open is empty.
+pub fn sections(w: &mut World, gu: &GameUi, panels: [Option<bool>; 3]) -> [Vec<Group>; 3] {
     let now = Instant::now();
     maintain(w);
     let me = w.my_id;
@@ -959,9 +968,18 @@ pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
     let debuffs =
         mobs.into_iter().map(|(_, b)| Group { name: Some(b.name.clone()), rows: applied_rows(b, now) }).collect();
     let recasts = if recasts.is_empty() { Vec::new() } else { vec![Group { name: None, rows: recasts }] };
-    // With the Extra off only the mods' timers show.
-    let mut secs = if w.extra_timers { [recasts, buffs, debuffs] } else { Default::default() };
+    let mut secs = [recasts, buffs, debuffs];
+    for (k, s) in secs.iter_mut().enumerate() {
+        if panels[k] != Some(true) {
+            s.clear();
+        }
+    }
     mod_rows(w, now, &mut secs);
+    for (k, s) in secs.iter_mut().enumerate() {
+        if panels[k].is_none() {
+            s.clear();
+        }
+    }
     secs
 }
 
@@ -1202,7 +1220,7 @@ pub fn draw_panel(
                             gu.image_rect(&t, rx, ly + 4.0, 16.0, 16.0, [c, c, c, 1.0]);
                         }
                     }
-                    Icon::List(lib, k) => {
+                    Icon::List(lib, k, _) => {
                         gu.sprite(lib, k, rx, ly + 4.0, N);
                     }
                     Icon::None => {}
@@ -1267,10 +1285,11 @@ pub fn prepare(gu: &GameUi, w: &mut World, sw: f32, sh: f32, foot: f32) {
     let step = dt * 60.0 / SLIDE_TICKS;
     w.timers.slide = if w.timers.out { (w.timers.slide + step).min(1.0) } else { (w.timers.slide - step).max(0.0) };
     w.timers.frame = None;
-    if !(w.extra_timers || !w.timers.mods.is_empty()) || super::event::active(w) || w.map.is_some() || w.cnq.is_some() {
+    let panels = w.lua.timers_panels();
+    if panels.iter().all(Option::is_none) || super::event::active(w) || w.map.is_some() || w.cnq.is_some() {
         return;
     }
-    let secs = sections(w, gu);
+    let secs = sections(w, gu, panels);
     let place = base_place(gu, w, sw, sh, foot);
     let t = 40.0 - (w.started.elapsed().as_secs_f32() * 60.0) % 40.0;
     let pulse = if t <= 20.0 { t } else { 40.0 - t } * 0.05;
@@ -1350,9 +1369,9 @@ pub fn shot(
             a.abilities.get(id as usize).map(|r| (r.icon as u16, r.icon_hd))
         };
         r.map_or(Icon::None, |(i, hd)| match hd {
-            0xffff => Icon::List("menu    magiconw", i as usize),
-            1000.. => Icon::List("menu    magico2w", (hd - 1000) as usize),
-            _ => Icon::List("menu    magiconw", hd as usize),
+            0xffff => Icon::List("menu    magiconw", i as usize, Some(i)),
+            1000.. => Icon::List("menu    magico2w", (hd - 1000) as usize, Some(hd)),
+            _ => Icon::List("menu    magiconw", hd as usize, Some(hd)),
         })
     };
     let row = |icon: Icon, name: &str, left: f32, total: f32, fills: bool| Row {

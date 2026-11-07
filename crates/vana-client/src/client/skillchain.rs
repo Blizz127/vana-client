@@ -512,7 +512,12 @@ pub fn prepare(w: &mut World, base: Place) {
     let out = !w.skillchain.folded;
     w.skillchain.slide = if out { (w.skillchain.slide + step).min(1.0) } else { (w.skillchain.slide - step).max(0.0) };
     w.skillchain.frame = None;
-    if !w.extra_skillchain || super::event::active(w) || w.map.is_some() || w.cnq.is_some() {
+    if w.lua.edge_panel("skillchains").is_none()
+        || w.lua.hides("skillchains")
+        || super::event::active(w)
+        || w.map.is_some()
+        || w.cnq.is_some()
+    {
         return;
     }
     let lines = lines(w);
@@ -520,8 +525,7 @@ pub fn prepare(w: &mut World, base: Place) {
         return;
     }
     // Under the Timers and the training regime windows (above them on the right).
-    let over =
-        [if w.extra_timers { w.timers.rect() } else { None }, if w.extra_regime { w.regime.rect() } else { None }];
+    let over = [w.timers.rect(), w.regime.rect()];
     let place = over.iter().flatten().fold(base, |p, r| match p.dock {
         Dock::Right if r[1] - 4.0 < p.y => Place { y: r[1] - 4.0, max_h: (p.max_h - (p.y - r[1] + 4.0)).max(0.0), ..p },
         Dock::Right => p,

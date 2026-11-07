@@ -43,6 +43,7 @@ end
 #[derive(Clone)]
 pub(super) enum Source {
     Dir(PathBuf),
+    #[cfg_attr(not(test), allow(dead_code))]
     Bundled(&'static [(&'static str, &'static str)]),
 }
 
@@ -134,6 +135,8 @@ pub(super) struct ModState {
     /// Filters (docs/lua-mods.md 3.2): chat lines before they are kept, typed lines before the parser.
     pub chat_filters: Vec<(u64, RegistryKey)>,
     pub typed_filters: Vec<(u64, RegistryKey)>,
+    /// Battle messages with their data, before they print (filters.battle).
+    pub battle_filters: Vec<(u64, RegistryKey)>,
     pub filters_dirty: bool,
     /// The user's setting values by key (account and character scopes merged); declared defaults fill the rest.
     pub settings: serde_json::Map<String, serde_json::Value>,
@@ -155,6 +158,7 @@ pub(super) struct ModState {
     /// Key and mouse filters (docs/lua-mods.md 4.5), and key binds.
     pub key_filters: Vec<(u64, RegistryKey)>,
     pub mouse_filters: Vec<(u64, RegistryKey)>,
+    pub pad_filters: Vec<(u64, RegistryKey)>,
     pub binds: Vec<super::input::Bind>,
     /// Functions other mods may call (mods.provide).
     pub provided: Vec<(String, RegistryKey)>,
@@ -192,6 +196,12 @@ impl ModState {
 
 /// A filter's budget per call (it runs inside the game's own paths).
 pub(super) const FILTER_CAP: Duration = Duration::from_millis(20);
+
+/// The client's start, for os.clock.
+fn process_start() -> Instant {
+    static START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    *START.get_or_init(Instant::now)
+}
 
 pub(super) struct Handler {
     pub id: u64,
@@ -245,9 +255,12 @@ impl Vm {
         // os: the clock and the date only.
         let os: mlua::Table = g.get("os")?;
         let keep = lua.create_table()?;
-        for name in ["time", "date", "clock", "difftime"] {
+        for name in ["time", "date", "difftime"] {
             keep.raw_set(name, os.get::<Value>(name)?)?;
         }
+        // os.clock as wall time (seconds on a monotonic clock since the client started): C's clock() is the process's
+        // CPU time, which runs at its own pace in a many-threaded client and broke mods' countdowns.
+        keep.raw_set("clock", lua.create_function(|_, ()| Ok(process_start().elapsed().as_secs_f64()))?)?;
         g.raw_set("os", keep)?;
         for name in ["dofile", "loadfile"] {
             g.raw_set(name, Value::Nil)?;

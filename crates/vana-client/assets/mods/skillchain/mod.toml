@@ -1,0 +1,14 @@
+name = "Skillchain Helper"
+version = "1.0.0"
+description = "In a party, the skillchains your party can make together; on your target, an open skillchain, what closes it, and when to magic burst (the skillchain add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Skillchain Helper"
+help = "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst."
+tab = "Timers"
+place = 3
+place_modern = 2
+from = "skillchain_helper"

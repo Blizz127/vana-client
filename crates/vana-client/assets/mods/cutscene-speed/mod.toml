@@ -1,0 +1,19 @@
+name = "Cutscene Speed"
+version = "1.0.0"
+description = "Plays cutscenes and other events faster (the fast-cutscene add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Cutscene Speed"
+help = "Plays cutscenes and other events faster than the game does."
+
+[settings.speed]
+type = "number"
+default = 2.0
+min = 1.0
+max = 4.0
+step = 0.5
+label = "Speed"
+help = "How many times faster events play."

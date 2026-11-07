@@ -47,10 +47,16 @@ scope = "character"
 | `min` | number | `0` | The smallest value an `int` or `number` row offers. |
 | `max` | number | `100` | The largest value an `int` or `number` row offers. |
 | `step` | number | `1` for `int`, a twentieth of the range for `number` | The step between the values the row offers (at most 201 values). |
-| `options` | string[] | `[]` | An `enum`'s choices. |
+| `options` | string[] | `[]` | An `enum`'s choices; with `values`, the labels of those values. |
+| `values` | any TOML values | `[]` | The values the row offers, one per label in `options`, for a row of named values of any type (`values = [0, 3, 5]` with `options = ["OFF", "3 s", "5 s"]`). Not as many as `options` stops the mod from loading. |
+| `tab` | string | `""` | Shows the row on one of the client's Extras tabs (`"Maps"`, `"Timers"`, `"Battle"`, `"Misc."`) instead of the mod's page. The client's bundled mods put their rows where the features they replaced had theirs. Any other tab stops the mod from loading. |
+| `place` | integer | the end | With `tab`: the row's place on that tab, from 0. |
+| `place_modern` | integer | `place` | With `tab`: its place in the modern UI's page, where that differs (a row only the classic page has, such as Timers Position, comes before it). |
+| `from` | string | `""` | A client config field (config.json) the setting takes its first value from, while the user has saved none: a bundled mod keeps the choice the player made for the feature it replaced. |
+| `preview_sound` | integer | none | An `int` whose value picks an interface sound: `preview_sound` + the value (Chat Alerts' Sound: `17`, the call sounds `<call0>` on). The settings page plays that sound whenever the value changes, so the player hears what they pick. |
 
 The value a row stores: `true` or `false` for `bool`; the chosen option's text for `enum`; an integer for `int`; a
-number for `number`.
+number for `number`; the chosen value for a row with `values`.
 
 The user changes a setting on the Extras page (`/lua settings <mod>` opens it) or with `/lua set <mod> <key> <value>`,
 where the value is read as JSON when it parses (`true`, `12`, `[1, 2]`, `"text"`) and as plain text otherwise. Either

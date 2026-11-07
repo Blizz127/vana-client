@@ -422,6 +422,8 @@ A mod can change the built-in interface as well as add to it. In the modern UI, 
   stand where it was.
 - **Move, scale or fade** a panel (`ui.native.place("target", {x = 600, y = 80, scale = 1.3, alpha = 0.9})`), and find
   where any panel is (`ui.native.rect`).
+- **Fill its slots** (both UIs): your text in a built-in panel, drawn as its own (`ui.native.slot("clock", game.clock())`
+  beside the game's clock; `target_distance` and `target_hpp` in the target window).
 - **Reskin** it: replace its sprites with your PNGs, set its palette colours, or give its windows a new frame
   (`ui.skin.sprite`, `ui.skin.colour`, `ui.skin.frame`). Every panel, and every mod's window, draws with them.
 
@@ -450,6 +452,11 @@ end)
 
 A filter runs inside the client while the line passes, so it must be quick. It cannot `sleep` or read the game.
 [examples/chat-tools](examples/chat-tools/) hides lines with a chosen word.
+
+`filters.battle` sees each battle message before it prints, with what it is about: the message id, the action's
+category, the actor and the target (id, name), the lines. It can read the game, colour the names
+(`m.actor.colour = 6`), drop the message, or replace its lines. The bundled Battle Text mod's short lines and coloured
+names are written with it.
 
 ## Saving data
 
@@ -637,8 +644,12 @@ the "Lua" extension, for example) and you get completion, argument hints and che
 
 ## Sharing your mod
 
-A mod is its folder: zip it (with the folder inside the zip) and share the file. To install one, unzip it into the
-mods folder. It shows up on the Mods page switched off; switch it on, and grant the permissions it asks for on its
+A mod is its folder: zip it (with the folder inside the zip) and share the file. To install one, use Settings >
+Mods > Install from File and pick the zip (or the mod's folder), or unzip it into the mods folder yourself. A mod
+installed by hand shows up on the Mods page switched off; switch it on, and grant the permissions it asks for on its
 Extras page.
+
+To list it in the mod catalogue, so players can install and update it from the Mods page, publish the zip as a
+GitHub release and add an entry for it to [catalogue/mods.json](../../catalogue/README.md) with a pull request.
 
 Put a `README.md` in the folder saying what the mod does, its commands, and which permissions it asks for and why.

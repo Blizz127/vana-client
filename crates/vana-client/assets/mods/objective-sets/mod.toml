@@ -1,0 +1,10 @@
+name = "Objective Sets"
+version = "1.0.0"
+description = "Saves the Records of Eminence objectives you have set as named sets and puts a set back with one command (the objective set add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Objective Sets"
+help = "//roeset save <name> keeps the objectives set now; //roeset <name> removes the others and sets those, a second apart (removing loses an objective's progress); //roeset list, //roeset delete <name>."

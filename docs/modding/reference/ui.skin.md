@@ -9,8 +9,8 @@ and a mod giving a thing back only takes away its own change.
 Every function that changes something needs the `ui.native` permission. To move, scale, fade or hide the built-in
 panels instead, see [ui.native](ui.native.md#modern-panels).
 
-The classic UI draws the game's own art from its DAT files: change it with a DAT overlay mod (a folder of replaced
-files, see the Mods page), not with `ui.skin`.
+The classic UI draws the game's art from its DAT files: change it with a DAT pack (a folder of replaced files,
+see Settings > DAT Packs), not with `ui.skin`.
 
 ```lua
 -- Red HP bars, a warmer gold, and a darker window.

@@ -1,0 +1,10 @@
+name = "Pet Status"
+version = "1.0.0"
+description = "Your pet's HP, MP and TP, what it is fighting and your pet commands' recasts, in a window on a screen edge (the pet status add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Pet Status"
+help = "While you have a pet (an avatar, a familiar, a wyvern, an automaton, a luopan), shows its HP, MP and TP, its target and your pet commands' recasts."

@@ -1,0 +1,16 @@
+name = "Tell Inbox"
+version = "1.0.0"
+description = "Keeps the tells that come while you are away, answers the last tell with //r, and can send an away reply (the answering machine add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Tell Inbox"
+help = "While you are /away, tells are kept and listed when you are back (/online); //tells shows them again; //r <message> answers the last tell."
+
+[settings.reply]
+type = "string"
+default = ""
+label = "Away Reply"
+help = "Sent once to each player who sends you a tell while you are away (empty: none)."

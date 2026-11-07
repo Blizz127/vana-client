@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6a48e"/>
+      <stop offset="0.45" stop-color="#ef5a32"/>
+      <stop offset="1" stop-color="#782d19"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#782d19"/>
+      <stop offset="1" stop-color="#782d19"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="20" y1="34.322" x2="20" y2="57.678" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="38.667" y1="17.866" x2="38.667" y2="34.76" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="29.566" y1="30.59" x2="29.566" y2="38.277" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w458</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118" opacity="0.8"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="burst" d="M20.349 34.72 L22.33 38.813 C22.523 39.21 23.017 39.415 23.434 39.27 L27.73 37.777 C28.147 37.632 28.368 37.853 28.223 38.27 L26.73 42.566 C26.585 42.983 26.79 43.477 27.187 43.67 L31.28 45.651 C31.678 45.844 31.678 46.156 31.28 46.349 L27.187 48.33 C26.79 48.523 26.585 49.017 26.73 49.434 L28.223 53.73 C28.368 54.147 28.147 54.368 27.73 54.223 L23.434 52.73 C23.017 52.585 22.523 52.79 22.33 53.187 L20.349 57.28 C20.156 57.678 19.844 57.678 19.651 57.28 L17.67 53.187 C17.477 52.79 16.983 52.585 16.566 52.73 L12.27 54.223 C11.853 54.368 11.632 54.147 11.777 53.73 L13.27 49.434 C13.415 49.017 13.21 48.523 12.813 48.33 L8.72 46.349 C8.322 46.156 8.322 45.844 8.72 45.651 L12.813 43.67 C13.21 43.477 13.415 42.983 13.27 42.566 L11.777 38.27 C11.632 37.853 11.853 37.632 12.27 37.777 L16.566 39.27 C16.983 39.415 17.477 39.21 17.67 38.813 L19.651 34.72 C19.844 34.322 20.156 34.322 20.349 34.72 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-linejoin="round" opacity="0.95"/>
+      <path id="katana_1" d="M29.333 32.8 L41.374 20.573 C43.8 18.333 46.134 17.866 48.001 18.799 C45.201 20.666 42.867 23 31.293 34.76 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="katana_2" d="M31.2 32.8 L41.84 21.973 C43.8 20.2 45.667 19.266 46.834 19.033 C44.361 20.76 42.4 22.533 31.62 33.22 Z" fill="#ffffff" opacity="0.5"/>
+      <path id="katana_3" d="M32.74 37.607 C32.07 38.277 30.106 37.4 28.353 35.647 C26.6 33.894 25.723 31.93 26.393 31.26 C27.063 30.59 29.027 31.467 30.78 33.22 C32.533 34.973 33.41 36.937 32.74 37.607 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="katana_4" d="M28.213 34.48 L29.52 35.787 C29.726 35.993 29.726 36.327 29.52 36.534 L24.2 41.854 C23.993 42.06 23.659 42.06 23.453 41.854 L22.146 40.547 C21.94 40.341 21.94 40.007 22.146 39.8 L27.466 34.48 C27.673 34.274 28.007 34.274 28.213 34.48 Z" fill="#3a2f45" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <polygon id="katana_5" points="26.626,35.694 27.56,38.12 27.186,38.494 26.253,36.067" fill="#c9b8e0" opacity="0.8"/>
+      <polygon id="katana_6" points="24.76,37.56 25.693,39.987 25.32,40.361 24.386,37.934" fill="#c9b8e0" opacity="0.8"/>
+      <polygon id="katana_7" points="22.893,39.427 23.826,41.854 23.453,42.227 22.519,39.8" fill="#c9b8e0" opacity="0.8"/>
+    </g>
+  </g>
+</svg>

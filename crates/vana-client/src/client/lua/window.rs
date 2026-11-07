@@ -41,10 +41,11 @@ impl Icon {
         }
     }
 
-    /// A spell's or an ability's list sprite (library, index).
-    pub fn sprite(self, w: &super::World) -> Option<(&'static str, usize)> {
+    /// A spell's or an ability's list row: its list and record index.
+    fn row(self, w: &super::World) -> Option<(super::super::magic::Kind, u16)> {
+        use super::super::magic::Kind;
         match self {
-            Icon::Spell(id) => super::super::magic::list_icon_of(w, true, id),
+            Icon::Spell(id) => Some((Kind::Magic, id)),
             Icon::Ability(id) => {
                 // The list takes a record's index; ids and indexes match, but look it up if one does not.
                 let acts = w.actions.as_ref()?;
@@ -53,10 +54,22 @@ impl Icon {
                 } else {
                     acts.abilities.iter().position(|a| a.id == id)? as u16
                 };
-                super::super::magic::list_icon_of(w, false, k)
+                Some((Kind::Ability, k))
             }
             _ => None,
         }
+    }
+
+    /// A spell's or an ability's list sprite (library, index).
+    pub fn sprite(self, w: &super::World) -> Option<(&'static str, usize)> {
+        let (kind, k) = self.row(w)?;
+        super::super::magic::row_icon(w, kind, k)
+    }
+
+    /// A spell's or an ability's list picture, which picks the modern UI's art.
+    pub fn picture(self, w: &super::World) -> Option<u16> {
+        let (kind, k) = self.row(w)?;
+        super::super::magic::picture(w, kind, k)
     }
 }
 
@@ -116,12 +129,16 @@ pub enum Elem {
     },
     /// A bar filled `value` (0..1) with its label and text; `kind` is the art pack's gauge (hp, mp, tp, cast,
     /// experience, recast).
+    /// `row`: a list row (label, the text at the right, a thin bar under; `dim` when done; a value below 0: no bar
+    /// known), as the training regime's rows.
     Gauge {
         id: String,
         label: String,
         value: f32,
         text: String,
         kind: String,
+        row: bool,
+        dim: bool,
     },
     Separator,
     /// Pages: elements with a `page` show only on theirs (of the tabs above them); Left / Right turn it.
@@ -157,6 +174,13 @@ pub enum Elem {
         label: String,
         open: bool,
     },
+    /// One section of the client's timers (0 recasts, 1 buffs, 2 debuffs): the mods' timers.add rows, and with
+    /// `builtin` the client's own (our recasts and effects, the effects we put on others), drawn as the Timers draw them.
+    Timers {
+        id: String,
+        section: usize,
+        builtin: bool,
+    },
     /// A region `w` x `h` the mod draws in (local units: classic pixels, modern points); a click sends where.
     Canvas {
         id: String,
@@ -164,6 +188,29 @@ pub enum Elem {
         h: f32,
         cmds: Vec<Cmd>,
     },
+    /// Rows naming entities (a label, the entity's name in its colour, its HP), drawn as the focus panel's; a click
+    /// targets the entity. Modern UI only.
+    Targets {
+        id: String,
+        rows: Vec<TargetRow>,
+    },
+    /// A status line as the pending-action chip's: a dot, the text, a note at the right in the tone's colour, and a
+    /// detail line under it. Tone 0 waiting, 1 refused, 2 quiet. Modern UI only.
+    Chip {
+        id: String,
+        text: String,
+        note: String,
+        tone: u8,
+        detail: String,
+    },
+}
+
+/// A `targets` row: the entity by server id, a short label before its name, the tag that names it in commands.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TargetRow {
+    pub entity: u32,
+    pub label: String,
+    pub tag: String,
 }
 
 /// A canvas drawing command, in the canvas's own units.
@@ -213,7 +260,16 @@ pub struct Meta {
 
 impl Elem {
     pub fn stop(&self) -> bool {
-        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. })
+        !matches!(
+            self,
+            Elem::Text { .. }
+                | Elem::Gauge { .. }
+                | Elem::Separator
+                | Elem::Canvas { .. }
+                | Elem::Timers { .. }
+                | Elem::Targets { .. }
+                | Elem::Chip { .. }
+        )
     }
 
     pub fn id(&self) -> Option<&str> {
@@ -227,7 +283,15 @@ impl Elem {
             | Elem::Colour { id, .. }
             | Elem::Section { id, .. }
             | Elem::Canvas { id, .. } => Some(id),
-            Elem::Text { id, .. } | Elem::Gauge { id, .. } if !id.is_empty() => Some(id),
+            Elem::Text { id, .. }
+            | Elem::Gauge { id, .. }
+            | Elem::Timers { id, .. }
+            | Elem::Targets { id, .. }
+            | Elem::Chip { id, .. }
+                if !id.is_empty() =>
+            {
+                Some(id)
+            }
             _ => None,
         }
     }
@@ -279,6 +343,12 @@ pub struct Window {
     /// classic UI: a press and release in place is a click, a move past 3 units starts the drag).
     pub drag: Option<(usize, f32, f32)>,
     pub press: Option<(usize, f32, f32)>,
+    /// An edge window (drawn as the Timers and the training regime are): its header line, whether it can be made
+    /// wider, and the built-in panel it stands in for (its place, fold, hiding).
+    pub edge: bool,
+    pub heading: String,
+    pub resize: bool,
+    pub panel: Option<String>,
 }
 
 /// What happened in a window, for the mod's handler.
@@ -421,6 +491,10 @@ impl Window {
             anchor: None,
             drag: None,
             press: None,
+            edge: false,
+            heading: String::new(),
+            resize: false,
+            panel: None,
         }
     }
 
@@ -1068,6 +1142,8 @@ impl Window {
             return 0.0;
         }
         match &self.elems[i] {
+            // The Timers' panels draw their sections (timers.rs, modern/extras.rs); target rows are modern only.
+            Elem::Timers { .. } | Elem::Targets { .. } | Elem::Chip { .. } => 0.0,
             Elem::Text { .. } => LINE,
             Elem::Buttons { .. } | Elem::Slider { .. } | Elem::Input { .. } | Elem::Choice { .. } => PITCH,
             Elem::List { height, columns, .. } => LINE * (*height + usize::from(has_header(columns))) as f32 + 6.0,
@@ -1114,6 +1190,7 @@ impl Window {
             }
             let here = self.focus && i == self.at;
             match e {
+                Elem::Timers { .. } | Elem::Targets { .. } | Elem::Chip { .. } => {}
                 Elem::Text { text, dim, colour, .. } => {
                     gu.text_fit(text, x + 20.0, ey, w - 40.0, colour.map_or(if *dim { DIM } else { N }, tint));
                 }
@@ -1432,7 +1509,16 @@ pub(super) fn icon(gu: &mut GameUi, w: Option<&super::World>, i: Icon, x: f32, y
             }
         }
         Icon::Spell(_) | Icon::Ability(_) => {
-            if let Some((lib, k)) = w.and_then(|w| i.sprite(w)) {
+            let Some(w) = w else { return };
+            // The modern UI's art for the spell, as its own lists draw it.
+            if w.modern
+                && i.picture(w)
+                    .and_then(super::super::modern::action_art)
+                    .is_some_and(|art| pack_icon(gu, art, x, y, s))
+            {
+                return;
+            }
+            if let Some((lib, k)) = i.sprite(w) {
                 let (sw, sh) = (gu.sprite_width(lib, k), gu.sprite_height(lib, k));
                 if sw > 0.0 && sh > 0.0 {
                     gu.sprite_scaled(lib, k, x, y, s / sw, s / sh, 0x8080_8080);
@@ -1440,6 +1526,17 @@ pub(super) fn icon(gu: &mut GameUi, w: Option<&super::World>, i: Icon, x: f32, y
             }
         }
     }
+}
+
+/// The modern pack's sprite `id` at (x, y), `s` square, uploaded on first use; false when the pack has none.
+fn pack_icon(gu: &mut GameUi, id: &str, x: f32, y: f32, s: f32) -> bool {
+    let key = format!("modern {id}");
+    if !gu.has_image(&key) {
+        let Some((iw, ih, rgba)) = super::super::modern::sprite_pixels(id) else { return false };
+        gu.image(&key, iw, ih, rgba);
+    }
+    gu.image_rect(&key, x, y, s, s, [1.0; 4]);
+    true
 }
 
 #[cfg(test)]

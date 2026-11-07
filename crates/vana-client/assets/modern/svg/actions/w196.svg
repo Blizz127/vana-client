@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfae63"/>
+      <stop offset="0.7" stop-color="#cfae63"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6e5427"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="34.602" y1="13.6" x2="41.091" y2="50.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="37.849" y1="18.337" x2="37.849" y2="45.529" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#ece7db"/>
+      <stop offset="1" stop-color="#b2aa9a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="36.49" y1="23.801" x2="39.203" y2="39.189" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="20.68" y1="18.948" x2="20.68" y2="44.715" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8e6b6"/>
+      <stop offset="0.42" stop-color="#f2d27a"/>
+      <stop offset="1" stop-color="#79693d"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="20.454" y1="35.431" x2="20.454" y2="44.61" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8e6b6"/>
+      <stop offset="0.42" stop-color="#f2d27a"/>
+      <stop offset="1" stop-color="#79693d"/>
+    </linearGradient>
+  </defs>
+  <title>w196</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#fff6dc" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="rim-2" data-name="rim" d="M37.85 15.306 C41.899 17.327 45.941 18.001 50.663 17.664 C51 27.446 50.663 34.87 47.295 40.266 C44.93 44.315 41.555 47.01 37.85 48.694 C34.137 47.01 30.762 44.315 28.404 40.266 C25.029 34.87 24.692 27.446 25.029 17.664 C29.752 18.001 33.801 17.327 37.85 15.306 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.982" stroke-linejoin="round"/>
+      <path id="field" d="M37.85 18.337 C41.555 20.029 44.93 20.702 47.969 20.562 C48.102 28.119 47.695 33.853 45 38.512 C42.972 41.88 40.544 44.042 37.85 45.529 C35.148 44.042 32.72 41.88 30.699 38.512 C27.997 33.853 27.59 28.119 27.731 20.562 C30.762 20.702 34.137 20.029 37.85 18.337 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.702" stroke-linejoin="round"/>
+      <polygon id="sparkle" points="37.85,24.751 39.274,30.063 44.593,31.495 39.274,32.926 37.85,38.238 36.418,32.926 31.099,31.495 36.418,30.063" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.702" stroke-linejoin="round"/>
+      <path id="blow" d="M13.19 20.358 C13.38 19.409 14.304 18.792 15.254 18.982 C22.738 20.478 27.35 25.131 28.117 31.277 C28.888 37.451 24.487 42.215 18.975 44.574 C18.085 44.955 17.054 44.542 16.673 43.651 C16.292 42.76 16.704 41.729 17.596 41.348 C21.525 39.666 25.21 36.311 24.636 31.712 C24.056 27.065 20.57 23.621 14.566 22.422 C13.617 22.233 13 21.308 13.19 20.358 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.982" stroke-linejoin="round"/>
+      <polygon id="blow_head" points="15.584,44.315 19.605,35.431 25.324,44.61" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="0.982" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

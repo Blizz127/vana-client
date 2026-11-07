@@ -1,0 +1,10 @@
+name = "Gathering Log"
+version = "1.0.0"
+description = "Your harvesting, logging, mining and excavation this session: tries, success rate, broken tools and what you got (the gathering add-ons)."
+permissions = ["packets.read"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Gathering Log"
+help = "Counts each try at a Harvesting, Logging, Mining or Excavation Point and shows the totals in a window on a screen edge. //gather reset starts over."

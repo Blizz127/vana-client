@@ -18,6 +18,7 @@ end)
 | Function | What it does |
 | --- | --- |
 | [`commands.register(name, handler)`](#commandsregister) | Adds a command `//name` / `/name` that calls `handler` with the words typed after it. |
+| [`commands.is_game(name)`](#commandsis_game) | Whether `/name` is one of the game's text commands. |
 | [`commands.run(line)`](#commandsrun) | Runs a line as if the player had typed it. |
 
 ## `commands.register`
@@ -68,6 +69,34 @@ How a typed line reaches the mod:
   a key bind ran it), the handler counts as the player's input: game actions in it need only the `actions`
   permission, also after a sleep. A command run by a mod with `commands.run` is not the player's input.
 
+## `commands.is_game`
+
+```lua
+commands.is_game(name) -> boolean
+```
+
+Whether `/name` is one of the game's text commands (`/ma`, `/tell`, `/away`...). A mod's command may not take such a
+name; a filter on typed lines can use this to leave the game's commands alone.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | yes | The command, with or without the slash. |
+
+**Returns** `boolean`.
+
+**Example**
+
+```lua
+filters.typed(function(line)
+  local word = line:match("^/(%S+)")
+  if word and not commands.is_game(word) then
+    -- a word of ours to read
+  end
+end)
+```
+
 ## `commands.run`
 
 ```lua
@@ -75,7 +104,9 @@ commands.run(line)
 ```
 
 Runs a line as if the player had typed it in the chat line: a game command (`/ma "Cure" <me>`), a client command, a
-mod's command (`//name`), or plain text, which is said in the current chat mode.
+mod's command (`//name`), or plain text, which is said in the current chat mode. A mod's command run this way is the
+player's input when your mod runs it on the player's input (a click, a key bind): its game actions need only the
+`actions` permission then, as when the player types it.
 
 **Parameters**
 

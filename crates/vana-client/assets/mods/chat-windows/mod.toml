@@ -1,0 +1,10 @@
+name = "Chat Windows"
+version = "1.0.0"
+description = "A window of its own for a chat channel (tells, party, linkshells, say, shout, yell, unity) with a line to answer in, and a search over the session's lines (the chat window add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Chat Windows"
+help = "//chatwin <tell | party | ls | ls2 | say | shout | yell | unity> opens or closes that channel's window; //chatfind <words> lists this session's lines with them."

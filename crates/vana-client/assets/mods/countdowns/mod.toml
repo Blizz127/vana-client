@@ -1,0 +1,10 @@
+name = "Countdowns"
+version = "1.0.0"
+description = "Your own countdowns as rows in the Timers windows, with a line when each is up (the timer add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Countdowns"
+help = "//timer <time> <name> counts down in the Timers windows and says when it is up (time as 90, 5m, 1h30m or 2:30); //timer cancel <name>; //timer clear."

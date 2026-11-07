@@ -1189,7 +1189,6 @@ pub fn use_slot(w: &mut World, container: u8, index: u8, target: u32) {
     b[10] = index;
     b[12..16].copy_from_slice(&(container as u32).to_le_bytes());
     send(w, 0x037, b);
-    super::pending::start(w, super::pending::Ask::Item(id), target);
 }
 
 /// LAB_101f30c0: Ex / Rare (flags 0xc000), augmented or the Linkshell ask once more (comyn); others go at once.

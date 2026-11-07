@@ -1,0 +1,22 @@
+name = "Monster Alerts"
+version = "1.0.0"
+description = "A box on screen with what nearby monsters ready or start casting, a sound for the moves you watch, and an alert when a monster you watch for comes near (the monster alert add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Monster Alerts"
+help = "Shows monsters' readied moves and spells near the top of the screen for a few seconds each."
+
+[settings.moves]
+type = "string"
+default = ""
+label = "Watched Moves"
+help = "Moves and spells to sound an alert for, separated by commas (e.g. Mighty Strikes, Death)."
+
+[settings.monsters]
+type = "string"
+default = ""
+label = "Watched Monsters"
+help = "Monster names to alert for when one comes within 50 yalms, separated by commas."

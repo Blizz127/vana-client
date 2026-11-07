@@ -137,7 +137,8 @@ const KEEP: usize = 20 * 50;
 /// Ticks a retail frame steps the log by (the frame divisor: 2 = stock retail's 30 fps).
 const FRAME: i32 = 2;
 
-/// Timestamps: retail's mode (config 0xb5, chat lines only), the extra's every-line switch, and their colour (0x31).
+/// Timestamps: retail's mode (config 0xb5, chat lines only), our every-line switch (client option stamp_all_lines), and
+/// their colour (0x31).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Stamps {
     pub mode: u32,
@@ -791,7 +792,8 @@ impl LogWin {
 
     /// Takes in new log lines and advances the counters by the ticks since the last call. `keep` holds it
     /// open, `shrink` is Escape (key 0x95, FUN_1015b830). Lines this window's mask leaves out are not taken; stamps
-    /// are added as lines come (a change of 0xb5 shows on new lines).
+    /// are added as lines come (a change of 0xb5 shows on new lines; ours, the every-line switch, rewraps them all, as
+    /// the modern chat shows it).
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
@@ -807,12 +809,13 @@ impl LogWin {
     ) -> f32 {
         let tw = text_width(sw, self.cfg.pct);
         let window = self.second as usize;
+        let restamp = stamps.all != self.stamps.all;
         self.stamps = stamps;
         // FUN_101295d0 refills 50 rows at an open; ours also rewraps on a route change (KEEP rows, the full log's
         // history), a width change (50 while it changes, then KEEP once it holds still) and an edit (its line only).
         let edited = if chat.edits() == self.edits { Some(Vec::new()) } else { chat.edited_since(self.edits) };
         let resized = tw != self.width;
-        let fill = if route != self.route || edited.is_none() {
+        let fill = if route != self.route || edited.is_none() || restamp {
             Some(KEEP)
         } else if resized {
             Some(50)
@@ -1208,6 +1211,11 @@ impl LogWin {
         let w = text_width(sw, self.cfg.pct) + 14.0;
         let h = self.anim.h.max(0) as f32;
         LogFrame { rect: second_rect(mode, w1, w, h), lines: self.lines(), alpha: self.anim.alpha() }
+    }
+
+    /// The frame's height at its max lines (the step's target with every line open).
+    pub fn full_h(&self) -> f32 {
+        (134 + (self.cfg.max as i32 - 8) * 16) as f32
     }
 
     /// The frame's rect (x 16, bottom H - 16, the height the step eased), its lines and the fade's alpha.

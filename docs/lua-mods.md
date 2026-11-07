@@ -60,7 +60,9 @@ Built (client/lua/, modern/modwin.rs), each checked live:
     radius, ours from 0x037); emote and hitbox checked live, invite and examined not (they need a second player)
 - **Chat and commands:**
   - `chat.add` (mode colours)
-  - `filters.chat` (keep, drop or rewrite every line) and `filters.typed` (typed lines before the parser)
+  - `filters.chat` (keep, drop or rewrite every line) and `filters.typed` (typed lines before the parser);
+    `filters.battle` (each battle message with its data, before it prints: drop it, colour its names, replace its
+    lines; `text.strip`, `text.colour`)
   - `commands.register` (`//name`, `/name`), `commands.run`
 - **Settings and storage:**
   - declared settings (bool, enum, int, number) on an Extras page per mod, in both UIs; per-scope files
@@ -87,7 +89,7 @@ Built (client/lua/, modern/modwin.rs), each checked live:
     modern regular or bold), with an outline (colour, width) or a drop shadow (checked live in both UIs);
     `hud.map` (a window onto the zone's map, where the client shows one: centred on us or a world point, its span in
     map pixels), `game.map` (the map's page, file, scale, origin) and `game.map_pos` (world to map image pixels);
-    checked live; PNG images from the mod's folder (`hud.image`, sized and tinted); `hud.on` takes left / right clicks on an element from the game; `hud.screen` (size,
+    checked live; PNG images from the mod's folder (`hud.image`, sized and tinted); speech bubbles with a tail aimed at a point (`hud.bubble`); live portraits of actors (`hud.portrait`: the actor's model drawn into an offscreen target each frame from in front of its face, oval or square, with a backing and a frame); `hud.on` takes left / right clicks on an element from the game; the modern UI draws the HUD with egui's painter (modern/hudmods.rs), the classic UI with the game's, each as it draws the rest; per-window opacity (user, 2026-11-06): every window, built in or a mod's (`ui.window` opacity, `ui.opacity`; HUD windows: elements' `window`, `hud.opacity`), carries an opacity the drawing code applies to all it draws, the player's (config `window_opacity`, no row yet) winning over a mod's; `hud.screen` (size,
     pixels per UI unit), `hud.bounds`. Checked live in both UIs, clicks too
   - (a user's request, 2026-11-06; checked live) spell and ability icons (`kind = "spell"` / `"ability"`, the magic and ability
     lists' sprites) for HUD, list and canvas icons; HUD drags (`drag_start`, `drag`, `drag_end` with the element
@@ -110,7 +112,8 @@ Built (client/lua/, modern/modwin.rs), each checked live:
   with it) and fades any panel but the edge windows; `ui.native.rect` / `panels` say where each is (a hidden one where
   it would stand now); a HUD element's `anchor` places it from a panel's corner (a replacement where a hidden one
   stands, or beside a shown one: HUD elements draw under panels); `ui.skin` replaces the pack's sprites (keeping their
-  logical size and insets), palette colours and window frames (border and gradient). Each undone when its mod
+  logical size and insets), palette colours and window frames (border and gradient); `ui.native.slot` puts a mod's values in a built-in panel's slot (the clock line, the
+  target window's distance and HP %), drawn by the panel as its own text in both UIs. Each undone when its mod
   unloads. Checked live (modern UI) with the action-bar and panel-tweaks examples: icons, tooltips, a swap and a bar
   moved by drags, a Berserk recast's total, a scaled target window, the location panel replaced, the skin on and off.
 - **Render** (`render`): per entity, while the mod runs (the newest mod's wins): hidden (model and plate), plate name and
@@ -220,7 +223,9 @@ Built (client/lua/, modern/modwin.rs), each checked live:
   through the world and logout, and was unloaded as the client closed.
   - checked live: a call returning two values, an emitted table, files written, appended, listed and read back, the
     mod's own file read, `..` and `shared/` refused, JSON both ways, the os subset, Shift-JIS round trip
-- **Bundled mods:** `/dps` (the first Extra ported).
+- **Bundled mods:** `/dps` (the first Extra ported), then Text Auto-Advance, Trust Speech, `/find` and the Map Overlay
+  (the Extras as mods, docs/extras-as-mods.md): granted their manifests' permissions, their settings on our Extras tabs (`tab`,
+  `place`), carried over from the config (`from`).
 - **Mods folder:** `mods/<id>/` (enabled through config `mods`); a test run uses `mods` beside its FFXI_CONFIG copy.
 
 Next (docs/lua-mods.md 6): packet layouts and decoded views, batch order (the rest of phase 4); the rest of phase 5

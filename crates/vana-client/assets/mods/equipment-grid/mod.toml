@@ -1,0 +1,10 @@
+name = "Equipment Grid"
+version = "1.0.0"
+description = "What you wear as a grid of item icons, as the equipment menu lays it out, with the ammo count (the equipment viewer add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Equipment Grid"
+help = "Shows what you wear as a grid of item icons in a window on a screen edge, with your ammunition's count."

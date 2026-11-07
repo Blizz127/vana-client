@@ -62,11 +62,12 @@ fn rows(
                 );
                 x += 22.0;
             }
-            if let Some(t) = r.icon.and_then(|i| m.sprite_icon(&ctx, gu, "menu    magiconw", i)) {
+            // The row's standard icon: blue magic's HD pictures are the standard ones, so it keys our art too.
+            if let Some((t, uv)) = r.icon.and_then(|i| m.list_icon(&ctx, gu, "menu    magiconw", i, Some(i as u16))) {
                 ui.painter().image(
                     t,
                     Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)),
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    uv,
                     Color32::WHITE,
                 );
             }

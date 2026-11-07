@@ -1,0 +1,49 @@
+name = "Client Tweaks"
+version = "1.0.0"
+description = "Switches for the game's built-in waits and a few display choices (the config and delay add-ons)."
+permissions = []
+
+[settings.instant_palette]
+type = "bool"
+default = false
+label = "Instant Macro Palette"
+help = "The Ctrl and Alt macro palette opens at once, not at the next whole second."
+
+[settings.instant_auction]
+type = "bool"
+default = false
+label = "Instant Auction Results"
+help = "A bid's result shows at once."
+
+[settings.instant_equipsets]
+type = "bool"
+default = false
+label = "No Equip Set Wait"
+help = "Equip sets change one after another without the game's short wait between them."
+
+[settings.instant_log]
+type = "bool"
+default = false
+label = "Instant Log Lines"
+help = "New log lines show at once instead of sliding in."
+
+[settings.dead_commands]
+type = "bool"
+default = false
+label = "Commands While K.O."
+help = "Text commands (/tell, /party and the like) work while you are knocked out."
+
+[settings.ttf_text]
+type = "bool"
+default = false
+label = "TrueType Text"
+help = "In the classic UI, the log and the windows' text in the interface's TrueType face instead of the game's font."
+
+[settings.animation]
+type = "number"
+default = 1.0
+min = 0.25
+max = 4.0
+step = 0.25
+label = "Animation Speed"
+help = "How fast characters and monsters animate; 1 is the game's speed."

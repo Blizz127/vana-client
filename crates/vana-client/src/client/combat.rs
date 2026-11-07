@@ -343,6 +343,8 @@ struct Msg {
     /// Its action's serial (Action::seq), and whether the action has more than one target.
     seq: u32,
     multi: bool,
+    /// The 0x028 action's category (the mods' battle filters); none for 0x029 / 0x02D.
+    category: Option<u8>,
 }
 
 /// Main lines waiting for the attacker's hit ("dada" in its attack scheduler).
@@ -591,25 +593,6 @@ fn target_name(t: &Who) -> String {
     if t.pc || t.named { name } else { format!("the {name}") }
 }
 
-/// Ours (Extras' Battle Names, client/battlemod.rs): a name's colour by who it is: us, our party (trusts and pets in
-/// it too), the alliance, a monster our party claimed or someone else's claim; others keep the line's colour.
-fn name_colour(w: &World, id: u32) -> u8 {
-    use super::battlemod::colour;
-    let party = |id: u32| w.party.party().any(|m| m.id == id);
-    let ours = |claim: u32| claim == w.my_id || party(claim);
-    if id == w.my_id || (w.my_pet != 0 && w.entities.get(&id).is_some_and(|e| e.index == w.my_pet)) {
-        colour::ME
-    } else if party(id) {
-        colour::PARTY
-    } else if w.party.members().any(|m| m.id == id) {
-        colour::ALLIANCE
-    } else if let Some(e) = w.entities.get(&id).filter(|e| e.mob && e.claim != 0) {
-        if ours(e.claim) { colour::OUR_CLAIM } else { colour::OTHER_CLAIM }
-    } else {
-        0
-    }
-}
-
 /// A record of an action on several targets: its target line (the one naming the target, the number all else that
 /// differs) joins the action's earlier one of the same plural text ("Nine, Raven, and Koru take 50, 48, and 45
 /// points of damage."); a first one is printed and kept. True when the whole message was merged.
@@ -761,26 +744,6 @@ fn print(w: &mut World, m: Msg) {
         log::info!("battle message {} before the message tables loaded", m.id);
         return;
     };
-    // Ours (pending.rs): a message of ours while an action waits is its answer, whatever the filters show.
-    if m.which.is_none()
-        && m.actor == w.my_id
-        && w.asked.as_ref().is_some_and(|p| p.state == super::pending::State::Waiting)
-    {
-        let ctx = Ctx {
-            actor: who(w, m.actor),
-            target: who(w, m.target),
-            me: w.name.clone(),
-            work: m.work,
-            keys: keys(w),
-            ..Default::default()
-        };
-        let text = render(&bt, m.id, relation(w, m.actor, m.target), &ctx, &w.game)
-            .into_iter()
-            .map(|l| l.0)
-            .collect::<Vec<_>>()
-            .join(" ");
-        super::pending::message(w, m.id, &text);
-    }
     // Ours: a damage number's message (main and proc records), whatever the filters show, for the mods' `damage`
     // event (the bundled dps mod tallies it).
     if let Some(which @ (0 | 1)) = m.which
@@ -806,33 +769,47 @@ fn print(w: &mut World, m: Msg) {
     if bt.off_channel(m.id, 0, &w.game) {
         return;
     }
-    let coloured = |w: &World, id: u32| {
-        who(w, id).map(|x| Who { colour: if w.name_colours { name_colour(w, id) } else { 0 }, ..x })
-    };
-    let ctx = Ctx {
-        actor: coloured(w, m.actor),
-        target: coloured(w, m.target),
+    let mut ctx = Ctx {
+        actor: who(w, m.actor),
+        target: who(w, m.target),
         me: w.name.clone(),
         work: m.work,
         keys: keys(w),
         ..Default::default()
     };
-    let mut lines = render(&bt, m.id, relation(w, m.actor, m.target), &ctx, &w.game);
-    // Extras' Battle Text: Short replaces the message with its short line; such lines are not condensed.
-    let short = w
-        .short_battle
-        .then(|| {
-            super::battlemod::shorten(
-                &lines.iter().map(|l| l.0.clone()).collect::<Vec<_>>(),
-                ctx.actor.as_ref(),
-                ctx.target.as_ref(),
-            )
-        })
-        .flatten();
-    let condense_on = w.modern && w.condense && short.is_none();
-    if let (Some(s), Some(c)) = (short, lines.first().map(|l| l.1)) {
-        lines = vec![(s, c)];
+    let rel = relation(w, m.actor, m.target);
+    let mut lines = render(&bt, m.id, rel, &ctx, &w.game);
+    // The mods' battle filters (filters.battle): they drop the message, colour its names or replace its lines (not
+    // condensed then).
+    let mut replaced = false;
+    if let Some(c) = lines.first().map(|l| l.1)
+        && w.lua.has_battle_filters()
+    {
+        let bm = super::lua::BattleMsg {
+            id: m.id,
+            category: m.category,
+            actor: m.actor,
+            target: m.target,
+            value: m.work[1],
+            mode: line_mode(&bt, m.id, rel, &ctx),
+        };
+        let (mut a, mut t) = (ctx.actor.take(), ctx.target.take());
+        let verdict = super::lua::filter_battle(w, &bm, &mut a, &mut t, lines.iter().map(|l| l.0.clone()).collect());
+        (ctx.actor, ctx.target) = (a, t);
+        match verdict {
+            super::lua::Verdict::Drop => return,
+            super::lua::Verdict::Replace(new) => {
+                lines = new.into_iter().map(|l| (l, c)).collect();
+                replaced = true;
+            }
+            super::lua::Verdict::Keep => {
+                if [&ctx.actor, &ctx.target].iter().any(|x| x.as_ref().is_some_and(|x| x.colour != 0)) {
+                    lines = render(&bt, m.id, rel, &ctx, &w.game);
+                }
+            }
+        }
     }
+    let condense_on = w.modern && w.condense && !replaced;
     if condense_on && m.which == Some(0) && condense_crit(w, &bt, &m, &ctx) {
         return;
     }
@@ -888,6 +865,7 @@ fn record_messages(a: &Action) -> Vec<Msg> {
                     which: Some(which as u8),
                     seq: a.seq,
                     multi: a.targets.len() > 1,
+                    category: Some(a.category),
                 });
             }
         }
@@ -1011,10 +989,6 @@ pub(super) fn on_battle_message(w: &mut World, m: &BattleMessage) {
     if super::partyreq::sender_blocked(w, m.actor, m.message, 1) {
         return;
     }
-    // Ours (the Trust Speech extra): a trust's party line (LSB's trustPartyMessage) is dropped.
-    if w.hide_trust_speech && m.message == 711 {
-        return;
-    }
     // FUN_100ad660 -> FUN_100c3300: into the queue, which FUN_100c33d0 steps from the next frame.
     let wait = MsgWait::new(m.queued, msg_target_status(w, m));
     w.msg_queue.push(QueuedMsg { m: m.clone(), wait, fresh: true });
@@ -1127,6 +1101,7 @@ pub(super) fn message_queue(w: &mut World, dt: f32) {
                 which: None,
                 seq: 0,
                 multi: false,
+                category: None,
             },
         );
     }
@@ -1135,9 +1110,6 @@ pub(super) fn message_queue(w: &mut World, dt: f32) {
 /// 0x028. A melee round of several records replays "atk0" per record (op 0x32 jumps back for the next one): one swing,
 /// message and reaction per hit, each after the last swing ends; ours splits the round and queues the rest.
 pub(super) fn on_action(w: &mut World, a: &Action) {
-    if a.actor == w.my_id {
-        super::pending::confirm(w, a.category);
-    }
     // A new round flushes what is left of the last one at once.
     if let Some((_, rest)) = w.rounds.remove(&a.actor) {
         for r in rest {
@@ -1224,17 +1196,6 @@ fn one_action(w: &mut World, a: &Action) {
         }
     }
     let mut messages = record_messages(a);
-    // Ours (the Ready Lines extra): a start line (weapon skill, spell, item, ranged) only for us and monsters.
-    if w.hide_ready_lines
-        && matches!(
-            a.category,
-            category::SKILL_START | category::MAGIC_START | category::ITEM_START | category::RANGED_START
-        )
-        && a.actor != w.my_id
-        && (ours(w, a.actor) || !w.entities.get(&a.actor).is_some_and(|e| e.mob))
-    {
-        messages.clear();
-    }
     // Melee / ranged proc and react lines (added effects, spikes, counters) print from their files' op 0x71.
     if matches!(a.category, category::BASIC_ATTACK | category::RANGED_FINISH) {
         messages.retain(|m| m.which == Some(0));
@@ -1313,7 +1274,19 @@ pub(super) fn print_record(w: &mut World, a: &Action, k: usize, which: u8) {
         _ => r.react.as_ref().map(|p| p.message),
     };
     if let Some(id) = id.filter(|&id| id != 0) {
-        print(w, Msg { id, actor: a.actor, target, work, which: Some(which), seq: a.seq, multi: a.targets.len() > 1 });
+        print(
+            w,
+            Msg {
+                id,
+                actor: a.actor,
+                target,
+                work,
+                which: Some(which),
+                seq: a.seq,
+                multi: a.targets.len() > 1,
+                category: Some(a.category),
+            },
+        );
     }
 }
 

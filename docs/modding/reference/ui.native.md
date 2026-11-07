@@ -33,10 +33,12 @@ end)
 | [`ui.native.interface(show)`](#uinativeinterface) | Shows or hides the whole interface. |
 | [`ui.native.hide(piece, hidden?)`](#uinativehide) | Hides or shows a piece of the game's HUD, or a modern panel. |
 | [`ui.native.hidden(piece)`](#uinativehidden) | Whether any mod hides a HUD piece or panel. |
+| [`ui.native.slot(slot, value?)`](#uinativeslot) | Fills a built-in panel's slot: the clock line, the target's distance and HP %. |
 | [`ui.native.place(panel, place?)`](#uinativeplace) | Moves, scales or fades a modern panel. |
 | [`ui.native.rect(panel)`](#uinativerect) | Where a modern panel is on screen. |
 | [`ui.native.panels()`](#uinativepanels) | Every modern panel a mod may name, with where it is. |
 | [`ui.native.item_colour(item, colour?)`](#uinativeitem_colour) | Colours an item's name in shop and auction house lists. |
+| [`ui.native.trim(list, ids?)`](#uinativetrim) | Leaves spells, abilities or mounts out of the game's lists. |
 | [`ui.native.config(id)`](#uinativeconfig) | Reads a game config value. |
 | [`ui.native.set_config(id, value)`](#uinativeset_config) | Sets a game config value, as the Config window does. |
 
@@ -102,7 +104,7 @@ end)
 | `"regime"` | The training regime window. |
 | `"network"` | The connection panel. |
 | `"palette"` | The macro palette's drawing (its keys still run macros). |
-| `"clock"` | The Earth time line of the Clock extra. |
+| `"clock"` | The line beside the game's clock ([`ui.native.slot`](#uinativeslot)'s `clock`). |
 | `"experience"` | The experience bar on the modern party window's top edge. |
 
 ## Modern panels
@@ -110,7 +112,8 @@ end)
 In the modern UI the HUD and the menus are panels, each with a name. `ui.native.hide` takes the names marked
 "hides" (none of them takes the keys), `ui.native.place` those marked "moves" (the edge windows stay on their edge),
 and `ui.native.rect`, `ui.native.panels` and a HUD element's `anchor` take every name. In the classic UI only the
-[HUD pieces](#hud-pieces) hide; the rest of this works in the modern UI.
+[HUD pieces](#hud-pieces) hide, and `ui.native.rect` knows only `"chat"` (the log window); the rest of this works in
+the modern UI.
 
 | Panel | Hides | Moves | What it is |
 | --- | --- | --- | --- |
@@ -392,6 +395,50 @@ if ui.native.hidden("minimap") then
 end
 ```
 
+## `ui.native.slot`
+
+```lua
+ui.native.slot(slot, value?)
+```
+
+Puts your values in a slot of a built-in panel. The panel draws them as its own text, in both UIs, in its own font,
+place and colours, so they look as the rest of it does. The value stays until you change it, empty it with `nil`, or
+your mod unloads. If two mods fill one slot, the last call wins; a mod's `nil` only empties a slot it filled.
+
+| Slot | Value | Where it shows |
+| --- | --- | --- |
+| `"clock"` | `{earth, moon_name, moon, next_day, next_minutes}`, the table [`game.clock`](game.md#gameclock) returns | Beside the game's clock: Earth time, the moon's percent and the next day (the modern location panel puts it on one line, the moon's name in its tooltip). |
+| `"target_distance"` | `number`, in yalms | The target window: left of the HP gauge in the classic UI (targets with a gauge), beside the name in the modern one. Shown with one decimal. |
+| `"target_hpp"` | `number`, a percent | The classic target window's right edge, on the gauge's row, in the HP colour. The modern one always shows the percent. |
+| `"battle_rows"` | a list of up to 8 rows | The modern battle menu, above its commands, as the menu's own rows: the action's icon and name (or `label`), `reason` in its tooltip. The cursor rides them with the commands. Enter or a click picks the action through Magic or Abilities and its list, as the player would, and the target prompt starts on `target` (a party member's name) when given; a row with a `group` (spell ids) opens a submenu of them with Right or Enter. Each row: `{kind = "spell" or "ability", id, target, reason, label, group}` (`id` a spell id or a `res.ability` id). The [`suggestions`](events.md#suggestions) event's rows come in this shape. Not drawn in the classic UI. |
+
+The target slots show on whatever is targeted, so set them as the target changes: every frame is simplest.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slot` | `string` | yes | `"clock"`, `"target_distance"`, `"target_hpp"` or `"battle_rows"`. |
+| `value` | see above | no | `nil` (or `false`) empties the slot. |
+
+**Returns** nothing.
+
+**Needs** the `ui.native` permission.
+
+**Errors**
+- Without the permission: `this needs the ui.native permission: ...`.
+- An unknown slot: `no slot "..."`, with the list; a value of the wrong shape: `slot ...: the wrong shape of value`.
+
+**Example**
+
+```lua
+-- The bundled Target Info's way: the distance with every frame.
+events.on("frame", function()
+  local t = game.target()
+  ui.native.slot("target_distance", t and t.distance or nil)
+end)
+```
+
 ## `ui.native.place`
 
 ```lua
@@ -452,14 +499,21 @@ had, with `shown = false`. A panel a mod hides has the place it would stand at n
 sit on another move with it), with no height if it has never been drawn: anchor to such a panel by the corner its place
 keeps (the location panel stands on the chat window, so its bottom).
 
+The chat window grows with its lines and folds into its bottom edge when idle, and what stands on it moves with it.
+Its rect also has `room`, `{x, y, w, h}`: where it stands at its full height. Place something over `room.y` to keep it
+still while the chat window grows and folds (the Hotbars mod does).
+
+In the classic UI only `"chat"` has a rect: the log window, with log window 2 when that stands over or beside it, and
+its `room` at the most lines the windows open to.
+
 **Parameters**
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `panel` | `string` | yes | A name from the [Modern panels](#modern-panels) table. |
 
-**Returns** `table?`: `{name, x, y, w, h, shown}`, or `nil` when the panel has been neither drawn nor hidden since
-login, and in the classic UI.
+**Returns** `table?`: `{name, x, y, w, h, shown}` (and `room` for the chat window), or `nil` when the panel has been neither drawn nor hidden since
+login, and in the classic UI for every panel but `"chat"`.
 
 **Errors** An unknown name: `no panel "..."`, with the list.
 
@@ -529,6 +583,39 @@ end
 ```
 
 The colours go away when your mod unloads.
+
+## `ui.native.trim`
+
+```lua
+ui.native.trim(list, ids?)
+```
+
+Leaves rows out of one of the game's lists while your mod is loaded, in both UIs and in the list search: spells you
+never cast, abilities you never use, mounts you never ride. Only the lists change: a command or macro still uses them.
+Each call replaces your mod's rows for that list; `nil` or an empty table gives them all back. Rows left out by any
+mod stay out.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `list` | `string` | yes | `"magic"` (spell ids), `"abilities"` (ids as `res.ability` takes them: weapon skills, job abilities, pet commands) or `"mounts"` (mount ids, as `res.mount`). |
+| `ids` | `integer[]` | no | The rows to leave out. |
+
+**Returns** nothing.
+
+**Needs** the `ui.native` permission.
+
+**Errors** `no list "<name>" (magic, abilities, mounts)`.
+
+**Example**
+
+```lua
+-- Raise and Raise II out of the magic list.
+ui.native.trim("magic", { 12, 13 })
+```
+
+The lists open whole again when your mod unloads.
 
 ## `ui.native.config`
 

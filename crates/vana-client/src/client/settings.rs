@@ -21,27 +21,12 @@ pub struct Settings {
     pub draw_distance: u32,
     pub send_interval: u32,
     pub party_tp: bool,
-    pub map_overlay: bool,
     pub map_opacity: u32,
-    pub synth_amount: bool,
-    pub stamp_all_lines: bool,
-    pub target_distance: bool,
-    pub target_hpp: bool,
-    pub earth_clock: bool,
     pub lamp_lights: bool,
     pub actor_shadows: u32,
     pub shadow_map: u32,
     pub ssao: bool,
-    pub hide_trust_speech: bool,
-    pub hide_ready_lines: bool,
-    pub short_battle: bool,
-    pub battle_name_colours: bool,
-    pub auto_advance: u32,
-    pub timers: bool,
     pub timers_dock: u32,
-    pub regime: bool,
-    pub skillchain_helper: bool,
-    pub minimap: bool,
     pub minimap_dock: u32,
     pub minimap_size: u32,
     pub music: u32,
@@ -77,27 +62,12 @@ impl Settings {
             draw_distance: c.draw_distance,
             send_interval: c.send_interval,
             party_tp: c.party_tp,
-            map_overlay: c.map_overlay,
             map_opacity: pct(c.map_overlay_opacity),
-            synth_amount: c.synth_amount,
-            stamp_all_lines: c.stamp_all_lines,
-            target_distance: c.target_distance,
-            target_hpp: c.target_hpp,
-            earth_clock: c.earth_clock,
             lamp_lights: c.lamp_lights,
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
             ssao: c.ssao,
-            hide_trust_speech: c.hide_trust_speech,
-            hide_ready_lines: c.hide_ready_lines,
-            short_battle: c.short_battle,
-            battle_name_colours: c.battle_name_colours,
-            auto_advance: c.auto_advance,
-            timers: c.timers,
             timers_dock: c.timers_dock,
-            regime: c.regime,
-            skillchain_helper: c.skillchain_helper,
-            minimap: c.minimap,
             minimap_dock: c.minimap_dock,
             minimap_size: c.minimap_size,
             // The game's own volumes (Gameplay page, config 10 / 9; the lobby's 0xa8): set by the opener.
@@ -130,27 +100,12 @@ impl Settings {
         c.draw_distance = self.draw_distance;
         c.send_interval = self.send_interval;
         c.party_tp = self.party_tp;
-        c.map_overlay = self.map_overlay;
         c.map_overlay_opacity = self.map_opacity as f32 / 100.0;
-        c.synth_amount = self.synth_amount;
-        c.stamp_all_lines = self.stamp_all_lines;
-        c.target_distance = self.target_distance;
-        c.target_hpp = self.target_hpp;
-        c.earth_clock = self.earth_clock;
         c.lamp_lights = self.lamp_lights;
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
-        c.hide_trust_speech = self.hide_trust_speech;
-        c.hide_ready_lines = self.hide_ready_lines;
-        c.short_battle = self.short_battle;
-        c.battle_name_colours = self.battle_name_colours;
-        c.auto_advance = self.auto_advance;
-        c.timers = self.timers;
         c.timers_dock = self.timers_dock;
-        c.regime = self.regime;
-        c.skillchain_helper = self.skillchain_helper;
-        c.minimap = self.minimap;
         c.minimap_dock = self.minimap_dock;
         c.minimap_size = self.minimap_size;
         c.retail_aspect = self.retail_aspect;
@@ -194,27 +149,11 @@ enum Val {
     DrawDistance,
     SendRate,
     PartyTp,
-    MapOverlay,
-    MapOpacity,
-    SynthAmount,
-    StampAll,
-    TargetDistance,
-    TargetHpp,
-    EarthClock,
     LampLights,
     ActorShadows,
     ShadowMap,
     Ssao,
-    TrustSpeech,
-    ReadyLines,
-    ShortBattle,
-    NameColours,
-    AutoAdvance,
-    Timers,
     TimersDock,
-    Skillchains,
-    Regime,
-    Minimap,
     MinimapDock,
     MinimapSize,
     Music,
@@ -233,8 +172,11 @@ enum Val {
     Gamepad,
     PadDeadZone,
     MouseCamSpeed,
+    MapOpacity,
     /// A Lua mod's declared setting: its row on the mod's page (docs/lua-mods.md 4.12).
     Mod(usize),
+    /// A bundled mod's setting on one of our Extras tabs (`SettingsUi::tab_rows`).
+    Tabbed(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -291,6 +233,12 @@ pub struct ModRow {
     pub help: String,
     pub choices: Vec<(String, serde_json::Value)>,
     pub at: usize,
+    /// One of our Extras tabs it shows on (a bundled mod's, in the rows of the extra it replaces), at row `place`.
+    pub tab: String,
+    pub place: Option<usize>,
+    pub place_modern: Option<usize>,
+    /// The interface sound its value is an offset from, played as the value changes (manifest `preview_sound`).
+    pub preview: Option<u32>,
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
@@ -328,10 +276,22 @@ const fn row(
     SRow { label, help, val, choices, when }
 }
 
-const TABS: [&str; 10] =
-    ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Controls", "Graphics", "Mods"];
-/// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
-const MODS: usize = 9;
+const TABS: [&str; 11] = [
+    "General",
+    "Screen",
+    "Textures",
+    "Effects",
+    "Sound",
+    "Misc.",
+    "Client",
+    "Controls",
+    "Graphics",
+    "DAT Packs",
+    "Mods",
+];
+/// The DAT Packs and Mods pages (client/modsui.rs): their rows come from the mods folder, not a table.
+const PACKS: usize = 9;
+const MODS: usize = 10;
 const EXTRA_TABS: [&str; 4] = ["Maps", "Timers", "Battle", "Misc."];
 
 /// `in_game`: the volumes are the Gameplay page's there, so the Sound page leaves them out. `modern`: the minimap's and
@@ -650,21 +610,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         ),
     ];
     const MAPS: &[SRow] = &[
-        row(
-            "Map Overlay",
-            "Ctrl or Alt + O shows the zone map over the game, like the map add-ons do.",
-            MapOverlay,
-            OFF_ON,
-            Now,
-        ),
         row("Map Overlay Opacity", "How see-through the map overlay is.", MapOpacity, &[], Now),
-        row(
-            "Minimap",
-            "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom.",
-            Minimap,
-            OFF_ON,
-            Now,
-        ),
         row(
             "Minimap Position",
             "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.",
@@ -674,110 +620,24 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         ),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
-    const TIMERS_ROW: SRow = row(
-        "Timers",
-        "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers).",
-        Timers,
-        OFF_ON,
+    const TIMERS: &[SRow] = &[row(
+        "Timers Position",
+        "Docks the timers window on the left, on the right above the party list, or at the top.",
+        TimersDock,
+        &[(0, "Left"), (1, "Right"), (2, "Top")],
         Now,
-    );
-    const REGIME_ROW: SRow = row(
-        "Training Regime",
-        "While a Fields or Grounds of Valor regime is active, shows its targets and your kills in a window beside the timers.",
-        Regime,
-        OFF_ON,
-        Now,
-    );
-    const SKILLCHAIN_ROW: SRow = row(
-        "Skillchain Helper",
-        "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.",
-        Skillchains,
-        OFF_ON,
-        Now,
-    );
-    const TIMERS: &[SRow] = &[
-        TIMERS_ROW,
-        row(
-            "Timers Position",
-            "Docks the timers window on the left, on the right above the party list, or at the top.",
-            TimersDock,
-            &[(0, "Left"), (1, "Right"), (2, "Top")],
-            Now,
-        ),
-        REGIME_ROW,
-        SKILLCHAIN_ROW,
-    ];
-    const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, REGIME_ROW, SKILLCHAIN_ROW];
+    )];
+    const TIMERS_MODERN: &[SRow] = &[];
     // A page holds 7 rows: what touches battle has its own.
-    const EXTRA_BATTLE: &[SRow] = &[
-        row("Target Distance", "Shows how far away your target is in the target window.", TargetDistance, OFF_ON, Now),
-        row(
-            "Target HP %",
-            "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it.",
-            TargetHpp,
-            OFF_ON,
-            Now,
-        ),
-        row(
-            "Trust Speech",
-            "Shows or hides what your trusts say in the chat log.",
-            TrustSpeech,
-            &[(0, "Shown"), (1, "Hidden")],
-            Now,
-        ),
-        row(
-            "Ready Lines",
-            "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.",
-            ReadyLines,
-            &[(0, "All"), (1, "Mine, Monsters'")],
-            Now,
-        ),
-        row(
-            "Battle Text",
-            "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".",
-            ShortBattle,
-            &[(0, "Retail"), (1, "Short")],
-            Now,
-        ),
-        row(
-            "Battle Names",
-            "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.",
-            NameColours,
-            &[(0, "Plain"), (1, "Coloured")],
-            Now,
-        ),
-    ];
-    const EXTRA_MISC: &[SRow] = &[
-        row(
-            "Synthesis Amount",
-            "After you press Synthesize, asks how many to make and crafts them one after another.",
-            SynthAmount,
-            OFF_ON,
-            Now,
-        ),
-        row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
-        row(
-            "Clock",
-            "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.",
-            EarthClock,
-            OFF_ON,
-            Now,
-        ),
-        row(
-            "Text Auto-Advance",
-            "Event messages that wait for a key move on by themselves after this many seconds.",
-            AutoAdvance,
-            &[(0, "OFF"), (3, "3 s"), (5, "5 s"), (8, "8 s")],
-            Now,
-        ),
-    ];
+    const EXTRA_BATTLE: &[SRow] = &[];
+    const EXTRA_MISC: &[SRow] = &[];
     match kind {
         Kind::Extras if modern => {
-            [&MAPS[..3], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[])
+            [&MAPS[..1], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[])
         }
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
-        Kind::Settings if tab == MODS => &[],
+        Kind::Settings if tab >= PACKS => &[],
         // Panel Places (the last Linux row) is a character's: in game only.
         Kind::Settings if !in_game && tab == 6 => &CLIENT[..CLIENT.len() - 1],
         Kind::Settings => [GENERAL, SCREEN, TEXTURES, EFFECTS, SOUND, MISC, CLIENT, GAMEPAD, GRAPHICS][tab.min(8)],
@@ -847,12 +707,20 @@ pub struct SettingsUi {
     pub hover: bool,
     /// The Mods page's archives and moves, opened the first time the page shows.
     pub mods_ui: Option<super::modsui::Mods>,
+    /// The folders in the mods folder that hold a Lua mod (the Mods page's; the rest are DAT packs).
+    pub lua_names: std::collections::HashSet<String>,
+    /// The modern DATs page's tab: 0 Installed, 1 Available.
+    pub m_dat_tab: usize,
+    /// The installed Lua mods' names by folder.
+    pub lua_info: std::collections::HashMap<String, crate::modpack::LuaInfo>,
     /// The modern Mods page's cursor (stop, button) and a removal being asked (pack, Yes on the cursor).
     pub m_mods: (usize, usize),
     pub m_remove: Option<(usize, bool)>,
     /// Extras: the Lua mods' pages after our own, and their changes for the app to apply (mod, key, value).
     pub mod_pages: Vec<ModPage>,
     pub mod_changes: Vec<(String, String, serde_json::Value)>,
+    /// Mods' settings shown on our own Extras tabs: (mod, row).
+    tab_rows: Vec<(String, ModRow)>,
 }
 
 /// What a row's controls are.
@@ -886,6 +754,10 @@ impl SettingsUi {
             m_remove: None,
             mod_pages: Vec::new(),
             mod_changes: Vec::new(),
+            tab_rows: Vec::new(),
+            lua_names: crate::modpack::lua_folders(),
+            m_dat_tab: 0,
+            lua_info: crate::modpack::lua_info(),
         };
         s.col = s.marked_col();
         s
@@ -896,6 +768,33 @@ impl SettingsUi {
             EXTRA_TABS.iter().map(|t| t.to_string()).chain(self.mod_pages.iter().map(|p| p.name.clone())).collect()
         } else {
             TABS.iter().map(|t| t.to_string()).collect()
+        }
+    }
+
+    /// The mods' Extras pages: rows that name one of our tabs go there, the rest make the mod's own page.
+    pub fn set_mod_pages(&mut self, pages: Vec<ModPage>) {
+        self.tab_rows.clear();
+        self.mod_pages.clear();
+        for mut p in pages {
+            let (tabbed, own): (Vec<ModRow>, Vec<ModRow>) =
+                p.rows.into_iter().partition(|r| EXTRA_TABS.contains(&r.tab.as_str()));
+            self.tab_rows.extend(tabbed.into_iter().map(|r| (p.id.clone(), r)));
+            if !own.is_empty() {
+                p.rows = own;
+                self.mod_pages.push(p);
+            }
+        }
+    }
+
+    /// A mod's setting on our Extras tabs as a row.
+    fn tab_row(&self, i: usize) -> Row {
+        let r = &self.tab_rows[i].1;
+        Row {
+            label: r.label.clone(),
+            help: r.help.clone(),
+            val: Val::Tabbed(i),
+            choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(),
+            when: When::Now,
         }
     }
 
@@ -922,7 +821,30 @@ impl SettingsUi {
                 })
                 .collect();
         }
-        rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect()
+        let mut out: Vec<Row> =
+            rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect();
+        // Mods' settings on this Extras tab, at their places.
+        if self.kind == Kind::Extras
+            && let Some(tab) = EXTRA_TABS.get(self.tab)
+        {
+            let mut mine: Vec<(usize, Row)> = self
+                .tab_rows
+                .iter()
+                .enumerate()
+                .filter(|(_, (_, r))| r.tab == *tab)
+                .map(|(i, (_, r))| {
+                    (
+                        (if self.s.modern_ui { r.place_modern.or(r.place) } else { r.place }).unwrap_or(usize::MAX),
+                        self.tab_row(i),
+                    )
+                })
+                .collect();
+            mine.sort_by_key(|m| m.0);
+            for (place, r) in mine {
+                out.insert(place.min(out.len()), r);
+            }
+        }
+        out
     }
 
     fn ctl(r: &Row) -> Ctl {
@@ -979,31 +901,16 @@ impl SettingsUi {
             Val::ModernUi => self.s.modern_ui as u32,
             Val::ModernScale => self.s.modern_scale,
             Val::ModernOpacity => self.s.modern_opacity,
+            Val::MapOpacity => self.s.map_opacity,
             Val::ResetPlaces => self.s.reset_places as u32,
             Val::Gamepad => self.s.gamepad as u32,
             Val::PadDeadZone => self.s.gamepad_dead,
             Val::MouseCamSpeed => self.s.mouse_camera_speed,
-            Val::MapOverlay => self.s.map_overlay as u32,
-            Val::MapOpacity => self.s.map_opacity,
-            Val::SynthAmount => self.s.synth_amount as u32,
-            Val::StampAll => self.s.stamp_all_lines as u32,
-            Val::TargetDistance => self.s.target_distance as u32,
-            Val::TargetHpp => self.s.target_hpp as u32,
-            Val::EarthClock => self.s.earth_clock as u32,
             Val::LampLights => self.s.lamp_lights as u32,
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
-            Val::TrustSpeech => self.s.hide_trust_speech as u32,
-            Val::ReadyLines => self.s.hide_ready_lines as u32,
-            Val::ShortBattle => self.s.short_battle as u32,
-            Val::NameColours => self.s.battle_name_colours as u32,
-            Val::AutoAdvance => self.s.auto_advance,
-            Val::Timers => self.s.timers as u32,
-            Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
-            Val::Regime => self.s.regime as u32,
-            Val::Minimap => self.s.minimap as u32,
             Val::MinimapDock => self.s.minimap_dock,
             Val::MinimapSize => self.s.minimap_size,
             Val::Music => self.s.music,
@@ -1012,6 +919,7 @@ impl SettingsUi {
             Val::CursorSize => self.s.cursor_size,
             Val::KeysHideCursor => self.s.keys_hide_cursor as u32,
             Val::Mod(i) => self.mod_page().and_then(|p| p.rows.get(i)).map_or(0, |r| r.at as u32),
+            Val::Tabbed(i) => self.tab_rows.get(i).map_or(0, |r| r.1.at as u32),
         }
     }
 
@@ -1031,31 +939,25 @@ impl SettingsUi {
             Val::Gamepad => self.s.gamepad = x != 0,
             Val::PadDeadZone => self.s.gamepad_dead = x,
             Val::MouseCamSpeed => self.s.mouse_camera_speed = x,
-            Val::MapOverlay => self.s.map_overlay = x != 0,
-            Val::SynthAmount => self.s.synth_amount = x != 0,
-            Val::StampAll => self.s.stamp_all_lines = x != 0,
-            Val::TargetDistance => self.s.target_distance = x != 0,
-            Val::TargetHpp => self.s.target_hpp = x != 0,
-            Val::EarthClock => self.s.earth_clock = x != 0,
             Val::LampLights => self.s.lamp_lights = x != 0,
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
-            Val::TrustSpeech => self.s.hide_trust_speech = x != 0,
-            Val::ReadyLines => self.s.hide_ready_lines = x != 0,
-            Val::ShortBattle => self.s.short_battle = x != 0,
-            Val::NameColours => self.s.battle_name_colours = x != 0,
-            Val::AutoAdvance => self.s.auto_advance = x,
-            Val::Timers => self.s.timers = x != 0,
-            Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
-            Val::Regime => self.s.regime = x != 0,
-            Val::Minimap => self.s.minimap = x != 0,
             Val::MinimapDock => self.s.minimap_dock = x,
             Val::MinimapSize => self.s.minimap_size = x,
             Val::RetailAspect => self.s.retail_aspect = x != 0,
             Val::CursorSize => self.s.cursor_size = x,
             Val::KeysHideCursor => self.s.keys_hide_cursor = x != 0,
+            Val::Tabbed(i) => {
+                if let Some((id, r)) = self.tab_rows.get_mut(i)
+                    && let Some(c) = r.choices.get(x as usize)
+                    && r.at != x as usize
+                {
+                    r.at = x as usize;
+                    self.mod_changes.push((id.clone(), r.key.clone(), c.1.clone()));
+                }
+            }
             Val::Mod(i) => {
                 let Some(k) = self.tab.checked_sub(EXTRA_TABS.len()) else { return };
                 if let Some(p) = self.mod_pages.get_mut(k)
@@ -1107,8 +1009,8 @@ impl SettingsUi {
             Val::Gpu => (self.gpus.len() + 1, self.gpus.iter().position(|g| *g == self.s.gpu).map_or(0, |i| i + 1)),
             Val::Music => (21, (self.s.music / 5) as usize),
             Val::Effects => (21, (self.s.effects / 5) as usize),
-            Val::MapOpacity => (19, (self.s.map_opacity.clamp(10, 100) / 5 - 2) as usize),
             Val::ModernOpacity => (19, (self.s.modern_opacity.clamp(10, 100) / 5 - 2) as usize),
+            Val::MapOpacity => (19, (self.s.map_opacity.clamp(10, 100) / 5 - 2) as usize),
             v => {
                 let list: Vec<u32> = r.choices.iter().map(|c| c.0).collect();
                 (list.len(), pos(&list, self.get(v)))
@@ -1141,8 +1043,8 @@ impl SettingsUi {
             }
             Val::Music => self.s.music = (i as u32 * 5).min(100),
             Val::Effects => self.s.effects = (i as u32 * 5).min(100),
-            Val::MapOpacity => self.s.map_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
             Val::ModernOpacity => self.s.modern_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
+            Val::MapOpacity => self.s.map_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
             v => {
                 if let Some(c) = r.choices.get(i) {
                     self.set(v, c.0);
@@ -1166,8 +1068,8 @@ impl SettingsUi {
             Val::FrameLimit => format!("{}", self.s.frame_limit),
             Val::Music => format!("{}%", self.s.music),
             Val::Effects => format!("{}%", self.s.effects),
-            Val::MapOpacity => format!("{}%", self.s.map_opacity),
             Val::ModernOpacity => format!("{}%", self.s.modern_opacity),
+            Val::MapOpacity => format!("{}%", self.s.map_opacity),
             Val::Monitor => self
                 .monitors
                 .iter()
@@ -1213,7 +1115,8 @@ impl SettingsUi {
     fn turn(&mut self, d: i32) {
         self.tab = (self.tab as i32 + d).rem_euclid(self.tabs().len() as i32) as usize;
         if self.on_mods() {
-            self.mods_ui.get_or_insert_with(super::modsui::Mods::open);
+            // An install's failure belongs to the page it was asked on.
+            self.mods_ui.get_or_insert_with(super::modsui::Mods::open).error = None;
         }
         self.row = self.row.min(self.row_count());
         self.col = self.marked_col();
@@ -1495,7 +1398,7 @@ impl SettingsUi {
         }
         self.row = row.min(self.row_count());
         self.col = self.marked_col();
-        if let Some(m) = self.mods_ui.as_mut().filter(|_| self.kind == Kind::Settings && self.tab == MODS) {
+        if let Some(m) = self.mods_ui.as_mut().filter(|_| self.kind == Kind::Settings && self.tab >= PACKS) {
             m.follow(self.row);
         }
     }
@@ -1543,14 +1446,13 @@ impl SettingsUi {
 /// page this state is on. A row left out here (in game, or with the modern interface) is None.
 impl SettingsUi {
     fn find(&self, label: &str) -> Option<Row> {
-        let pages = (0..TABS.len())
-            .filter(|&t| t != MODS)
-            .map(|t| (Kind::Settings, t))
-            .chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        pages
+        let pages = (0..PACKS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
+        let ours = pages
             .flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter())
             .find(|r| r.label == label)
-            .map(Row::from)
+            .map(Row::from);
+        // Else a bundled mod's, in its extra's place.
+        ours.or_else(|| self.tab_rows.iter().position(|(_, r)| r.label == label).map(|i| self.tab_row(i)))
     }
 
     fn vrow(&self, r: &Row) -> VRow {
@@ -1609,16 +1511,13 @@ impl SettingsUi {
 
     /// The first mods tab: Mods (Settings), or the first Lua mod's page (Extras after its own).
     pub fn mods_tab(&self) -> usize {
-        if self.kind == Kind::Extras { EXTRA_TABS.len() } else { MODS }
+        if self.kind == Kind::Extras { EXTRA_TABS.len() } else { PACKS }
     }
 
     /// Every label of ours, for the Settings window's test that each row has a place.
     #[cfg(test)]
     pub fn all_labels(in_game: bool, modern: bool) -> Vec<&'static str> {
-        let pages = (0..TABS.len())
-            .filter(|&t| t != MODS)
-            .map(|t| (Kind::Settings, t))
-            .chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
+        let pages = (0..PACKS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
         pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).collect()
     }
 }
@@ -1670,23 +1569,22 @@ fn plain(help: &str) -> String {
 impl SettingsUi {
     pub fn view(&self) -> View {
         let rows = if self.on_mods() {
-            let n = self.s.mods.len();
-            let m = self.mods_ui.as_ref();
-            (0..self.mods_total())
-                .filter_map(|i| {
-                    if i < n {
-                        let on = self.s.mods[i].enabled;
-                        let ctl = VCtl::Buttons(vec![("ON".into(), on), ("OFF".into(), !on), ("Move".into(), false)]);
-                        Some(VRow { label: format!("{}. {}", i + 1, self.s.mods[i].name), ctl })
-                    } else {
-                        let p = m?.packs.get(i - n)?;
-                        let name = p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
-                        let label = m
-                            .and_then(|m| m.progress(&p.slug))
-                            .map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
-                        Some(VRow { label, ctl: VCtl::Buttons(vec![("Install".into(), false)]) })
-                    }
-                })
+            let offers = self.offers();
+            let lua = self.lua_page();
+            let installed = self.on_page().into_iter().enumerate().map(|(i, k)| {
+                let m = &self.s.mods[k];
+                let mut b = vec![("ON".into(), m.enabled), ("OFF".into(), !m.enabled)];
+                if !lua {
+                    b.push(("Move".into(), false));
+                }
+                VRow { label: format!("{}. {}", i + 1, m.name), ctl: VCtl::Buttons(b) }
+            });
+            installed
+                .chain(
+                    offers
+                        .into_iter()
+                        .map(|o| VRow { label: o.label, ctl: VCtl::Buttons(vec![(o.button.into(), false)]) }),
+                )
                 .collect()
         } else {
             self.rows().iter().map(|r| self.vrow(r)).collect()
@@ -1748,10 +1646,22 @@ impl SettingsUi {
     }
 }
 
-/// The Mods page (client/modsui.rs): the installed packs (ON / OFF / Move), then the archives (Install).
+/// The DAT Packs and Mods pages (client/modsui.rs): the installed DAT packs (ON / OFF / Move) or Lua mods (ON / OFF),
+/// then the offers of that kind (Install / Update).
 impl SettingsUi {
     fn on_mods(&self) -> bool {
-        self.kind == Kind::Settings && self.tab == MODS
+        self.kind == Kind::Settings && (self.tab == PACKS || self.tab == MODS)
+    }
+
+    /// The Mods page (Lua mods), not DAT Packs.
+    pub fn lua_page(&self) -> bool {
+        self.tab == MODS
+    }
+
+    /// The indexes in `s.mods` of the page's kind, in order.
+    fn on_page(&self) -> Vec<usize> {
+        let lua = self.lua_page();
+        (0..self.s.mods.len()).filter(|&i| self.lua_names.contains(&self.s.mods[i].name) == lua).collect()
     }
 
     /// Rows below the page name.
@@ -1759,48 +1669,70 @@ impl SettingsUi {
         if self.on_mods() { self.mods_total() } else { self.rows().len() }
     }
 
-    fn mods_total(&self) -> usize {
-        self.s.mods.len() + self.mods_ui.as_ref().map_or(0, |m| m.packs.len())
+    fn offers(&self) -> Vec<super::modsui::Offer> {
+        self.mods_ui.as_ref().map(|m| m.offers(self.lua_page())).unwrap_or_default()
     }
 
+    fn mods_total(&self) -> usize {
+        self.on_page().len() + self.offers().len()
+    }
+
+    /// Buttons on a row: ON / OFF (and Move for a pack), or an offer's one.
     fn mods_cols(&self, row: usize) -> usize {
         match row.checked_sub(1) {
-            Some(i) if i < self.s.mods.len() => 3,
+            Some(i) if i < self.on_page().len() => {
+                if self.lua_page() {
+                    2
+                } else {
+                    3
+                }
+            }
             _ => 1,
         }
     }
 
     fn mods_marked(&self) -> usize {
-        match self.row.checked_sub(1).and_then(|i| self.s.mods.get(i)) {
+        let sh = self.on_page();
+        match self.row.checked_sub(1).and_then(|i| sh.get(i)).map(|&k| &self.s.mods[k]) {
             Some(m) if !m.enabled => 1,
             _ => 0,
         }
     }
 
-    /// Per frame: the archive scan and an install coming in.
+    /// Per frame: the archive scan, the catalogue and an install coming in.
     pub fn tick(&mut self) {
         if let Some(m) = self.mods_ui.as_mut()
             && m.tick(&mut self.s.mods)
         {
             self.dirty = true;
+            // A Lua mod just installed starts at once (in game).
+            let now = crate::modpack::lua_folders();
+            for id in now.iter().filter(|id| !self.lua_names.contains(*id)) {
+                if self.s.mods.iter().any(|m| &m.name == id && m.enabled) {
+                    self.mod_changes.push((id.clone(), super::lua::ENABLED.into(), true.into()));
+                }
+            }
+            self.lua_names = now;
+            self.lua_info = crate::modpack::lua_info();
         }
     }
 
     fn mods_key(&mut self, key: egui::Key, page_mod: bool) -> bool {
         use egui::Key as K;
-        let n = self.s.mods.len();
+        let sh = self.on_page();
+        let n = sh.len();
         if let Some(before) = self.mods_ui.as_mut().and_then(|m| m.held.take()) {
             // Moving: Up / Down carry the pack, Enter places it, Escape puts the order back.
             let i = self.row - 1;
             let mut keep = Some(before);
             match key {
                 K::ArrowUp if i > 0 => {
-                    self.s.mods.swap(i, i - 1);
+                    self.s.mods.swap(sh[i], sh[i - 1]);
                     self.row -= 1;
                     self.sounds.push(Se::Cursor);
                 }
                 K::ArrowDown if i + 1 < n => {
-                    self.s.mods.swap(i, i + 1);
+                    self.s.mods.swap(sh[i], sh[i + 1]);
                     self.row += 1;
                     self.sounds.push(Se::Cursor);
                 }
@@ -1810,9 +1742,13 @@ impl SettingsUi {
                 }
                 K::Escape => {
                     if let Some(b) = keep.take() {
-                        let name = self.s.mods[i].name.clone();
-                        self.row = b.iter().position(|m| m.name == name).map_or(self.row, |k| k + 1);
+                        let name = self.s.mods[sh[i]].name.clone();
                         self.s.mods = b;
+                        self.row = self
+                            .on_page()
+                            .iter()
+                            .position(|&k| self.s.mods[k].name == name)
+                            .map_or(self.row, |k| k + 1);
                     }
                     self.sounds.push(Se::Cancel);
                 }
@@ -1855,32 +1791,35 @@ impl SettingsUi {
 
     fn mods_enter(&mut self) {
         let Some(i) = self.row.checked_sub(1) else { return };
-        let n = self.s.mods.len();
-        if i < n {
+        let sh = self.on_page();
+        let lua = self.lua_page();
+        if let Some(&k) = sh.get(i) {
             if self.col < 2 {
                 let on = self.col == 0;
-                self.dirty |= self.s.mods[i].enabled != on;
-                self.s.mods[i].enabled = on;
+                self.dirty |= self.s.mods[k].enabled != on;
+                self.s.mods[k].enabled = on;
             } else if let Some(m) = self.mods_ui.as_mut() {
                 m.held = Some(self.s.mods.clone());
             }
             self.sounds.push(Se::Select);
-        } else if self.mods_ui.as_mut().is_some_and(|m| m.install(i - n)) {
+        } else if self.mods_ui.as_mut().is_some_and(|m| m.install_offer(i - sh.len(), lua)) {
             self.sounds.push(Se::Select);
         } else {
             self.sounds.push(Se::Error);
         }
     }
 
-    /// The shown rows' buttons, relative to the page: conf3win's three for a pack, conf2win's first for an archive.
+    /// The shown rows' buttons, relative to the page: conf3win's three for a pack (two for a mod), conf2win's first
+    /// for an offer.
     fn mods_controls(&self) -> Vec<(usize, usize, [f32; 4])> {
         let top = self.mods_ui.as_ref().map_or(0, |m| m.top);
-        let n = self.s.mods.len();
+        let n = self.on_page().len();
+        let cols = if self.lua_page() { 2 } else { 3 };
         let mut out = Vec::new();
         for (vis, i) in (top..self.mods_total()).take(super::modsui::VISIBLE).enumerate() {
             let y = Self::TOP + PITCH * vis as f32 + 14.0;
             if i < n {
-                for (c, bx) in NARROW.iter().enumerate() {
+                for (c, bx) in NARROW.iter().enumerate().take(cols) {
                     out.push((i + 1, c, [*bx, y, 64.0, 16.0]));
                 }
             } else {
@@ -1895,25 +1834,21 @@ impl SettingsUi {
         const ON: u32 = 0x8080_5020;
         let m = self.mods_ui.as_ref();
         let (top, held) = (m.map_or(0, |m| m.top), m.is_some_and(|m| m.held.is_some()));
-        let n = self.s.mods.len();
+        let sh = self.on_page();
+        let n = sh.len();
         let total = self.mods_total();
+        let offers = self.offers();
         for (vis, i) in (top..total).take(super::modsui::VISIBLE).enumerate() {
             let hy = y + Self::TOP + PITCH * vis as f32;
             if let Some(b) = gu.cell_bounds("menu    windowps", 465, 2) {
                 gu.sprite_cells("menu    windowps", 465, 2..3, x + 20.0 - b[0], hy + 2.0 - b[1], N);
             }
-            let (mut label, tint) = match (i < n, m) {
-                (true, _) => {
-                    (format!("{}. {}", i + 1, self.s.mods[i].name), if held && self.row == i + 1 { ON } else { N })
+            let (mut label, tint) = match (sh.get(i), offers.get(i.wrapping_sub(n))) {
+                (Some(&k), _) => {
+                    (format!("{}. {}", i + 1, self.s.mods[k].name), if held && self.row == i + 1 { ON } else { N })
                 }
-                (false, Some(m)) => {
-                    let p = &m.packs[i - n];
-                    let name = p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
-                    match m.progress(&p.slug) {
-                        Some(pm) => (format!("{}%  {name}", pm / 10), ON),
-                        None => (name, N),
-                    }
-                }
+                // A row being installed shows its per cent, lit.
+                (None, Some(o)) => (o.label.clone(), if o.label.contains("%  ") { ON } else { N }),
                 _ => continue,
             };
             while gu.label_width(&label) > W - 52.0 && label.pop().is_some() {}
@@ -1926,9 +1861,9 @@ impl SettingsUi {
             let d = if on && !held { -1.0 } else { 0.0 };
             let tint = if on { ON } else { N };
             button(gu, [x + b[0] + d, y + b[1] + d, b[2], b[3]], tint);
-            let cap = if row - 1 < n { captions[c] } else { "Install" };
+            let cap = if row - 1 < n { captions[c] } else { offers.get(row - 1 - n).map_or("Install", |o| o.button) };
             gu.label(cap, x + b[0] + 5.0 + d, y + b[1] + 1.0 + d, tint, true);
-            if row - 1 < n && c < 2 && self.s.mods[row - 1].enabled == (c == 0) {
+            if row - 1 < n && c < 2 && self.s.mods[sh[row - 1]].enabled == (c == 0) {
                 marker(gu, x + b[0], y + b[1], b[2]);
             }
             if on {
@@ -1950,59 +1885,68 @@ impl SettingsUi {
         }
     }
 
-    /// The modern Mods page is the one open.
+    /// The DATs page (`lua` false) or the Mods page turned to.
+    pub fn goto_page(&mut self, lua: bool) {
+        self.goto(if lua { MODS } else { PACKS }, 0);
+        self.m_mods = (0, 0);
+    }
+
+    /// The modern DAT Packs or Mods page is the one open.
     pub fn on_mods_page(&self) -> bool {
         self.on_mods()
     }
 
-    /// The installed packs (name, on) in priority order, then the archives found (name, per mille when installing).
-    pub fn mods_rows(&self) -> (Vec<(String, bool)>, Vec<(String, Option<u32>)>) {
-        let packs = self.s.mods.iter().map(|m| (m.name.clone(), m.enabled)).collect();
-        let archives = self
-            .mods_ui
-            .as_ref()
-            .map(|m| {
-                m.packs
-                    .iter()
-                    .map(|p| {
-                        (
-                            p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(),
-                            m.progress(&p.slug),
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        (packs, archives)
+    /// The page's installed packs or mods (name, on) in order, then its offers: archives found and catalogue entries.
+    /// A Lua mod goes by its mod.toml's name.
+    pub fn mods_rows(&self) -> (Vec<(String, bool)>, Vec<super::modsui::Offer>) {
+        let name = |n: &String| self.lua_info.get(n).map_or_else(|| n.clone(), |i| i.name.clone());
+        let packs = self.on_page().into_iter().map(|k| (name(&self.s.mods[k].name), self.s.mods[k].enabled)).collect();
+        (packs, self.offers())
     }
 
-    /// Pack `i` on or off.
+    /// The page's installed pack or mod `i`'s folder (a Lua mod's id).
+    pub fn mod_id(&self, i: usize) -> Option<String> {
+        self.on_page().get(i).map(|&k| self.s.mods[k].name.clone())
+    }
+
+    /// The page's pack or mod `i` on or off.
     pub fn mod_enable(&mut self, i: usize, on: bool) {
-        if let Some(m) = self.s.mods.get_mut(i) {
+        if let Some(&k) = self.on_page().get(i) {
+            let lua = self.lua_page();
+            let m = &mut self.s.mods[k];
             self.dirty |= m.enabled != on;
             m.enabled = on;
+            // A Lua mod starts or stops at once (in game).
+            if lua {
+                self.mod_changes.push((m.name.clone(), super::lua::ENABLED.into(), on.into()));
+            }
             self.sounds.push(Se::Select);
         }
     }
 
-    /// Pack `i` a place up (higher priority) or down; true when it moved.
+    /// The page's pack `i` a place up (higher priority) or down among the packs; true when it moved.
     pub fn mod_move(&mut self, i: usize, up: bool) -> bool {
-        let j = if up { i.checked_sub(1) } else { Some(i + 1).filter(|&j| j < self.s.mods.len()) };
-        let Some(j) = j.filter(|_| i < self.s.mods.len()) else {
+        let sh = self.on_page();
+        let j = if up { i.checked_sub(1) } else { Some(i + 1).filter(|&j| j < sh.len()) };
+        let Some(j) = j.filter(|_| i < sh.len()) else {
             self.sounds.push(Se::Error);
             return false;
         };
-        self.s.mods.swap(i, j);
+        self.s.mods.swap(sh[i], sh[j]);
         self.dirty = true;
         self.sounds.push(Se::Select);
         true
     }
 
-    /// Pack `i` removed: its folder deleted and its entry dropped.
+    /// The page's pack or mod `i` removed: its folder deleted and its entry dropped.
     pub fn mod_remove(&mut self, i: usize) {
-        let Some(m) = self.s.mods.get(i) else { return };
-        if super::modsui::remove_folder(&m.name) {
-            self.s.mods.remove(i);
+        let Some(&k) = self.on_page().get(i) else { return };
+        if self.lua_page() {
+            self.mod_changes.push((self.s.mods[k].name.clone(), super::lua::ENABLED.into(), false.into()));
+        }
+        if super::modsui::remove_folder(&self.s.mods[k].name) {
+            let m = self.s.mods.remove(k);
+            self.lua_names.remove(&m.name);
             self.dirty = true;
             self.sounds.push(Se::Select);
         } else {
@@ -2010,9 +1954,10 @@ impl SettingsUi {
         }
     }
 
-    /// Archive `k` of those found installed.
+    /// The page's offer `k` (an archive found, a catalogue entry) installed.
     pub fn archive_install(&mut self, k: usize) {
-        let ok = self.mods_ui.as_mut().is_some_and(|m| m.install(k));
+        let lua = self.lua_page();
+        let ok = self.mods_ui.as_mut().is_some_and(|m| m.install_offer(k, lua));
         self.sounds.push(if ok { Se::Select } else { Se::Error });
     }
 
@@ -2024,47 +1969,53 @@ impl SettingsUi {
         self.mods_ui.as_ref()
     }
 
-    /// The modern Mods page's help for its cursor (m_mods: the tabs, Install from File, the packs, the archives).
+    /// The modern page's help for its cursor (m_mods: the tabs, Install from File, the installed, the offers).
     fn modern_mods_help(&self) -> String {
+        let lua = self.lua_page();
         if self.mods_ui.as_ref().is_some_and(|m| m.browse.is_some()) {
-            return "Enter: open the folder, or install the archive (zip, 7z, rar). Escape: back.".into();
+            return if lua {
+                "Enter: open the folder, or install the Lua mod's folder or archive (zip, 7z, rar). Escape: back."
+            } else {
+                "Enter: open the folder, or install the archive (zip, 7z, rar). Escape: back."
+            }
+            .into();
         }
-        let n = self.s.mods.len();
+        let n = self.on_page().len();
         match self.m_mods {
             (0, _) => "Left / Right or Tab: another page of settings.".into(),
-            (1, _) => "Pick a mod archive (zip, 7z, rar) to install. Takes effect on restart.".into(),
-            (st, b) if st >= 2 && st - 2 < n => match b {
-                0 => "This pack on or off. Takes effect on restart.",
-                1 | 2 => "A higher pack's textures win over a lower one's. Takes effect on restart.",
+            (1, _) if lua => {
+                "Pick a Lua mod's archive (zip, 7z, rar) or folder to install. It starts at the next login.".into()
+            }
+            (1, _) => "Pick a DAT pack archive (zip, 7z, rar) to install. Takes effect on restart.".into(),
+            (st, b) if st >= 2 && st - 2 < n => match (b, lua) {
+                (0, true) => "This mod on or off. Takes effect at the next login.",
+                (0, false) => "This pack on or off. Takes effect on restart.",
+                (1 | 2, _) => "A higher pack's textures win over a lower one's. Takes effect on restart.",
+                (_, true) => "Deletes this mod's folder. Its settings and saved data are kept.",
                 _ => "Deletes this pack's folder.",
             }
             .into(),
-            _ => "Unpacks the archive's game files into the mods folder, on and first. Takes effect on restart.".into(),
+            (st, _) => self.offers().into_iter().nth(st.saturating_sub(2 + n)).map_or_else(String::new, |o| o.help),
         }
     }
 
     fn mods_help(&self) -> String {
-        let n = self.s.mods.len();
+        let n = self.on_page().len();
         let m = self.mods_ui.as_ref();
         match self.row.checked_sub(1) {
             None => "Left / Right: another page of settings.".into(),
             Some(_) if m.is_some_and(|m| m.held.is_some()) => {
                 "Up / Down: move the pack. Enter: place it here. Escape: put it back.".into()
             }
+            Some(_) if m.and_then(|m| m.error.as_ref()).is_some() => {
+                format!("The last install failed: {}", m.and_then(|m| m.error.clone()).unwrap_or_default())
+            }
+            Some(i) if i < n && self.lua_page() => "A Lua mod: ON / OFF. Takes effect at the next login.".into(),
             Some(i) if i < n => format!(
-                "Mod pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.",
+                "DAT pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.",
                 i + 1
             ),
-            Some(i) => match (m.and_then(|m| m.packs.get(i - n)), m.and_then(|m| m.error.clone())) {
-                (_, Some(e)) => format!("The last install failed: {e}"),
-                (Some(p), None) => format!(
-                    "{} game file{} in {}: Install unpacks them into the mods folder, on and first. Takes effect on restart.",
-                    p.files,
-                    if p.files == 1 { "" } else { "s" },
-                    p.path.display()
-                ),
-                (None, None) => String::new(),
-            },
+            Some(i) => self.offers().into_iter().nth(i - n).map_or_else(String::new, |o| o.help),
         }
     }
 }
@@ -2131,6 +2082,37 @@ mod tests {
             !title.iter().any(|r| matches!(r.val, Val::ResetPlaces))
                 && matches!(game.last().unwrap().val, Val::ResetPlaces)
         );
+    }
+
+    /// A bundled mod's rows on our Extras tabs stand at their places; its other rows make its own page; a choice there
+    /// goes to the app as the mod's change.
+    #[test]
+    fn mod_rows_on_our_tabs() {
+        let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
+        let row = |key: &str, tab: &str, place| ModRow {
+            preview: None,
+            key: key.into(),
+            label: key.into(),
+            help: String::new(),
+            choices: vec![("OFF".into(), 0.into()), ("3 s".into(), 3.into())],
+            at: 0,
+            tab: tab.into(),
+            place,
+            place_modern: None,
+        };
+        ui.set_mod_pages(vec![ModPage {
+            id: "m".into(),
+            name: "M".into(),
+            rows: vec![row("first", "Misc.", Some(0)), row("own", "", None), row("last", "Misc.", None)],
+        }]);
+        assert_eq!((ui.mod_pages.len(), ui.mod_pages[0].rows.len()), (1, 1));
+        ui.tab = 3;
+        let shown = ui.rows();
+        assert_eq!((shown.first().unwrap().label.as_str(), shown.last().unwrap().label.as_str()), ("first", "last"));
+        assert_eq!(shown.len(), rows(Kind::Extras, 3, false, false).len() + 2);
+        ui.set(shown[0].val, 1);
+        assert_eq!(ui.mod_changes, [("m".to_string(), "first".to_string(), serde_json::Value::from(3))]);
+        assert_eq!(ui.get(shown[0].val), 1);
     }
 
     #[test]
@@ -2207,15 +2189,13 @@ mod tests {
         ui.key(egui::Key::ArrowLeft);
         assert_eq!(ui.tab, 3);
         ui.key(egui::Key::ArrowRight);
+        // The first row is Map Overlay Opacity (a slider); Up from it to the page name, and Up again wraps to the last
+        // row, Minimap Size (Small / Medium / Large): Large; then its place, top left.
         ui.key(egui::Key::ArrowDown);
-        assert_eq!((ui.row, ui.col), (1, 1));
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.map_overlay && ui.dirty);
-        // The last row, Minimap Size (Small / Medium / Large): Large; then its place, top left; then the minimap on.
+        assert_eq!(ui.row, 1);
         ui.key(egui::Key::ArrowUp);
         ui.key(egui::Key::ArrowUp);
-        assert_eq!(ui.row, 5);
+        assert_eq!(ui.row, 3);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.minimap_size, 2);
@@ -2223,24 +2203,11 @@ mod tests {
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.minimap_dock, 1);
-        ui.key(egui::Key::ArrowUp);
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.minimap);
-        // Timers: Timers Position (Left / Right / Top): the right dock; then the timers on.
-        ui.goto(1, 2);
+        // Timers: Timers Position (Left / Right / Top): the right dock.
+        ui.goto(1, 1);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.timers_dock, 1);
-        ui.key(egui::Key::ArrowUp);
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.timers);
-        // Misc.: Timestamps on All Lines.
-        ui.goto(3, 2);
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.stamp_all_lines);
     }
 
     /// Settings: Left / Right turn the page on a slider row, move between buttons on a buttons row, and always turn
@@ -2268,7 +2235,8 @@ mod tests {
         assert_eq!(ui.tab, 4);
     }
 
-    /// Mods: ON / OFF mark a pack; Move carries it with Up / Down, Enter places it, Escape puts the order back.
+    /// DAT Packs: ON / OFF mark a pack; Move carries it with Up / Down, Enter places it, Escape puts the order back.
+    /// Lua mods are on the Mods page only, and the packs' moves step over them.
     #[test]
     fn mods_page() {
         use crate::config::ModRef;
@@ -2276,8 +2244,9 @@ mod tests {
         let mut ui = SettingsUi::open(&c, [1280, 800]);
         let m = |n: &str, on: bool| ModRef { name: n.into(), enabled: on };
         ui.s.mods = vec![m("a", true), m("b", false), m("c", true)];
+        ui.lua_names = std::collections::HashSet::new();
         ui.mods_ui = Some(super::super::modsui::Mods::empty());
-        (ui.tab, ui.row, ui.col) = (MODS, 1, 0);
+        (ui.tab, ui.row, ui.col) = (PACKS, 1, 0);
         let names = |ui: &SettingsUi| ui.s.mods.iter().map(|m| m.name.clone()).collect::<Vec<_>>().join("");
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
@@ -2298,6 +2267,13 @@ mod tests {
         ui.key(egui::Key::ArrowDown);
         assert_eq!(ui.row, 0);
         ui.key(egui::Key::ArrowRight);
-        assert_eq!(ui.tab, 0);
+        assert_eq!(ui.tab, MODS);
+        // "a" a Lua mod: the Mods page holds it alone, with ON / OFF; on DAT Packs, "b" moves down past it.
+        ui.lua_names.insert("a".into());
+        assert_eq!((ui.mods_rows().0, ui.mods_cols(1)), (vec![("a".to_string(), false)], 2));
+        ui.goto(PACKS, 1);
+        assert_eq!(ui.mods_rows().0.iter().map(|r| r.0.as_str()).collect::<String>(), "bc");
+        assert!(ui.mod_move(0, false));
+        assert_eq!(names(&ui), "cab");
     }
 }

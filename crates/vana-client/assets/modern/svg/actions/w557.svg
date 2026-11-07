@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8a96a2"/>
+      <stop offset="0.7" stop-color="#8a96a2"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b444e"/>
+      <stop offset="1" stop-color="#3b444e"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="13" x2="32" y2="36.919" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#37ac4f"/>
+      <stop offset="1" stop-color="#184a22"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="27.303" y1="18.305" x2="27.303" y2="26.568" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="31.666" y1="34.583" x2="31.666" y2="50.033" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#79d68c"/>
+      <stop offset="0.5" stop-color="#3fc45a"/>
+      <stop offset="1" stop-color="#2c893f"/>
+    </linearGradient>
+  </defs>
+  <title>w557</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#eef2f5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="cloud" d="M25.013 18.189 C26.379 15.131 29.444 13 33.009 13 C37.029 13 40.419 15.712 41.449 19.405 C41.555 19.4 41.661 19.398 41.769 19.398 C45.486 19.398 48.506 22.417 48.506 26.141 C48.506 27.197 48.262 28.196 47.828 29.087 C47.562 33.434 40.42 36.919 31.661 36.919 C22.735 36.919 15.494 33.299 15.494 28.835 C15.494 27.995 15.751 27.184 16.226 26.422 C16.185 26.108 16.165 25.788 16.165 25.464 C16.165 21.367 19.481 18.05 23.578 18.05 C24.069 18.05 24.549 18.098 25.013 18.189 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.967" stroke-linejoin="round"/>
+      <path id="cloud_light" d="M29.92 18.493 C32.85 17.974 35.399 18.569 35.627 19.812 C35.841 21.056 33.644 22.486 30.715 23.004 C27.786 23.522 25.229 22.928 25.008 21.685 C24.794 20.441 26.984 19.011 29.92 18.493 Z M21.001 23.267 C22.403 22.762 23.785 23.032 24.089 23.868 C24.393 24.711 23.509 25.802 22.106 26.314 C20.711 26.818 19.329 26.548 19.025 25.712 C18.721 24.87 19.605 23.778 21.001 23.267 Z" fill="url(#linear-gradient-2)" opacity="0.35"/>
+      <path id="gusts" d="M33.72 41.384 L24.165 41.384 C23.637 41.384 23.21 40.956 23.21 40.429 C23.21 39.901 23.637 39.473 24.165 39.473 L33.72 39.473 C35.601 39.473 36.793 38.402 35.985 36.975 C35.598 36.346 34.529 36.231 34.382 37.195 C34.301 37.716 33.814 38.074 33.293 37.995 C32.771 37.914 32.413 37.427 32.493 36.906 C32.911 34.17 36.324 33.829 37.627 35.999 C37.631 36.004 37.634 36.01 37.638 36.016 C39.104 38.579 37.331 41.384 33.72 41.384 Z M23.322 43.411 L37.092 43.411 C40.71 43.411 41.997 46.589 40.077 48.903 C38.384 51 35.01 50.04 35.01 47.172 C35.01 46.644 35.438 46.216 35.966 46.216 C36.494 46.216 36.921 46.644 36.921 47.172 C36.921 48.214 37.99 48.422 38.603 47.686 C39.494 46.616 39.094 45.322 37.092 45.322 L23.322 45.322 C22.794 45.322 22.367 44.895 22.367 44.367 C22.367 43.839 22.794 43.411 23.322 43.411 Z M25.291 47.342 L31.192 47.342 C31.719 47.342 32.147 47.77 32.147 48.298 C32.147 48.826 31.719 49.253 31.192 49.253 L25.291 49.253 C24.764 49.253 24.336 48.826 24.336 48.298 C24.336 47.77 24.764 47.342 25.291 47.342 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.898" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

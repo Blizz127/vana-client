@@ -1,0 +1,16 @@
+name = "Multibox Control"
+version = "1.0.0"
+description = "Commands, targets and status removal sent to your other game windows on this machine, focus switching, and tells relayed between them (the multibox add-ons)."
+permissions = ["multibox", "automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Multibox Control"
+help = "//send <name | all | others> <command>, //sendtarget [name], //focus <name>, //stna [name] (the -na spell for the party's worst ailment, cast by that window)."
+
+[settings.relay_tells]
+type = "bool"
+default = false
+label = "Relay Tells"
+help = "Tells your other windows' characters get show in this window's log too."

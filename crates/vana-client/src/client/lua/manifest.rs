@@ -59,9 +59,24 @@ pub struct Setting {
     pub min: Option<f64>,
     pub max: Option<f64>,
     pub step: Option<f64>,
-    /// An enum's labels.
+    /// An enum's labels; with `values`, any type's labels for those values.
     pub options: Vec<String>,
+    pub values: Vec<toml::Value>,
+    /// Shown on one of the client's Extras tabs (Maps, Timers, Battle, Misc.) at row `place`, not on the mod's page:
+    /// a bundled mod's settings where the extra it replaces had its rows.
+    pub tab: String,
+    pub place: Option<usize>,
+    /// Its row in the modern UI's page, where that differs (rows only the classic page has).
+    pub place_modern: Option<usize>,
+    /// The client config field its first value comes from (the extra it replaces kept it there).
+    pub from: String,
+    /// An int whose value picks interface sound `preview_sound` + value: the settings page plays it whenever the value
+    /// changes.
+    pub preview_sound: Option<u32>,
 }
+
+/// The client's Extras tabs a setting may name.
+pub const EXTRA_TABS: [&str; 4] = ["Maps", "Timers", "Battle", "Misc."];
 
 /// Every permission a mod may ask for.
 pub const PERMISSIONS: [&str; 14] = [
@@ -114,6 +129,12 @@ pub fn parse(text: &str, folder: &str) -> Result<Manifest> {
         }
         if !s.kind.is_empty() && !TYPES.contains(&s.kind.as_str()) {
             bail!("{}: setting {key}: type is one of {} ({:?} given)", m.id, TYPES.join(", "), s.kind);
+        }
+        if !s.values.is_empty() && s.values.len() != s.options.len() {
+            bail!("{}: setting {key}: values needs one label in options each", m.id);
+        }
+        if !s.tab.is_empty() && !EXTRA_TABS.contains(&s.tab.as_str()) {
+            bail!("{}: setting {key}: tab is one of {} ({:?} given)", m.id, EXTRA_TABS.join(", "), s.tab);
         }
     }
     Ok(m)

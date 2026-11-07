@@ -93,8 +93,6 @@ pub struct Anim {
 #[derive(Default)]
 pub struct State {
     pub win: Option<Win>,
-    /// Ours (not retail): the recipe being repeated and how many are still to go.
-    repeat: Option<(Record, u32)>,
     pub menu: Option<Menu>,
     /// DAT_106634b8: the last ten synthesises, newest first; read once per login.
     pub history: Vec<Record>,
@@ -673,12 +671,12 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
                     w.sounds.push(Ui::Cursor as u32);
                 }
             }
-            // FUN_101e08e0: the gate (0x77), the inventory check (silent), the send; then everything closes. With the
-            // Synthesis Amount extra it first asks how many (1 ready, so Enter goes on).
+            // FUN_101e08e0: the gate (0x77), the inventory check (silent), the send; then everything closes. Ours: with
+            // the client option synth_amount it first asks how many (1 ready, so Enter goes on).
             K::Enter if s.cursor == 9 => {
                 if !(complete(&s) && super::textcmd::status_gate(w, 0x77) && still_held(w, &s)) {
                     w.sounds.push(Ui::Error as u32);
-                } else if w.synth_amount {
+                } else if w.opts.synth_amount {
                     w.sounds.push(Ui::Select as u32);
                     s.focus = Focus::Amount(1, sets_held(w, &s), false);
                 } else if send(w, s.crystal, &s.slots) {
@@ -781,9 +779,13 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
                 (K::Enter, _) => {
                     if send(w, s.crystal, &s.slots) {
                         w.sounds.push(Ui::Select as u32);
-                        if v > 1 {
-                            w.synth.repeat = Some((recipe(&s), v - 1));
-                        }
+                        // The count goes to the mods (the bundled Synthesis Amount makes the rest).
+                        let r = recipe(&s);
+                        let items: Vec<u16> = r.materials.iter().copied().filter(|m| *m != 0).collect();
+                        w.lua.raise(
+                            "synth_amount",
+                            vec![v.into(), serde_json::json!({"crystal": r.crystal, "items": items})],
+                        );
                         // Modes 1 and 2 also close the cmbmenu chain (FUN_1015e910 / cmbhlst).
                         if matches!(s.from, From::Crystals | From::History) {
                             w.synth.menu = None;
@@ -984,7 +986,7 @@ fn sets_held(w: &World, s: &Win) -> u32 {
     need.iter().map(|&(id, n)| held(id) / n.max(1)).min().unwrap_or(1).clamp(1, 99)
 }
 
-/// The request as a record (its crystal and one id per unit) for the repeats.
+/// The request as a record (its crystal and one id per unit).
 fn recipe(s: &Win) -> Record {
     let mut materials = [0u16; 8];
     let mut k = 0;
@@ -999,40 +1001,71 @@ fn recipe(s: &Win) -> Record {
     Record { crystal: s.crystal.1, materials, ..Default::default() }
 }
 
-/// Ours: the next of the repeats once the last one is over (its answer in and the 2 s lock gone, our animation done,
-/// out of status 0x2c, no synthesis window), from fresh stacks; missing materials stop it with group 9 0xe.
-fn repeat_frame(w: &mut World) {
-    let Some((r, left)) = w.synth.repeat else { return };
-    if left == 0 {
-        w.synth.repeat = None;
-        return;
-    }
-    let busy = w.synth.request.is_some()
+/// Ours: a synthesis is under way: its answer or the 2 s lock after it, our animation, status 0x2c, the window open.
+pub(super) fn busy(w: &World) -> bool {
+    w.synth.request.is_some()
         || w.synth.anims.contains_key(&w.my_id)
         || w.my_motion.status == 0x2c
-        || w.synth.win.is_some();
-    if busy {
-        return;
+        || w.synth.win.is_some()
+}
+
+/// Why a synthesis by item ids would not go out: the line it prints.
+enum Stop {
+    Group9(usize),
+    Refuse(usize),
+}
+
+/// A synthesis by item ids (a mod's actions.synth): the crystal and one material id per unit, from fresh unlocked
+/// stacks; the window's gate (0x77) and send's refusals, missing materials group 9 0xe.
+fn check(w: &World, crystal: u16, materials: &[u16]) -> Result<((u8, u16), [(u8, u16, u32); 10]), Stop> {
+    if materials.len() > 8 {
+        return Err(Stop::Group9(0xf));
     }
-    match find_units(w, &r) {
-        Some((crystal, slots)) if send(w, crystal, &slots) => w.synth.repeat = Some((r, left - 1)),
-        Some(_) => w.synth.repeat = None,
-        None => {
-            w.synth.repeat = None;
-            log_group9(w, 0xe, 0x79);
+    if materials.is_empty() {
+        return Err(Stop::Refuse(0x63));
+    }
+    let mut r = Record { crystal, ..Default::default() };
+    r.materials[..materials.len()].copy_from_slice(materials);
+    let units = find_units(w, &r).ok_or(Stop::Group9(0xe))?;
+    if let Some(line) = super::textcmd::gate_line(w, 0x77) {
+        return Err(Stop::Refuse(line));
+    }
+    if !free_slot(w) {
+        return Err(Stop::Refuse(0x8c));
+    }
+    if w.synth.request.is_some() {
+        return Err(Stop::Refuse(0x64));
+    }
+    Ok(units)
+}
+
+/// Whether a synthesis by item ids would go out now.
+pub(super) fn can_synth(w: &World, crystal: u16, materials: &[u16]) -> bool {
+    check(w, crystal, materials).is_ok()
+}
+
+/// A synthesis by item ids sent, or its refusal printed.
+pub(super) fn synth_ids(w: &mut World, crystal: u16, materials: &[u16]) -> bool {
+    match check(w, crystal, materials) {
+        Ok((c, slots)) => send(w, c, &slots),
+        Err(Stop::Group9(id)) => {
+            log_group9(w, id, 0x79);
+            false
+        }
+        Err(Stop::Refuse(id)) => {
+            super::textcmd::refuse(w, id);
+            false
         }
     }
 }
 
-/// s2c 0x06F: the waiting request's callback (LAB_101e0940) by Result, then the request is answered. Ours: anything but
-/// a result (success or failure) ends the repeats.
+/// s2c 0x06F: the waiting request's callback (LAB_101e0940) by Result, then the request is answered. Ours: the mods'
+/// synth_result event.
 pub fn on_result(w: &mut World, a: Answer) {
     if !matches!(w.synth.request, Some((2, _))) {
         return;
     }
-    if !matches!(a.result, 0 | 1 | 0xc) {
-        w.synth.repeat = None;
-    }
+    w.lua.raise("synth_result", vec![a.result.into(), a.item.into(), a.count.into(), a.grade.into()]);
     w.synth.request = Some((4, Instant::now()));
     let line9 = |w: &mut World, id| log_group9(w, id, 0x79);
     match a.result {
@@ -1103,7 +1136,6 @@ pub fn update(w: &mut World) {
         r => r,
     };
     shown_frame(w, ticks);
-    repeat_frame(w);
     let ids: Vec<u32> = w.synth.anims.keys().copied().collect();
     for id in ids {
         anim_frame(w, id, ticks);

@@ -204,6 +204,28 @@ fn request(w: &mut World, main: u8, sub: u8) {
     let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x053, body: vec![0; 0x84] });
 }
 
+/// A mod's job change (actions.change_job): the Change Jobs window's request, where the window could send it.
+pub(super) fn mod_change(w: &mut World, main: u8, sub: u8) -> Result<(), &'static str> {
+    if w.myroom.is_none() && !w.mog_zone {
+        return Err("only in a Mog House or where a moogle can change jobs");
+    }
+    let off = jobs_off(w);
+    if !(1..=22).contains(&main) || off.contains(&u16::from(main)) {
+        return Err("that main job is not unlocked");
+    }
+    if sub != 0 && (sub == main || sub > 22 || off.contains(&u16::from(sub))) {
+        return Err("that support job cannot be set");
+    }
+    if w.job_req.is_some_and(|r| r.pending) {
+        return Err("a job change is under way");
+    }
+    if jobs_now(w) == (main, sub) {
+        return Err("those are the jobs already");
+    }
+    request(w, main, sub);
+    Ok(())
+}
+
 /// jobchang (FUN_101459d0) and jobcselu (FUN_10145a90) keys.
 fn jobs_key(w: &mut World, gu: &GameUi, j: Jobs, key: egui::Key) {
     use crate::audio::Ui;

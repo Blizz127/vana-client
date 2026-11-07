@@ -1,0 +1,39 @@
+name = "Visual Tweaks"
+version = "1.0.0"
+description = "Changes how the world looks: brightness, colour, a cel-shaded look with outlines, or wireframe (the render tweak add-ons). The menus are not changed."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Visual Tweaks"
+help = "Applies the look below to the world (not to the menus)."
+
+[settings.brightness]
+type = "number"
+default = 1.0
+min = 0.3
+max = 1.6
+step = 0.05
+label = "Brightness"
+
+[settings.saturation]
+type = "number"
+default = 1.0
+min = 0.0
+max = 2.0
+step = 0.05
+label = "Colour"
+help = "0 is black and white, 1 the game's colours, 2 twice as vivid."
+
+[settings.toon]
+type = "bool"
+default = false
+label = "Cel Shading"
+help = "Flat bands of colour with dark outlines, as a cartoon."
+
+[settings.wireframe]
+type = "bool"
+default = false
+label = "Wireframe"
+help = "Draws the scenery as lines."

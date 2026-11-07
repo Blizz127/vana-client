@@ -8,7 +8,7 @@ pub(super) mod audio;
 mod devices;
 mod docs;
 mod draw;
-mod hud;
+pub(super) mod hud;
 pub(super) mod input;
 mod ipc;
 pub(super) mod lobby;
@@ -28,7 +28,8 @@ pub(super) mod window;
 pub(in crate::client) use state::Placed;
 
 use super::World;
-use std::path::PathBuf;
+use crate::dat::battle::Who;
+use std::path::{Path, PathBuf};
 use vm::Vm;
 
 /// What a mod asked the client to do, applied after the mod phase.
@@ -41,7 +42,8 @@ pub(super) enum Op {
     },
     Print(String),
     /// commands.run: the line, and whether the mod holds the mods permission.
-    Run(String, bool),
+    /// A line run as typed, whether the mod may control mods, and whether it ran it on the player's input.
+    Run(String, bool, bool),
     Act(actions::Action),
     /// A key the mod pressed (input.press / input.send).
     Key(input::Synth),
@@ -106,7 +108,7 @@ pub(in crate::client) struct WinReq {
 }
 
 /// The behaviour switches (client.set_option) by name; false for an unknown name or value.
-pub(super) const OPTIONS: [&str; 19] = [
+pub(super) const OPTIONS: [&str; 21] = [
     "macro_palette_delay",
     "ah_result_delay",
     "equipset_delay",
@@ -126,10 +128,13 @@ pub(super) const OPTIONS: [&str; 19] = [
     "send_interval",
     "wireframe",
     "ttf_text",
+    "stamp_all_lines",
+    "synth_amount",
 ];
 
 /// The switches retail has off.
-const OFF: [&str; 5] = ["all_maps", "dead_commands", "compass_monsters", "wireframe", "ttf_text"];
+const OFF: [&str; 7] =
+    ["all_maps", "dead_commands", "compass_monsters", "wireframe", "ttf_text", "stamp_all_lines", "synth_amount"];
 
 /// An {r, g, b} (0..255) as gamma-space floats; false / nil: none.
 fn rgb_of(v: &serde_json::Value) -> Option<Option<[f32; 3]>> {
@@ -162,6 +167,8 @@ fn set_option(w: &mut World, name: &str, v: &serde_json::Value) -> bool {
         ("menu_reach", Some(b)) => w.opts.menu_reach = b,
         ("wireframe", Some(b)) => w.opts.wireframe = b,
         ("ttf_text", Some(b)) => w.opts.ttf_text = b,
+        ("stamp_all_lines", Some(b)) => w.stamp_all_lines = b,
+        ("synth_amount", Some(b)) => w.opts.synth_amount = b,
         ("log_slide", Some(b)) => (w.log.anim.instant, w.log2.anim.instant, w.modern_log.anim.instant) = (!b, !b, !b),
         ("cutscene_speed", _) => match v.as_f64() {
             Some(k) => w.opts.cutscene_speed = (k as f32).clamp(1.0, 4.0),
@@ -222,6 +229,8 @@ pub(super) fn option(w: &World, name: &str) -> Option<serde_json::Value> {
         "menu_reach" => json!(w.opts.menu_reach),
         "wireframe" => json!(w.opts.wireframe),
         "ttf_text" => json!(w.opts.ttf_text),
+        "stamp_all_lines" => json!(w.stamp_all_lines),
+        "synth_amount" => json!(w.opts.synth_amount),
         "log_slide" => json!(!w.log.anim.instant),
         "cutscene_speed" => json!(w.opts.cutscene_speed),
         "animation_rate" => json!(w.opts.anim_rate),
@@ -286,6 +295,8 @@ pub struct Host {
     pub(in crate::client) synth: Vec<input::Synth>,
     /// A mod pressed Enter this frame: a chat line it submits is the mod's, not the player's.
     pub(in crate::client) synth_enter: bool,
+    /// actions.choose's pick, held until the event's menu takes input (5 s at most).
+    pub(in crate::client) choose: Option<(usize, std::time::Instant)>,
     /// Every loaded mod, for mods.list / call / emit.
     dir: runtime::Shared,
     /// Sounds the mods asked for, for the app's mixer.
@@ -531,11 +542,59 @@ fn changes(a: &Snap, b: &Snap) -> Vec<(&'static str, Vec<serde_json::Value>)> {
 
 /// Mods built into the client (assets/mods): our own features on the mod API (docs/lua-mods.md 7.4). Each is (id,
 /// mod.toml, files).
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = &[(
-    "dps",
-    include_str!("../../../assets/mods/dps/mod.toml"),
-    &[("init.lua", include_str!("../../../assets/mods/dps/init.lua"))],
-)];
+/// Our own features on the mod API (docs/extras-as-mods.md): id, mod.toml, files.
+#[cfg(test)]
+macro_rules! bundled {
+    ($($id:literal $([$($file:literal),*])?),* $(,)?) => {
+        &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[
+            ("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))
+            $($(, ($file, include_str!(concat!("../../../assets/mods/", $id, "/", $file))))*)?
+        ])),*]
+    };
+}
+/// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
+pub(in crate::client) const EDGE_PANELS: [&str; 6] =
+    ["regime", "timers_recasts", "timers_buffs", "timers_debuffs", "skillchains", "minimap"];
+
+/// The built-in modern panels a mod's ordinary window may stand in for (ui.window's `panel`): its place and docking,
+/// /uimodes and hiding; not drawn in the classic UI.
+pub(in crate::client) const STAND_IN_PANELS: [&str; 2] = ["focus", "pending"];
+
+/// The timers' sections' panels, in section order.
+pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
+
+/// The mods kept in this repository (assets/mods), for the tests: the client loads only installed mods (the mods
+/// folder); these reach players from GitHub (Settings > Mods, Download Standard Mods).
+#[cfg(test)]
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log", "casket-solver",
+    "blue-sets" ["src/learn.lua"],
+    "warp-helper" ["src/places.lua"],
+    "dialogue-bubbles",
+    "look-changer" ["src/models.lua"],
+    "content-trackers" ["src/omen.lua", "src/delve.lua", "src/odyssey.lua", "src/sortie.lua", "src/reive.lua", "src/pops.lua", "src/empy.lua", "src/znm.lua"],
+    "auction-desk",
+    "npc-errands",
+    "completion-log",
+    "monster-notes",
+    "chat-windows",
+    "multibox",
+    "gear-stats",
+    "item-details" ["src/trials.lua"],
+    "objective-sets",
+    "focus-target",
+    "pending-actions",
+    "action-panel",
+    "map-notes",
+    "exit-markers",
+    "list-trimmer",
+    "bag-manager",
+    "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua", "src/xml.lua", "src/acxml.lua", "src/modes.lua", "src/texts.lua", "src/regex.lua", "src/spellcast.lua"],
+    "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
+        "src/stock.lua"],
+    "pad-bars" ["src/actions.lua", "src/runner.lua"],
+    // After gearshift: its hooks see an action first.
+    "steady-cast" ["src/hold.lua"],
+];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -545,9 +604,27 @@ fn data_dir() -> PathBuf {
     }
 }
 
+/// The folder in `mods` of the mod `id` names: the folder of that name, else the one whose manifest has that id.
+fn folder_of(mods: &Path, id: &str) -> PathBuf {
+    let named = mods.join(id);
+    if named.join("mod.toml").is_file() {
+        return named;
+    }
+    std::fs::read_dir(mods)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| manifest::read(p).is_ok_and(|m| m.id == id))
+        .unwrap_or(named)
+}
+
 /// The mods' folders; a test run's own (`mods` beside its FFXI_CONFIG copy) when it has one, so test mods never sit
 /// among the user's.
 fn mods_dir() -> PathBuf {
+    if std::env::var_os("VANA_MODS_DIR").is_some() {
+        return crate::config::mods_dir();
+    }
     match std::env::var_os("FFXI_CONFIG").map(|p| PathBuf::from(p).with_file_name("mods")) {
         Some(d) if d.is_dir() => d,
         _ => crate::config::mods_dir(),
@@ -564,6 +641,11 @@ impl Host {
         if self.started {
             self.events.push((name, args));
         }
+    }
+
+    /// Whether a running mod has a handler for an event.
+    pub(in crate::client) fn listens(&self, event: &str) -> bool {
+        self.vms.iter().any(|v| v.suspended.is_none() && v.has_handler(event))
     }
 
     /// Whether a typed line is for the mods: //anything, /lua, or a mod's registered /command.
@@ -593,7 +675,8 @@ impl Host {
         self.load_with(w, m, dir.clone(), vm::Source::Dir(dir))
     }
 
-    /// A bundled mod (assets/mods) by id.
+    /// A bundled mod (assets/mods) by id (tests).
+    #[cfg(test)]
     fn load_bundled(&mut self, w: Option<&World>, id: &str) -> Result<(), String> {
         let (_, text, files) = BUNDLED.iter().find(|b| b.0 == id).ok_or_else(|| format!("no bundled mod {id}"))?;
         let m = manifest::parse(text, id).map_err(|e| format!("{e:#}"))?;
@@ -612,17 +695,26 @@ impl Host {
         }
         let data = data_dir().join(&m.id);
         let char_file = Self::char_file(w);
+        if m.id == "regime"
+            && let (Some(w), Some(f)) = (w, char_file.as_deref())
+        {
+            migrate_regime(w, &data, f);
+        }
         let storage = (
             read_json(&data.join("account.json")),
             char_file.as_ref().map_or(serde_json::Value::Null, |f| read_json(&data.join(f))),
         );
-        let settings = load_settings(&m, &data, char_file.as_deref());
+        migrate_settings(&m, &data, char_file.as_deref());
+        let mut settings = load_settings(&m, &data, char_file.as_deref());
+        force_on(&m, &mut settings);
         let given: Vec<String> = grants()
             .get(&m.id)
             .and_then(|v| v.as_array())
             .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
             .unwrap_or_default();
-        let granted: Vec<String> = m.permissions.iter().filter(|p| given.contains(p)).cloned().collect();
+        // A bundled mod is the client's own code: it has what it asks for.
+        let bundled = matches!(src, vm::Source::Bundled(_));
+        let granted: Vec<String> = m.permissions.iter().filter(|p| bundled || given.contains(p)).cloned().collect();
         let missing: Vec<String> = m.permissions.iter().filter(|p| !granted.contains(p)).cloned().collect();
         let vm = Vm::new(m, dir, src).map_err(|e| format!("{e:#}"))?;
         vm.st.borrow_mut().char_file = Self::char_file(w);
@@ -675,9 +767,17 @@ impl Host {
             mods.remove(&vm.manifest.id);
         }
         info.placed.retain(|_, p| p.0 != vm.manifest.id);
+        info.opacity.retain(|_, p| p.0 != vm.manifest.id);
+        info.slots.retain(|_, s| s.0 != vm.manifest.id);
         info.skin.forget(&vm.manifest.id);
         info.looks.retain(|_, l| l.0 != vm.manifest.id);
+        let n = info.models.len();
+        info.models.retain(|_, m| m.0 != vm.manifest.id);
+        if info.models.len() != n {
+            info.models_ver += 1;
+        }
         info.item_tints.retain(|_, t| t.0 != vm.manifest.id);
+        info.trimmed.retain(|k, _| k.0 != vm.manifest.id);
         info.shaders.retain(|s| s.0 != vm.manifest.id);
         drop(info);
         self.filters_dirty = true;
@@ -704,20 +804,6 @@ impl Host {
         let cfg = crate::config::Config::load();
         let root = mods_dir();
         install_stubs(root.clone());
-        let loaded = |h: &Self, id: &str| h.vms.iter().any(|v| v.manifest.id == id);
-        // Bundled mods (our own features on the mod API) run unless turned off in `mods` or replaced by a folder.
-        for (id, ..) in BUNDLED {
-            let off = cfg.mods.iter().any(|r| r.name == *id && !r.enabled);
-            let folder =
-                cfg.mods.iter().any(|r| r.name == *id && r.enabled) && root.join(id).join("mod.toml").is_file();
-            if off || folder || loaded(self, id) {
-                continue;
-            }
-            if let Err(e) = self.load_bundled(Some(w), id) {
-                log::warn!("lua mod {id}: {e}");
-                w.chat.push_colour(format!("Mod {id}: {e}"), ERROR);
-            }
-        }
         for r in cfg.mods.iter().filter(|r| r.enabled) {
             let dir = root.join(&r.name);
             if !dir.join("mod.toml").is_file() || self.vms.iter().any(|v| v.dir == dir) {
@@ -733,6 +819,7 @@ impl Host {
             let file = Self::char_file(Some(w));
             vm.st.borrow_mut().char_file = file.clone();
             vm.st.borrow_mut().settings = load_settings(&vm.manifest, &data, file.as_deref());
+            force_on(&vm.manifest, &mut vm.st.borrow_mut().settings);
             let stored = file.map_or(serde_json::Value::Null, |f| read_json(&data.join(f)));
             if let Ok(t) = vm.lua.globals().get::<mlua::Table>("storage")
                 && let Ok(c) = api::json_table(&vm.lua, &stored)
@@ -783,23 +870,23 @@ impl Host {
         }
     }
 
-    /// A mod by id: its folder, else the bundled one.
+    /// A mod by id: its folder in the mods folder.
     fn load_named(&mut self, w: Option<&World>, id: &str) -> Result<(), String> {
-        let dir = mods_dir().join(id);
-        if !dir.join("mod.toml").is_file() && BUNDLED.iter().any(|b| b.0 == id) {
-            self.load_bundled(w, id)
-        } else {
-            self.load(w, dir)
-        }
+        self.load(w, mods_dir().join(id))
     }
 
     /// Reloads the mod at `k` from its files, in the same place in the load order; its id.
     fn reload(&mut self, w: Option<&World>, k: usize) -> Result<String, String> {
         let dir = self.vms[k].dir.clone();
         let id = self.vms[k].manifest.id.clone();
+        #[cfg(test)]
         let bundled = matches!(self.vms[k].src, vm::Source::Bundled(_));
         self.unload(w, k);
-        if bundled { self.load_bundled(w, &id) } else { self.load(w, dir) }.map_err(|e| format!("{id}: {e}"))?;
+        #[cfg(test)]
+        let r = if bundled { self.load_bundled(w, &id) } else { self.load(w, dir) };
+        #[cfg(not(test))]
+        let r = self.load(w, dir);
+        r.map_err(|e| format!("{id}: {e}"))?;
         let vm = self.vms.pop().expect("just loaded");
         self.vms.insert(k.min(self.vms.len()), vm);
         Ok(id)
@@ -1177,7 +1264,7 @@ pub(super) fn frame(w: &mut World, gu: Option<&super::game_ui::GameUi>) {
                 }
                 continue;
             }
-            let input = !matches!(from, From::Mod { .. });
+            let input = !matches!(from, From::Mod { input: false, .. });
             let owner = host
                 .vms
                 .iter()
@@ -1380,6 +1467,7 @@ pub(super) fn frame(w: &mut World, gu: Option<&super::game_ui::GameUi>) {
     for op in ops {
         apply(w, gu, op);
     }
+    actions::choose_pending(w);
     for line in bind_lines {
         run_line(w, &line, super::textcmd::Mode::Typed, From::Bind { mods: false });
     }
@@ -1403,13 +1491,14 @@ pub(super) enum From {
     /// A mod's key bind the player pressed: the mod's command runs as the player's input, but /lua grant, revoke,
     /// run, set and watch do not.
     Bind { mods: bool },
-    /// A mod's own line (commands.run, actions): runs as the mod's own, not the player's input.
-    Mod { mods: bool },
+    /// A mod's own line (commands.run, actions): runs as the mod's own, and as the player's input only when the mod ran
+    /// it on the player's input (a hotbar slot clicked runs another mod's command as the player would).
+    Mod { mods: bool, input: bool },
 }
 
 impl From {
     fn controls_mods(self) -> bool {
-        matches!(self, From::Player | From::Bind { mods: true } | From::Mod { mods: true })
+        matches!(self, From::Player | From::Bind { mods: true } | From::Mod { mods: true, .. })
     }
 }
 
@@ -1563,7 +1652,7 @@ fn apply(w: &mut World, gu: Option<&super::game_ui::GameUi>, op: Op) {
             }
             (None, None, text) => w.chat.push(text),
         },
-        Op::Run(line, mods) => run_line(w, &line, super::textcmd::Mode::Typed, From::Mod { mods }),
+        Op::Run(line, mods, input) => run_line(w, &line, super::textcmd::Mode::Typed, From::Mod { mods, input }),
         Op::Act(a) => actions::apply(w, gu, a),
         Op::Key(k) => w.lua.synth.push(k),
         Op::Copy(text) => w.copied = Some(text),
@@ -1586,9 +1675,7 @@ fn apply(w: &mut World, gu: Option<&super::game_ui::GameUi>, op: Op) {
                 use super::timers::Icon;
                 let icon = match icon {
                     Some((k, id)) if k == "status" => Icon::Status(id),
-                    Some((k, id)) => {
-                        super::magic::list_icon_of(w, k == "spell", id).map_or(Icon::None, |(l, i)| Icon::List(l, i))
-                    }
+                    Some((k, id)) => super::timers::list_icon(w, k == "spell", id),
                     None => Icon::None,
                 };
                 let end = std::time::Instant::now() + std::time::Duration::from_secs_f32(s.max(0.0));
@@ -1647,6 +1734,9 @@ pub(super) fn world_shapes(w: &World) -> [Vec<crate::render::LineVertex>; 2] {
 
 /// The mods' HUD elements, under the windows (world_hud).
 pub(super) fn draw_hud(gu: &mut super::game_ui::GameUi, w: &World) {
+    if !w.modern {
+        w.lua.set_modern_scale(None);
+    }
     if w.lua.started && !w.lua.all_hidden {
         draw::draw_overlay(gu, w);
         hud::draw(gu, w);
@@ -1659,6 +1749,133 @@ impl Host {
     /// This frame's view-projection (world_hud), for draw.to_screen.
     pub(in crate::client) fn set_view_proj(&self, m: glam::Mat4) {
         self.info.borrow_mut().view_proj = m;
+    }
+
+    /// A window's opacity (per-window opacity): the player's (config `window_opacity`), else its mod's, else 1.
+    pub(in crate::client) fn window_opacity(&self, player: &std::collections::BTreeMap<String, f32>, key: &str) -> f32 {
+        player
+            .get(key)
+            .copied()
+            .or_else(|| self.info.borrow().opacity.get(key).map(|o| o.1))
+            .unwrap_or(1.0)
+            .clamp(0.0, 1.0)
+    }
+
+    /// Every window's opacity that is not 1 this frame: the player's and the mods'.
+    pub(in crate::client) fn window_opacities(
+        &self,
+        player: &std::collections::BTreeMap<String, f32>,
+    ) -> std::collections::HashMap<String, f32> {
+        let mut out: std::collections::HashMap<String, f32> =
+            self.info.borrow().opacity.iter().map(|(k, v)| (k.clone(), v.1)).collect();
+        out.extend(player.iter().map(|(k, v)| (k.clone(), *v)));
+        out
+    }
+
+    /// A built-in panel's slot a mod fills (ui.native.slot).
+    pub(in crate::client) fn slot(&self, name: &str) -> Option<serde_json::Value> {
+        self.info.borrow().slots.get(name).map(|s| s.1.clone())
+    }
+
+    /// The timers' sections shown: per section, whether its panel's window is open, and with the client's own rows.
+    pub(in crate::client) fn timers_panels(&self) -> [Option<bool>; 3] {
+        TIMERS_PANELS.map(|p| {
+            let win = self.edge_panel(p).filter(|_| !self.hides(p))?;
+            Some(win.elems.iter().any(|e| matches!(e, window::Elem::Timers { builtin: true, .. })))
+        })
+    }
+
+    /// The open edge window standing in for a built-in panel (the newest mod's).
+    pub(in crate::client) fn edge_panel(&self, panel: &str) -> Option<window::Window> {
+        if self.all_hidden {
+            return None;
+        }
+        self.vms.iter().rev().filter(|v| v.suspended.is_none()).find_map(|v| {
+            v.st.borrow().windows.iter().find(|w| w.open && w.edge && w.panel.as_deref() == Some(panel)).cloned()
+        })
+    }
+
+    /// A number slot (target_distance, target_hpp).
+    pub(in crate::client) fn slot_num(&self, name: &str) -> Option<f64> {
+        self.info.borrow().slots.get(name).and_then(|s| s.1.as_f64())
+    }
+
+    /// The clock slot as the panels draw it.
+    pub(in crate::client) fn clock_slot(&self) -> Option<super::clock::Parts> {
+        let v = self.slot("clock")?;
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        let n = |k: &str| v.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
+        Some(super::clock::Parts {
+            earth: s("earth"),
+            moon: (s("moon_name"), n("moon") as i32),
+            next: (s("next_day"), n("next_minutes").max(0) as u64),
+        })
+    }
+
+    /// Whether the mods' HUD draws: they run and `/lua hide` is off.
+    pub(in crate::client) fn hud_shown(&self) -> bool {
+        self.started && !self.all_hidden
+    }
+
+    /// The actors the mods' HUD portraits show (hud.portrait), first by layer, each once (as its first element asks).
+    pub(in crate::client) fn portraits_wanted(&self) -> Vec<hud::Wanted> {
+        if !self.hud_shown() {
+            return Vec::new();
+        }
+        let mut out: Vec<hud::Wanted> = Vec::new();
+        for (_, e) in hud::elements(self) {
+            if let hud::Kind::Portrait { entity, w, h, look, .. } = e.kind
+                && !out.iter().any(|p| p.entity == entity)
+            {
+                out.push(hud::Wanted { entity, size: [w, h], look });
+            }
+        }
+        out
+    }
+
+    /// The portraits drawn this frame: entity -> (game UI image, modern UI texture).
+    pub(in crate::client) fn set_portraits(&self, drawn: std::collections::HashMap<u32, (String, egui::TextureId)>) {
+        self.info.borrow_mut().portraits = drawn;
+    }
+
+    /// A portrait drawn this frame (hud.portrait's actor): its game UI image and modern UI texture.
+    pub(in crate::client) fn portrait(&self, entity: u32) -> Option<(String, egui::TextureId)> {
+        self.info.borrow().portraits.get(&entity).cloned()
+    }
+
+    /// The mods' visible HUD elements by layer, then load order: (mod, element).
+    pub(in crate::client) fn hud_elements(&self) -> Vec<(String, hud::Elem)> {
+        hud::elements(self)
+    }
+
+    /// What HUD places count from: the panels as last drawn and the window, in pixels.
+    pub(in crate::client) fn hud_frame(&self) -> (std::collections::BTreeMap<String, ([f32; 4], bool)>, [f32; 2]) {
+        let f = self.info.borrow();
+        (f.native_rects.clone(), f.window)
+    }
+
+    /// HUD elements drawn this frame by the modern layer, after the game UI's: (mod, element, window pixel rect).
+    pub(in crate::client) fn add_hud_rects(&self, rects: Vec<(String, String, [f32; 4])>) {
+        self.info.borrow_mut().hud_rects.extend(rects);
+    }
+
+    /// The modern UI's pixels per point while it draws (hud.screen's ui_scale there), else none.
+    pub(in crate::client) fn set_modern_scale(&self, ppp: Option<f32>) {
+        self.info.borrow_mut().modern_ppp = ppp;
+    }
+
+    /// The map HUD maps show (the one the client shows here), as the modern layer draws it.
+    pub(in crate::client) fn hud_map_image(
+        &self,
+        w: &World,
+        regions: &[super::map::Region],
+    ) -> Option<super::map::MapImage> {
+        let mut m = self.map.borrow_mut();
+        match m.as_mut() {
+            Some(o) if o.zone == w.pos_zone => o.follow(w, regions),
+            _ => *m = Some(super::map::Overlay::open_hud(w, regions)),
+        }
+        m.as_mut()?.modern_image()
     }
 
     /// The tooltip of the mod HUD element under the pointer: (title, text, seconds there).
@@ -1684,9 +1901,20 @@ impl Host {
         }
     }
 
+    /// Whether a mod leaves this row out of a game list (0 magic, 1 abilities, 2 mounts).
+    pub(in crate::client) fn trimmed(&self, list: u8, id: u16) -> bool {
+        self.info.borrow().trimmed.iter().any(|(k, ids)| k.1 == list && ids.contains(&id))
+    }
+
     /// A mod's colour for an item's name in the game's lists (shops, the auction house).
     pub(in crate::client) fn item_tint(&self, id: u16) -> Option<u32> {
         self.info.borrow().item_tints.get(&id).map(|t| t.1)
+    }
+
+    /// The player looks mods set (render.look) and their version.
+    pub(in crate::client) fn models(&self) -> (u64, std::collections::HashMap<u32, render::Model>) {
+        let f = self.info.borrow();
+        (f.models_ver, f.models.iter().map(|(id, m)| (*id, m.1)).collect())
     }
 
     pub(in crate::client) fn looks(&self) -> std::collections::HashMap<u32, render::Look> {
@@ -1717,6 +1945,23 @@ impl Host {
         for (id, r) in hidden {
             f.native_rects.insert(id, (r, false));
         }
+    }
+
+    /// The classic log region (ui.native.rect's "chat" there), in layout units: as drawn, and at its full height.
+    pub(in crate::client) fn set_classic_chat(&self, drawn: [f32; 4], shown: bool, room: [f32; 4]) {
+        let mut f = self.info.borrow_mut();
+        let (kx, ky) = f.k;
+        if kx <= 0.0 || ky <= 0.0 {
+            return;
+        }
+        let px = |r: [f32; 4]| [r[0] / kx, r[1] / ky, r[2] / kx, r[3] / ky];
+        f.native_rects.insert("chat".into(), (px(drawn), shown));
+        f.native_rooms.insert("chat".into(), px(room));
+    }
+
+    /// The whole room of the modern panels drawn folded or growing this frame; others keep their last.
+    pub(in crate::client) fn set_native_rooms(&self, rooms: Vec<(String, [f32; 4])>) {
+        self.info.borrow_mut().native_rooms.extend(rooms);
     }
 
     /// The mods' look for the modern UI, when it changed since version `seen`.
@@ -1796,6 +2041,97 @@ mod tests {
         assert_eq!(vm.st.borrow().errors.len(), 1);
     }
 
+    /// hud.bubble: the tail leaves the side facing its point and stops at its length; none for a point inside; the
+    /// outline and feathering go round it.
+    #[test]
+    fn hud_bubbles() {
+        let r = [100.0, 100.0, 200.0, 80.0];
+        let tail = |x: f32, y: f32| Some(hud::Tail { at: [x, y], w: 20.0, len: 25.0 });
+        let pts = |t: &[[([f32; 2], [f32; 4]); 3]]| t.iter().flat_map(|t| t.iter().map(|v| v.0)).collect::<Vec<_>>();
+        let fill = [10, 20, 30, 255];
+        // A point far below: the tip is 25 under the bottom edge's base (its mitred feather a little more).
+        let below = hud::bubble_tris(r, 12.0, tail(200.0, 400.0), fill, None);
+        let lowest = pts(&below).iter().map(|p| p[1]).fold(f32::MIN, f32::max);
+        assert!(lowest > 205.0 && lowest < 209.0, "{lowest}");
+        assert!(pts(&below).iter().all(|p| p[0].is_finite() && p[1].is_finite()));
+        // Off to the left: from the left side.
+        let left = hud::bubble_tris(r, 12.0, tail(0.0, 140.0), fill, None);
+        assert!(pts(&left).iter().map(|p| p[0]).fold(f32::MAX, f32::min) < 100.0 - 20.0);
+        // Inside: no tail, the plain rounded rect.
+        let none = hud::bubble_tris(r, 12.0, tail(150.0, 120.0), fill, None);
+        let plain = hud::bubble_tris(r, 12.0, None, fill, None);
+        assert_eq!(none.len(), plain.len());
+        // An outline adds a ring of quads; its colour is on them.
+        let edged = hud::bubble_tris(r, 12.0, tail(200.0, 400.0), fill, Some(([200, 160, 90, 255], 2.0)));
+        assert!(edged.len() > below.len());
+        assert!(edged.iter().any(|t| t[0].1[0] > 0.7));
+        let vm = Vm::new(
+            manifest::Manifest { id: "t".into(), ..Default::default() },
+            PathBuf::from("."),
+            vm::Source::Dir(PathBuf::from(".")),
+        )
+        .unwrap();
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.lua
+            .load(
+                r#"
+                hud.bubble("b", {x = 10, y = 10, w = 300, h = 90, round = 8, edge = {200, 160, 90}, tail = {x = 100, y = 300}, tail_w = 30})
+                assert(not pcall(hud.bubble, "c", {tail = 5}))
+            "#,
+            )
+            .exec()
+            .unwrap();
+        let tail_of = |vm: &Vm| {
+            vm.st.borrow().hud.iter().find_map(|e| match e.kind {
+                hud::Kind::Bubble { tail, w, .. } if e.id == "b" => Some((tail, w)),
+                _ => None,
+            })
+        };
+        assert_eq!(tail_of(&vm), Some((Some(hud::Tail { at: [100.0, 300.0], w: 30.0, len: 22.0 }), 300.0)));
+        vm.lua.load(r#"hud.set("b", {tail = false})"#).exec().unwrap();
+        assert_eq!(tail_of(&vm), Some((None, 300.0)));
+    }
+
+    /// hud.portrait: its actor is wanted once however many show it, a later entity moves it, none is an error.
+    #[test]
+    fn hud_portraits() {
+        let mut host = Host::default();
+        let vm = Vm::new(
+            manifest::Manifest { id: "t".into(), ..Default::default() },
+            PathBuf::from("."),
+            vm::Source::Dir(PathBuf::from(".")),
+        )
+        .unwrap();
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.lua
+            .load(
+                r#"
+                hud.portrait("a", {entity = 7, size = 64, w = 50, bg = {0, 0, 0, 200}, shape = "square", frame = {200, 160, 90}})
+                hud.portrait("b", {entity = 7, layer = 3})
+                hud.portrait("c", {entity = 9})
+                hud.set("c", {entity = 11, frame_w = 5})
+                assert(not pcall(hud.portrait, "d", {size = 10}))
+                assert(not pcall(hud.portrait, "e", {entity = 1, shape = "star"}))
+            "#,
+            )
+            .exec()
+            .unwrap();
+        host.vms.push(vm);
+        host.started = true;
+        let want = host.portraits_wanted();
+        assert_eq!(want.iter().map(|p| p.entity).collect::<Vec<_>>(), vec![7, 11]);
+        assert_eq!(
+            (want[0].size, want[0].look),
+            (
+                [50.0, 64.0],
+                hud::Look { bg: Some([0, 0, 0, 200]), oval: false, frame: Some([200, 160, 90, 255]), frame_w: 3.0 }
+            )
+        );
+        assert_eq!((want[1].size, want[1].look.oval, want[1].look.frame_w), ([96.0, 96.0], true, 5.0));
+        host.all_hidden = true;
+        assert!(host.portraits_wanted().is_empty());
+    }
+
     /// HUD elements: a press released in place is a click; one that moves is a drag, ending over another element that
     /// gets a drop; the pointer coming and going; tips and spell icons from their specs.
     #[test]
@@ -1867,6 +2203,1744 @@ mod tests {
         hud::hover(&mut host);
         assert_eq!(kinds(&take(&mut host)), ["b mouse_enter", "b mouse_leave", "a mouse_enter"]);
         assert_eq!(hud::tip(&host).map(|t| (t.0, t.1)), Some((String::new(), "A".into())));
+    }
+
+    /// The bundled Battle Text's short lines: the common forms; an unknown one stays as printed; names in their colours.
+    #[test]
+    fn battle_text_short_lines() {
+        let host = Host::default();
+        let vm =
+            Vm::new(bundled_manifest("battle-text").unwrap(), PathBuf::from("."), vm::Source::Dir(PathBuf::from(".")))
+                .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let src = BUNDLED
+            .iter()
+            .find(|b| b.0 == "battle-text")
+            .and_then(|b| b.2.iter().find(|f| f.0 == "init.lua"))
+            .unwrap()
+            .1;
+        let module: mlua::Table = vm.lua.load(src).eval().unwrap();
+        let shorten: mlua::Function = module.get("shorten").unwrap();
+        let who = |name: &str, pc: bool, colour: u8| {
+            let t = vm.lua.create_table().unwrap();
+            t.set("name", name).unwrap();
+            t.set("pc", pc).unwrap();
+            t.set("colour", colour).unwrap();
+            t
+        };
+        let (me, rabbit) = (who("Lnxcsfix", true, 0), who("Wild Rabbit", false, 0));
+        let s = |l: &[&str], a: &mlua::Table, t: &mlua::Table| {
+            shorten.call::<Option<String>>((l.to_vec(), a.clone(), t.clone())).unwrap()
+        };
+        assert_eq!(
+            s(&["Lnxcsfix uses Fast Blade.", "The Wild Rabbit takes 123 points of damage."], &me, &rabbit).as_deref(),
+            Some("Lnxcsfix [Fast Blade] → Wild Rabbit: 123")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix hits the Wild Rabbit for 18 points of damage."], &me, &rabbit).as_deref(),
+            Some("Lnxcsfix → Wild Rabbit: 18")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix scores a critical hit!", "The Wild Rabbit takes 31 points of damage."], &me, &rabbit)
+                .as_deref(),
+            Some("Lnxcsfix → Wild Rabbit: 31!")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix misses the Wild Rabbit."], &me, &rabbit).as_deref(),
+            Some("Lnxcsfix → Wild Rabbit: miss")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix casts Dia.", "The Wild Rabbit gains the effect of dia."], &me, &rabbit).as_deref(),
+            Some("Lnxcsfix [Dia] → Wild Rabbit: +Dia")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix casts Fire.", "Magic Burst! The Wild Rabbit takes 80 points of damage."], &me, &rabbit)
+                .as_deref(),
+            Some("Lnxcsfix [Fire] → Wild Rabbit: 80 (Magic Burst)")
+        );
+        assert_eq!(
+            s(&["The Wild Rabbit takes 48 points of damage."], &me, &rabbit).as_deref(),
+            Some("Wild Rabbit: 48")
+        );
+        assert_eq!(s(&["Lnxcsfix defeats the Wild Rabbit."], &me, &rabbit), None);
+        assert_eq!(
+            s(&["Lnxcsfix uses Provoke on the Wild Rabbit."], &me, &rabbit).as_deref(),
+            Some("Lnxcsfix [Provoke] → Wild Rabbit")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix casts Cure.", "Lnxcsfix recovers 45 HP."], &me, &me).as_deref(),
+            Some("Lnxcsfix [Cure] → Lnxcsfix: +45 HP")
+        );
+        let red = who("Wild Rabbit", false, 8);
+        let c = s(&["Lnxcsfix misses the Wild Rabbit."], &me, &red).unwrap();
+        assert_eq!(crate::dat::font::strip_codes(&c), "Lnxcsfix → Wild Rabbit: miss");
+        assert!(c.contains(crate::dat::font::colour_code(8)));
+    }
+
+    /// The bundled Training Regime's page labels, credit attribution, and its block on the real zone 100 dialogue.
+    #[test]
+    fn regime_labels_and_credits() {
+        let host = Host::default();
+        let vm = Vm::new(bundled_manifest("regime").unwrap(), PathBuf::from("."), vm::Source::Dir(PathBuf::from(".")))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.st.borrow_mut().granted.push("packets.read".into());
+        let src =
+            BUNDLED.iter().find(|b| b.0 == "regime").and_then(|b| b.2.iter().find(|f| f.0 == "init.lua")).unwrap().1;
+        let module: mlua::Table = vm.lua.load(src).eval().unwrap();
+        let lua = &vm.lua;
+        let label = |b: &[u8]| {
+            module.get::<mlua::Function>("label").unwrap().call::<String>(lua.create_string(b).unwrap()).unwrap()
+        };
+        assert_eq!(label(b"\x0a\x00 \x7f\x92\x00[Siege Bat/Siege Bats]."), "Siege Bat");
+        assert_eq!(label(b"\x0a\x01 member\x7f\x92\x01[/s] of the worm family."), "Worm family");
+        assert_eq!(label(b"\x0a\x02 undead-type creature\x7f\x92\x02[/s]."), "Undead-type");
+        // Credits: by counts, then names; a family slot takes the monster no name fits; nothing fits a full slot.
+        let attribute = |slots: &[(&str, u8, u8, bool)], k: u8, n: u8, name: Option<&str>| {
+            let t = lua.create_table().unwrap();
+            for (i, (l, needed, killed, known)) in slots.iter().enumerate() {
+                let s = lua.create_table().unwrap();
+                (
+                    s.set("label", *l).unwrap(),
+                    s.set("needed", *needed).unwrap(),
+                    s.set("killed", *killed).unwrap(),
+                    s.set("known", *known).unwrap(),
+                );
+                t.set(i + 1, s).unwrap();
+            }
+            module.get::<mlua::Function>("attribute").unwrap().call::<Option<usize>>((t, k, n, name)).unwrap()
+        };
+        let s = [("Siege Bat", 4, 2, true), ("Borer Beetle", 2, 0, true)];
+        assert_eq!((attribute(&s, 3, 4, None), attribute(&s, 1, 2, None)), (Some(1), Some(2)));
+        assert_eq!(
+            attribute(&[("Goblin family", 4, 1, true), ("Gigas family", 4, 1, true)], 2, 4, Some("Goblin Mugger")),
+            Some(1)
+        );
+        let s = [("Crab family", 6, 2, true), ("Hill Lizard", 6, 2, true)];
+        assert_eq!(
+            (attribute(&s, 3, 6, Some("Snipper")), attribute(&s, 3, 6, Some("Hill Lizard"))),
+            (Some(1), Some(2))
+        );
+        // Counts unknown (a book's page, no kills yet): the name decides.
+        assert_eq!(
+            attribute(&[("Siege Bat", 0, 0, false), ("Borer Beetle", 0, 0, false)], 3, 4, Some("Borer Beetle")),
+            Some(2)
+        );
+        let matches = |a: &str, b: &str| module.get::<mlua::Function>("matches").unwrap().call::<bool>((a, b)).unwrap();
+        assert!(
+            matches("Bat family", "Seeker Bats")
+                && matches("Siege Bat", "siege bat")
+                && !matches("Siege Bat", "Siege Bats")
+        );
+        // The real block of zone 100, through stand-ins for res.zone_text / zone_text_find.
+        let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
+        let Ok(d) = crate::dat::dialog::Dialog::load(&index, 100) else { return };
+        let d = std::sync::Arc::new(d);
+        let res: mlua::Table = lua.globals().get("res").unwrap();
+        let d1 = d.clone();
+        res.set(
+            "zone_text",
+            lua.create_function(move |lua, (_z, id): (u16, u32)| d1.raw(id).map(|b| lua.create_string(&b)).transpose())
+                .unwrap(),
+        )
+        .unwrap();
+        let d2 = d.clone();
+        res.set(
+            "zone_text_find",
+            lua.create_function(move |_, (_z, p): (u16, mlua::LuaString)| {
+                Ok((0..d2.len() as u32).find(|&i| d2.raw(i).is_some_and(|r| r.starts_with(&p.as_bytes()))))
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let r: u32 = res
+            .get::<mlua::Function>("zone_text_find")
+            .unwrap()
+            .call((100, "New training regime registered!"))
+            .unwrap();
+        let page = |id: u32| {
+            module.get::<mlua::Function>("page").unwrap().call::<(Vec<String>, String)>((100, r, id)).unwrap()
+        };
+        let (l, area) = page(2);
+        assert_eq!(l, ["Forest Hare"]);
+        assert!(area.contains("Ronfaure"), "{area}");
+        assert_eq!(
+            page(704),
+            (vec!["Siege Bat".to_string(), "Borer Beetle".to_string()], "Garlaige Citadel".to_string())
+        );
+    }
+
+    /// Gearshift with a fake game: a GearSwap file and a LuAshitacast profile each wear their precast gear before a
+    /// Cure's action packet and their midcast gear after it, in one batch; the client's own packet is dropped.
+    #[test]
+    fn gearshift_swaps_around_a_cast() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "gearshift").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("gearshift").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            local sent, said = {}, {}
+            local ITEMS = {
+              [1001] = { name = "Fast Hat", log_name = "Fast Hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+              [1002] = { name = "Cast Coat", log_name = "Cast Coat", slots = 1 << 5, jobs = 1 << 3, level = 1 },
+              [1003] = { name = "Heal Gloves", log_name = "Healing Gloves", slots = 1 << 6, jobs = 1 << 3, level = 1 },
+              [1004] = { name = "Idle Hat", log_name = "Idle Hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+            }
+            local FILES = {}
+            game = {
+              player = function() return { name = "Tester", id = 100, index = 1, main_job = 3, main_level = 75, sub_job = 4,
+                sub_level = 37, hp = 900, mp = 500, tp = 0, hpp = 100, mpp = 100, hp_max = 900, mp_max = 500, status = 0, zone = 230 } end,
+              equipment = function() return {} end,
+              items = function(bag) if bag ~= 0 then return {} end
+                return { { bag = 0, slot = 1, id = 1001, count = 1, locked = 0 }, { bag = 0, slot = 2, id = 1002, count = 1, locked = 0 },
+                  { bag = 0, slot = 3, id = 1003, count = 1, locked = 0 }, { bag = 0, slot = 4, id = 1004, count = 1, locked = 0 } } end,
+              buffs = function() return {} end,
+              target = function() return nil end,
+              entity = function(id) return { id = id, index = 5, name = "Tester", kind = "player", me = true, hpp = 100, distance = 0, status = 0 } end,
+              entity_by_tag = function() return nil end,
+              time = function() return { weekday = 0, moon_phase = 0, moon = 50, hour = 12, minute = 0, day = 1 } end,
+              weather = function() return 0 end,
+              info = function() return { mog_house = false, zone = 230 } end,
+              party = function() return {} end,
+              find_items = function() return {} end,
+              entities = function() return {} end,
+            }
+            res = setmetatable({
+              item = function(id) return ITEMS[id] end,
+              spell = function(id) if id == 1 then return { name = "Cure", kind = 1, skill = 33, element = 6, mp = 8, cast_time = 2, recast = 5, targets = 63 } end end,
+              ability = function() return nil end,
+              job = function(id) return ({ "WAR", "MNK", "WHM", "BLM" })[id] end,
+              status = function() return nil end,
+              zone = function() return "Somewhere" end,
+              day = function() return "Firesday" end, moon = function() return "Full Moon" end, weather = function() return "Clear" end,
+            }, { __index = function() return function() return nil end end })
+            packets.inject_out = function(d) sent[#sent + 1] = d end
+            fs = { list = function(dir) local t = {} for k in pairs(FILES) do local n = k:match("^" .. dir:gsub("%p", "%%%0") .. "([^/]+)$") if n then t[#t + 1] = n end end return t end,
+              read = function(p) return FILES[p] end, exists = function(p) return FILES[p] ~= nil end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            local function cast_packet()
+              return packets.build(0x01A, string.pack("<I4I2I2I4fff", 100, 1, 3, 1, 0, 0, 0))
+            end
+            local function ids()
+              local t = {}
+              for _, d in ipairs(sent) do t[#t + 1] = string.format("%03X", string.unpack("<I2", d) & 0x1ff) end
+              return table.concat(t, " ")
+            end
+            local core = require("src.core")
+
+            FILES["gearswap/Tester_WHM.lua"] = [[
+              function get_sets()
+                sets.precast = { FC = { head = "Fast Hat", body = "Cast Coat" } }
+                sets.midcast = { Cure = { hands = "Healing Gloves" } }
+              end
+              function precast(spell) if spell.action_type == "Magic" then equip(sets.precast.FC) end end
+              function midcast(spell) if spell.english == "Cure" then equip(sets.midcast.Cure) end end
+            ]]
+            local gs = require("src.gs")
+            assert(gs.find() == "gearswap/Tester_WHM.lua", tostring(gs.find()))
+            assert(gs.load(gs.find()), table.concat(said, " | "))
+            gs.typed('/ma "Cure" <me>')
+            local act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(gs.action(act) == false)
+            local gs_order = ids()
+            assert(sent[#sent]:sub(5, 8) == string.pack("BBBB", 3, 6, 0, 0), "the gloves after the action")
+            gs.unload()
+
+            sent = {}
+            core.sent = {}
+            FILES["ashitacast/Tester_100/WHM.lua"] = [[
+              local profile = {}
+              profile.Sets = { Precast = { Head = "Fast Hat", Body = "Cast Coat" }, Cure = { Hands = "Heal Gloves" } }
+              profile.HandlePrecast = function() gFunc.EquipSet("precast") end
+              profile.HandleMidcast = function() if gData.GetAction().Name == "Cure" then gFunc.EquipSet(profile.Sets.Cure) end end
+              return profile
+            ]]
+            local lac = require("src.lac")
+            assert(lac.find() == "ashitacast/Tester_100/WHM.lua", tostring(lac.find()))
+            assert(lac.load(lac.find()), table.concat(said, " | "))
+            act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(lac.action(act) == false)
+            local lac_order = ids()
+            lac.unload()
+
+            sent = {}
+            core.sent = {}
+            FILES["ashitacast/Tester_WHM.xml"] = [[<?xml version="1.0"?>
+              <ashitacast>
+                <sets>
+                  <set name="Base"><head>Idle Hat</head></set>
+                  <set name="FC" baseset="Base"><head>Fast Hat</head><body>Cast Coat</body></set>
+                </sets>
+                <precast><equip set="FC"/></precast>
+                <midcast>
+                  <if ad_name="Cure*" p_mainjob="WHM"><equip><hands>Heal Gloves</hands></equip></if>
+                  <else><echo>not a cure</echo></else>
+                </midcast>
+              </ashitacast>]]
+            local ac = require("src.acxml")
+            assert(ac.find() == "ashitacast/Tester_WHM.xml", tostring(ac.find()))
+            assert(ac.load(ac.find()), table.concat(said, " | "))
+            act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(ac.action(act) == false)
+            return gs_order, lac_order, ids()
+        "#;
+        let (gs, lac, xml): (String, String, String) = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        // GearSwap: two pieces go as single equips, then the action, then the midcast piece.
+        assert_eq!(gs, "050 050 01A 050");
+        // LuAshitacast: its precast is one equipset, its midcast single equips.
+        assert_eq!(lac, "051 01A 050");
+        // Ashitacast XML: precast as single equips, the action, midcast as one equipset.
+        assert_eq!(xml, "050 050 01A 051");
+    }
+
+    /// Gearshift's XML front ends. Ashitacast: substitution, basic and advanced rules with the original's quirks,
+    /// setvar arithmetic, augment paths; a profile's commands, default and sets; a v3 file through the import rules.
+    /// Spellcast: wildcards, regex, variables, Advanced; a file's command lines, phases and timers, a trigger, an
+    /// include and the idle autoset. The regex engine alone.
+    #[test]
+    fn gearshift_ashitacast_rules() {
+        let files = BUNDLED.iter().find(|b| b.0 == "gearshift").unwrap().2;
+        for (script, want) in [
+            (ACXML_EVAL, "acxml eval ok"),
+            (ACXML_FLOW, "acxml flow ok"),
+            (SPELLCAST, "spellcast ok"),
+            (REGEX, "regex ok"),
+        ] {
+            let host = Host::default();
+            let vm = Vm::new(bundled_manifest("gearshift").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+                .unwrap();
+            vm.lua.set_app_data(host.info.clone());
+            api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+            let got: String = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+            assert_eq!(got, want);
+        }
+    }
+
+    /// Gearshift's built-in GearSwap libraries: M() modes, and texts boxes drawn as HUD texts (fields filled, colour
+    /// runs placed one after another by their drawn widths).
+    #[test]
+    fn gearshift_gearswap_libs() {
+        let files = BUNDLED.iter().find(|b| b.0 == "gearshift").unwrap().2;
+        let host = Host::default();
+        let vm =
+            Vm::new(bundled_manifest("gearshift").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            local M = require("src.modes")
+            local idle = M('refresh', 'dt', 'mdt')
+            assert(idle.value == 'refresh' and idle.current == 'refresh' and idle[1] == 'refresh' and idle.index == 1)
+            assert(idle:cycle() == 'dt' and idle:cycleback() == 'refresh' and idle:cycleback() == 'mdt')
+            idle:set('DT')
+            assert(idle.value == 'dt' and idle:contains('mdt') and not idle:contains('x') and tostring(idle) == 'dt')
+            idle:reset()
+            assert(idle.value == 'refresh')
+            local burst = M(false, 'Magic Burst')
+            assert(burst.value == false and burst.description == 'Magic Burst')
+            burst:toggle()
+            assert(burst.value == true)
+            burst:set('off')
+            assert(burst.value == false)
+            local s = M{ ['description'] = 'Weapon', ['string'] = 'Naegling' }
+            assert(s.value == 'Naegling' and s.description == 'Weapon')
+            local d = M{ ['description'] = 'Nuke', 'normal', 'acc' }
+            assert(d.description == 'Nuke' and d:length() == 2)
+
+            local drawn = {}
+            hud = { text = function(id, spec) drawn[id] = spec end, rect = function(id, spec) drawn[id] = spec end,
+              remove = function(id) drawn[id] = nil end, screen = function() return { width = 1000, height = 800, ui_scale = 1 } end,
+              bounds = function(id) local d = drawn[id] return d and d.text and { x = d.x, y = d.y, w = #d.text * 10, h = 18 * d.size } end }
+            local texts = require("src.texts")
+            local t = texts.new('Idle: \\cs(0,0,255)${idle|none}\\cr!', { pos = { x = 100, y = 50 }, padding = 5 })
+            t:show()
+            texts.frame()
+            texts.frame()
+            local a, b, c = drawn['gstext1_1_1'], drawn['gstext1_1_2'], drawn['gstext1_1_3']
+            assert(a.text == 'Idle: ' and b.text == 'none' and c.text == '!', tostring(b and b.text))
+            assert(b.colour[3] == 255 and a.x == 105 and b.x == 105 + 60 and c.x == 105 + 100, b.x .. ' ' .. c.x)
+            t.idle = 'dt'
+            texts.frame()
+            texts.frame()
+            assert(drawn['gstext1_1_2'].text == 'dt' and drawn['gstext1_1_3'].x == 105 + 80)
+            t:hide()
+            assert(next(drawn) == nil)
+            return "ok"
+        "#;
+        let got: String = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(got, "ok");
+    }
+
+    const SPELLCAST: &str = r#"local said, ran, sent, timers = {}, {}, {}, {}
+local FILES = {}
+local BUFFS = {}
+local ITEMS = {
+  [11] = { name = "Idle Hat", log_name = "idle hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+  [12] = { name = "Fast Hat", log_name = "fast hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+  [13] = { name = "Cast Coat", log_name = "cast coat", slots = 1 << 5, jobs = 1 << 3, level = 1 },
+  [14] = { name = "Heal Gloves", log_name = "healing gloves", slots = 1 << 6, jobs = 1 << 3, level = 1 },
+}
+local PLAYER = { name = "Tester", id = 100, index = 1, main_job = 3, main_level = 75, sub_job = 4, sub_level = 37,
+  hp = 900, hp_max = 1000, mp = 400, mp_max = 500, tp = 0, hpp = 90, mpp = 80, status = 0, zone = 230 }
+local SPELLS = { [1] = { name = "Cure", kind = 1, skill = 33, element = 6, mp = 8, cast_time = 2, recast = 5, targets = 63 },
+  [3] = { name = "Cure III", kind = 1, skill = 33, element = 6, mp = 46, cast_time = 2.5, recast = 6, targets = 63 },
+  [144] = { name = "Fire", kind = 2, skill = 36, element = 0, mp = 7, cast_time = 1, recast = 2, targets = 32 },
+  [338] = { name = "Utsusemi: Ichi", kind = 4, skill = 39, element = 2, mp = 0, cast_time = 4, recast = 30, targets = 1 } }
+game = {
+  player = function() return PLAYER end,
+  buffs = function() return BUFFS end,
+  party = function() return {} end,
+  target = function() return { id = 200, index = 50, name = "Goblin", kind = "mob", hpp = 100, distance = 5, status = 1 } end,
+  entity = function(id) if id == 100 then return { id = 100, index = 1, name = "Tester", kind = "player", me = true, hpp = 90 } end end,
+  entities = function() return {} end,
+  entity_by_tag = function() return nil end,
+  time = function() return { earth = 0, weekday = 5, hour = 7, minute = 5, moon = 50, moon_phase = 0 } end,
+  weather = function() return 4 end,
+  equipment = function() return {} end,
+  items = function(bag)
+    if bag ~= 0 then return {} end
+    return { { bag = 0, slot = 1, id = 11 }, { bag = 0, slot = 2, id = 12 }, { bag = 0, slot = 3, id = 13 }, { bag = 0, slot = 4, id = 14 } }
+  end,
+}
+res = {
+  job = function(id) return ({ "WAR", "MNK", "WHM", "BLM" })[id] end,
+  status = function(id) return ({ [33] = "Haste", [5] = "Blindness" })[id] end,
+  spell = function(id) return SPELLS[id] end,
+  ability = function(id) if id == 0x200 + 10 then return { name = "Divine Seal", recast_id = 26, targets = 1 } end end,
+  item = function(id) return ITEMS[id] end,
+  zone = function() return "Southern San d'Oria" end,
+  moon = function() return "Full Moon" end,
+}
+chat = { add = function(t) said[#said + 1] = t end }
+clock = function() return 1000 end
+timer = { after = function(secs, f) timers[#timers + 1] = { secs, f } end }
+commands = { run = function(l) ran[#ran + 1] = l end }
+packets = { inject_out = function(d) sent[#sent + 1] = d end, build = function(id, b) return string.pack("<I2I2", id, 0) .. b end }
+fs = {
+  list = function(dir)
+    local t = {}
+    for k in pairs(FILES) do
+      local n = k:match("^" .. dir:gsub("%p", "%%%0") .. "([^/]+)$")
+      if n then t[#t + 1] = n end
+    end
+    return t
+  end,
+  read = function(p) return FILES[p] end,
+}
+local function equips()
+  local t = {}
+  for _, d in ipairs(sent) do
+    local id = string.unpack("<I2", d)
+    if id == 0x050 then
+      local index, slot = string.unpack("BB", d, 5)
+      t[#t + 1] = slot .. ":" .. ITEMS[({ 11, 12, 13, 14 })[index]].name
+    elseif id == 0x051 then
+      local n = string.unpack("B", d, 5)
+      for k = 0, n - 1 do
+        local index, slot = string.unpack("BB", d, 9 + k * 4)
+        t[#t + 1] = slot .. ":" .. ITEMS[({ 11, 12, 13, 14 })[index]].name
+      end
+    end
+  end
+  sent = {}
+  table.sort(t)
+  return table.concat(t, " ")
+end
+local function fire_timers()
+  local list = timers
+  timers = {}
+  table.sort(list, function(a, b) return a[1] < b[1] end)
+  local order = {}
+  for _, x in ipairs(list) do
+    x[2]()
+    order[#order + 1] = string.format("%.1f", x[1])
+  end
+  return table.concat(order, " ")
+end
+
+local core = require("src.core")
+local sc = require("src.spellcast")
+
+-- Matching, variables, Advanced.
+assert(sc._match("m*d*", "mad") and not sc._match("m*d*", "master") and sc._match("m???e?", "monkey"))
+assert(sc._match("Cure*|Fire", "fire") and sc._match("(regex)^cure (ii|iii)$(/regex)", "Cure III"))
+assert(not sc._match("(regex-case)^cure$(/regex)", "Cure"))
+assert(sc._key("Cure III") == "cure3" and sc._key("Utsusemi: Ichi") == "utsusemiichi")
+sc._uvars({ instra1 = { name = "instra1", value = "A" }, fireobi = { name = "FireObi", value = "Karin Obi" },
+  use = { name = "use", value = "$" }, b = { name = "B", value = "bee" } })
+assert(sc._expand("$instra11") == "A1", sc._expand("$instra11"))
+assert(sc._expand("$%SpellElementObi", { spell = { element = "Fire" } }) == "Karin Obi")
+assert(sc._expand("%MoonPCT %Moon %Time %Weather %MainJob/%SubJob") == "50 Full Moon 07.05 Fire WHM/BLM", sc._expand("%MoonPCT %Moon %Time %Weather %MainJob/%SubJob"))
+assert(sc._expand("\\$B and $B") == "$B and bee")
+local A = sc._advanced
+assert(A('"%MainJob"="WHM" AND "%SubJob"="BLM"') and not A('"%MainJob"="WHM" AND %MPP < 50'))
+assert(A("(float)%MP/%MPMax*100 > 79") and A("%MP/%MPMax*100 = 0") and A("!(%HPP < 50)"))
+assert(A('(bool)strmatch("Southern*","%Area")') and A('(bool)isArea("*d\'Oria")') and A('(bool)regex("%HPP","8[5-9]|9.")'))
+assert(not A('(bool)buffactive("Haste")') and A("(regex)%Weather=^fire$(/regex)") and not A("broken ((("))
+
+FILES["spellcast/WHM.xml"] = [==[<?xml version="1.0" ?>
+<spellcast xmlns:xi="http://www.w3.org/2001/XInclude">
+  <config ShowGearSwaps="false" RequiredVersion="2.30"/>
+  <variables clear="true">
+    <var name="IdleSet">Standard</var>
+  </variables>
+  <sets>
+    <group name="WHM|WhiteMage" default="yes">
+      <set name="Standard"><head>Idle Hat</head></set>
+      <set name="FastCast" baseset="Standard"><head>Fast Hat</head><body>Cast Coat</body></set>
+      <set name="Cure"><hands>Healing Gloves</hands></set>
+    </group>
+  </sets>
+  <rules>
+    <xi:include href="inc.xml" xpointer="//include[@name='Auto']/*"/>
+    <if Type="WhiteMagic|BlackMagic">
+      <equip when="precast" set="FastCast"/>
+    </if>
+    <if Spell="Cure*">
+      <action type="equip" when="midcast" set="Cure"/>
+      <midcastdelay delay="0.4"/>
+    </if>
+    <elseif Spell="Fire*">
+      <addtochat>fire chain</addtochat>
+    </elseif>
+    <if Spell="Trigger1">
+      <var cmd="set IdleSet FastCast"/>
+      <addtochat when="precast">idle $IdleSet</addtochat>
+    </if>
+    <if NotSpellTargetType="SELF" Spell="Fire">
+      <cmd when="aftercast">input /p burned %SpellTargetName</cmd>
+    </if>
+    <equip when="aftercast" set="$IdleSet"/>
+  </rules>
+</spellcast>]==]
+FILES["spellcast/inc.xml"] = [==[<includes><include name="Auto">
+  <if spell="autoset"><equip when="idle" set="$IdleSet"/><return/></if>
+</include></includes>]==]
+
+assert(sc.find() == "spellcast/WHM.xml", tostring(sc.find()))
+assert(sc.load(sc.find()), table.concat(said, " | "))
+
+-- Cure III typed loosely: the line goes out canonical, the precast set (FastCast over its base) at once.
+local out = sc.typed("/ma cure3 me")
+assert(out == '/ma "Cure III" <me>', tostring(out))
+assert(equips() == "4:Fast Hat 5:Cast Coat", "precast")
+local when = fire_timers()
+assert(when == "0.4 4.0", when)
+local got = equips()
+assert(got == "4:Idle Hat 6:Heal Gloves", got)
+
+-- Fire at the target: aftercast command.
+core.sent = {}
+assert(sc.typed('/ma "Fire" <t>') == '/ma "Fire" <t>')
+equips()
+assert(said[#said] == "fire chain", "the elseif runs when the if before it failed")
+fire_timers()
+equips()
+assert(ran[#ran] == "/p burned Goblin", tostring(ran[#ran]))
+
+-- A trigger: never sent; its var and chat run.
+assert(sc.typed("/ma Trigger1") == false)
+assert(said[#said] == "idle FastCast", said[#said])
+
+-- The idle autoset uses the variable now.
+core.sent = {}
+sc.status_change(0)
+local idle = equips()
+assert(idle == "4:Fast Hat 5:Cast Coat", idle .. " | " .. table.concat(said, " | "))
+
+-- /sc takes over; other lines get their variables.
+assert(sc.typed("/sc var set IdleSet Standard") == false and sc._uvars().idleset.value == "Standard")
+assert(sc.typed("/p job %MainJob, %HPP%") == "/p job WHM, 90%")
+assert(sc.typed("/echo plain") == nil)
+return "spellcast ok"
+"#;
+
+    const REGEX: &str = r#"local R = require("src.regex").test
+local cases = {
+  { "^.* x2$", "Fire x2", true }, { "^.* x2$", "Fire", false }, { "8[5-9]|9.", "87", true }, { "8[5-9]|9.", "84", false },
+  { "8[5-9]|9.", "93", true }, { "^(Cure|Curaga)( I+V?)?$", "cure iii", true }, { "^(Cure|Curaga)( I+V?)?$", "Cura", false },
+  { "a{2,3}b", "caaab", true }, { "^a{2}b", "aaab", false }, { "\\d+\\.\\d", "v2.45", true }, { "\\bfire\\b", "firestorm", false },
+  { "\\bfire\\b", "the fire burns", true }, { "[^aeiou]x", "ax", false }, { "[^aeiou]x", "bx", true }, { "a.*?b", "aXbYb", true },
+  { "Dynamis.*", "Dynamis - Bastok", true }, { "^$", "", true }, { "x?", "", true }, { "(ab)+c", "ababc", true },
+}
+for _, c in ipairs(cases) do
+  local got = R(c[1], c[2])
+  assert(got == c[3], c[1] .. " ~ " .. c[2] .. " gave " .. tostring(got))
+end
+assert(R("ABC", "abc", true) == false and R("ABC", "abc") == true)
+assert(not pcall(R, "(ab", "ab"))
+return "regex ok"
+"#;
+
+    const ACXML_EVAL: &str = r#"local said, ran, sent = {}, {}, {}
+local BUFFS = { { id = 5 }, { id = 33 } }
+local PLAYER = { name = "Tester", id = 100, index = 1, main_job = 1, main_level = 75, sub_job = 13, sub_level = 37,
+  hp = 300, hp_max = 1000, mp = 50, mp_max = 100, tp = 1000, hpp = 75, mpp = 50, status = 1, zone = 230, pos = { x = 0, y = 0, z = 0 } }
+game = {
+  player = function() return PLAYER end,
+  buffs = function() return BUFFS end,
+  party = function() return {} end,
+  target = function() return nil end,
+  entity = function() return nil end,
+  entities = function() return {} end,
+  entity_by_tag = function() return nil end,
+  stats = function() return { attack = 300, defense = 250, resist = { 1, 2, 3, 4, 5, 6, 7, 8 } } end,
+  time = function() return { earth = 0, weekday = 0, hour = 7, minute = 5, moon = 50, moon_phase = 0 } end,
+  weather = function() return 4 end,
+  equipment = function() return {} end,
+  items = function() return {} end,
+}
+res = {
+  job = function(id) return ({ [0] = nil, "WAR", "MNK", "WHM", [13] = "NIN" })[id] end,
+  status = function(id) return ({ [5] = "Blindness", [33] = "Haste", [580] = "Haste" })[id] end,
+  spell = function(id) if id == 1 then return { name = "Cure", mp = 8, cast_time = 2, element = 6, skill = 33, kind = 1 } end end,
+  ability = function() return nil end,
+  item = function() return nil end,
+  zone = function() return "Somewhere" end,
+  mob_skill = function() return nil end,
+}
+chat = { add = function(t) said[#said + 1] = t end }
+clock = function() return 1000 end
+timer = { after = function(_, f) f() end }
+commands = { run = function(l) ran[#ran + 1] = l end }
+packets = { inject_out = function(d) sent[#sent + 1] = d end, build = function(id, b) return string.pack("<I2", id) .. b end }
+fs = { list = function() return {} end, read = function() return nil end }
+
+local ac = require("src.acxml")
+local R, B, A, S = ac._resolve, ac._basic, ac._advanced, ac._setvar
+
+-- Substitution: longest names, text after a name kept, unknown names lose their $, right to left.
+assert(R("$p_hpp") == "75" and R("$p_hp") == "300" and R("$p_hpmax") == "1000", R("$p_hpp"))
+assert(R("$p_hppx") == "75x", R("$p_hppx"))
+assert(R("$U_x") == "U_x" and R("$nope") == "nope")
+ac._uvars({ x = "p" })
+assert(R("$p_hp$u_x") == "75", R("$p_hp$u_x"))
+assert(R("$p_job") == "WAR/NIN" and R("$e_time") == "07.05" and R("$e_weather") == "fire")
+-- Buffs by id and by name (the longest name; several ids under one name summed).
+assert(R("$b_33") == "1" and R("$b_haste") == "1" and R("$b_5 ") == "1 ")
+-- The single-digit quirk: $b_5=1 reads "5=" as the id.
+assert(R("$b_5=1") == "11")
+assert(B("b_5", "1") == false)
+-- Arguments only inside a command match.
+assert(R("$arg1") == "arg1")
+ac._args({ [0] = "/acc", "x", "y", text = "x y" })
+assert(R("$args|$arg0|$arg1|$arg2|$arg9") == "x y|/acc|x|y|arg9", R("$args|$arg0|$arg1|$arg2|$arg9"))
+assert(R("$arg1st") == "x")
+ac._args(nil)
+
+-- Basic rules: | before &, operators anywhere, wildcards, the stray character of two-character operators.
+assert(B("p_hpp", "<50") == false and B("p_hpp", ">=75") == true and B("p_hpp", "75") == true)
+assert(B("p_mainjob", "WAR|NIN") == true and B("p_mainjob", "NIN|THF") == false)
+assert(B("p_mainjob", "W*") == true and B("p_mainjob", "w*R") == true and B("p_mainjob", "WA**") == true and B("p_mainjob", "WAR**") == false)
+assert(B("p_mainjob", "!WAR") == false and B("p_mainjob", "!=WAR") == true)
+assert(B("p_mainjob", "THF|") == true, "an empty piece compares as numbers")
+assert(B("p_hpp", ">50&<80") == true and B("p_hpp", ">50&<70") == false)
+
+-- Advanced rules: precedence, left association, signed values (no hang), no crash on division by zero.
+assert(A("$p_hpp > 50 & $p_mp >= 10") == true)
+assert(A("($p_hp - 500) > 0") == false and A("$p_hp-500<0") == true)
+assert(A("2^3^2=64.000000") == true and A("8-2-1=5") == true and A("7/2=3") == true and A("-7/2=-3") == true)
+assert(A("5/0=0") == true and A("$p_job=WAR/NIN") == true)
+-- "*" multiplies here: WAR=W* is WAR=0, true for any name (as in the original).
+assert(A("$p_mainjob=war") == true and A("$p_mainjob=W*") == true and A("$p_mainjob=NIN") == false)
+assert(A("($p_mainjob=WAR)|($p_mainjob=NIN)") == true and A("!true") == false)
+
+-- setvar arithmetic: * / + - only, names with - become numbers.
+ac._uvars({ n = "3" })
+assert(S("$u_n + 1") == "4" and S("$u_n - 5") == "-2" and S("Mid-Acc") == "0" and S("Plain") == "Plain")
+
+-- Augment path / rank / trial from extdata.
+local ext = string.char(2, 0x20, 0x07, 0) .. string.rep("\0", 20)
+local p, r = ac._aug_meta(ext)
+assert(p == 4 and r == 1, p .. " " .. r)
+
+return "acxml eval ok"
+"#;
+
+    const ACXML_FLOW: &str = r#"local said, ran, sent = {}, {}, {}
+local FILES = {}
+local BUFFS = {}
+local ITEMS = {
+  [11] = { name = "Idle Hat", slots = 1 << 4, jobs = 1 << 1, level = 1 },
+  [12] = { name = "Acc Hat", slots = 1 << 4, jobs = 1 << 1, level = 1 },
+  [13] = { name = "Ear A", slots = (1 << 11) | (1 << 12), jobs = 1 << 1, level = 1 },
+  [14] = { name = "Body B", slots = 1 << 5, jobs = 1 << 1, level = 1 },
+}
+local PLAYER = { name = "Tester", id = 100, index = 1, main_job = 1, main_level = 75, sub_job = 13, sub_level = 37,
+  hp = 900, hp_max = 1000, mp = 50, mp_max = 100, tp = 0, hpp = 90, mpp = 50, status = 0, zone = 230, pos = { x = 0, y = 0, z = 0 } }
+game = {
+  player = function() return PLAYER end,
+  buffs = function() return BUFFS end,
+  party = function() return {} end,
+  target = function() return nil end,
+  entity = function() return nil end,
+  entities = function() return {} end,
+  entity_by_tag = function() return nil end,
+  time = function() return { earth = 0, weekday = 0, hour = 7, minute = 5 } end,
+  weather = function() return 0 end,
+  equipment = function() return {} end,
+  items = function(bag)
+    if bag ~= 0 then return {} end
+    return { { bag = 0, slot = 1, id = 11 }, { bag = 0, slot = 2, id = 12 }, { bag = 0, slot = 3, id = 13 }, { bag = 0, slot = 4, id = 14 } }
+  end,
+}
+res = {
+  job = function(id) return ({ "WAR", "MNK", "WHM", [13] = "NIN" })[id] end,
+  status = function(id) return ({ [33] = "Haste" })[id] end,
+  spell = function() return nil end,
+  ability = function() return nil end,
+  item = function(id) return ITEMS[id] end,
+  zone = function() return "Somewhere" end,
+}
+chat = { add = function(t) said[#said + 1] = t end }
+clock = function() return 1000 end
+timer = { after = function(_, f) f() end }
+commands = { run = function(l) ran[#ran + 1] = l end }
+packets = { inject_out = function(d) sent[#sent + 1] = d end, build = function(id, b) return string.pack("<I2", id) .. b end }
+fs = {
+  list = function(dir)
+    local t = {}
+    for k in pairs(FILES) do
+      local n = k:match("^" .. dir:gsub("%p", "%%%0") .. "([^/]+)$")
+      if n then t[#t + 1] = n end
+    end
+    return t
+  end,
+  read = function(p) return FILES[p] end,
+}
+local function ids()
+  local t = {}
+  for _, d in ipairs(sent) do
+    local id = string.unpack("<I2", d)
+    if id == 0x050 then
+      local index, slot = string.unpack("BB", d, 3)
+      t[#t + 1] = string.format("%d:%d", slot, index)
+    else
+      t[#t + 1] = string.format("%03X", id)
+    end
+  end
+  sent = {}
+  return table.concat(t, " ")
+end
+
+local core = require("src.core")
+local ac = require("src.acxml")
+
+FILES["ashitacast/Tester_WAR.xml"] = [==[<?xml version="1.0"?>
+<!-- a comment with <tags> in it -->
+<ashitacast>
+  <sets>
+    <set name="Idle"><head>Idle Hat</head></set>
+    <set name="Acc" baseset="Idle"><head>Acc Hat</head><body>Body B</body></set>
+  </sets>
+  <load><setvar name="mode" value="Idle"/><echo>loaded $p_name</echo></load>
+  <commands>
+    <command input="/mode"><setvar name="mode" value="$arg1"/><echo>mode $u_mode</echo></command>
+    <command input="/modex"><echo>never: the shorter input wins</echo></command>
+  </commands>
+  <default>
+    <if u_mode="Acc"><equip set="Acc"/></if>
+    <else><equip set="Idle"/></else>
+  </default>
+</ashitacast>]==]
+
+assert(ac.find() == "ashitacast/Tester_WAR.xml", tostring(ac.find()))
+assert(ac.load(ac.find()), table.concat(said, " | "))
+assert(said[#said] == "loaded Tester", said[#said])
+ac.tick()
+assert(ids() == "4:1", "idle hat")
+-- /modex is taken by /mode (a prefix, the shorter input); the line is consumed.
+assert(ac.typed("/modex Acc") == false and said[#said] == "mode Acc", said[#said])
+assert(ac.typed("/other") == nil)
+core.sent = {}
+ac.tick()
+assert(ids() == "4:2 5:4", "acc set over its baseset")
+
+-- A v3 file through the import rules: idlegear, buffactive, lear, variables.
+ac.unload()
+core.sent = {}
+FILES["ashitacast/Tester_WAR.xml"] = [==[<ashitacast>
+  <variables><var name="x">7</var></variables>
+  <sets><set name="Ears" lock="true"><lear>Ear A</lear></set></sets>
+  <idlegear>
+    <if buffactive="Haste"><equip set="Ears"/></if>
+    <elseif advanced="%p_hpp &lt; 50"><equip><head>Acc Hat</head></equip></elseif>
+    <doidlegear/>
+  </idlegear>
+</ashitacast>]==]
+assert(ac.load(ac.find()), table.concat(said, " | "))
+assert(ac._uvars().x == "7")
+ac.tick()
+assert(ids() == "", "no haste: nothing")
+BUFFS = { { id = 33 } }
+ac.tick()
+assert(ids() == "11:3", "ear1 from lear under haste")
+return "acxml flow ok"
+"#;
+
+    /// Steady Cast: a spell sent while moving waits with what follows it, and all of it goes in order once we stand
+    /// still; a spell sent standing goes at once; a hold ends after three seconds even while moving.
+    #[test]
+    fn steady_cast_holds_while_moving() {
+        let files = BUNDLED.iter().find(|b| b.0 == "steady-cast").unwrap().2;
+        let host = Host::default();
+        let vm =
+            Vm::new(bundled_manifest("steady-cast").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            local hold = require("src.hold")
+            local function act(cat) return string.pack("<I2I2I4I2I2I4", 0x01A, 0, 200, 50, cat, 1) end
+            local equip = string.pack("<I2I2BBBB", 0x050, 0, 1, 4, 0, 0)
+            local sent = {}
+            local send = function(d) sent[#sent + 1] = d end
+            -- Moving: the cast and the midcast gear behind it wait.
+            hold.frame({ x = 0, z = 0 }, 1.00, send)
+            hold.frame({ x = 1, z = 0 }, 1.05, send)
+            assert(hold.out(0x01A, act(3), 1.06) == false and hold.out(0x050, equip, 1.06) == false and hold.held() == 2)
+            hold.frame({ x = 1, z = 0 }, 1.10, send)
+            assert(#sent == 0, "still too short")
+            hold.frame({ x = 1, z = 0 }, 1.25, send)
+            assert(#sent == 2 and sent[1] == act(3) and sent[2] == equip)
+            -- What we send again passes once.
+            assert(hold.out(0x01A, sent[1], 1.25) == nil and hold.out(0x050, sent[2], 1.25) == nil)
+            -- Standing: at once; a weapon skill never waits.
+            assert(hold.out(0x01A, act(3), 2.0) == nil)
+            hold.frame({ x = 2, z = 0 }, 2.1, send)
+            assert(hold.out(0x01A, act(7), 2.1) == nil)
+            -- Moving all along: three seconds, then it goes anyway.
+            sent = {}
+            assert(hold.out(0x01A, act(3), 2.1) == false)
+            for t = 2.2, 5.3, 0.1 do hold.frame({ x = t, z = 0 }, t, send) end
+            assert(#sent == 1)
+            return "ok"
+        "#;
+        let got: String = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(got, "ok");
+    }
+
+    /// Chat Alerts: a tell, our name and a chosen word call; our own lines, other people's names and a second call
+    /// within a second do not.
+    #[test]
+    fn chat_alerts_calls() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "chat-alerts").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("chat-alerts").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local S = { on = true, sound = 2, tells = true, mentions = true, party = false, linkshell = false, invites = true,
+              examined = false, emotes = false, away = false, words = "rare drop, nm" }
+            local H, calls, clock = {}, {}, 0
+            settings = { get = function(k) return S[k] end }
+            events = { on = function(n, f) H[n] = f end }
+            audio = { play_ui = function(id) calls[#calls + 1] = id end }
+            game = { player = function() return { name = "Tester", id = 7 } end }
+            text = { plain = function(t) return t end }
+            os.clock = function() return clock end
+            load(INIT)()
+            local function heard(line, sender, kind)
+              local n = #calls
+              clock = clock + 2
+              H.chat_message(line, sender, kind, false)
+              return #calls > n
+            end
+            assert(heard("hi", "Friend", 3))
+            assert(not heard("hi", "Tester", 3))
+            assert(heard("Tester, over here", "Friend", 0))
+            assert(not heard("Testers unite", "Friend", 0))
+            assert(heard("an NM popped", "Friend", 1))
+            assert(not heard("nothing", "Friend", 4))
+            assert(calls[1] == 19)
+            -- Two tells in one moment: one call.
+            clock = clock + 2
+            H.chat_message("hi", "Friend", 3, false)
+            H.chat_message("hi again", "Friend", 3, false)
+            assert(#calls == 4, #calls)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Blue Magic Sets: a monster readying a move that teaches a blue spell we lack gives a line and a call (only as
+    /// a Blue Mage, never for one we know); the codex lists what is missing and what teaches it.
+    #[test]
+    fn blue_sets_learnable_moves() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "blue-sets").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("blue-sets").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local S = { on = true, alert = true, alert_sound = true }
+            local H, C, said, calls, wins = {}, {}, {}, {}, {}
+            local job, learned = 16, { [517] = true }
+            settings = { get = function(k) return S[k] end }
+            events = { on = function(n, f) H[n] = f end }
+            commands = { register = function(n, f) C[n] = f end }
+            timer = { every = function() end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            audio = { play_ui = function(id) calls[#calls + 1] = id end }
+            ui = { window = function(id, w) wins[id] = w end, open = function() end, close = function() end,
+              is_open = function() return false end, on = function() end, update = function() end }
+            game = {
+              player = function() return { name = "Tester", main_job = job, main_level = 75 } end,
+              entity = function(id) return { id = id, name = "Bat", kind = id == 9 and "player" or "mob" } end,
+              spells = function() local t = {} for id in pairs(learned) do t[#t + 1] = id end return t end,
+            }
+            res = { spell = function(id) return ({ [515] = { name = "Maelstrom", levels = { [16] = 61 } },
+                [517] = { name = "Metallic Body", levels = { [16] = 8 } } })[id] or { name = "Spell " .. id, levels = {} } end,
+              mob_skill = function(id) return ({ [462] = "Maelstrom", [448] = "Metallic Body" })[id] end }
+            load(INIT)()
+            local function readies(actor, move, cat)
+              H.action({ actor = actor, category = cat or 7, param = 0, targets = { { id = 1, results = { { value = move, message = 43 } } } } })
+            end
+            readies(5, 462)
+            assert(said[#said] == "Blue Magic: Bat readies Maelstrom, which teaches Maelstrom.", said[#said])
+            assert(#calls == 1 and calls[1] == 18)
+            readies(5, 448)
+            readies(9, 462)
+            readies(5, 462, 8)
+            assert(#said == 1, "a learned spell, a player, a spell cast: none")
+            job = 1
+            readies(5, 462)
+            assert(#said == 1, "not a Blue Mage")
+            C.blu("codex")
+            local w = wins.blucodex
+            assert(w and w.elements[1].text:match("^1 of %d+ learned$"), w and w.elements[1].text)
+            local rows = w.elements[3].rows
+            local found
+            for _, r in ipairs(rows) do
+              if r[1] == "Maelstrom" then found = r end
+              assert(r[1] ~= "Metallic Body", "the Missing tab leaves learned spells out")
+            end
+            assert(found and found[2] == "61" and found[4] == "Maelstrom")
+            return "ok"
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        let got: String = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(got, "ok");
+    }
+
+    /// Tell Inbox: tells while /away are kept and each sender gets one away reply; none kept while online; back
+    /// online, the count is told; //r answers the last sender.
+    #[test]
+    fn tell_inbox_keeps_and_replies() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "tell-inbox").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("tell-inbox").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local S = { on = true, reply = "Back soon." }
+            local H, C, T, ran, said, away = {}, {}, {}, {}, {}, true
+            settings = { get = function(k) return S[k] end }
+            events = { on = function(n, f) H[n] = f end }
+            commands = { register = function(n, f) C[n] = f end, run = function(l) ran[#ran + 1] = l end }
+            timer = { every = function(_, f) T[#T + 1] = f end }
+            game = { player = function() return { name = "Tester", away = away } end }
+            text = { plain = function(t) return t end, strip = function(t) return t end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            ui = { window = function() end, open = function() end, on = function() end, close = function() end }
+            storage = { character = {}, save = function() end }
+            load(INIT)()
+            T[1]()
+            H.chat_message("are you there?", "Friend", 3, false)
+            H.chat_message("hello?", "Friend", 3, false)
+            assert(#storage.character.inbox == 2)
+            assert(#ran == 1 and ran[1] == "/tell Friend Back soon.", ran[1])
+            away = false
+            T[1]()
+            assert(said[#said]:find("2 tells"), said[#said])
+            H.chat_message("ok", "Other", 3, false)
+            assert(#storage.character.inbox == 2)
+            C.r("see", "you")
+            assert(ran[#ran] == "/tell Other see you", ran[#ran])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Target Debuffs: an effect landing on the target shows its icon; it goes when it wears off, and all go when the
+    /// target is defeated.
+    #[test]
+    fn target_debuffs_track() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "target-debuffs").unwrap().2;
+        let vm = Vm::new(bundled_manifest("target-debuffs").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, icons = {}, {}
+            settings = { get = function() return true end }
+            events = { on = function(n, f) H[n] = f end }
+            game = { target = function() return { id = 77 } end }
+            res = { status = function(id) return "Effect " .. id end }
+            ui = { native = { rect = function() return nil end } }
+            hud = { screen = function() return { width = 1920, height = 1080, ui_scale = 1 } end,
+              clear = function() icons = {} end, icon = function(k, s) icons[k] = s.id end }
+            load(INIT)()
+            local function count() local n = 0 for _ in pairs(icons) do n = n + 1 end return n end
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 236, value = 4 } } } } })
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 2, value = 30 } } } } })
+            H.frame()
+            assert(icons.d4 == 4 and count() == 1)
+            H.action({ actor = 5, category = 4, targets = { { id = 77, results = { { message = 237, value = 13 } } } } })
+            H.frame()
+            assert(count() == 2)
+            H.battle_message(5, 77, 206, 4, 0)
+            H.frame()
+            assert(icons.d4 == nil and icons.d13 == 13)
+            H.battle_message(5, 77, 6, 0, 0)
+            H.frame()
+            assert(count() == 0)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Job Gauges: SCH 99 with 100 s of the stratagem recast left has 2 of 5 charges, the next in 4 s; a NIN sub sees
+    /// its shadows and tools.
+    #[test]
+    fn job_gauges_counts() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "job-gauges").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("job-gauges").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local T, shown = nil, nil
+            settings = { get = function() return true end }
+            timer = { every = function(_, f) T = f end }
+            game = {
+              player = function() return { main_job = 20, main_level = 99, sub_job = 13, sub_level = 49 } end,
+              recasts = function() return { abilities = { [231] = 100 }, spells = {}, totals = { abilities = {}, spells = {} } } end,
+              buffs = function() return { { id = 445 } } end,
+              find_items = function(n) return n == "Shihei" and { { count = 30 } } or {} end,
+            }
+            ui = { window = function(_, spec) shown = spec.elements end, open = function() end, close = function() end }
+            load(INIT)()
+            T()
+            local by = {}
+            for _, e in ipairs(shown) do by[e.label] = e.text end
+            assert(by["Stratagems"] == "2 / 5  +1 in 4s", by["Stratagems"])
+            assert(by["Shadows"] == "3", by["Shadows"])
+            assert(by["Shihei"] == "30")
+            assert(by["Ready"] == nil)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Roll Helper: a Chaos Roll of 4 is lucky (+25), a Double-Up typed then is held back; at 9 it goes through; a
+    /// bust ends the roll.
+    #[test]
+    fn roll_helper_lucky() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "roll-helper").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("roll-helper").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, F, said = {}, nil, {}
+            settings = { get = function() return true end }
+            events = { on = function(n, f) H[n] = f end }
+            filters = { typed = function(f) F = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            game = { player = function() return { id = 5 } end }
+            res = { ability = function(id) return ({ [0x200 + 98] = { name = "Chaos Roll" }, [0x200 + 123] = { name = "Double-Up" } })[id] end,
+              status = function() return nil end }
+            load(INIT)()
+            local function act(param, msg, value)
+              H.action({ actor = 5, category = 6, param = param, targets = { { id = 5, results = { { message = msg, value = value } } } } })
+            end
+            act(98, 420, 4)
+            assert(said[#said] == "Chaos Roll 4 (Lucky!): Attack % +25  (lucky 4, unlucky 8)", said[#said])
+            assert(F('/ja "Double-Up" <me>') == false)
+            act(123, 424, 9)
+            assert(said[#said]:find("^Chaos Roll 9: Attack %% %+17"), said[#said])
+            assert(F('/ja "Double-Up" <me>') == nil)
+            act(123, 426, 0)
+            assert(said[#said] == "Chaos Roll: Bust!")
+            assert(F('/ja "Double-Up" <me>') == nil)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Automaton Sets: a saved set changes only the slots that differ: a different attachment off, then the head,
+    /// the frame and the set's attachments on.
+    #[test]
+    fn automaton_sets_round_trip() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "automaton-sets").unwrap().2;
+        let vm = Vm::new(bundled_manifest("automaton-sets").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, ops, said = {}, {}, {}
+            local job = { job = 18, head = 8193, frame = 8226, attachments = { 8449, 8450 }, attachment_slots = { 8449, 8450, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } }
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            storage = { account = {}, save = function() end }
+            sleep = function() end
+            res = { item = function(id) return { name = "item" .. id } end }
+            actions = { attach = function(slot, id) ops[#ops + 1] = "a" .. slot .. ":" .. id end,
+              detach = function(slot) ops[#ops + 1] = "d" .. slot end }
+            game = { job_data = function() return { main = job } end, entity_by_tag = function() return nil end }
+            load(INIT)()
+            C.automaton("save", "Tank")
+            assert(storage.account.sets.tank.head == 8193)
+            job = { job = 18, head = 8194, frame = 8227, attachments = { 8451 }, attachment_slots = { 0, 0, 8451, 0, 0, 0, 0, 0, 0, 0, 0, 0 } }
+            C.automaton("tank")
+            local s = table.concat(ops, " ")
+            assert(s == "d5 a1:8193 a2:8226 a3:8449 a4:8450", s)
+            assert(said[#said]:find("but not"), said[#said])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Loot Tracker: a TH rise (proc 603) shows on the target; a new pool item counts as its dropper's drop, with the
+    /// pool's time left.
+    #[test]
+    fn loot_tracker_th_and_pool() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "loot-tracker").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("loot-tracker").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, T, shown = {}, nil, {}
+            settings = { get = function() return true end }
+            events = { on = function(n, f) H[n] = f end }
+            timer = { every = function(_, f) T = f end }
+            commands = { register = function() end }
+            local mob = { id = 77, name = "Forest Hare", kind = "mob" }
+            game = { target = function() return mob end, entity = function(id) return id == 77 and mob or nil end,
+              treasure = function() return { { slot = 0, item = 4358, count = 1, dropper = 77 } } end }
+            res = { item = function() return { name = "Hare Meat" } end }
+            ui = { window = function(_, s) shown = s.elements end, open = function() end, close = function() end }
+            os.clock = function() return 100 end
+            load(INIT)()
+            H.action({ targets = { { id = 77, results = { { proc = { message = 603, value = 3 } } } } } })
+            H.battle_message(5, 77, 6, 0, 0)
+            T()
+            assert(shown[1].label == "Treasure Hunter: Forest Hare" and shown[1].text == "3", shown[1].text)
+            assert(shown[2].label == "Hare Meat" and shown[2].text == "5:00", shown[2].text)
+            assert(shown[3].text == "Forest Hare: 1 killed \u{2014} Hare Meat x1", shown[3].text)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Monster Alerts: a monster's readied move and started spell make lines in the box; a watched move calls; a
+    /// player's action makes none.
+    #[test]
+    fn monster_alerts_lines() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "monster-alerts").unwrap().2;
+        let vm = Vm::new(bundled_manifest("monster-alerts").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local H, texts, calls = {}, {}, 0
+            local S = { on = true, moves = "Foot Kick", monsters = "" }
+            settings = { get = function(k) return S[k] end }
+            events = { on = function(n, f) H[n] = f end }
+            timer = { every = function() end }
+            local E = { [9] = { id = 9, name = "Forest Hare", kind = "mob" }, [5] = { id = 5, name = "Lnxcsfix", kind = "player" } }
+            game = { entity = function(id) return E[id] end, entities = function() return {} end }
+            res = { mob_skill = function(id) return id == 257 and "Foot Kick" or nil end, ability = function() return nil end,
+              spell = function(id) return id == 144 and { name = "Fire" } or nil end }
+            audio = { play_ui = function() calls = calls + 1 end }
+            hud = { screen = function() return { width = 1920, height = 1080, ui_scale = 1 } end, clear = function() texts = {} end,
+              text = function(k, s) texts[k] = s.text end }
+            load(INIT)()
+            local function act(actor, cat, value)
+              H.action({ actor = actor, category = cat, param = 24931, targets = { { id = 5, results = { { message = 43, value = value } } } } })
+            end
+            act(9, 7, 257)
+            act(9, 8, 144)
+            act(5, 7, 257)
+            H.frame()
+            assert(texts.l1 == "Forest Hare readies Foot Kick.", texts.l1)
+            assert(texts.l2 == "Forest Hare starts casting Fire on Lnxcsfix.", texts.l2)
+            assert(texts.l3 == nil and calls == 1)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Casket Solver: hint lines narrow 10..99; the answer comes when one is left.
+    #[test]
+    fn casket_solver_narrows() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "casket-solver").unwrap().2;
+        let vm = Vm::new(bundled_manifest("casket-solver").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local F, T, said = nil, nil, {}
+            settings = { get = function() return true end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function(_, f) T = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            text = { strip = function(t) return t end }
+            load(INIT)()
+            F("The monster was concealing a treasure chest!")
+            F("You have a hunch that the combination is greater than 40 and less than 60.")
+            T()
+            assert(said[#said] == "Casket Solver: 19 left. Try 50.", said[#said])
+            F("You have a hunch that the first digit is odd.")
+            F("You have a hunch that the second digit is 2, 7, or 9.")
+            T()
+            assert(said[#said] == "Casket Solver: 3 left: 52, 57, 59. Try 57.", said[#said])
+            F("You have a hunch that the lock's combination is greater than 57.")
+            T()
+            assert(said[#said] == "Casket Solver: the combination is 59.", said[#said])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Warp Helper: the Home Point and Survival Guide walks pick the rows the menus showed live, through a second page.
+    #[test]
+    fn warp_helper_walks() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "warp-helper").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("warp-helper").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, said, picks, menus, at = {}, {}, {}, {}, 0
+            settings = { get = function(k) return k == "fare" and "Gil" or true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            events = { on = function() end }
+            sleep = function() end
+            game = {
+              event = function()
+                if at == 0 or at > #menus then return nil end
+                return { menu = { question = menus[at][1], options = menus[at][2], cursor = 1 } }
+              end,
+              entities = function() return { { id = 7, name = "Home Point #1", distance = 3, pos = { x = 0, z = 0 } },
+                { id = 8, name = "Survival Guide", distance = 40, pos = { x = 0, z = 0 } } } end,
+            }
+            actions = {
+              talk = function() at = 1 end,
+              choose = function(i) picks[#picks + 1] = i; at = at + 1 end,
+            }
+            load(INIT)()
+            menus = {
+              { "What will you do?", { "Travel to another home point.", "Set this as your home point.", "Other settings.", "On second thought, never mind." } },
+              { "Teleport to which region?", { "On second thought, none.", "Select from favorites.", "Current region.", "San d'Oria.", "Bastok.", "Windurst.", "Jeuno.", "Next page." } },
+              { "Teleport where?", { "Never mind.", "Ru'Lude Gardens.", "Upper Jeuno.", "Lower Jeuno.", "Port Jeuno." } },
+              { "Teleport where?(Lower Jeuno)", { "Nowhere.", "Home Point #1 (E).", "Home Point #2 (M)." } },
+              { "Teleport? (Current gil: 97531)", { "Add to favorites.", "Yes, please.", "No, thank you." } },
+            }
+            C.warp("hp", "lower", "jeuno", "2")
+            assert(table.concat(picks, " ") == "1 7 4 3 2", table.concat(picks, " "))
+            C.warp("jeuno")
+            assert(said[#said] == "Warp Helper: which one: Upper Jeuno, Lower Jeuno, Port Jeuno?", said[#said])
+            picks, at = {}, 0
+            game.entities = function() return { { id = 8, name = "Survival Guide", distance = 2, pos = { x = 0, z = 0 } } } end
+            menus = {
+              { "What chapter will you read?", { "None.", "\u{201C}Teleportation Assistance.\u{201D}", "\u{201C}Other mysteries.\u{201D}" } },
+              { "Travel to which region?", { "On second thought, none.", "Select from amongst favorites.", "Bastok.", "Ronfaure.", "Next page." } },
+              { "Travel to which region?", { "On second thought, none.", "Select from amongst favorites.", "Movalpolos.", "Mamool Ja Savage.", "Previous page." } },
+              { "Where will you travel?", { "Nowhere.", "Wajaom Woodlands.", "Mamook.", "Aydeewa Subterrane." } },
+              { "Travel to Wajaom Woodlands?", { "Add to favorites.", "Travel using 1000 gil. (97531 gil)", "Travel using 50 tabs. (0 total)", "Not just yet." } },
+            }
+            C.warp("wajaom")
+            assert(table.concat(picks, " ") == "2 5 4 2 2", table.concat(picks, " "))
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Content Trackers: each content's lines become its window's rows; a new zone starts afresh; Odyssey only from
+    /// Rabao; the pop windows.
+    #[test]
+    fn content_trackers_read() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "content-trackers").unwrap().2;
+        let vm = Vm::new(bundled_manifest("content-trackers").unwrap(), PathBuf::from("."), vm::Source::Bundled(files))
+            .unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r##"
+            local F, T, W, Z = nil, nil, nil, 1
+            local NAMES = { [1] = "Dynamis - San d'Oria", [2] = "Abyssea - Konschtat", [3] = "Zhayolm Remnants", [4] = "Nyzul Isle",
+              [292] = "Reisenjima Henge", [264] = "Yorcia Weald [U]", [261] = "Ceizak Battlegrounds", [262] = "Foret de Hennetiel",
+              [247] = "Rabao", [298] = "Walk of Echoes [P1]", [279] = "Walk of Echoes [P2]", [275] = "Outer Ra'Kaznar [U1]" }
+            local WINS, ON, CMDS, SAID, UPD = {}, {}, {}, {}, {}
+            settings = { get = function() return true end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function(_, f) T = f end }
+            text = { strip = function(t) return t end }
+            commands = { register = function(n, f) CMDS[n] = f end }
+            chat = { add = function(t) SAID[#SAID + 1] = t end }
+            storage = { character = {} }
+            ui = { window = function(id, spec) WINS[id] = spec if id == "content" then W = spec end end, open = function() end,
+              close = function(id) WINS[id] = nil if id == "content" then W = nil end end, on = function(id, f) ON[id] = f end,
+              is_open = function(id) return WINS[id] ~= nil end, update = function(id, el, f) UPD[#UPD + 1] = { id, el, f } end }
+            res = { zone = function(id) return NAMES[id] end, item = function(id) return { name = "item" .. id } end,
+              key_item = function(id) return { name = "ki" .. id } end }
+            local bag = { { id = 1452, count = 30 }, { id = 1453, count = 2 } }
+            local KEYS, BUFFS, POOL, COUNT = { 1546, 9 }, {}, {}, nil
+            game = { player = function() return { zone = Z, name = "Lnxcsfix" } end, items = function(b) return b == 0 and bag or {} end,
+              key_items = function() return KEYS end, buffs = function() return BUFFS end, treasure = function() return POOL end,
+              countdown = function() return COUNT end }
+            load(INIT)()
+            local function texts()
+              local out = {}
+              for _, e in ipairs(W.elements) do out[#out + 1] = e.text end
+              return table.concat(out, "|")
+            end
+            local function el(t)
+              for _, e in ipairs(W.elements) do if e.text == t then return e end end
+            end
+            T()
+            F("The sands of the hourglass have begun to fall.\nYou have 60 minutes (Earth time) remaining in Dynamis.")
+            F("Your stay in Dynamis has been extended by 10 minutes.")
+            T()
+            assert(W.title == "Dynamis")
+            assert(texts() == "69:59|Bronzepiece: 30|Silverpiece: 2|Currency worth 230 singles|Granules: Azure"
+              or texts() == "70:00|Bronzepiece: 30|Silverpiece: 2|Currency worth 230 singles|Granules: Azure", texts())
+            Z = 2
+            T()
+            F("Visitant Light Intensity")
+            F("Pearlescent: 12 / Ebon: 3")
+            F("Golden: 40 / Silvery: 5")
+            F("Azure: 100 / Ruby: 0 / Amber: 255")
+            F("Lnxcsfix's body emits a strong golden light!")
+            F("Obtained 120 cruor. (Total: 4410)")
+            F("Exiting in 5 minutes.")
+            T()
+            assert(W.elements[1].text == "4:59" or W.elements[1].text == "5:00", W.elements[1].text)
+            F("Your visitant status will wear off in 30 minutes.")
+            T()
+            assert(texts():find("Pearlescent: 12|Ebon: 3|Golden: 40 %+|Silvery: 5|Azure: 100|Ruby: 0|Amber: 255|Cruor: 4410"), texts())
+            Z = 3
+            bag = { { id = 5365, count = 1 }, { id = 5376, count = 2 } }
+            T()
+            F("Main Weapon/Sub-Weapon restriction removed.")
+            F("STR Down removed.")
+            T()
+            local t = texts()
+            assert(not t:find("Main Weapon") and not t:find("STR Down") and t:find("Head/Neck|Body"), t)
+            Z = 4
+            T()
+            F("Transfer complete. Welcome to Floor 21.")
+            F("Objective: Eliminate all enemies.")
+            F("You obtain 160 tokens!")
+            F("Floor 21 objective complete. Rune of Transfer activated.")
+            T()
+            assert(texts() == "Floor 21 \u{2014} cleared|Eliminate all enemies|Tokens this run: 160", texts())
+
+            -- Omen: the floor objective, omens, the bonus objectives; a cleared floor's next objective drops them.
+            Z = 292
+            T()
+            F("Vanquish 5 sweetwater foes.")
+            F("There are 12 omens from your foes!")
+            F("Follow the light and carry out your charge before time runs out.\nYou have 120 seconds remaining.")
+            F("1: Deal 3 critical hits to your foes.")
+            F("2: Reduce your foe's HP by at least 2000 using a single weapon skill.")
+            F("3: Restore at least 500 HP 4 times.")
+            F("1: You have dealt 3 critical hits to your foes.")
+            F("3: You have restored at least 500 HP 2 times.")
+            F("2: You have failed to reduce your foe's HP by at least 2000 using a single weapon skill.")
+            T()
+            assert(W.title == "Omen")
+            t = texts()
+            assert(t:find("Floor 1  \u{00b7}  Omens: 12|Vanquish 5 sweetwater foes|", 1, true), t)
+            assert(el("1  Critical hits  3/3").colour[2] == 220 and el("2  Weapon skill damage  at least 2000").colour[1] == 235, t)
+            assert(el("3  Cures  2/4") and el("3  Cures  2/4").colour == nil, t)
+            F("A spectral light flares up.")
+            F("Your stay has been extended by 5 minutes.")
+            F("Vanquish all monsters.")
+            T()
+            t = texts()
+            assert(t == "Floor 2  \u{00b7}  Omens: 12|Vanquish all monsters", t)
+
+            -- Delve: a fracture's plasm, kills, stage and airlixirs; in a field zone the plasm opens the window.
+            Z = 264
+            T()
+            F("You receive 150 corpuscles of mweya plasm.")
+            F("You receive 500 corpuscles, making for a total of 12500.")
+            F("Your ears pick up a discordant howl.")
+            F("You find an airlixir +1 on the Yorcia Bloodfly.")
+            T()
+            assert(W.title == "Delve")
+            assert(texts() == "Plasm: 650 (total 12500)|Kills (estimate): 4|3 of 6|Airlixirs: 0  \u{00b7}  +1: 1  \u{00b7}  +2: 0", texts())
+            Z = 261
+            T()
+            assert(W == nil)
+            F("You receive 100 corpuscles of mweya plasm.")
+            T()
+            assert(W.title == "Delve" and texts():find("Plasm: 100", 1, true), texts())
+
+            -- A reive: ours joined, momentum, bayld (a quest's is not counted).
+            Z = 262
+            T()
+            F("Lnxcsfix has joined the Colonization Reive!")
+            F("Reive momentum score: Physical attack.")
+            F("Momentum bonus: HP recovery!")
+            F("Momentum Bonus: Fast Cast!")
+            F("Lnxcsfix obtained 300 bayld!")
+            F("You have obtained 50 bayld!")
+            T()
+            assert(W.title == "Reive", tostring(W and W.title))
+            t = texts()
+            assert(t:find("Colonization Reive|", 1, true) and t:find("Bayld: 300", 1, true) and t:find("1  Physical attack", 1, true)
+              and t:find("HP recovery \u{00d7}1", 1, true) and t:find("Fast Cast \u{00d7}1", 1, true), t)
+
+            -- Odyssey: armed in Rabao, the run, the last run back in Rabao; the moglophone's wait.
+            KEYS = { 3212 }
+            Z = 247
+            T()
+            assert(W.title == "Odyssey" and texts() == "Moglophone: in hand", texts())
+            F("Entering Sheol B: Difficult.")
+            T()
+            KEYS = {}
+            Z = 298
+            T()
+            assert(W.title == "Odyssey")
+            F("You receive 20 moogle segments for a total of 1020.")
+            F("You receive 5 izzat, for a total of 35.")
+            F("Moogle Mastery is now level IV.")
+            T()
+            assert(texts() == "Sheol B (Difficult)|Segments: 20 (total 1020)|Izzat: 5 (total 35)|Moogle Mastery: IV", texts())
+            Z = 247
+            T()
+            t = texts()
+            assert(t:find("Last run: Sheol B (Difficult)|Segments: 20 (total 1020)|Another moglophone in about ", 1, true), t)
+            Z = 279
+            T()
+            assert(W == nil, "not entered from Rabao: not Odyssey")
+
+            -- Sortie: our gallimaufry, coffer reports, temporary items; the game's countdown for the time.
+            Z = 275
+            COUNT = { left = 600, length = 1800 }
+            T()
+            F("Lnxcsfix received 100 gallimaufry for a total of 900.")
+            F("Someone received 50 gallimaufry for a total of 60.")
+            F("#B treasure coffer status report: 3/3 #?: 1/1.")
+            F("You obtain the temporary item: Ra'Kaznarian Ether!")
+            T()
+            assert(W.title == "Sortie")
+            t = texts()
+            assert(t:find("^10:00|Gallimaufry: 100 %(total 900%)|#A  no report yet|#B  3/3   #%?: 1/1|"), t)
+            assert(el("#B  3/3   #?: 1/1").colour[2] == 220 and t:find("Temporary items: Ra'Kaznarian Ether", 1, true), t)
+
+            -- Pop lists: an NM's tree with what we hold; the NM list; the Zeni NMs and a ???'s place.
+            KEYS = { 1530 }
+            bag = { { id = 3262, count = 1 }, { id = 3291, count = 12 } }
+            CMDS.pops("alf")
+            local P = WINS.pops
+            assert(P.title == "Alfard", P.title)
+            local tree = P.elements[2].rows
+            assert(#tree == 5 and tree[1].colour[2] == 220 and tree[2].colour[2] == 220 and tree[3].colour[1] == 235, #tree)
+            assert(tree[1].cells[1] == "ki1530" and tree[4].cells[1] == "        item3267" and tree[1].cells[2] == "Ningishzida  Forced (I-7/I-8)",
+              tree[4].cells[1])
+            assert(P.elements[3].text == "Every pop held" and P.elements[4].text == "item3291: 12 / 75", P.elements[4].text)
+            T()
+            assert(#UPD > 0 and UPD[1][1] == "pops")
+            CMDS.pops("")
+            assert(WINS.pops.title == "Pop lists" and #WINS.pops.elements[1].rows == 28)
+            ON.pops("pops", { kind = "select", id = "nms", index = 2 })
+            assert(WINS.pops.title == "Amphitrite")
+            CMDS.pops("nobody")
+            assert(SAID[#SAID]:find("No pop list", 1, true))
+            CMDS.znm()
+            assert(WINS.znm.elements[1].type == "tabs" and #WINS.znm.elements[1].items == 4)
+            ON.znm("znm", { kind = "select", id = "t1_1", index = 1 })
+            assert(SAID[#SAID] == "Vulpangue: its ??? is at (-697, -7, -123) in zone 51.", SAID[#SAID])
+        "##;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// No two bundled mods register the same // command (the first loaded would take it).
+    #[test]
+    fn bundled_commands_unique() {
+        let mut seen: std::collections::HashMap<String, &str> = std::collections::HashMap::new();
+        for (id, _, files) in BUNDLED {
+            for (_, src) in files.iter() {
+                for part in src.split("commands.register(\"").skip(1) {
+                    let name = part.split('"').next().unwrap().to_string();
+                    if let Some(other) = seen.insert(name.clone(), id) {
+                        assert_eq!(other, *id, "//{name} is registered by both {other} and {id}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// Multibox Control: //send, //sendtarget and //stna go out as ipc lines; a window that gets them acts.
+    #[test]
+    fn multibox_routes() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "multibox").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("multibox").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, E, sent, ran, cast, said = {}, {}, {}, {}, {}, {}
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end, run = function(l) ran[#ran + 1] = l end }
+            events = { on = function(n, f) E[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            ipc = { send = function(t, to) sent[#sent + 1] = (to or "*") .. "|" .. t end }
+            client = { focus = function() ran[#ran + 1] = "focus" end }
+            actions = { cast = function(s, who) cast[#cast + 1] = s .. ">" .. who end, target = function(id) ran[#ran + 1] = "target " .. id end }
+            game = {
+              player = function() return { name = "Mage" } end,
+              target = function() return { id = 1234 } end,
+              spells = function() return { 14, 15, 20, 143 } end,
+              recasts = function() return { spells = {} } end,
+              party = function() return {
+                { slot = 0, name = "Mage", in_zone = true, hp = 500, buffs = { 3 } },
+                { slot = 1, name = "Tank", in_zone = true, hp = 900, buffs = { 4, 13 } },
+              } end,
+            }
+            load(INIT)()
+            C.send("Tank", "/ja", "Provoke", "<t>")
+            C.sendtarget()
+            C.stna("Mage")
+            assert(sent[1] == "Tank|run\t/ja Provoke <t>", sent[1])
+            assert(sent[2] == "*|target\t1234", sent[2])
+            assert(cast[1] == "15>Tank", tostring(cast[1]))
+            E.ipc_message("run\t/heal", "Mage")
+            E.ipc_message("target\t77", "Mage")
+            E.ipc_message("focus\t", "Mage")
+            assert(table.concat(ran, ",") == "/heal,target 77,focus", table.concat(ran, ","))
+            E.chat_message("hello", "Friend", 3, false)
+            assert(sent[3] == "*|tell\t[Mage] Friend>> hello", sent[3])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Gear Stats: descriptions and augments summed; conditional lines and DMG / Delay left out.
+    #[test]
+    fn gear_stats_sum() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "gear-stats").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("gear-stats").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, W = {}, nil
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            timer = { every = function() end }
+            local open = false
+            ui = { window = function(_, spec) W = spec end, open = function() open = true end, close = function() end,
+              is_open = function() return open end }
+            local desc = {
+              [1] = "DMG:20 Delay:240\nSTR+2 Accuracy+5",
+              [2] = "DEF:30 HP+20 MP-10\n\"Store TP\"+3 Haste+3%\nPet: Attack+10",
+              [3] = "DEF:5 Accuracy+2\nSet: Increases Haste",
+            }
+            res = {
+              item = function(id) return { description = desc[id] } end,
+              augments = function(id) return { lines = id == 3 and { "STR+1", "Magic Atk. Bonus+4" } or {} } end,
+            }
+            game = {
+              equipment = function() return { [0] = { id = 1, bag = 0, slot = 1 }, [5] = { id = 2, bag = 0, slot = 2 },
+                [15] = { id = 3, bag = 0, slot = 3 } } end,
+              items = function() return { { slot = 3, extdata = "x" } } end,
+            }
+            load(INIT)()
+            C.gearstats()
+            local got = {}
+            for _, r in ipairs(W.elements[1].rows) do got[#got + 1] = r[1] .. "=" .. r[2] end
+            local s = table.concat(got, " ")
+            assert(s == '"Store TP"=+3 Accuracy=+7 DEF=35 HP=+20 Haste=+3% MP=-10 Magic Atk. Bonus=+4 STR=+3', s)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Calculator: precedence, brackets, powers, k / m, commas in the answer; bad input is an error line, never run.
+    #[test]
+    fn calculator_answers() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "calculator").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("calculator").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, said = {}, {}
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            ui = { window = function() end, open = function() end, on = function() end, update = function() end }
+            load(INIT)()
+            local function calc(s) C.calc(s) return said[#said] end
+            assert(calc("12 * 99 + 450") == "12 * 99 + 450 = 1,638", said[#said])
+            assert(calc("(2+3)*4") == "(2+3)*4 = 20")
+            assert(calc("2^10") == "2^10 = 1,024")
+            assert(calc("1.5k / 4") == "1.5k / 4 = 375")
+            assert(calc("2m - 1") == "2m - 1 = 1,999,999")
+            assert(calc("10 / 4") == "10 / 4 = 2.5")
+            assert(calc("os.exit()"):find("^Calculator: "))
+            assert(calc("1/0"):find("no answer"))
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Chat Filter: a listed player, a listed word, a hidden kind and a repeat are dropped; others pass.
+    #[test]
+    fn chat_filter_drops() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "chat-filter").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("chat-filter").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local S = { on = true, players = "Spammer, Bot", words = "gil selling", shouts = false, yells = true, repeats = true }
+            local F, clock = nil, 0
+            settings = { get = function(k) return S[k] end }
+            filters = { chat = function(f) F = f end }
+            timer = { every = function() end }
+            text = { strip = function(t) return t end }
+            os.clock = function() return clock end
+            load(INIT)()
+            assert(F("Spammer : hi", 9) == false)
+            assert(F("[1]<Bot> hi", 14) == false)
+            assert(F("(Friend) hi", 13) == nil)
+            assert(F("Friend : cheap GIL SELLING here", 10) == false)
+            assert(F("Friend : party?", 11) == false)
+            assert(F("Friend : need a healer", 10) == nil)
+            clock = 30
+            assert(F("Friend : need a healer", 10) == false)
+            clock = 100
+            assert(F("Friend : need a healer", 10) == nil)
+            assert(F("The Forest Hare is paralyzed.", 36) == nil)
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Web Search: the words given, else the item under a list's cursor, else the target, go to the site, encoded.
+    #[test]
+    fn web_search_urls() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "web-search").unwrap().2;
+        let vm =
+            Vm::new(bundled_manifest("web-search").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, opened, high, target = {}, {}, nil, nil
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            net = { open_url = function(u) opened[#opened + 1] = u end }
+            chat = { add = function() end }
+            ui = { native = { highlighted = function() return high end } }
+            game = { target = function() return target end }
+            res = { item = function(id) return id == 4096 and { name = "Fire Crystal" } or nil end }
+            load(INIT)()
+            C.wiki("Kupipi's", "Trust")
+            assert(opened[1] == "https://www.bg-wiki.com/index.php?search=Kupipi%27s%20Trust", opened[1])
+            high = { kind = "item", id = 4096 }
+            C.ah()
+            assert(opened[2] == "https://www.ffxiah.com/search/item?q=Fire%20Crystal", opened[2])
+            high, target = nil, { name = "Forest Hare" }
+            C.wiki()
+            assert(opened[3] == "https://www.bg-wiki.com/index.php?search=Forest%20Hare", opened[3])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Hotbars: a macro's first action names its icon and recast; a drag swaps two slots, in the sub job's set when
+    /// either slot comes from it.
+    #[test]
+    fn hotbar_actions_and_swap() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "hotbar").unwrap().2;
+        let vm = Vm::new(bundled_manifest("hotbar").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            res = setmetatable({
+              spell = function(id) if id == 1 then return { name = "Cure" } end end,
+              ability = function(id)
+                if id == 0x20 then return { name = "Raging Axe" } end
+                if id == 0x210 then return { name = "Provoke", recast_id = 5 } end
+              end,
+            }, { __index = function() return function() return nil end end })
+            game.find_items = function(name) if name == "potion" then return { { id = 4112 } } end return {} end
+            local a = require("src.actions")
+            local p = a.of({ lines = { "/echo go", '/ja "Provoke" <t>' } })
+            assert(p.kind == "ability" and p.id == 0x210 and p.recast_id == 5)
+            assert(a.of({ lines = { "/ma Cure <me>" } }).id == 1)
+            assert(a.of({ lines = { '/ws "Raging Axe" <t>' } }).id == 0x20)
+            assert(a.of({ lines = { '/item "Potion" <me>' } }).id == 4112)
+            assert(a.of({ lines = { "/echo nothing" } }) == false)
+            local r = { spells = {}, abilities = { [5] = 15 }, totals = { spells = {}, abilities = { [5] = 30 } } }
+            local left, frac = a.recast(p, r)
+            assert(left == 15 and frac == 0.5)
+
+            local saved
+            local data = require("src.data")
+            data.init({ read = function() return nil end, write = function(_, t) saved = t end, decode = json.decode,
+              encode = json.encode })
+            local m = function(n) return { name = n, lines = { "/echo " .. n } } end
+            data.set_macro("WAR", nil, 1, 1, m("one"))
+            data.set_macro("WAR", nil, 1, 2, m("two"))
+            data.set_macro("WAR", "NIN", 1, 3, m("sub"))
+            data.swap("WAR", nil, 1, 1, 1, 2)
+            assert(data.resolve("WAR", nil, 1, 1).name == "two" and data.resolve("WAR", nil, 1, 2).name == "one")
+            -- Into the sub set: the main set keeps its macro under the sub set's.
+            data.swap("WAR", "NIN", 1, 3, 1, 4)
+            local four, from = data.resolve("WAR", "NIN", 1, 4)
+            assert(four.name == "sub" and from == "sub")
+            assert(data.resolve("WAR", "NIN", 1, 3) == nil)
+            assert(saved ~= nil)
+        "#;
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
     }
 
     /// ui.native.place / rect / panels and ui.skin: names checked, the permission asked, each change its mod's (another
@@ -1960,6 +4034,90 @@ mod tests {
         assert_eq!(n as usize, native::PANELS.len());
     }
 
+    /// Every bundled mod's manifest parses and its Lua compiles; settings on our Extras tabs name one and label their
+    /// values.
+    #[test]
+    fn bundled_mods_load() {
+        for (id, text, files) in BUNDLED {
+            let m = manifest::parse(text, id).unwrap_or_else(|e| panic!("{id}: {e:#}"));
+            for (name, src) in files.iter() {
+                let lua = mlua::Lua::new();
+                lua.load(*src).set_name(*name).into_function().unwrap_or_else(|e| panic!("{id}/{name}: {e}"));
+            }
+            for (key, d) in &m.settings {
+                assert!(d.tab.is_empty() || !d.label.is_empty(), "{id}.{key}: a tabbed setting needs its row's label");
+            }
+        }
+    }
+
+    /// A setting `from` a config field takes its value once, when not saved yet; others are left alone.
+    #[test]
+    fn settings_carry_over_from_the_config() {
+        let m = manifest::parse(
+            r#"
+            [settings.a]
+            type = "int"
+            from = "x"
+            [settings.b]
+            type = "bool"
+            from = "y"
+            scope = "character"
+            [settings.c]
+            type = "bool"
+            from = "missing"
+            [settings.d]
+            type = "bool"
+            "#,
+            "t",
+        )
+        .unwrap();
+        let config = serde_json::json!({"x": 3, "y": true});
+        assert_eq!(
+            migrations(&m, &config, |_, _| false),
+            [("a".to_string(), false, 3.into()), ("b".to_string(), true, true.into())]
+        );
+        assert_eq!(migrations(&m, &config, |k, character| k == "b" && character), [("a".to_string(), false, 3.into())]);
+        // Labelled values need a label each; a tab must be one of ours.
+        assert!(manifest::parse("[settings.e]\ntype = \"int\"\noptions = [\"OFF\"]\nvalues = [0, 3]", "t").is_err());
+        assert!(manifest::parse("[settings.e]\ntype = \"int\"\ntab = \"Nope\"", "t").is_err());
+    }
+
+    /// Per-window opacity: a mod's for its own windows (ui.window, ui.opacity, hud.opacity), cleared by it alone; the
+    /// player's wins.
+    #[test]
+    fn window_opacity() {
+        let host = Host::default();
+        let new = |id: &str| {
+            let vm = Vm::new(
+                manifest::Manifest { id: id.into(), ..Default::default() },
+                PathBuf::from("."),
+                vm::Source::Dir(PathBuf::from(".")),
+            )
+            .unwrap();
+            vm.lua.set_app_data(host.info.clone());
+            api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+            vm
+        };
+        let (a, b) = (new("a"), new("b"));
+        a.lua.load(r#"ui.window("w", {title = "W", opacity = 0.5}); hud.opacity("bars", 0.25); hud.rect("r", {window = "bars"})"#).exec().unwrap();
+        let player = std::collections::BTreeMap::new();
+        assert_eq!(
+            (
+                host.window_opacity(&player, "mod:a:w"),
+                host.window_opacity(&player, "hud:a:bars"),
+                host.window_opacity(&player, "hud:a:hud")
+            ),
+            (0.5, 0.25, 1.0)
+        );
+        assert!(a.st.borrow().hud.iter().any(|e| e.id == "r" && e.window == "bars"));
+        b.lua.load(r#"ui.opacity("w", nil)"#).exec().unwrap();
+        assert_eq!(host.window_opacity(&player, "mod:a:w"), 0.5);
+        let player = std::collections::BTreeMap::from([("mod:a:w".to_string(), 0.75)]);
+        assert_eq!(host.window_opacity(&player, "mod:a:w"), 0.75);
+        a.lua.load(r#"ui.opacity("w", nil)"#).exec().unwrap();
+        assert_eq!(host.window_opacity(&std::collections::BTreeMap::new(), "mod:a:w"), 1.0);
+    }
+
     /// ui.skin: the newest mod's change wins, and a clear or unload lets the change before it show again.
     #[test]
     fn skin_override_precedence() {
@@ -2051,6 +4209,25 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// The Mods page's on/off names a mod by its folder, which need not be its manifest id: either finds it.
+    #[test]
+    fn mods_named_by_folder_or_id() {
+        let base = std::env::temp_dir().join(format!("vana-lua-named-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("my-folder")).unwrap();
+        std::fs::write(base.join("my-folder/mod.toml"), "id = \"the-id\"\n").unwrap();
+        assert_eq!(folder_of(&base, "my-folder"), base.join("my-folder"));
+        assert_eq!(folder_of(&base, "the-id"), base.join("my-folder"));
+        let mut host = Host::default();
+        let dir = base.join("my-folder");
+        let m = manifest::Manifest { id: "the-id".into(), ..Default::default() };
+        host.vms.push(Vm::new(m, dir.clone(), vm::Source::Dir(dir)).unwrap());
+        assert_eq!(host.named("my-folder"), Some(0));
+        assert_eq!(host.named("the-id"), Some(0));
+        assert_eq!(host.named("other"), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     /// A /lua line as the host reads one, whatever its spaces, slashes or case.
     #[test]
     fn lua_lines() {
@@ -2080,10 +4257,12 @@ mod tests {
         vm.st.borrow_mut().granted.push("mods".into());
         vm.lua.load("commands.run('//lua unload other')").exec().unwrap();
         let ops: Vec<bool> =
-            vm.st.borrow().ops.iter().filter_map(|o| if let Op::Run(_, m) = o { Some(*m) } else { None }).collect();
+            vm.st.borrow().ops.iter().filter_map(|o| if let Op::Run(_, m, _) = o { Some(*m) } else { None }).collect();
         assert_eq!(ops, [false, true]);
-        assert!(!From::Mod { mods: false }.controls_mods() && !From::Bind { mods: false }.controls_mods());
-        assert!(From::Player.controls_mods() && From::Mod { mods: true }.controls_mods());
+        assert!(
+            !From::Mod { mods: false, input: false }.controls_mods() && !From::Bind { mods: false }.controls_mods()
+        );
+        assert!(From::Player.controls_mods() && From::Mod { mods: true, input: false }.controls_mods());
     }
 
     /// Injected and hook-built packets carry a size field that matches their bytes, and none overflows it.
@@ -2245,6 +4424,108 @@ impl Host {
     }
 }
 
+/// A battle message as the mods' battle filters see it (filters.battle).
+pub(in crate::client) struct BattleMsg {
+    pub id: u16,
+    /// The 0x028 action's category; none for a 0x029 / 0x02D message.
+    pub category: Option<u8>,
+    pub actor: u32,
+    pub target: u32,
+    pub value: i32,
+    pub mode: u8,
+}
+
+/// What the battle filters made of a message.
+pub(in crate::client) enum Verdict {
+    Keep,
+    Drop,
+    Replace(Vec<String>),
+}
+
+impl Host {
+    pub(in crate::client) fn has_battle_filters(&self) -> bool {
+        self.vms.iter().any(|v| v.suspended.is_none() && !v.st.borrow().battle_filters.is_empty())
+    }
+}
+
+/// The mods' battle filters in load order, with game state: each sees the lines so far and may drop the message,
+/// replace its lines, or set its names' colour codes (written back to `actor` / `target`).
+pub(in crate::client) fn filter_battle(
+    w: &mut World,
+    m: &BattleMsg,
+    actor: &mut Option<Who>,
+    target: &mut Option<Who>,
+    mut lines: Vec<String>,
+) -> Verdict {
+    let host = std::mem::take(&mut w.lua);
+    let mut verdict = Verdict::Keep;
+    for vm in host.vms.iter().filter(|v| v.suspended.is_none()) {
+        let funcs: Vec<mlua::Function> =
+            vm.st.borrow().battle_filters.iter().filter_map(|(_, k)| vm.lua.registry_value(k).ok()).collect();
+        if funcs.is_empty() {
+            continue;
+        }
+        lend(vm, w, |vm| {
+            for f in funcs {
+                let r = (|| -> mlua::Result<()> {
+                    let lua = &vm.lua;
+                    let t = lua.create_table()?;
+                    t.set("id", m.id)?;
+                    t.set("category", m.category)?;
+                    t.set("value", m.value)?;
+                    t.set("mode", m.mode)?;
+                    t.set("lines", lua.create_sequence_from(lines.iter().map(String::as_str))?)?;
+                    // Each side by id; its name, flags and colour where it is known.
+                    for (key, id, x) in [("actor", m.actor, &*actor), ("target", m.target, &*target)] {
+                        if id == 0 {
+                            continue;
+                        }
+                        let p = lua.create_table()?;
+                        p.set("id", id)?;
+                        if let Some(x) = x {
+                            p.set("name", x.name.as_str())?;
+                            p.set("pc", x.pc)?;
+                            p.set("named", x.named)?;
+                            p.set("colour", x.colour)?;
+                        }
+                        t.set(key, p)?;
+                    }
+                    vm.st.borrow_mut().deadline = Some(std::time::Instant::now() + vm::FILTER_CAP);
+                    let r = f.call::<mlua::Value>(&t);
+                    vm.st.borrow_mut().deadline = None;
+                    let r = r?;
+                    for (key, x) in [("actor", &mut *actor), ("target", &mut *target)] {
+                        if let (Some(x), Some(p)) = (x.as_mut(), t.get::<Option<mlua::Table>>(key)?) {
+                            x.colour = p.get::<Option<u8>>("colour")?.unwrap_or(0);
+                        }
+                    }
+                    match r {
+                        mlua::Value::Boolean(false) => verdict = Verdict::Drop,
+                        mlua::Value::String(s) => lines = vec![s.to_string_lossy()],
+                        mlua::Value::Table(l) => lines = l.sequence_values::<String>().collect::<mlua::Result<_>>()?,
+                        _ => return Ok(()),
+                    }
+                    if !matches!(verdict, Verdict::Drop) {
+                        verdict = Verdict::Replace(lines.clone());
+                    }
+                    Ok(())
+                })();
+                if let Err(e) = r {
+                    vm.error(&e);
+                }
+                if matches!(verdict, Verdict::Drop) {
+                    return;
+                }
+            }
+        });
+        if matches!(verdict, Verdict::Drop) {
+            break;
+        }
+    }
+    w.lua = host;
+    verdict
+}
+
 /// The mods' typed-line filters (docs/lua-mods.md 4.3), before our command parser: the line as they left it, or none
 /// when one blocked it.
 pub(super) fn filter_typed(w: &mut World, line: &str) -> Option<String> {
@@ -2281,7 +4562,199 @@ pub(super) fn filter_typed(w: &mut World, line: &str) -> Option<String> {
     (!blocked).then_some(line)
 }
 
+/// The training regime the client kept before the bundled Training Regime mod (its file per server and character)
+/// goes into the mod's character storage, once ("migrated" marks it).
+fn migrate_regime(w: &World, data: &std::path::Path, char_file: &str) {
+    let file = data.join(char_file);
+    let mut v = read_json(&file);
+    if v.get("regime").is_some() || v.get("migrated").is_some() || w.name.is_empty() {
+        return;
+    }
+    let server = format!("{}-{}", w.search_addr.0, w.search_addr.1);
+    let read =
+        |p: &std::path::Path| std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+    let kept = read(&crate::config::regime_path(&server, &w.name))
+        .or_else(|| crate::config::regime_moved_path(&server, &w.name).and_then(|p| read(&p)))
+        .or_else(|| {
+            let mut old: Vec<_> = crate::config::regime_legacy_paths(&w.name)
+                .into_iter()
+                .filter_map(|p| Some((std::fs::metadata(&p).and_then(|m| m.modified()).ok()?, p)))
+                .collect();
+            old.sort_by(|a, b| b.0.cmp(&a.0));
+            old.into_iter().find_map(|(_, p)| read(&p))
+        });
+    if !v.is_object() {
+        v = serde_json::json!({});
+    }
+    if let Some(k) = kept.filter(|k| !k.is_null()) {
+        log::info!("lua mod regime: the client's kept regime for {}: {k}", w.name);
+        v["regime"] = k;
+    }
+    v["migrated"] = true.into();
+    let _ = std::fs::create_dir_all(data);
+    if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+        log::warn!("lua mod regime: {}: {e}", file.display());
+    }
+}
+
+/// Settings declared `from` a client config field (a bundled mod's, replacing an extra that kept its value there) and
+/// not set yet take that field's value, written to their scope's file so the config may drop it.
+fn migrate_settings(m: &manifest::Manifest, data: &std::path::Path, char_file: Option<&str>) {
+    if m.settings.values().all(|d| d.from.is_empty()) {
+        return;
+    }
+    let config = read_json(&crate::config::config_path());
+    let file = |character: bool| match char_file {
+        Some(c) if character => data.join(format!("settings-{c}")),
+        _ => data.join("settings.json"),
+    };
+    for (key, character, old) in migrations(m, &config, |key, character| read_json(&file(character)).get(key).is_some())
+    {
+        let file = file(character);
+        let mut v = read_json(&file);
+        if !v.is_object() {
+            v = serde_json::json!({});
+        }
+        log::info!("lua mod {}: setting {key} from the config ({old})", m.id);
+        v[key.as_str()] = old;
+        let _ = std::fs::create_dir_all(data);
+        if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+            log::warn!("lua mod {}: saving {}: {e}", m.id, file.display());
+        }
+    }
+}
+
+/// The settings declared `from` a config field `config` holds that are not saved yet (`saved(key, character scope)`):
+/// (key, character scope, the field's value).
+fn migrations(
+    m: &manifest::Manifest,
+    config: &serde_json::Value,
+    saved: impl Fn(&str, bool) -> bool,
+) -> Vec<(String, bool, serde_json::Value)> {
+    m.settings
+        .iter()
+        .filter(|(_, d)| !d.from.is_empty())
+        .filter_map(|(key, d)| {
+            let character = d.scope == "character";
+            let old = config.get(&d.from)?;
+            (!saved(key, character)).then(|| (key.clone(), character, old.clone()))
+        })
+        .collect()
+}
+
 /// A mod's settings: the account file's keys, then the character file's for character-scoped ones.
+/// A mod's settings page: its settings as rows (the "on" switch left out: it is the Mods page's toggle) and its
+/// permissions, each allowed or not; none when it has neither.
+fn mod_page(
+    m: &manifest::Manifest,
+    settings: &serde_json::Map<String, serde_json::Value>,
+    granted: &[String],
+    bundled: bool,
+) -> Option<super::settings::ModPage> {
+    use super::settings::{ModPage, ModRow};
+    let mut rows = Vec::new();
+    for (key, d) in &m.settings {
+        if key == "on" && d.kind == "bool" {
+            continue;
+        }
+        let current = settings
+            .get(key)
+            .cloned()
+            .or_else(|| d.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
+            .unwrap_or(serde_json::Value::Null);
+        let choices: Vec<(String, serde_json::Value)> = match d.kind.as_str() {
+            // Labelled values (any type).
+            _ if !d.values.is_empty() => d
+                .options
+                .iter()
+                .cloned()
+                .zip(d.values.iter().map(|v| serde_json::to_value(v).unwrap_or_default()))
+                .collect(),
+            "bool" => vec![("ON".into(), true.into()), ("OFF".into(), false.into())],
+            "enum" => d.options.iter().map(|o| (o.clone(), o.as_str().into())).collect(),
+            "int" | "number" => {
+                let (min, max) = (d.min.unwrap_or(0.0), d.max.unwrap_or(100.0));
+                let step = d.step.unwrap_or(if d.kind == "int" { 1.0 } else { (max - min) / 20.0 }).max(f64::EPSILON);
+                let n = (((max - min) / step).floor() as usize).min(200);
+                (0..=n)
+                    .map(|i| {
+                        let v = min + step * i as f64;
+                        if d.kind == "int" {
+                            (format!("{}", v.round() as i64), (v.round() as i64).into())
+                        } else {
+                            (format!("{v}"), v.into())
+                        }
+                    })
+                    .collect()
+            }
+            _ => continue,
+        };
+        let at = choices
+            .iter()
+            .position(|c| {
+                c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-6)
+            })
+            .unwrap_or(0);
+        let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
+        rows.push(ModRow {
+            key: key.clone(),
+            label,
+            help: d.help.clone(),
+            choices,
+            at,
+            tab: String::new(),
+            place: None,
+            place_modern: None,
+            preview: d.preview_sound,
+        });
+    }
+    // The permissions it asks for (docs/lua-mods.md 3.5); a bundled mod's are given.
+    for p in m.permissions.iter().filter(|_| !bundled) {
+        let (label, help) = permission_text(p);
+        let on = granted.contains(p);
+        let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
+        rows.push(ModRow {
+            key: format!("{PERM}{p}"),
+            label: label.into(),
+            help: help.into(),
+            choices,
+            at: if on { 0 } else { 1 },
+            tab: String::new(),
+            place: None,
+            place_modern: None,
+            preview: None,
+        });
+    }
+    (!rows.is_empty()).then(|| ModPage { id: m.id.clone(), name: m.name.clone(), rows })
+}
+
+/// Gives an installed mod every permission its manifest asks for (a standard mod installed from our list).
+pub(in crate::client) fn grant_manifest(dir: &std::path::Path) {
+    let Ok(m) = manifest::read(dir) else { return };
+    if m.permissions.is_empty() {
+        return;
+    }
+    let mut g = grants();
+    let list: Vec<serde_json::Value> = m
+        .permissions
+        .iter()
+        .filter(|p| manifest::PERMISSIONS.contains(&p.as_str()))
+        .map(|p| p.as_str().into())
+        .collect();
+    g.insert(m.id.clone(), list.into());
+    save_grants(&g);
+}
+
+/// The Mods page's toggle as a setting change's key: its value turns the mod on (loads it) or off (unloads it).
+pub(in crate::client) const ENABLED: &str = "@enabled";
+
+/// A mod's "on" switch is its enable toggle on the Mods page: a loaded mod is on.
+fn force_on(m: &manifest::Manifest, settings: &mut serde_json::Map<String, serde_json::Value>) {
+    if m.settings.get("on").is_some_and(|d| d.kind == "bool") {
+        settings.insert("on".into(), true.into());
+    }
+}
+
 fn load_settings(
     m: &manifest::Manifest,
     data: &std::path::Path,
@@ -2308,78 +4781,85 @@ fn load_settings(
 impl Host {
     /// The Extras pages of the running mods: their declared settings that buttons and sliders can show (bool, enum,
     /// int and number).
+    /// Every installed mod's settings page (Settings > Mods, its Settings button): its settings but the "on" switch (the
+    /// page's toggle), and the permissions it asks for. A mod that is off reads its settings from its files.
     pub(super) fn settings_pages(&self) -> Vec<super::settings::ModPage> {
-        use super::settings::{ModPage, ModRow};
         let mut pages = Vec::new();
         for vm in &self.vms {
             let st = vm.st.borrow();
-            let mut rows = Vec::new();
-            for (key, d) in &vm.manifest.settings {
-                let current = st
-                    .settings
-                    .get(key)
-                    .cloned()
-                    .or_else(|| d.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
-                    .unwrap_or(serde_json::Value::Null);
-                let choices: Vec<(String, serde_json::Value)> = match d.kind.as_str() {
-                    "bool" => vec![("ON".into(), true.into()), ("OFF".into(), false.into())],
-                    "enum" => d.options.iter().map(|o| (o.clone(), o.as_str().into())).collect(),
-                    "int" | "number" => {
-                        let (min, max) = (d.min.unwrap_or(0.0), d.max.unwrap_or(100.0));
-                        let step =
-                            d.step.unwrap_or(if d.kind == "int" { 1.0 } else { (max - min) / 20.0 }).max(f64::EPSILON);
-                        let n = (((max - min) / step).floor() as usize).min(200);
-                        (0..=n)
-                            .map(|i| {
-                                let v = min + step * i as f64;
-                                if d.kind == "int" {
-                                    (format!("{}", v.round() as i64), (v.round() as i64).into())
-                                } else {
-                                    (format!("{v}"), v.into())
-                                }
-                            })
-                            .collect()
-                    }
-                    _ => continue,
-                };
-                let at = choices
-                    .iter()
-                    .position(|c| {
-                        c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-9)
-                    })
-                    .unwrap_or(0);
-                let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
-                rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at });
+            let bundled = matches!(vm.src, vm::Source::Bundled(_));
+            pages.extend(mod_page(&vm.manifest, &st.settings, &st.granted, bundled));
+        }
+        let char_file = self.vms.first().and_then(|v| v.st.borrow().char_file.clone());
+        let g = grants();
+        for e in std::fs::read_dir(mods_dir()).into_iter().flatten().flatten() {
+            let Ok(m) = manifest::read(&e.path()) else { continue };
+            if self.vms.iter().any(|v| v.manifest.id == m.id) {
+                continue;
             }
-            // The permissions it asks for, each allowed or not (docs/lua-mods.md 3.5).
-            for p in &vm.manifest.permissions {
-                let (label, help) = permission_text(p);
-                let on = st.granted.contains(p);
-                let choices = vec![("ON".into(), true.into()), ("OFF".into(), false.into())];
-                rows.push(ModRow {
-                    key: format!("{PERM}{p}"),
-                    label: label.into(),
-                    help: help.into(),
-                    choices,
-                    at: if on { 0 } else { 1 },
-                });
-            }
-            if !rows.is_empty() {
-                pages.push(ModPage { id: vm.manifest.id.clone(), name: vm.manifest.name.clone(), rows });
-            }
+            let settings = load_settings(&m, &data_dir().join(&m.id), char_file.as_deref());
+            let given: Vec<String> = g
+                .get(&m.id)
+                .and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                .unwrap_or_default();
+            pages.extend(mod_page(&m, &settings, &given, false));
         }
         pages
     }
 
+    /// The loaded mod `id` names: the Mods page names a mod by its folder, the rest by its manifest id, and the two
+    /// may differ (a manifest's id is its own); the folder first.
+    fn named(&self, id: &str) -> Option<usize> {
+        let by_folder = self.vms.iter().position(|v| v.dir.file_name().is_some_and(|f| f == id));
+        by_folder.or_else(|| self.vms.iter().position(|v| v.manifest.id == id))
+    }
+
     /// A setting changed on its Extras page: kept, written to its scope's file, and `settings_changed` sent.
     pub(super) fn apply_setting(&mut self, w: &World, id: &str, key: &str, value: serde_json::Value) {
-        if let Some(p) = key.strip_prefix(PERM) {
-            if let Some(k) = self.vms.iter().position(|v| v.manifest.id == id) {
-                self.set_grant(k, p, value.as_bool() == Some(true));
+        if key == ENABLED {
+            let k = self.named(id);
+            match (value.as_bool() == Some(true), k) {
+                (true, None) => {
+                    if let Err(e) = self.load(Some(w), folder_of(&mods_dir(), id)) {
+                        log::warn!("lua mod {id}: {e}");
+                    }
+                }
+                (false, Some(k)) => self.unload(Some(w), k),
+                _ => {}
             }
             return;
         }
-        let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) else { return };
+        if let Some(p) = key.strip_prefix(PERM) {
+            match self.vms.iter().position(|v| v.manifest.id == id) {
+                Some(k) => self.set_grant(k, p, value.as_bool() == Some(true)),
+                None => {
+                    grant_one(id, p, value.as_bool() == Some(true));
+                }
+            }
+            return;
+        }
+        let Some(vm) = self.vms.iter().find(|v| v.manifest.id == id) else {
+            // A mod that is off: its settings file only.
+            if let Ok(m) = manifest::read(&mods_dir().join(id)) {
+                let scope = m.settings.get(key).map_or("account", |d| d.scope.as_str());
+                let dir = data_dir().join(id);
+                let file = match Self::char_file(Some(w)) {
+                    Some(c) if scope == "character" => dir.join(format!("settings-{c}")),
+                    _ => dir.join("settings.json"),
+                };
+                let mut v = read_json(&file);
+                if !v.is_object() {
+                    v = serde_json::json!({});
+                }
+                v[key] = value;
+                let _ = std::fs::create_dir_all(&dir);
+                if let Err(e) = std::fs::write(&file, serde_json::to_vec_pretty(&v).unwrap_or_default()) {
+                    log::warn!("lua mod {id}: saving {}: {e}", file.display());
+                }
+            }
+            return;
+        };
         vm.st.borrow_mut().settings.insert(key.to_string(), value.clone());
         let scope = vm.manifest.settings.get(key).map_or("account", |d| d.scope.as_str());
         let dir = data_dir().join(id);
@@ -2483,7 +4963,11 @@ pub(super) fn draw_classic(gu: &mut super::game_ui::GameUi, w: &World) -> Vec<[f
     let mut out = Vec::new();
     for (v, id, x, y) in classic_places(w) {
         if let Some(win) = w.lua.vms[v].st.borrow().windows.iter().find(|x| x.id == id) {
+            // Its opacity (per-window opacity), over the whole window.
+            let o = w.lua.window_opacity(&w.window_opacity, &format!("mod:{}:{id}", w.lua.vms[v].manifest.id));
+            gu.opacity((o < 1.0).then_some(o));
             out.push(win.draw_classic(gu, Some(w), x, y));
+            gu.opacity(None);
         }
     }
     out
@@ -2491,6 +4975,40 @@ pub(super) fn draw_classic(gu: &mut super::game_ui::GameUi, w: &World) -> Vec<[f
 
 impl Host {
     /// The open windows (mod id, a copy of the window), for the modern UI's panels.
+    /// What /uimodes lists of the mods: each running mod's windows (not its prompts) by panel key, and each of its
+    /// HUD windows as hud:<mod>:<window>, with a label.
+    pub(in crate::client) fn mode_windows(&self) -> Vec<(String, String)> {
+        let mut out: Vec<(String, String)> = Vec::new();
+        for vm in self.vms.iter().filter(|v| v.suspended.is_none()) {
+            let st = vm.st.borrow();
+            let name = &vm.manifest.name;
+            for win in st.windows.iter().filter(|w| !w.modal) {
+                let key = win.panel.clone().unwrap_or_else(|| format!("mod:{}:{}", vm.manifest.id, win.id));
+                let what = [&win.title, &win.heading]
+                    .into_iter()
+                    .find(|t| !t.is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| win.id.clone());
+                let label = if what.eq_ignore_ascii_case(name) || win.panel.is_some() {
+                    name.clone()
+                } else {
+                    format!("{name}: {what}")
+                };
+                if !out.iter().any(|o| o.0 == key) {
+                    out.push((key, label));
+                }
+            }
+            let mut groups: Vec<&str> = st.hud.iter().map(|e| e.window.as_str()).collect();
+            groups.sort_unstable();
+            groups.dedup();
+            for g in groups {
+                let label = if g == "hud" { format!("{name} (on screen)") } else { format!("{name}: {g}") };
+                out.push((format!("hud:{}:{g}", vm.manifest.id), label));
+            }
+        }
+        out
+    }
+
     pub(super) fn open_windows(&self) -> Vec<(String, window::Window)> {
         let mut out = Vec::new();
         if self.all_hidden {
@@ -2525,6 +5043,11 @@ pub(super) fn close_popup(w: &mut World, k: usize, id: &str) {
 
 /// The pointer on a mod window (modern UI): it takes the focus, then the click acts as the window model says.
 pub(super) fn window_click(w: &mut World, mod_id: &str, win_id: &str, click: super::modern::ModClick) {
+    // A `targets` row picks its entity, as the target list does.
+    if let super::modern::ModClick::Pick(id) = click {
+        super::target::pick(w, Some(id));
+        return;
+    }
     let host = &mut w.lua;
     // An open modal window takes no clicks meant for another.
     if let Some((k, id)) = host.modal()
@@ -2573,7 +5096,8 @@ fn classic_places(w: &World) -> Vec<(usize, String, f32, f32)> {
     let (sw, sh) = (screen[0] * uk.0, screen[1] * uk.1);
     let mut k = 0.0;
     for (v, vm) in w.lua.vms.iter().enumerate().filter(|(_, v)| v.suspended.is_none()) {
-        for win in vm.st.borrow().windows.iter().filter(|w| w.open) {
+        // A panel's edge window is the Timers' dock's (regime.rs).
+        for win in vm.st.borrow().windows.iter().filter(|w| w.open && w.panel.is_none()) {
             let (ww, wh) = win.classic_size();
             match (win.anchor, win.place) {
                 (Some((ax, ay)), _) => modal.push((
@@ -2713,12 +5237,15 @@ mod stub_tests {
     }
 }
 
-/// A bundled mod's manifest.
+/// The bundled mods' settings on our Extras tabs: (label, tab, place).
+#[cfg(test)]
+/// A bundled mod's manifest (tests).
+#[cfg(test)]
 fn bundled_manifest(id: &str) -> Option<manifest::Manifest> {
     BUNDLED.iter().find(|b| b.0 == id).and_then(|b| manifest::parse(b.1, id).ok())
 }
 
-/// Every mod on disk and bundled: (id, name, version, enabled in the config, bundled).
+/// Every mod installed (the mods folder): (id, name, version, enabled in the config, bundled: always false now).
 pub(super) fn installed() -> Vec<(String, String, String, bool, bool)> {
     let cfg = crate::config::Config::load();
     let enabled = |id: &str, bundled: bool| cfg.mods.iter().find(|r| r.name == id).map_or(bundled, |r| r.enabled);
@@ -2728,18 +5255,6 @@ pub(super) fn installed() -> Vec<(String, String, String, bool, bool)> {
         if let Ok(m) = manifest::read(&dir) {
             let id = m.id.clone();
             out.push((id.clone(), m.name, m.version, enabled(&id, false), false));
-        }
-    }
-    for (id, ..) in BUNDLED {
-        if !out.iter().any(|o| o.0 == *id) {
-            let m = bundled_manifest(id);
-            out.push((
-                id.to_string(),
-                m.as_ref().map_or_else(|| id.to_string(), |m| m.name.clone()),
-                m.map_or_else(String::new, |m| m.version),
-                enabled(id, true),
-                true,
-            ));
         }
     }
     out.sort();
@@ -2791,21 +5306,27 @@ impl Host {
     /// Allows or withdraws permission `p` (one the mod asks for) for the mod at `k`; kept in grants.json.
     fn set_grant(&mut self, k: usize, p: &str, on: bool) {
         let id = self.vms[k].manifest.id.clone();
-        let mut g = grants();
-        let mut list: Vec<String> = g
-            .get(&id)
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
-            .unwrap_or_default();
-        list.retain(|x| x != p);
-        if on && manifest::PERMISSIONS.contains(&p) {
-            list.push(p.to_string());
-        }
-        g.insert(id, list.clone().into());
-        save_grants(&g);
+        let list = grant_one(&id, p, on);
         let asked = self.vms[k].manifest.permissions.clone();
         self.vms[k].st.borrow_mut().granted = asked.into_iter().filter(|p| list.contains(p)).collect();
     }
+}
+
+/// Mod `id`'s permission `p` allowed or not in grants.json; its list of grants after.
+fn grant_one(id: &str, p: &str, on: bool) -> Vec<String> {
+    let mut g = grants();
+    let mut list: Vec<String> = g
+        .get(id)
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+    list.retain(|x| x != p);
+    if on && manifest::PERMISSIONS.contains(&p) {
+        list.push(p.to_string());
+    }
+    g.insert(id.to_string(), list.clone().into());
+    save_grants(&g);
+    list
 }
 
 fn save_grants(g: &serde_json::Map<String, serde_json::Value>) {

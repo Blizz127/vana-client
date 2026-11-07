@@ -46,6 +46,7 @@ end)
 | [`actions.talk(id)`](#actionstalk) | Talks to an NPC. |
 | [`actions.choose(option)`](#actionschoose) | Picks an option of the event menu showing. |
 | [`actions.advance()`](#actionsadvance) | Moves the event's waiting text on, as Enter does. |
+| [`actions.synth(crystal, items)`](#actionssynth) | Synthesizes by item ids, as the synthesis window does. |
 | [`actions.trade(npc, items?, gil?)`](#actionstrade) | Hands items and gil to an NPC. |
 | [`actions.buy(row, count?)`](#actionsbuy) | Buys from the open NPC shop. |
 | [`actions.sell(slot, count?)`](#actionssell) | Sells an inventory item to the open NPC shop. |
@@ -840,7 +841,7 @@ Nothing happens during an event, while an earlier talk is still waiting for the 
 actions.choose(option) -> nil
 ```
 
-Picks an option of the event menu showing, as moving the cursor to it and pressing Enter does.
+Picks an option of the event menu showing, as moving the cursor to it and pressing Enter does. A menu can show a moment before its event waits on it, when Enter does nothing; the pick then waits for it, up to 5 seconds, and is dropped if the event ends first.
 
 **Parameters**
 
@@ -898,6 +899,46 @@ end)
 ```
 
 Nothing happens outside an event. With a menu showing it picks the option under the cursor, as Enter would: check `game.event().menu` first.
+
+## `actions.synth`
+
+```lua
+actions.synth(crystal, items) -> boolean
+```
+
+Synthesizes as the synthesis window's Synthesize does: the same checks, refusal lines and request. The crystal and
+the materials are taken by item id from unlocked stacks in the inventory, so a run of synths keeps going while the
+stacks last.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `crystal` | `integer` | yes | The crystal's item id. |
+| `items` | `integer[]` | yes | One material item id per unit, 1 to 8 of them (two of one material: its id twice). |
+
+**Returns** `boolean`: true when the synthesis goes out; false when it would not, and then the game's line for why
+prints (the materials not held, a full inventory, another synthesis under way, a status that forbids it).
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //again 3: the last recipe made through the window's count step, three more times.
+local last
+events.on("synth_amount", function(_, recipe) last = recipe end)
+commands.register("again", function(n)
+  for _ = 1, tonumber(n) or 1 do
+    while game.synth().busy do sleep(0.5) end
+    if not last or not actions.synth(last.crystal, last.items) then break end
+    sleep(1)  -- the request goes out after this mod phase; busy shows it from the next frame
+  end
+end)
+```
+
+Wait for `game.synth().busy` to go false between synths: the server answers each one, and the game keeps a short lock
+after the answer. The bundled Synthesis Amount mod is written with it.
 
 ## `actions.trade`
 
@@ -1021,13 +1062,167 @@ end)
 
 Whether the shop takes the item is the server's to decide.
 
+## `actions.roe_set`
+
+```lua
+actions.roe_set(id) -> nil
+```
+
+Sets a Records of Eminence objective, as Yes on its row in the list does (c2s 0x10C). The server takes one change a
+second.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `integer` | yes | The objective's number n (`res.item(0xE000 + n)`). |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+commands.register("roeone", function(n) actions.roe_set(tonumber(n)) end)
+```
+
+Problems are printed in the log in red: `actions.roe_set: the objectives have not come yet`, `objectives are 1..4095`, `one change a second: wait and call again`, `that objective is set already`, `every objective slot is taken`.
+
+## `actions.roe_remove`
+
+```lua
+actions.roe_remove(id) -> nil
+```
+
+Removes a set objective, as Yes on its row does (c2s 0x10D); its progress is lost. One change a second, as
+`actions.roe_set`.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `integer` | yes | The objective's number n. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- Remove every objective set, a second apart.
+commands.register("roeclear", function()
+  for _, o in ipairs(game.roe().active) do
+    actions.roe_remove(o.id)
+    sleep(1.1)
+  end
+end)
+```
+
+Problems are printed in the log in red: as `actions.roe_set`'s, and `that objective is not set`.
+
+## `actions.change_job`
+
+```lua
+actions.change_job(main, sub?) -> nil
+```
+
+Changes jobs as the moogle's Change Jobs window does: the moogle dances, the lockstyle goes off, and the server is
+asked for the jobs. Only in a Mog House, or in a zone whose moogle menu works outside one, as the window.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `main` | `integer` | yes | The main job's id, 1 (WAR) .. 22 (RUN); `res.job(id)` gives its abbreviation. |
+| `sub` | `integer` | no | The support job's id, 0 for none; left out, the support job stays. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //wardnc: Warrior with Dancer support.
+commands.register("wardnc", function() actions.change_job(1, 19) end)
+```
+
+Problems are printed in the log in red: `actions.change_job: only in a Mog House or where a moogle can change jobs`, `that main job is not unlocked`, `that support job cannot be set`, `a job change is under way`, `those are the jobs already`. Whether the server agrees is its own.
+
+## `actions.auction_bid`
+
+```lua
+actions.auction_bid(item, price, stack?) -> nil
+```
+
+At an open auction house, asks the game's bid question for an item at a price, the one the bid window asks after its
+price entry. The player answers it; a Yes bids as the window does, into the first free slot.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `item` | `integer` | yes | The item id. |
+| `price` | `integer` | yes | The bid in gil, 1 or more. |
+| `stack` | `boolean` | no | `true` bids on a stack; one item when left out. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //bid 4096 120: a bid on one Fire Crystal for 120 gil.
+commands.register("bid", function(item, price)
+  actions.auction_bid(tonumber(item), tonumber(price))
+end)
+```
+
+Problems are printed in the log in red: `actions.auction_bid: open the auction house first`, `actions.auction_bid: another question is open`, `actions.auction_bid: the price is 1 gil or more`. The bid's result comes as the window's does.
+
+## `actions.auction_sell`
+
+```lua
+actions.auction_sell(slot, price, stack?) -> nil
+```
+
+At an open auction house, puts an inventory slot up for sale as the Sell button does: the game asks the server for
+the fee, then asks the player about the fee and the sale, as the window does.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slot` | `integer` | yes | The inventory slot (`slot` of a `game.items(0)` entry). |
+| `price` | `integer` | yes | The price in gil, 1 or more. |
+| `stack` | `boolean` | no | `true` sells the whole stack; one item when left out. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //sellone <name> <price>: one of an item we hold.
+commands.register("sellone", function(name, price)
+  local it = game.find_items(name, { 0 })[1]
+  if it then actions.auction_sell(it.slot, tonumber(price)) end
+end)
+```
+
+Problems are printed in the log in red: `actions.auction_sell: open the auction house first`, `actions.auction_sell: nothing in that inventory slot`, `actions.auction_sell: another sale is being asked`, `actions.auction_sell: the price is 1 gil or more`.
+
 ## `actions.blue_set`
 
 ```lua
 actions.blue_set(slot, spell) -> nil
 ```
 
-Sets a blue magic slot to a spell, as the Set Spells window does. Read the slots back with `game.job_data()` (`blue_spells`).
+Sets a blue magic slot to a spell, as the Set Spells window does. Read the slots back with `game.job_data()` (`blue_slots`, or `blue_spells` without the empty slots).
 
 **Parameters**
 
@@ -1057,7 +1252,7 @@ commands.register("blu", function(...)
 end)
 ```
 
-Problems found when the action runs are printed in the log in red, not raised: `actions.blue_set: not a blue mage` (neither job is Blue Mage). One change goes out per second: a change within a second of the last blue magic or automaton change, or before the server has sent your setup, does nothing. Whether you know the spell and have the points for it is the server's to check.
+Problems found when the action runs are printed in the log in red, not raised: `actions.blue_set: not a blue mage` (neither job is Blue Mage). The server takes one change a second: a change within a second of the last blue magic or automaton change prints `actions.blue_set: one change a second: wait and call again`, so wait 1.1 seconds between calls. Before the server has sent your setup a change does nothing. Whether you know the spell and have the points for it is the server's to check.
 
 ## `actions.blue_remove`
 
@@ -1098,7 +1293,7 @@ Problems are printed in the log in red: `actions.blue_remove: not a blue mage`, 
 actions.attach(slot, item) -> nil
 ```
 
-Sets an automaton slot to a head, frame or attachment, as the automaton customization window does. Read the setup back with `game.job_data()` (`head`, `frame`, `attachments`).
+Sets an automaton slot to a head, frame or attachment, as the automaton customization window does. Read the setup back with `game.job_data()` (`head`, `frame`, `attachment_slots`).
 
 **Parameters**
 
@@ -1126,7 +1321,7 @@ commands.register("pupset", function()
 end)
 ```
 
-Problems are printed in the log in red: `actions.attach: not a puppetmaster` (neither job is Puppetmaster). Nothing happens when the slot already holds the item, within a second of the last blue magic or automaton change, or before the server has sent your setup.
+Problems are printed in the log in red: `actions.attach: not a puppetmaster` (neither job is Puppetmaster). Within a second of the last blue magic or automaton change it prints `actions.attach: one change a second: wait and call again`. Nothing happens when the slot already holds the item or before the server has sent your setup.
 
 ## `actions.detach`
 
@@ -1159,7 +1354,7 @@ commands.register("pupclear", function()
 end)
 ```
 
-Problems are printed in the log in red: `actions.detach: not a puppetmaster`. An empty slot, or a change within a second of the last one, does nothing.
+Problems are printed in the log in red: `actions.detach: not a puppetmaster`, `actions.detach: one change a second: wait and call again` within a second of the last change. An empty slot does nothing.
 
 ## `actions.invite`
 

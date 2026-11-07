@@ -1,0 +1,10 @@
+name = "XP Tracker"
+version = "1.0.0"
+description = "Experience, limit and capacity points with their rates per hour, in a window on a screen edge (the point-watch add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "XP Tracker"
+help = "Shows your experience points, merits and limit points, job points and capacity points, with what you are earning per hour. //xp reset starts the rates again."

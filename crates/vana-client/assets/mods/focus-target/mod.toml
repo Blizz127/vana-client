@@ -1,0 +1,10 @@
+name = "Focus and Last Target"
+version = "1.0.0"
+description = "The modern UI's focus panel on the target panel: the focus target and the last target, each with its HP; a click targets it."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Focus and Last Target"
+help = "On the target panel (modern UI): the focus target (/focustarget) and the target before the current one, each with its HP; a click targets it. <ft> and <lt> name them in commands."

@@ -1,0 +1,16 @@
+name = "Roll Helper"
+version = "1.0.0"
+description = "Says your Corsair roll's number, whether it is lucky or unlucky and its power, and can hold back a Double-Up on a lucky roll (the roll tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Roll Helper"
+help = "After each Phantom Roll and Double-Up, says the roll's number, its lucky and unlucky numbers and its power."
+
+[settings.guard]
+type = "bool"
+default = true
+label = "Guard Lucky Rolls"
+help = "Holds back a Double-Up typed while the roll is lucky or at 11."

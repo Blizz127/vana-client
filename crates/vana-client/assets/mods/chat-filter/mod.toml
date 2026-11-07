@@ -1,0 +1,38 @@
+name = "Chat Filter"
+version = "1.0.0"
+description = "Hides chat from chosen players, lines with chosen words, shouts or yells, and repeated lines (the chat filter add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Chat Filter"
+help = "Hides the chat lines the settings below pick."
+
+[settings.players]
+type = "string"
+default = ""
+label = "Players"
+help = "Hide everything these players say, separated by commas."
+
+[settings.words]
+type = "string"
+default = ""
+label = "Words"
+help = "Hide chat lines holding any of these words, separated by commas."
+
+[settings.shouts]
+type = "bool"
+default = false
+label = "Hide Shouts"
+
+[settings.yells]
+type = "bool"
+default = false
+label = "Hide Yells"
+
+[settings.repeats]
+type = "bool"
+default = true
+label = "Hide Repeats"
+help = "Hides a say, shout or yell someone already sent in the last minute."

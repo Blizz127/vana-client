@@ -639,10 +639,12 @@ impl Modern {
             folded: &mut Default::default(),
             scan_kinds: &mut 7,
             this: Default::default(),
+            rooms: Default::default(),
             retail: Default::default(),
             focus: Some("select"),
             hidden: Vec::new(),
             placed: Default::default(),
+            opacity: Default::default(),
         };
         let mut out = Pointer::default();
         list_panel(&mut p, gu, v, &mut out);
@@ -679,10 +681,12 @@ impl Modern {
             folded: &mut Default::default(),
             scan_kinds: &mut 7,
             this: Default::default(),
+            rooms: Default::default(),
             retail: Default::default(),
             focus: Some(focus),
             hidden: Vec::new(),
             placed: Default::default(),
+            opacity: Default::default(),
         };
         let mut out = creator::Pointer::default();
         creator_panel(&mut p, gu, c, &mut out);
@@ -723,10 +727,12 @@ impl Modern {
             folded: &mut Default::default(),
             scan_kinds: &mut 7,
             this: Default::default(),
+            rooms: Default::default(),
             retail: Default::default(),
             focus: Some("lobby config"),
             hidden: Vec::new(),
             placed: Default::default(),
+            opacity: Default::default(),
         };
         let out = super::config::lobby(&mut p, c, v, s, sw);
         *p.m.rects.borrow_mut() = std::mem::take(&mut p.this);

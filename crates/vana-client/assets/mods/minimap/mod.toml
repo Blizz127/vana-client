@@ -1,0 +1,13 @@
+name = "Minimap"
+version = "1.0.0"
+description = "A small map in a corner that follows you and shows what is nearby (the minimap add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Minimap"
+help = "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom."
+tab = "Maps"
+place = 2
+from = "minimap"

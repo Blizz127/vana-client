@@ -1,0 +1,10 @@
+name = "Skill-up Log"
+version = "1.0.0"
+description = "Adds your session's total to each skill-up line, and lists your skills, their caps and today's gains (the skill-up tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Skill-up Log"
+help = "Skill-up lines show how much the skill has risen this session; //skills lists your combat and magic skills with their levels, caps and gains."

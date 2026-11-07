@@ -114,10 +114,11 @@ Some things hold for all of them:
 | [Lifecycle](#lifecycle) | [`load`](#load), [`unload`](#unload), [`login`](#login), [`logout`](#logout), [`lobby_screen`](#lobby_screen), [`frame`](#frame) |
 | [Character](#character) | [`hp_change`](#hp_change), [`mp_change`](#mp_change), [`tp_change`](#tp_change), [`hpp_change`](#hpp_change), [`mpp_change`](#mpp_change), [`status_change`](#status_change), [`job_change`](#job_change), [`level_up`](#level_up), [`level_down`](#level_down), [`buff_gain`](#buff_gain), [`buff_lose`](#buff_lose), [`target_change`](#target_change) |
 | [Party](#party) | [`party_change`](#party_change), [`party_invite`](#party_invite) |
-| [Combat](#combat) | [`action`](#action), [`battle_message`](#battle_message), [`damage`](#damage) |
+| [Combat](#combat) | [`action`](#action), [`battle_message`](#battle_message), [`damage`](#damage), [`suggestions`](#suggestions) |
 | [Chat](#chat) | [`chat_message`](#chat_message), [`emote`](#emote), [`examined`](#examined) |
+| [Crafting](#crafting) | [`synth_amount`](#synth_amount), [`synth_result`](#synth_result) |
 | [Items](#items) | [`item_add`](#item_add), [`item_remove`](#item_remove), [`item_change`](#item_change) |
-| [World](#world) | [`zone_change`](#zone_change), [`time_change`](#time_change), [`day_change`](#day_change), [`moon_change`](#moon_change), [`weather_change`](#weather_change) |
+| [World](#world) | [`zone_change`](#zone_change), [`zone_text`](#zone_text), [`time_change`](#time_change), [`day_change`](#day_change), [`moon_change`](#moon_change), [`weather_change`](#weather_change) |
 | [Input and UI](#input-and-ui) | [`focus_change`](#focus_change), [`settings_changed`](#settings_changed) |
 | [Network](#network) | [`ipc_message`](#ipc_message), [events from other mods](#events-from-other-mods) |
 
@@ -489,6 +490,24 @@ events.on("damage", function(actor, target, value)
 end)
 ```
 
+## `suggestions`
+
+The client's suggestion rules picked new rows for the modern battle menu: a spell, ability or weapon skill worth using
+now, and why. The rules run only while the modern battle menu is open and some mod has a handler for this event; when
+the menu closes an empty list comes. While the player's cursor is on one of the rows they hold still, and only their
+submenus' spells are taken again.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `rows` | `table[]` | Rows as the `battle_rows` [slot](ui.native.md#uinativeslot) takes them: `{kind, id, target, reason, label, group}`. |
+
+```lua
+-- What the bundled Battle Suggestions mod does.
+events.on("suggestions", function(rows)
+  ui.native.slot("battle_rows", #rows > 0 and rows or nil)
+end)
+```
+
 ## Chat
 
 ## `chat_message`
@@ -544,6 +563,41 @@ Someone examined us with `/check` (the "X examines you." message).
 ```lua
 events.on("examined", function(id, name)
   print((name ~= "" and name or "Someone") .. " checked you.")
+end)
+```
+
+## Crafting
+
+## `synth_amount`
+
+The synthesis window's count step was answered (it asks how many after Synthesize while the client option
+`synth_amount` is on). The first synthesis has already gone out from the window.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `count` | `integer` | How many the player asked for, 1 or more. |
+| `recipe` | `table` | `{crystal, items}`: the crystal's item id and one material id per unit, as `actions.synth` takes them. |
+
+```lua
+events.on("synth_amount", function(count, recipe)
+  print(("%d to go"):format(count - 1))
+end)
+```
+
+## `synth_result`
+
+Our synthesis was answered (s2c 0x06F). The game has printed its lines.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `result` | `integer` | 0 and 12 made, 1 failed (materials lost); anything else: refused or cut short. |
+| `item` | `integer` | The item made. |
+| `count` | `integer` | How many were made. |
+| `grade` | `integer` | The quality: 0 normal, 1 to 3 high quality. |
+
+```lua
+events.on("synth_result", function(result, item, count)
+  if result == 0 or result == 12 then print(("made %d x %s"):format(count, res.item(item).name)) end
 end)
 ```
 
@@ -626,6 +680,26 @@ fires then.
 ```lua
 events.on("zone_change", function(zone, previous)
   print("Entered " .. (res.zone(zone) or zone))
+end)
+```
+
+
+## `zone_text`
+
+A zone dialogue line came from the server (s2c 0x036, 0x02A or 0x027): an NPC's or an event's line printed in the
+log. The id is the entry's in the installed game files (the server's id mapped to it), for
+[`res.zone_text`](res.md#reszone_text).
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `id` | `integer` | The dialogue entry's id in this zone's file. |
+| `actor` | `integer` | The server id the line is about (the NPC, or us). |
+| `plain` | `boolean` | The server marked it plain (MesNum bit 15): printed without the speaker's name. |
+| `packet` | `integer` | The packet it came in: `0x036`, `0x02A` or `0x027`. |
+
+```lua
+events.on("zone_text", function(id, actor, plain)
+  log.info(("zone text %d about %d"):format(id, actor))
 end)
 ```
 

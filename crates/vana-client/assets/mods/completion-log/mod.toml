@@ -1,0 +1,10 @@
+name = "Completion Log"
+version = "1.0.0"
+description = "What is left to do: the spells a job has yet to learn and every area's quests, done, under way or not started (the checklist add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Completion Log"
+help = "//left opens the window: Spells (a job's unlearned spells by level) and Quests (an area's quests and where you stand); //left spells [job] and //left quests print a summary."

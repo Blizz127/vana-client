@@ -245,7 +245,8 @@ The `fs` functions take paths relative to the mod's data folder; they do not nee
 ## The Lua environment
 
 - Lua 5.4 with the `coroutine`, `math`, `string`, `table` and `utf8` libraries, and `os` with only `os.time`,
-  `os.date`, `os.clock` and `os.difftime`. There is no `io`, `package` or `debug`; `dofile` and `loadfile` are absent;
+  `os.date`, `os.clock` and `os.difftime`; `os.clock` is wall time (seconds on a monotonic clock since the client
+  started; standard Lua's is the process's CPU time), so differences of it time things. There is no `io`, `package` or `debug`; `dofile` and `loadfile` are absent;
   `load` accepts source text only; `string.dump` is absent; `collectgarbage("count")` gives the mod's memory in KB and
   the other options do nothing.
 - Each mod has its own Lua state with up to 64 MB of memory.

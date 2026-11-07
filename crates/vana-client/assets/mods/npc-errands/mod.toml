@@ -1,0 +1,10 @@
+name = "NPC Errands"
+version = "1.0.0"
+description = "Walks an NPC's menus by command, keeps such errands by name, and changes jobs at a moogle by command (the NPC shop and job change add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "NPC Errands"
+help = "//npc <name>: <option> > <option> > ... talks to the NPC and picks those rows; //errand save <name> <the same>, //errand <name>, //errand list | delete <name>; //job <main>[/<sub>] in a Mog House."

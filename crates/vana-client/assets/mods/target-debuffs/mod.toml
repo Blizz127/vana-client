@@ -1,0 +1,10 @@
+name = "Target Debuffs"
+version = "1.0.0"
+description = "The effects anyone has put on your target, as icons under the target window (the debuff tracker add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Target Debuffs"
+help = "Shows the effects on your target (from anyone's spells and abilities) as icons under the target window, each with its name and how long ago it landed."

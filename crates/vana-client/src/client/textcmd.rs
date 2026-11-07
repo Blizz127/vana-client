@@ -668,18 +668,13 @@ pub(super) fn run_unfiltered(w: &mut World, line: &str, mode: Mode) {
     let line = if line.starts_with('/') { line.to_string() } else { format!("{}{line}", w.chat_prefix) };
     let first = line.split([' ', '\t']).next().unwrap_or("");
     // Ours (Extras, not retail): /timers [in | out] slides the timers window's drawer; alone it toggles.
-    if first.eq_ignore_ascii_case("/timers") && w.extra_timers {
+    if first.eq_ignore_ascii_case("/timers") && w.lua.timers_panels().iter().any(Option::is_some) {
         match line.split_whitespace().nth(1).map(str::to_ascii_lowercase).as_deref() {
             Some("in") if w.timers.out => w.timers.toggle(),
             Some("out") if !w.timers.out => w.timers.toggle(),
             None => w.timers.toggle(),
             _ => {}
         }
-        return;
-    }
-    // Ours (not retail; the find-all add-ons): /find <words> lists the bags holding each item whose name has them.
-    if first.eq_ignore_ascii_case("/find") {
-        find(w, line[first.len()..].trim());
         return;
     }
     // Ours (not retail; the modern UI's mode presets): /uimodes opens or closes their editor.
@@ -2592,7 +2587,7 @@ fn atoi(s: &str) -> i64 {
     if neg { -n } else { n }
 }
 
-/// A container's name for /find (the wardrobes and safes numbered) and the Modern UI's bag headers.
+/// A container's name (the wardrobes and safes numbered) for the Modern UI's bag headers.
 pub(super) fn bag_name(c: u8) -> String {
     match c {
         0 => "Inventory".into(),
@@ -2607,31 +2602,6 @@ pub(super) fn bag_name(c: u8) -> String {
         9 => "Mog Safe 2".into(),
         10..=16 => format!("Mog Wardrobe {}", c - 8),
         _ => format!("Bag {c}"),
-    }
-}
-
-/// /find: one line per matching item, its bags with the count in each; "(none)" without a match.
-fn find(w: &mut World, what: &str) {
-    let Some(info) = w.item_info.clone() else { return };
-    let want = what.to_lowercase();
-    if want.is_empty() {
-        return;
-    }
-    let mut found: std::collections::BTreeMap<String, std::collections::BTreeMap<u8, u32>> = Default::default();
-    for (&(c, _), &(id, n)) in &w.inv.slots {
-        let Some(it) = info.item(id).filter(|_| id != 0 && id != 0xffff) else { continue };
-        if it.name.to_lowercase().contains(&want) {
-            *found.entry(it.name.clone()).or_default().entry(c).or_default() += n.max(1);
-        }
-    }
-    let colour = w.battle.as_ref().map_or([0x80; 4], |bt| bt.colour_in(0x8b, &w.game));
-    if found.is_empty() {
-        w.chat.push_colour(format!("/find {what}: (none)"), colour);
-        return;
-    }
-    for (name, bags) in found {
-        let at: Vec<String> = bags.iter().map(|(c, n)| format!("{} {n}", bag_name(*c))).collect();
-        w.chat.push_colour(format!("{name}: {}", at.join(", ")), colour);
     }
 }
 
@@ -3067,7 +3037,6 @@ fn magic(w: &mut World, cid: u16, args: &[String], mode: Mode) -> Done {
     // FUN_10159cc0: the ground-position cursor less the target's position (0 with no cursor) rides in +0x10..+0x1b.
     let offset = super::target::ground_offset(w, t.0);
     act_at(w, t, cat::MAGIC, spell as u32, offset);
-    super::pending::start(w, super::pending::Ask::Spell(spell as u16), t.0);
     Ok(())
 }
 
@@ -3098,7 +3067,6 @@ fn weapon_skill(w: &mut World, args: &[String], mode: Mode) -> Done {
     let ws = ability_named(w, args.get(1).ok_or(())?, 0..0x200).ok_or(())?;
     let t = resolve(w, args.get(2).map(String::as_str), false, true, mode).ok_or(())?;
     act(w, t, cat::WS, ws as u32);
-    super::pending::start(w, super::pending::Ask::WeaponSkill(ws as u16), t.0);
     Ok(())
 }
 
@@ -3120,7 +3088,6 @@ fn ability(w: &mut World, _pet: bool, args: &[String], mode: Mode) -> Done {
     }
     let t = resolve(w, args.get(2).map(String::as_str), false, true, mode).ok_or(())?;
     act(w, t, cat::JA, (id - 0x200) as u32);
-    super::pending::start(w, super::pending::Ask::Ability(id as u16), t.0);
     Ok(())
 }
 
@@ -3218,7 +3185,6 @@ fn bstpet(w: &mut World, args: &[String], mode: Mode) -> Done {
     .ok_or(())?;
     let t = resolve(w, args.get(2).map(String::as_str), false, false, mode).ok_or(())?;
     act(w, t, cat::JA, (id - 0x200) as u32);
-    super::pending::start(w, super::pending::Ask::Ability(id as u16), t.0);
     Ok(())
 }
 

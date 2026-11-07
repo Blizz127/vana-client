@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c0d893"/>
+      <stop offset="0.45" stop-color="#8db83a"/>
+      <stop offset="1" stop-color="#465c1d"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#465c1d"/>
+      <stop offset="1" stop-color="#465c1d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="15" y1="32.4" x2="15" y2="35.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0ecc9"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="12" y1="38.4" x2="12" y2="41.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0ecc9"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="15" y1="44.4" x2="15" y2="47.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e0ecc9"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="37.358" y1="19.468" x2="37.358" y2="45.693" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+  </defs>
+  <title>w445</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="speed_0" d="M10.455 32.4 L19.545 32.4 C20.349 32.4 21 33.051 21 33.855 L21 34.145 C21 34.949 20.349 35.6 19.545 35.6 L10.455 35.6 C9.651 35.6 9 34.949 9 34.145 L9 33.855 C9 33.051 9.651 32.4 10.455 32.4 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.9" stroke-linejoin="round"/>
+      <path id="speed_1" d="M7.455 38.4 L16.545 38.4 C17.349 38.4 18 39.051 18 39.855 L18 40.145 C18 40.949 17.349 41.6 16.545 41.6 L7.455 41.6 C6.651 41.6 6 40.949 6 40.145 L6 39.855 C6 39.051 6.651 38.4 7.455 38.4 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.9" stroke-linejoin="round"/>
+      <path id="speed_2" d="M10.455 44.4 L19.545 44.4 C20.349 44.4 21 45.051 21 45.855 L21 46.145 C21 46.949 20.349 47.6 19.545 47.6 L10.455 47.6 C9.651 47.6 9 46.949 9 46.145 L9 45.855 C9 45.051 9.651 44.4 10.455 44.4 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.9" stroke-linejoin="round"/>
+      <path id="arrow" d="M23.67 45.56 L47.83 27.44 C48.007 27.307 48.257 27.343 48.39 27.52 L51.015 31.02 C51.148 31.197 51.297 31.166 51.349 30.951 L53.906 20.389 C53.958 20.174 53.821 19.992 53.6 19.981 L42.745 19.479 C42.524 19.468 42.452 19.603 42.585 19.78 L45.21 23.28 C45.343 23.457 45.307 23.707 45.13 23.84 L20.97 41.96 C20.793 42.093 20.757 42.343 20.89 42.52 L23.11 45.48 C23.243 45.657 23.493 45.693 23.67 45.56 Z" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

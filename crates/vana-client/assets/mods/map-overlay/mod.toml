@@ -1,0 +1,13 @@
+name = "Map Overlay"
+version = "1.0.0"
+description = "Ctrl or Alt + O shows the zone map over the game (the map add-ons): pan it with a drag, zoom it with the wheel. Its opacity is the client's Map Overlay Opacity."
+permissions = ["input.capture"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Map Overlay"
+help = "Ctrl or Alt + O shows the zone map over the game, like the map add-ons do."
+tab = "Maps"
+place = 0
+from = "map_overlay"

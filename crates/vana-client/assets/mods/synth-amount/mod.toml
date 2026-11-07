@@ -1,0 +1,13 @@
+name = "Synthesis Amount"
+version = "1.0.0"
+description = "After Synthesize, asks how many to make and crafts them one after another (the crafting add-ons)."
+permissions = ["automation"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Synthesis Amount"
+help = "After you press Synthesize, asks how many to make and crafts them one after another."
+tab = "Misc."
+place = 0
+from = "synth_amount"

@@ -42,6 +42,34 @@ impl Suggestion {
     fn new(action: Action, target: Option<String>, reason: String) -> Self {
         Self { action, target, reason, group: Vec::new(), label: None, family: None }
     }
+
+    /// As the mods see it (the suggestions event, the battle_rows slot): {kind, id, target, reason, label, group}.
+    pub fn to_row(&self) -> serde_json::Value {
+        let (kind, id) = match self.action {
+            Action::Spell(id) => ("spell", id),
+            Action::Ability(id) => ("ability", id),
+        };
+        serde_json::json!({"kind": kind, "id": id, "target": self.target, "reason": self.reason, "label": self.label, "group": self.group})
+    }
+
+    /// A battle_rows slot row back (its shape checked by ui.native.slot).
+    pub fn from_row(v: &serde_json::Value) -> Option<Self> {
+        let id = v.get("id")?.as_u64()? as u16;
+        let action = match v.get("kind")?.as_str()? {
+            "spell" => Action::Spell(id),
+            "ability" => Action::Ability(id),
+            _ => return None,
+        };
+        let text = |k: &str| v.get(k).and_then(|x| x.as_str()).map(str::to_string);
+        let mut s = Self::new(action, text("target"), text("reason").unwrap_or_default());
+        s.label = text("label");
+        s.group = v
+            .get("group")
+            .and_then(|g| g.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_u64().map(|n| n as u16)).collect())
+            .unwrap_or_default();
+        Some(s)
+    }
 }
 
 /// A party member (ourselves first): in our zone, HP now / max, main job, effects.
@@ -685,8 +713,28 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
 /// while it is on one of them the rows hold still and only their families are retaken (the submenu's cursor kept on
 /// its spell); none without the menu.
 pub fn refresh_root(w: &mut World) {
+    let before = w.root_sugg.clone();
+    run_rules(w);
+    if w.root_sugg != before {
+        w.lua
+            .raise("suggestions", vec![serde_json::Value::Array(w.root_sugg.iter().map(Suggestion::to_row).collect())]);
+    }
+    // The rows shown: a mod's (the battle_rows slot).
+    let v = w.lua.slot("battle_rows").filter(|_| w.modern).unwrap_or_default();
+    if v != w.battle_src {
+        w.battle_rows = v.as_array().map(|a| a.iter().filter_map(Suggestion::from_row).collect()).unwrap_or_default();
+        w.battle_src = v;
+    }
+}
+
+/// The rules' picks into root_sugg, while a mod listens for them (the suggestions event).
+fn run_rules(w: &mut World) {
     if !w.modern || w.action_menu.is_none() || w.prompt.is_some() {
         (w.root_sugg, w.root_sugg_at, w.suggest_sel, w.suggest_sub) = (Vec::new(), None, None, None);
+        return;
+    }
+    if !w.lua.listens("suggestions") {
+        (w.root_sugg, w.root_sugg_at) = (Vec::new(), None);
         return;
     }
     if w.suggest_sel.is_none() {
@@ -782,7 +830,7 @@ pub fn family_start(s: &Suggestion) -> usize {
 /// Up / Down move, Enter casts that spell, Left / Escape close it. True when the key was the submenu's.
 pub fn family_key(w: &mut World, on: Option<usize>, key: egui::Key) -> bool {
     use crate::audio::Ui as Se;
-    let Some(s) = on.and_then(|k| w.root_sugg.get(k)).filter(|s| s.group.len() > 1).cloned() else {
+    let Some(s) = on.and_then(|k| w.battle_rows.get(k)).filter(|s| s.group.len() > 1).cloned() else {
         w.suggest_sub = None;
         return false;
     };

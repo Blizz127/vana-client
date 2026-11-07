@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8c78a"/>
+      <stop offset="0.45" stop-color="#f39a2a"/>
+      <stop offset="1" stop-color="#7a4d15"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7a4d15"/>
+      <stop offset="1" stop-color="#7a4d15"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="29.163" y1="15.907" x2="34.837" y2="48.093" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="27.976" y1="9.183" x2="36.024" y2="54.817" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="32" y1="27.695" x2="32" y2="36.305" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f39da5"/>
+      <stop offset="0.42" stop-color="#e94c5b"/>
+      <stop offset="1" stop-color="#74262e"/>
+    </linearGradient>
+  </defs>
+  <title>w372</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="ring" d="M17.894 32 C17.894 24.209 24.209 17.894 32 17.894 C39.791 17.894 46.106 24.209 46.106 32 C46.106 39.791 39.791 46.106 32 46.106 C24.209 46.106 17.894 39.791 17.894 32 Z M32 20.278 C25.526 20.278 20.278 25.526 20.278 32 C20.278 38.474 25.526 43.722 32 43.722 C38.474 43.722 43.722 38.474 43.722 32 C43.722 25.526 38.474 20.278 32 20.278 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.927" stroke-linejoin="round"/>
+      <path id="arms" d="M30.543 13.457 C30.543 12.653 31.195 12 32 12 C32.805 12 33.457 12.653 33.457 13.457 L33.457 23.391 C33.457 24.196 32.805 24.847 32 24.847 C31.195 24.847 30.543 24.196 30.543 23.391 Z M13.457 30.543 L23.391 30.543 C24.196 30.543 24.847 31.195 24.847 32 C24.847 32.805 24.196 33.457 23.391 33.457 L13.457 33.457 C12.653 33.457 12 32.805 12 32 C12 31.195 12.653 30.543 13.457 30.543 Z M40.609 30.543 L50.543 30.543 C51.347 30.543 52 31.195 52 32 C52 32.805 51.347 33.457 50.543 33.457 L40.609 33.457 C39.804 33.457 39.153 32.805 39.153 32 C39.153 31.195 39.804 30.543 40.609 30.543 Z M30.543 40.609 C30.543 39.804 31.195 39.153 32 39.153 C32.805 39.153 33.457 39.804 33.457 40.609 L33.457 50.543 C33.457 51.347 32.805 52 32 52 C31.195 52 30.543 51.347 30.543 50.543 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.927" stroke-linejoin="round"/>
+      <circle id="point" cx="32" cy="32" r="4.305" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.795" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

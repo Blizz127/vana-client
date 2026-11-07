@@ -1,0 +1,16 @@
+name = "Cast Grid"
+version = "1.0.0"
+description = "A grid of buttons over the party list: a row per member, a column per spell you choose; a click casts it on them (the click-to-cast add-ons)."
+permissions = ["actions"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Cast Grid"
+help = "Shows a button for each spell below for each party member, over the party list; click one to cast it on them. Spells you cannot cast now are dimmed."
+
+[settings.spells]
+type = "string"
+default = "Cure, Cure II, Cure III, Cure IV, Paralyna, Silena, Poisona"
+label = "Spells"
+help = "The spells, separated by commas, in the order of the columns."

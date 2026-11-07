@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="23.252" y1="5.084" x2="40.748" y2="58.916" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cca5fa"/>
+      <stop offset="0.42" stop-color="#a35cf5"/>
+      <stop offset="1" stop-color="#522e7a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="19.5" x2="32" y2="44.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfc6fc"/>
+    </linearGradient>
+  </defs>
+  <title>quickdraw_lightning</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M19.858 7.535 C20.714 4.106 24.186 2.02 27.616 2.874 L49.544 8.341 C52.974 9.196 55.062 12.67 54.207 16.1 L44.143 56.464 C43.286 59.894 39.814 61.98 36.384 61.126 L14.456 55.659 C11.026 54.804 8.938 51.33 9.793 47.9 Z" fill="#0a1118"/>
+      <path id="card" d="M27.084 5.009 L49.012 10.476 C51.263 11.037 52.633 13.317 52.072 15.568 L42.008 55.932 C41.446 58.183 39.167 59.552 36.916 58.991 L14.988 53.524 C12.737 52.963 11.367 50.683 11.928 48.432 L21.992 8.068 C22.554 5.817 24.833 4.448 27.084 5.009 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <path id="border" d="M28.299 9.228 L45.958 13.631 C47.352 13.979 48.2 15.39 47.852 16.783 L38.853 52.878 C38.505 54.271 37.094 55.119 35.701 54.772 L18.042 50.369 C16.648 50.021 15.8 48.61 16.148 47.217 L25.147 11.122 C25.495 9.729 26.906 8.881 28.299 9.228 Z" fill="none" stroke="#dfc6fc" stroke-linejoin="round" opacity="0.6"/>
+      <polygon id="sheen" points="25.776,8.599 48.481,14.26 21.131,27.229" fill="#ffffff" opacity="0.18"/>
+      <polygon id="bolt" points="35.03,19.5 24.803,34.651 30.863,34.651 28.212,44.5 39.197,29.349 33.136,29.349 36.771,19.5" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

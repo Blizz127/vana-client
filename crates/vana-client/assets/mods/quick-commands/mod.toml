@@ -1,0 +1,10 @@
+name = "Quick Commands"
+version = "1.0.0"
+description = "Type a spell or ability you have as a command, in short: /cure3 me, /provoke, /utsusemiichi (the shortcut add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Quick Commands"
+help = "Lets you type /<spell or ability> [target] for anything you can use: no quotes, any case, spaces left out, numbers for II, III... Targets: t, me, st, bt, p0-p5, or the start of a party member's name."

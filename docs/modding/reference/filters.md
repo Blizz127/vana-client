@@ -1,9 +1,10 @@
 # `filters`
 
 Filters see lines before the client takes them, and keep, change or drop them: `filters.chat` sees every line about to
-go into the chat log, `filters.typed` every line about to run as a command. A filter is a plain function that returns
+go into the chat log, `filters.typed` every line about to run as a command, `filters.battle` every battle message with
+its data before it prints. A filter is a plain function that returns
 its verdict. Filters run inline, inside the client's work, not in the mod phase: they cannot sleep, and each call
-has a budget of about 20 ms. Chat filters cannot read game state; typed filters can. No permission is needed. A
+has a budget of about 20 ms. Chat filters cannot read game state; typed and battle filters can. No permission is needed. A
 suspended mod's filters stop until it is reloaded.
 
 ```lua
@@ -21,6 +22,7 @@ end)
 | --- | --- |
 | [`filters.chat(filter)`](#filterschat) | Runs `filter` on every chat log line before it is kept: keep, rewrite or drop it. |
 | [`filters.typed(filter)`](#filterstyped) | Runs `filter` on every typed or run line before it is handled: keep, rewrite or drop it. |
+| [`filters.battle(filter)`](#filtersbattle) | Runs `filter` on every battle message with its data: colour its names, rewrite or drop it. |
 | [`filters.off(id)`](#filtersoff) | Removes a filter. |
 
 ## `filters.chat`
@@ -134,19 +136,76 @@ Notes:
 - Typed filters can read game state (`game.player()` and the like). They cannot sleep and have the same 20 ms budget
   as chat filters; errors are reported and counted the same way.
 
+## `filters.battle`
+
+```lua
+filters.battle(filter) -> integer
+```
+
+Adds a battle message filter: `filter` is called for each battle message the log is about to print (an action's
+lines, s2c 0x029 and 0x02D messages), after the game's own Chat Filters have let it through, with what the message is
+about. It can colour the names in it, replace its lines or drop it. The bundled Battle Text mod is written with it.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `filter` | `function` | yes | Called as `filter(m)` with the message's table. |
+
+**`m` fields**
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `integer` | The battle message's id. |
+| `category` | `integer?` | The 0x028 action's category (7 a weapon skill starts, 8 a spell, 9 an item, 12 a ranged attack, ...); `nil` for 0x029 and 0x02D messages. |
+| `value` | `integer` | The record's value (the damage, the HP healed, the status id). |
+| `mode` | `integer` | The chat mode the lines print in. |
+| `lines` | `string[]` | The lines as printed so far, in-line codes kept ([`text.strip`](text.md#textstrip) gives the words). |
+| `actor` | `table?` | The actor: `id`; and where it is known, `name`, `pc` (a player: no "the"), `named` (a proper noun: no "the"), `colour`. |
+| `target` | `table?` | The target, the same fields. |
+
+**What `filter` returns**
+
+| Return | What happens |
+| --- | --- |
+| nothing or `nil` | The lines print as they are. Colours set on `actor.colour` / `target.colour` draw those names in that colour code (see [`text.colour`](text.md#textcolour)). |
+| `false` | The message is dropped. Later filters do not see it. |
+| a string, or a list of strings | Its lines are replaced, in the message's colour. Replaced lines are not condensed by the modern chat. |
+
+**Returns** `integer`: the filter's id, for `filters.off`.
+
+**Example**
+
+```lua
+-- Our own name in the party colour, and every miss dropped.
+filters.battle(function(m)
+  if m.actor and m.actor.id == game.player().id then m.actor.colour = 6 end
+  for _, line in ipairs(m.lines) do
+    if text.strip(line):find(" misses ", 1, true) then return false end
+  end
+end)
+```
+
+Notes:
+
+- Mods run in load order and each mod's filters in the order added; each sees the lines and colours the one before
+  left.
+- Battle filters can read game state; they cannot sleep and have the same 20 ms budget as chat filters.
+- The lines a battle filter keeps or writes still pass the chat filters on their way into the log.
+
 ## `filters.off`
 
 ```lua
 filters.off(id)
 ```
 
-Removes a chat or typed filter. An id that matches none does nothing.
+Removes a chat, typed or battle filter. An id that matches none does nothing.
 
 **Parameters**
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `id` | `integer` | yes | What `filters.chat` or `filters.typed` returned. |
+| `id` | `integer` | yes | What `filters.chat`, `filters.typed` or `filters.battle` returned. |
 
 **Returns** nothing.
 

@@ -665,6 +665,16 @@ impl Region {
         t0 <= t1
     }
 
+    /// The four corners of its footprint (x, z), in order around it: `local`'s rotation undone.
+    pub fn corners(&self) -> [[f32; 2]; 4] {
+        let (sn, cs) = self.rot[1].sin_cos();
+        let (sx, sz) = (self.scale[0].abs(), self.scale[2].abs());
+        [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)].map(|(lx, lz): (f32, f32)| {
+            let (dx, dz) = (lx * sx, lz * sz);
+            [self.pos[0] + dx * cs + dz * sn, self.pos[2] - dx * sn + dz * cs]
+        })
+    }
+
     /// A point in the box's unit space (the box is [-0.5, 0.5]^3 there).
     fn local(&self, p: [f32; 3]) -> [f32; 3] {
         let (dx, dy, dz) = (p[0] - self.pos[0], p[1] - self.pos[1], p[2] - self.pos[2]);
@@ -925,6 +935,25 @@ mod tests {
         let mut p = header(0x81, 1, 2, 32, 0);
         p.extend([1, 2, 3, 0x40, 4, 5, 6, 0x80]);
         assert_eq!(parse_img(&p).unwrap().rgba, [6, 5, 4, 255, 3, 2, 1, 0x80]);
+    }
+
+    /// Each footprint corner, nudged toward the centre, is inside the box; nudged out, it is not.
+    #[test]
+    fn region_corners() {
+        let r = Region {
+            name: "zabcdefg".into(),
+            pos: [10.0, -2.0, 5.0],
+            rot: [0.0, 0.7, 0.0],
+            scale: [4.0, 6.0, 10.0],
+            class: 0,
+            param: 0,
+            flags: 0,
+            floors: [0, 0],
+        };
+        for c in r.corners() {
+            let at = |k: f32| [r.pos[0] + (c[0] - r.pos[0]) * k, r.pos[1], r.pos[2] + (c[1] - r.pos[2]) * k];
+            assert!(r.contains(at(0.98)) && !r.contains(at(1.02)), "{c:?}");
+        }
     }
 
     #[test]

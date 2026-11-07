@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2aa6a6"/>
+      <stop offset="0.7" stop-color="#2aa6a6"/>
+      <stop offset="1" stop-color="#155353"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#155353"/>
+      <stop offset="1" stop-color="#155353"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="23" y1="16.16" x2="23" y2="46.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="41" y1="16.16" x2="41" y2="46.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="32" y1="19.04" x2="32" y2="22.28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d9a874"/>
+      <stop offset="0.5" stop-color="#9a6a3c"/>
+      <stop offset="1" stop-color="#57381c"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="32" y1="43.52" x2="32" y2="48.56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>o52</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#c5e7e7" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="harp_1" d="M25.088 20.48 L25.304 20.48 C25.463 20.48 25.592 20.609 25.592 20.768 L25.592 44.672 C25.592 44.831 25.463 44.96 25.304 44.96 L25.088 44.96 C24.929 44.96 24.8 44.831 24.8 44.672 L24.8 20.768 C24.8 20.609 24.929 20.48 25.088 20.48 Z" fill="#f2ead8" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_2" d="M31.208 20.48 L31.424 20.48 C31.583 20.48 31.712 20.609 31.712 20.768 L31.712 44.672 C31.712 44.831 31.583 44.96 31.424 44.96 L31.208 44.96 C31.049 44.96 30.92 44.831 30.92 44.672 L30.92 20.768 C30.92 20.609 31.049 20.48 31.208 20.48 Z" fill="#f2ead8" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_3" d="M37.328 20.48 L37.544 20.48 C37.703 20.48 37.832 20.609 37.832 20.768 L37.832 44.672 C37.832 44.831 37.703 44.96 37.544 44.96 L37.328 44.96 C37.169 44.96 37.04 44.831 37.04 44.672 L37.04 20.768 C37.04 20.609 37.169 20.48 37.328 20.48 Z" fill="#f2ead8" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_4" d="M26.24 46.4 C19.04 42.08 16.16 33.44 19.04 24.8 C20.12 21.2 18.32 18.32 15.44 16.88 C20.48 16.16 24.08 19.04 24.08 24.08 C23.36 32 24.8 39.2 30.56 43.52 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_5" d="M37.76 46.4 C44.96 42.08 47.84 33.44 44.96 24.8 C43.88 21.2 45.68 18.32 48.56 16.88 C43.52 16.16 39.92 19.04 39.92 24.08 C40.64 32 39.2 39.2 33.44 43.52 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_6" d="M21.56 19.04 L42.44 19.04 C43.036 19.04 43.52 19.524 43.52 20.12 L43.52 21.2 C43.52 21.796 43.036 22.28 42.44 22.28 L21.56 22.28 C20.964 22.28 20.48 21.796 20.48 21.2 L20.48 20.12 C20.48 19.524 20.964 19.04 21.56 19.04 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="harp_7" d="M25.52 43.52 L38.48 43.52 C39.276 43.52 40.097 44.14 40.315 44.905 L40.965 47.175 C41.183 47.94 40.716 48.56 39.92 48.56 L24.08 48.56 C23.284 48.56 22.817 47.94 23.035 47.175 L23.685 44.905 C23.903 44.14 24.724 43.52 25.52 43.52 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

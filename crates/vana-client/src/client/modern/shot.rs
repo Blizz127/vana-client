@@ -509,10 +509,12 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         folded: &mut Default::default(),
         scan_kinds: &mut 7,
         this: Default::default(),
+        rooms: Default::default(),
         retail: Default::default(),
         focus: Some("target"),
         hidden: Vec::new(),
         placed: Default::default(),
+        opacity: Default::default(),
     };
     // The chat window first, as the layer draws it: the location panel sits on it.
     let wh = [0x80, 0x80, 0x80, 0x80];
@@ -534,7 +536,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
             NO_MODE,
         ),
     ];
-    let shown = chat::Shown { rows: 8.0, draw_n: 8, pending: 0, slide: 0 };
+    let shown = chat::Shown { rows: 8.0, full: 8.0, draw_n: 8, pending: 0, slide: 0 };
     // A selection from the second line's middle into the fourth (chatsel.rs).
     *m.log_sel.borrow_mut() = Some(super::chatsel::LogSel { anchor: (1, 14), head: (3, 22) });
     let mut unread = [0; 11];
@@ -577,6 +579,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
         dots: vec![dot(4.0, -9.0, 0x8030_60e0), dot(-11.0, 3.0, 0x8000_b040), dot(14.0, 13.0, 0x5000_b040)],
         range: 28.8,
         arrow: Some((0.6, -0.8, "focus")),
+        name: Some("Ephauge".into()),
     };
     hud::where_panel(
         &mut p,
@@ -629,6 +632,15 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
             row(3, "Shantotto", 4, true, 0.95, false, vec![]),
             row(4, "Prishe", 2, false, 1.0, false, vec![]),
         ],
+        &[hud::PetRow {
+            id: 9,
+            name: "FunguarFamiliar".into(),
+            hpp: 84,
+            gauge: true,
+            tp: Some(450),
+            pet: true,
+            marked: false,
+        }],
         false,
         Some(super::super::resttick::Shown::Next(0.6, 4.0)),
         Some(&hud::ExpView {
@@ -659,20 +671,14 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
             ally(11, "Trion", 7, true, 0.77, 0, true),
         ];
         let a2 = [ally(12, "Zeid", 8, true, 0.66, 1, true), ally(13, "Lion", 6, true, 1.0, 0, true)];
-        hud::party_panel(&mut p, "alliance1", "Alliance", &a1, false, None, None);
-        hud::party_panel(&mut p, "alliance2", "Alliance", &a2, false, None, None);
+        hud::party_panel(&mut p, "alliance1", "Alliance", &a1, &[], false, None, None);
+        hud::party_panel(&mut p, "alliance2", "Alliance", &a2, &[], false, None, None);
     }
     hud::cast_panel(&mut p, "cast", "Casting", 0.6, "60%");
     // A refused action's chip over the cast bar (pending.rs).
-    super::pending::panel(
-        &mut p,
-        &super::pending::View {
-            what: "Cure III".into(),
-            on: Some("Raven".into()),
-            state: super::super::pending::State::Refused("Raven is out of range.".into()),
-            secs: 0.6,
-        },
-    );
+    p.panel("pending", None, 300.0, |ui| {
+        super::pending::chip(ui, m, "Cure III \u{2192} Raven", "refused", 1, "Raven is out of range.")
+    });
     if !opts.titles {
         hud::target_panel(
             &mut p,
@@ -699,7 +705,11 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     if opts.modes {
         let mut cfg = crate::config::ModernModes::default();
         cfg.pinned.push("party".into());
-        super::modes::editor(&mut p, &mut true, &mut cfg, super::modes::Mode::Combat);
+        let mods = [
+            ("mod:loot-tracker:loot".to_string(), "Loot Tracker: Loot".to_string()),
+            ("hud:zone-banner:hud".to_string(), "Zone Banner (on screen)".to_string()),
+        ];
+        super::modes::editor(&mut p, &mut true, &mut cfg, super::modes::Mode::Combat, &mods);
     }
     if opts.favs {
         favs_sample(&mut p);

@@ -1,3 +1,7 @@
+# The standard mods' files are listed in catalogue/mods.json by the SHA-256 and size of their working-tree bytes
+# (standard_mods_listed), and the client downloads the committed bytes from GitHub: checked out as committed (LF),
+# never converted to CRLF (Windows with core.autocrlf), so both describe the same bytes.
+crates/vana-client/assets/mods/** -text
 # The generated Lua API stubs are compared byte for byte with `vana-client lua-stubs` output (LF) by
 # committed_stubs_current; a CRLF checkout (Windows with core.autocrlf) would fail it.
 crates/vana-client/assets/mods/library/vana.lua text eol=lf

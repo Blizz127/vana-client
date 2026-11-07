@@ -282,6 +282,11 @@ enum Cmd {
         #[arg(long)]
         out: PathBuf,
     },
+    /// The stock spell and ability list icons as PNGs plus actions.tsv (each spell and ability, its icons).
+    ActionIconDump {
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Every stock image once (by content) as a PNG plus manifest.tsv, for an upscaler (texpack.rs).
     TexExport {
         #[arg(long)]
@@ -2153,6 +2158,7 @@ fn main() -> Result<()> {
         Cmd::MovieShot { frames, out, size } => movie_shot(&frames, &out, size.as_deref()),
         Cmd::TexExport { out } => texpack::export(&out),
         Cmd::StatusDump { out } => texpack::status_dump(&out),
+        Cmd::ActionIconDump { out } => texpack::action_icon_dump(&out),
         Cmd::LuaStubs { out } => {
             std::fs::write(&out, client::lua_stubs())?;
             println!("{}", out.display());

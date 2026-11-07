@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6a48e"/>
+      <stop offset="0.45" stop-color="#ef5a32"/>
+      <stop offset="1" stop-color="#782d19"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#782d19"/>
+      <stop offset="1" stop-color="#782d19"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="12" x2="32" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cda4ea"/>
+      <stop offset="0.42" stop-color="#a45ad8"/>
+      <stop offset="1" stop-color="#522d6c"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="28.392" y1="11.537" x2="35.608" y2="52.463" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="32" y1="17" x2="32" y2="47" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#ece7db"/>
+      <stop offset="1" stop-color="#b2aa9a"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="32" y1="26.403" x2="32" y2="37.597" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cda4ea"/>
+      <stop offset="0.42" stop-color="#a45ad8"/>
+      <stop offset="1" stop-color="#522d6c"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-6" x1="30.668" y1="28.47" x2="30.668" y2="30.866" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfc5f1"/>
+    </linearGradient>
+  </defs>
+  <title>w447</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <polygon id="flare" points="52,32 37.657,37.657 32,52 26.343,37.657 12,32 26.343,26.343 32,12 37.657,26.343" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.045" stroke-linejoin="round"/>
+      <path id="frame" d="M32 12.664 C38.664 19.336 42 25.336 42 32 C42 38.664 38.664 44.664 32 51.336 C25.336 44.664 22 38.664 22 32 C22 25.336 25.336 19.336 32 12.664 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.045" stroke-linejoin="round"/>
+      <path id="eye" d="M32 17 C37 22.336 39 27 39 32 C39 37 37 41.664 32 47 C27 41.664 25 37 25 32 C25 27 27 22.336 32 17 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.746" stroke-linejoin="round"/>
+      <path id="iris" d="M37.597 32 C37.597 35.097 35.097 37.597 32 37.597 C28.903 37.597 26.403 35.097 26.403 32 C26.403 28.903 28.903 26.403 32 26.403 C35.097 26.403 37.597 28.903 37.597 32 Z" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="0.746" stroke-linejoin="round"/>
+      <path id="pupil" d="M33.597 32 C33.597 34.209 32.888 36 32 36 C31.112 36 30.403 34.209 30.403 32 C30.403 29.791 31.112 28 32 28 C32.888 28 33.597 29.791 33.597 32 Z" fill="#0a1118"/>
+      <path id="glint" d="M31.866 29.664 C31.866 30.328 31.328 30.866 30.664 30.866 C30.007 30.866 29.47 30.328 29.47 29.664 C29.47 29.007 30.007 28.47 30.664 28.47 C31.328 28.47 31.866 29.007 31.866 29.664 Z" fill="url(#linear-gradient-6)"/>
+    </g>
+  </g>
+</svg>

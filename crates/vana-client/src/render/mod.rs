@@ -13,6 +13,7 @@ pub mod movie;
 pub mod mtext;
 pub mod occlusion;
 pub mod points;
+pub mod portrait;
 pub mod postfx;
 pub mod scale;
 pub mod screenfx;
@@ -518,6 +519,9 @@ pub struct ZoneRenderer {
     zone_areas: usize,
     area_lights: Vec<Option<crate::dat::weather::Lighting>>,
     areas: wgpu::Buffer,
+    /// The sway deltas (globals binding 4), and each portrait's uniforms and globals (render_portrait).
+    deltas_gpu: wgpu::Buffer,
+    portrait_globals: Vec<(wgpu::Buffer, wgpu::BindGroup)>,
     /// Door parts: slots by door id, their base matrices, their animations (CPU copy of the GPU table) and the tick
     /// they run against.
     pub door_parts: HashMap<u32, Vec<u32>>,
@@ -2484,6 +2488,8 @@ impl ZoneRenderer {
             zone_areas: geo.area_keys.len(),
             area_lights: Vec::new(),
             areas,
+            deltas_gpu: deltas,
+            portrait_globals: Vec::new(),
             door_parts: geo.door_parts.clone(),
             door_bases: geo.door_bases.clone(),
             parts: vec![PartGpu::default(); PARTS],
@@ -3479,21 +3485,8 @@ impl ZoneRenderer {
         self.draws.len()
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn render(
-        &self,
-        gpu: &Gpu,
-        encoder: &mut wgpu::CommandEncoder,
-        color: &wgpu::TextureView,
-        depth: &wgpu::TextureView,
-        camera: &Camera,
-        aspect: f32,
-        actors: &[&ActorGpu],
-    ) {
-        if !self.budgeted {
-            gpu.run_mips(encoder, u64::MAX);
-        }
-        let done = gpu.mips_done();
+    /// The scene's uniforms seen from `camera` (this frame's lighting, fog and areas) and its clear colour.
+    fn frame_uniforms(&self, camera: &Camera, aspect: f32) -> (Uniforms, [f32; 3]) {
         let vp = camera.view_proj(aspect);
         let v4 = |v: Vec3, w: f32| [v.x, v.y, v.z, w];
         let mut u = Uniforms {
@@ -3560,6 +3553,27 @@ impl ZoneRenderer {
         {
             u.area_info[0] = (s + 1) as f32;
         }
+        (u, clear)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn render(
+        &self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        color: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        camera: &Camera,
+        aspect: f32,
+        actors: &[&ActorGpu],
+    ) {
+        if !self.budgeted {
+            gpu.run_mips(encoder, u64::MAX);
+        }
+        let done = gpu.mips_done();
+        let vp = camera.view_proj(aspect);
+        let v4 = |v: Vec3, w: f32| [v.x, v.y, v.z, w];
+        let (u, clear) = self.frame_uniforms(camera, aspect);
         let mut areas = [AreaGpu::zeroed(); AREAS];
         for (slot, l) in self.area_lights.iter().enumerate().take(AREAS - 1) {
             if let Some(l) = l {
@@ -3888,6 +3902,86 @@ impl ZoneRenderer {
         let mut list: Vec<&ActorGpu> = faded.iter().map(|&i| actors[i]).collect();
         list.sort_by(|a, b| b.origin.distance(camera.eye).total_cmp(&a.origin.distance(camera.eye)));
         self.render_faded(gpu, encoder, color, depth, &list, slot);
+    }
+
+    /// One actor posed this frame drawn alone into `color` / `depth` (cleared to `clear`, premultiplied) from `camera`,
+    /// lit as the scene: a Lua HUD portrait. `slot` picks its uniforms, one per portrait a frame. False when it is not
+    /// posed this frame or its textures are not all up.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_portrait(
+        &mut self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        slot: usize,
+        color: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        camera: &Camera,
+        aspect: f32,
+        clear: [f32; 4],
+        a: &ActorGpu,
+    ) -> bool {
+        let (Some((_, poses, _)), Some(skin)) =
+            (&self.pose_gpu, a.skin.as_ref().filter(|s| s.frame == self.pose_frame))
+        else {
+            return false;
+        };
+        if a.mips > gpu.mips_done() || a.refract.is_some() {
+            return false;
+        }
+        while self.portrait_globals.len() <= slot {
+            let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("portrait uniforms"),
+                size: std::mem::size_of::<Uniforms>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            let group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("portrait globals"),
+                layout: &self.globals_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: buf.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: self.lights.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 2, resource: self.areas.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 3, resource: self.parts_gpu.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 4, resource: self.deltas_gpu.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 5, resource: self.lamp_shadow.uniform.as_entire_binding() },
+                ],
+            });
+            self.portrait_globals.push((buf, group));
+        }
+        let (u, _) = self.frame_uniforms(camera, aspect);
+        let (buf, globals) = &self.portrait_globals[slot];
+        let clear = wgpu::Color { r: clear[0] as f64, g: clear[1] as f64, b: clear[2] as f64, a: clear[3] as f64 };
+        gpu.queue.put(buf, 0, bytemuck::bytes_of(&u));
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("portrait"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: color,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(clear), store: wgpu::StoreOp::Store },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth,
+                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Discard }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.skin_pipeline);
+        pass.set_bind_group(0, globals, &[]);
+        pass.set_bind_group(2, poses, &[skin.offset]);
+        pass.set_vertex_buffer(0, skin.vertices.slice(..));
+        for (tex, range, wep) in &a.draws {
+            if *wep != NO_WEP && a.hidden_weps & (1 << wep) != 0 {
+                continue;
+            }
+            pass.set_bind_group(1, &a.textures[*tex], &[]);
+            pass.draw(range.clone(), 0..1);
+        }
+        true
     }
 
     /// The faded actors, farthest first (retail's translucent list DAT_1047bc94, back to front): each drawn opaque with

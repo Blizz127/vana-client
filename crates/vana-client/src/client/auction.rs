@@ -1117,6 +1117,60 @@ pub fn answered(w: &mut World, ask: Ask, yes: bool) {
     }
 }
 
+/// A mod's bid (actions.auction_bid): the game's bid prompt for it, at an open auction house.
+pub(super) fn mod_bid(w: &mut World, item: u16, price: u32, single: bool) -> Result<(), &'static str> {
+    if w.auction.is_none() {
+        return Err("open the auction house first");
+    }
+    if w.confirm.is_some() {
+        return Err("another question is open");
+    }
+    if price == 0 {
+        return Err("the price is 1 gil or more");
+    }
+    w.confirm = Some((super::Confirm::Auction(Ask::Bid { item, price, single }), false));
+    Ok(())
+}
+
+/// A mod's sale (actions.auction_sell): the Sell button's AskCommit for an inventory slot; the fee and the sale are
+/// asked as the window asks them.
+pub(super) fn mod_sell(w: &mut World, inv: u8, price: u32, single: bool) -> Result<(), &'static str> {
+    let Some(item) = w.inv.item(0, inv) else { return Err("nothing in that inventory slot") };
+    let Some(a) = w.auction.as_mut() else { return Err("open the auction house first") };
+    if a.shopsell.is_some() || w.confirm.is_some() {
+        return Err("another sale is being asked");
+    }
+    if price == 0 {
+        return Err("the price is 1 gil or more");
+    }
+    a.shopsell = Some((1, inv, item, price, single));
+    send(w, 4, 0, price, inv as u16, item, single as u32);
+    Ok(())
+}
+
+/// Our auction slots for mods (game.auction): slot, item, count, price, state.
+pub(super) fn mod_slots(w: &World) -> Option<Vec<(usize, u16, u8, u32, &'static str)>> {
+    w.auction.as_ref()?;
+    let state = |stat: u8| match stat {
+        3 => "listed",
+        0xa => "sold",
+        0xb => "returned",
+        0xc | 0x15 => "sold, collected",
+        0xd | 0x16 => "returned, collected",
+        0xe => "being returned",
+        0xf => "selling",
+        _ => "",
+    };
+    Some(
+        w.ah_slots
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| !state(p.stat).is_empty())
+            .map(|(k, p)| (k + 1, p.item, p.qty, p.price, state(p.stat)))
+            .collect(),
+    )
+}
+
 /// s2c AskCommit Result 1 (FUN_101d73a0): the fee line in the log, then asked.
 fn fee(w: &mut World, inv: u8, item: u16, fee: u32, single: bool) {
     let Some(price) = w.auction.as_ref().and_then(|a| a.shopsell.map(|s| s.3)) else { return };

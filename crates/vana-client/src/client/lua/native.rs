@@ -259,14 +259,21 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             Ok(())
         })?,
     )?;
-    let rect = |lua: &Lua, name: &str, r: [f32; 4], shown: bool| -> mlua::Result<Table> {
-        let t = lua.create_table()?;
+    let rect = |lua: &Lua, name: &str, r: [f32; 4], shown: bool, room: Option<&[f32; 4]>| -> mlua::Result<Table> {
+        let xywh = |r: &[f32; 4]| -> mlua::Result<Table> {
+            let t = lua.create_table()?;
+            t.set("x", r[0].round() as i64)?;
+            t.set("y", r[1].round() as i64)?;
+            t.set("w", r[2].round() as i64)?;
+            t.set("h", r[3].round() as i64)?;
+            Ok(t)
+        };
+        let t = xywh(&r)?;
         t.set("name", name)?;
-        t.set("x", r[0].round() as i64)?;
-        t.set("y", r[1].round() as i64)?;
-        t.set("w", r[2].round() as i64)?;
-        t.set("h", r[3].round() as i64)?;
         t.set("shown", shown)?;
+        if let Some(room) = room {
+            t.set("room", xywh(room)?)?;
+        }
         Ok(t)
     };
     t.set(
@@ -275,7 +282,10 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             find_panel(&name)?;
             let info = info(lua);
             let f = info.borrow();
-            f.native_rects.get(&name).map(|(r, shown)| rect(lua, &name, *r, *shown)).transpose()
+            f.native_rects
+                .get(&name)
+                .map(|(r, shown)| rect(lua, &name, *r, *shown, f.native_rooms.get(&name)))
+                .transpose()
         })?,
     )?;
     t.set(
@@ -286,7 +296,7 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             let out = lua.create_table()?;
             for p in PANELS {
                 let t = match f.native_rects.get(p.name) {
-                    Some((r, shown)) => rect(lua, p.name, *r, *shown)?,
+                    Some((r, shown)) => rect(lua, p.name, *r, *shown, f.native_rooms.get(p.name))?,
                     None => {
                         let t = lua.create_table()?;
                         t.set("name", p.name)?;
@@ -301,6 +311,52 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
                 out.push(t)?;
             }
             Ok(out)
+        })?,
+    )?;
+    let me = mod_id.to_string();
+    t.set(
+        "slot",
+        lua.create_function(move |lua, (name, value): (String, mlua::Value)| {
+            need(lua, "ui.native")?;
+            let v: serde_json::Value = match value {
+                mlua::Value::Nil | mlua::Value::Boolean(false) => serde_json::Value::Null,
+                v => mlua::LuaSerdeExt::from_value(lua, v)?,
+            };
+            // Each slot's shape, checked here so the panels draw only what they can.
+            let ok = match name.as_str() {
+                "clock" => {
+                    v.is_null()
+                        || ["earth", "moon_name", "next_day"].iter().all(|k| v.get(k).is_some_and(|x| x.is_string()))
+                            && ["moon", "next_minutes"].iter().all(|k| v.get(k).is_some_and(|x| x.is_number()))
+                }
+                "target_distance" | "target_hpp" => v.is_null() || v.is_number(),
+                "battle_rows" => {
+                    v.is_null()
+                        || v.as_array().is_some_and(|a| {
+                            a.len() <= 8 && a.iter().all(|r| super::super::suggest::Suggestion::from_row(r).is_some())
+                        })
+                }
+                _ => {
+                    return Err(mlua::Error::runtime(format!(
+                        "no slot {name:?} (clock, target_distance, target_hpp, battle_rows)"
+                    )));
+                }
+            };
+            if !ok {
+                return Err(mlua::Error::runtime(format!(
+                    "slot {name}: the wrong shape of value (see ui.native.slot)"
+                )));
+            }
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            if v.is_null() {
+                if f.slots.get(&name).is_some_and(|s| s.0 == me) {
+                    f.slots.remove(&name);
+                }
+            } else {
+                f.slots.insert(name, (me.clone(), v));
+            }
+            Ok(())
         })?,
     )?;
     t.set(
@@ -325,6 +381,29 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
                     if f.item_tints.get(&id).is_some_and(|t| t.0 == me) {
                         f.item_tints.remove(&id);
                     }
+                }
+            }
+            Ok(())
+        })?,
+    )?;
+    let me = mod_id.to_string();
+    t.set(
+        "trim",
+        lua.create_function(move |lua, (list, ids): (String, Option<Vec<u16>>)| {
+            let k = match list.as_str() {
+                "magic" => 0,
+                "abilities" => 1,
+                "mounts" => 2,
+                o => return Err(mlua::Error::runtime(format!("no list {o:?} (magic, abilities, mounts)"))),
+            };
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            match ids.filter(|v| !v.is_empty()) {
+                Some(v) => {
+                    f.trimmed.insert((me.clone(), k), v.into_iter().collect());
+                }
+                None => {
+                    f.trimmed.remove(&(me.clone(), k));
                 }
             }
             Ok(())

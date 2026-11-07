@@ -28,7 +28,9 @@ Settled for every row:
 - Native client features count as covered: draw distance, frame limit, minimap, timestamps, the Timers Extra, party
   status icons, screenshots and the like.
 - Fixes for problems our client does not have count as covered ("not needed").
-- Gamepad input is deferred until after the first release. It stays a gap, marked "(deferred)": it blocks the controller
+- Gamepad input: the client has had gamepad support since 2026-11-03, and mods read the pad since 2026-11-07
+  (`input.on_pad`, taking buttons from the game, and `input.pad`). The rows marked "(deferred)" below were rated
+  before; that gap is filled.
   add-ons and is in parentheses where a pad is one input among others.
 - Windower's Timers service is `timers.add`, rows in the client's Timers window. Any other service one add-on offers
   others counts as covered when that add-on can be ported: `mods.provide` and `commands.register` make the service.

@@ -7,11 +7,19 @@ use super::World;
 use super::game_ui::GameUi;
 
 /// One row's data.
-struct Row {
-    name: String,
-    hpp: u8,
-    model: bool,
-    tp: Option<u16>,
+pub(super) struct Row {
+    pub id: u32,
+    pub name: String,
+    pub hpp: u8,
+    pub model: bool,
+    pub tp: Option<u16>,
+    pub pet: bool,
+}
+
+/// The modern party panel's rows, top first: the fellow, then the pet (always shown: the panel is not covered by the
+/// windows that skip retail's rows).
+pub(super) fn rows(w: &World) -> Vec<Row> {
+    [row(w, w.my_fellow, false), row(w, w.my_pet, true)].into_iter().flatten().collect()
 }
 
 /// Our pet (player +0x1fa, s2c 0x037 @0x34 >> 3) or fellow (player +0x2a0, 0x037 @0x48 / 0x067 type 2) by ActIndex.
@@ -24,7 +32,7 @@ fn row(w: &World, index: u16, pet: bool) -> Option<Row> {
     // FUN_10098320: no TP for the luopans (models 0xb22..0xb31); FUN_10087610: 0x068's TP only for this pet.
     let tp = (pet && w.party_tp && !(0xb22..=0xb31).contains(&e.model))
         .then(|| w.pet_sync.as_ref().filter(|p| p.index == index).map_or(0, |p| p.tp));
-    Some(Row { name: super::monstrosity::name(e).to_string(), hpp: e.hpp, model, tp })
+    Some(Row { id: *id, name: super::monstrosity::name(e).to_string(), hpp: e.hpp, model, tp, pet })
 }
 
 /// The fellow's server id and name, for the party-list cursor's row -1.

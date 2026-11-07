@@ -302,10 +302,20 @@ pub struct Gamepad {
 
 impl Gamepad {
     /// Reads the pads. `focused`: the window has the focus (a pad in the background does nothing, as padmode's
-    /// foreground default, unless config gamepad_background).
-    pub fn poll(&mut self, cfg: &Config, focused: bool, ctx: Ctx, dt: f32) -> Frame {
+    /// foreground default, unless config gamepad_background). `mods` sees the buttons held (VIRTUAL's numbers), the
+    /// sticks and triggers (lx, ly, rx, ry, lt, rt) and whether a pad plays, before the game: the buttons it returns
+    /// are the mods' and the game does not see them.
+    pub fn poll(
+        &mut self,
+        cfg: &Config,
+        focused: bool,
+        ctx: Ctx,
+        dt: f32,
+        mods: &mut dyn FnMut(&[u8], [f32; 6], bool) -> Vec<u8>,
+    ) -> Frame {
         let Ctx { menu, palette, tabs, field, keyboard } = ctx;
         if !cfg.gamepad {
+            mods(&[], [0.0; 6], false);
             return self.release_all();
         }
         if !self.tried {
@@ -327,7 +337,10 @@ impl Gamepad {
             self.maps =
                 Some((padsin.to_string(), padexsin.to_string(), PadMap::parse(padsin), PadMap::parse(padexsin)));
         }
-        let Some(g) = &mut self.gilrs else { return Frame::default() };
+        let Some(g) = &mut self.gilrs else {
+            mods(&[], [0.0; 6], false);
+            return Frame::default();
+        };
         // The pad last touched is the one that plays.
         while let Some(ev) = g.next_event() {
             match ev.event {
@@ -346,9 +359,23 @@ impl Gamepad {
         }
         let pad = match self.active.and_then(|id| g.connected_gamepad(id)) {
             Some(p) if focused || cfg.gamepad_background => p,
-            _ => return self.release_all(),
+            _ => {
+                mods(&[], [0.0; 6], false);
+                return self.release_all();
+            }
         };
-        let buttons: Vec<u8> = VIRTUAL.iter().filter(|(b, _)| pad.is_pressed(*b)).map(|(_, n)| *n).collect();
+        let mut buttons: Vec<u8> = VIRTUAL.iter().filter(|(b, _)| pad.is_pressed(*b)).map(|(_, n)| *n).collect();
+        let trigger = |b: Button| pad.button_data(b).map_or(0.0, |d| d.value());
+        let axes = [
+            pad.value(Axis::LeftStickX),
+            pad.value(Axis::LeftStickY),
+            pad.value(Axis::RightStickX),
+            pad.value(Axis::RightStickY),
+            trigger(Button::LeftTrigger2),
+            trigger(Button::RightTrigger2),
+        ];
+        let taken = mods(&buttons, axes, true);
+        buttons.retain(|b| !taken.contains(b));
         let axis = |code: u8| {
             let a = match code {
                 1 => Axis::LeftStickX,

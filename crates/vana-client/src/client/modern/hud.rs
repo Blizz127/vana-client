@@ -200,6 +200,8 @@ pub struct CompassView {
     pub range: f32,
     /// The arrow toward the tracked target or the call-for-help monster: its local direction and theme colour.
     pub arrow: Option<(f32, f32, &'static str)>,
+    /// Its name (retail's beside the dial at +36, +26; ours beside the grid label over it).
+    pub name: Option<String>,
 }
 
 /// The pack's gauge pair (`kind`_empty, `kind`_full) cut at `f` over `r`.
@@ -342,6 +344,7 @@ pub fn status_panel(p: &mut Panels, v: &StatusView, small: bool) {
 
 /// Row heights: party rows carry an MP bar under the HP bar, alliance rows not.
 const PARTY_ROW: f32 = 60.0;
+const PET_ROW: f32 = 36.0;
 const ALLY_ROW: f32 = 50.0;
 
 /// The rest tick's strip under the party window's title (ours, client/resttick.rs).
@@ -492,15 +495,34 @@ fn exp_bar(p: &Panels, id: &str, r: Rect, e: &ExpView) {
 /// the job, leader marks, the name over the HP bar with the HP number in its colour, the MP bar and number and TP
 /// (party rows), a member elsewhere greyed with the zone's name, the hand on the party cursor's or our target's row.
 /// Its height is exact, so the party window grows upward with no frame's lag. The slot clicked, if any.
+/// A row under the party's members for our pet or fellow (retail's rows beside the party window).
+pub struct PetRow {
+    pub id: u32,
+    pub name: String,
+    pub hpp: u8,
+    /// Its HP gauge (retail's needs a model).
+    pub gauge: bool,
+    pub tp: Option<u16>,
+    pub pet: bool,
+    pub marked: bool,
+}
+
+/// What a click on the party panel picked: a member's slot, or a pet or fellow by server id.
+pub enum PartyPick {
+    Slot(usize),
+    Entity(u32),
+}
+
 pub fn party_panel(
     p: &mut Panels,
     id: &str,
     title: &str,
     rows: &[PartyRow],
+    pets: &[PetRow],
     small: bool,
     rest: Option<Shown>,
     exp: Option<&ExpView>,
-) -> Option<usize> {
+) -> Option<PartyPick> {
     if rows.is_empty() {
         return None;
     }
@@ -512,7 +534,8 @@ pub fn party_panel(
     let n = rows.len() as f32;
     let strip = if rest.is_some() { REST_H } else { 0.0 };
     let cap = if exp.is_some() { EXP_CAP } else { 0.0 };
-    let height = cap + super::MARGIN.sum().y + 37.0 + strip + n * row_h + (n - 1.0) * 4.0;
+    let pets_h = pets.len() as f32 * (PET_ROW + 4.0);
+    let height = cap + super::MARGIN.sum().y + 37.0 + strip + n * row_h + (n - 1.0) * 4.0 + pets_h;
     let mut clicked = None;
     let show = super::Show {
         title: Some(Title { icon: None, text: title, note: note.as_deref(), name: false }),
@@ -605,7 +628,7 @@ pub fn party_panel(
                     m.theme.color("muted"),
                 );
                 if resp.clicked() {
-                    clicked = Some(row.slot);
+                    clicked = Some(PartyPick::Slot(row.slot));
                 }
                 row_menu(m, &resp, row.slot);
                 continue;
@@ -679,15 +702,84 @@ pub fn party_panel(
                 }
             }
             if resp.clicked() {
-                clicked = Some(row.slot);
+                clicked = Some(PartyPick::Slot(row.slot));
             }
             row_menu(m, &resp, row.slot);
+        }
+        for pet in pets {
+            ui.add_space(4.0);
+            if pet_row(ui, m, pet) {
+                clicked = Some(PartyPick::Entity(pet.id));
+            }
         }
     });
     if let (Some(e), Some(r)) = (exp, shown) {
         exp_bar(p, id, r, e);
     }
     clicked
+}
+
+/// A pet or fellow row: a slimmer row with the name, the HP gauge and its percent, and the pet's TP (as party TP shows);
+/// the fellow's name in the focus colour, as retail's ncol 4. True when clicked.
+fn pet_row(ui: &mut Ui, m: &Modern, pet: &PetRow) -> bool {
+    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), PET_ROW), Sense::click());
+    let sprite = if pet.marked {
+        "controls/list_row_selected"
+    } else if resp.hovered() {
+        "controls/list_row_hover"
+    } else {
+        "controls/list_row_normal"
+    };
+    let painter = ui.painter();
+    super::rows::face(painter, m, r, sprite, Color32::WHITE);
+    let x = r.min.x + 54.0;
+    let right = r.max.x - 10.0;
+    let name_col = if pet.pet { m.theme.color("text") } else { m.theme.color("focus") };
+    let font = FontId::new(LABEL_SIZE, FontFamily::Name(super::LABEL.into()));
+    let small_font = FontId::new(14.0, FontFamily::Name(super::LABEL.into()));
+    paint::outlined(painter, pos2(x, r.min.y + 10.0), Align2::LEFT_CENTER, &pet.name, font, name_col);
+    let kind = if pet.pet { "Pet" } else { "Fellow" };
+    painter.text(
+        pos2(r.min.x + 22.0, r.center().y),
+        Align2::LEFT_CENTER,
+        kind,
+        FontId::proportional(m.theme.small - 1.0),
+        m.theme.color("muted"),
+    );
+    if pet.gauge {
+        let pct = format!("{}%", pet.hpp);
+        let pw = painter.layout_no_wrap("100%".into(), small_font.clone(), Color32::WHITE).size().x;
+        let mut bx = x;
+        if let Some(tp) = pet.tp {
+            let col = if tp > 999 { m.theme.color("focus") } else { m.theme.color("muted") };
+            bx = paint::outlined(
+                painter,
+                pos2(x + 2.0, r.min.y + 24.0),
+                Align2::LEFT_CENTER,
+                &tp.to_string(),
+                small_font.clone(),
+                col,
+            )
+            .max
+            .x + 8.0;
+        }
+        bar(
+            ui,
+            m,
+            "hp",
+            Rect::from_min_max(pos2(bx, r.min.y + 21.0), pos2(right - pw - 6.0, r.min.y + 27.0)),
+            pet.hpp.min(100) as f32 / 100.0,
+        );
+        paint::outlined(
+            painter,
+            pos2(right, r.min.y + 24.0),
+            Align2::RIGHT_CENTER,
+            &pct,
+            small_font,
+            m.theme.color("text"),
+        );
+    }
+    resp.clicked()
 }
 
 /// A right click on a party row opens its menu (ctxmenu.rs).
@@ -729,10 +821,10 @@ pub fn target_panel(p: &mut Panels, v: &TargetView) {
     }
 }
 
-/// A row of the focus panel: the focus target or the last one.
+/// A `targets` row as drawn (a mod's window; the focus panel's rows were these).
 pub struct OtherRow {
-    pub label: &'static str,
-    pub tag: &'static str,
+    pub label: String,
+    pub tag: String,
     pub id: u32,
     pub name: String,
     pub hpp: Option<u8>,
@@ -741,65 +833,54 @@ pub struct OtherRow {
     pub current: bool,
 }
 
-/// Ours (modern): the focus target (/focustarget, a member of our six) and the last target (the one before the
-/// current), each a row with its HP; a click targets it. On the target panel; none when neither is set.
-pub fn others_panel(p: &mut Panels, rows: &[OtherRow]) -> Option<u32> {
-    if rows.is_empty() {
-        return None;
-    }
-    let m = p.m;
+/// `targets` rows (a mod's window): a label, the entity's name in its colour, its HP bar; a click returns the entity.
+pub(super) fn other_rows(ui: &mut egui::Ui, m: &Modern, rows: &[OtherRow]) -> Option<u32> {
     let mut picked = None;
-    p.panel("focus", None, 340.0, |ui| {
-        for row in rows {
-            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
-            let face = if row.current {
-                "controls/list_row_selected"
-            } else if resp.hovered() {
-                "controls/list_row_hover"
-            } else {
-                "controls/list_row_normal"
-            };
-            super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
-            let label = ui.painter().text(
-                pos2(r.min.x + 8.0, r.center().y),
-                Align2::LEFT_CENTER,
-                row.label,
-                FontId::proportional(m.theme.small),
-                m.theme.color("muted"),
+    for row in rows {
+        let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::click());
+        let face = if row.current {
+            "controls/list_row_selected"
+        } else if resp.hovered() {
+            "controls/list_row_hover"
+        } else {
+            "controls/list_row_normal"
+        };
+        super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
+        let label = ui.painter().text(
+            pos2(r.min.x + 8.0, r.center().y),
+            Align2::LEFT_CENTER,
+            &row.label,
+            FontId::proportional(m.theme.small),
+            m.theme.color("muted"),
+        );
+        let name_x = (r.min.x + 52.0).max(label.max.x + 8.0);
+        let bar_w = 70.0;
+        let room = r.max.x - 12.0 - bar_w - 8.0 - name_x;
+        let g = super::one_line(
+            ui.painter(),
+            &row.name,
+            FontId::proportional(m.theme.ui),
+            row.colour.unwrap_or(m.theme.color("text")),
+            room,
+        );
+        ui.painter().galley(pos2(name_x, r.center().y - g.size().y / 2.0), g, Color32::WHITE);
+        if let Some(hpp) = row.hpp {
+            let bar = Rect::from_min_size(pos2(r.max.x - 12.0 - bar_w, r.center().y - 3.0), vec2(bar_w, 6.0));
+            ui.painter().rect_filled(bar, 3.0, m.theme.color("charcoal"));
+            ui.painter().rect_filled(
+                Rect::from_min_size(bar.min, vec2(bar_w * hpp.min(100) as f32 / 100.0, 6.0)),
+                3.0,
+                m.theme.color("hp"),
             );
-            let name_x = (r.min.x + 52.0).max(label.max.x + 8.0);
-            let bar_w = 70.0;
-            let room = r.max.x - 12.0 - bar_w - 8.0 - name_x;
-            let g = super::one_line(
-                ui.painter(),
-                &row.name,
-                FontId::proportional(m.theme.ui),
-                row.colour.unwrap_or(m.theme.color("text")),
-                room,
-            );
-            ui.painter().galley(pos2(name_x, r.center().y - g.size().y / 2.0), g, Color32::WHITE);
-            if let Some(hpp) = row.hpp {
-                let bar = Rect::from_min_size(pos2(r.max.x - 12.0 - bar_w, r.center().y - 3.0), vec2(bar_w, 6.0));
-                ui.painter().rect_filled(bar, 3.0, m.theme.color("charcoal"));
-                ui.painter().rect_filled(
-                    Rect::from_min_size(bar.min, vec2(bar_w * hpp.min(100) as f32 / 100.0, 6.0)),
-                    3.0,
-                    m.theme.color("hp"),
-                );
-            }
-            if resp.clicked() {
-                picked = Some(row.id);
-            }
-            let hp = row.hpp.map(|h| format!(" HP {h}%.")).unwrap_or_default();
-            m.tip(
-                ui,
-                r,
-                &row.name,
-                &format!("{} target.{hp} Click to target it; {} names it in commands.", row.label, row.tag),
-            );
-            ui.add_space(2.0);
         }
-    });
+        if resp.clicked() {
+            picked = Some(row.id);
+        }
+        let hp = row.hpp.map(|h| format!(" HP {h}%.")).unwrap_or_default();
+        let named = if row.tag.is_empty() { String::new() } else { format!("; {} names it in commands", row.tag) };
+        m.tip(ui, r, &row.name, &format!("{} target.{hp} Click to target it{named}.", row.label));
+        ui.add_space(2.0);
+    }
     picked
 }
 
@@ -855,6 +936,11 @@ pub fn where_panel(p: &mut Panels, v: &WhereView) {
             compass(painter, m, dial, c);
         }
         let g = painter.text(pos2(dial.x, r.min.y + 2.0), Align2::CENTER_CENTER, &v.grid, FontId::proportional(m.theme.small), m.theme.color("muted"));
+        // What the arrow points to, beside the grid (retail's name by the dial; ours has the clock line under it).
+        if let Some((c, name)) = v.compass.as_ref().and_then(|c| Some((c, c.name.as_ref()?))) {
+            let col = m.theme.color(c.arrow.map_or("focus", |a| a.2));
+            painter.text(pos2(g.max.x + 8.0, r.min.y + 2.0), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), col);
+        }
         // The weather fills the room right of the compass, centred in the whole panel (the clock line too; a double
         // weather's art in the same square).
         let room = Rect::from_min_max(pos2(right, r.min.y), pos2(r.max.x, clock_row.map_or(r.max.y, |c| c.max.y)));
@@ -873,7 +959,11 @@ pub fn where_panel(p: &mut Panels, v: &WhereView) {
         m.tip_with(ui, Rect::from_min_max(pos2(r.min.x, low - 14.0), pos2(d.max.x, low + 14.0)), || (v.day.1.clone(), format!("Vana'diel time {}:{:02}.\n{element} is strong today.", v.time.0, v.time.1)));
         m.tip_with(ui, g.expand(4.0), || ("Map position".into(), format!("{} on this area's map.", v.grid)));
         if let Some(c) = &v.compass {
-            let arrow = if c.arrow.is_some() { "\nThe arrow points to what you are tracking." } else { "" };
+            let arrow = match (&c.arrow, &c.name) {
+                (Some(_), Some(n)) => format!("\nThe arrow points to {n}."),
+                (Some(_), None) => "\nThe arrow points to what you are tracking.".to_string(),
+                _ => String::new(),
+            };
             m.tip_with(ui, Rect::from_center_size(dial, vec2(2.0 * DIAL, 2.0 * DIAL * TILT + 8.0)), || ("Compass".into(), format!("The red N is north; the dial turns with the camera. The dots are the people and monsters near you.{arrow}")));
         }
         if let Some(id) = v.weather {
@@ -982,15 +1072,15 @@ fn compass(painter: &Painter, m: &Modern, c: Pos2, v: &CompassView) {
         let k = 1.0 + 0.25 * pulse;
         let (tip, base) = (at(lx, ly, DIAL + 8.0 * k), at(lx, ly, DIAL - 6.0 * k));
         let n = (tip - base).normalized().rot90() * 6.0 * k;
-        let c = m.theme.color(col);
+        let colour = m.theme.color(col);
         painter.add(egui::Shape::convex_polygon(
             vec![tip, base + n, base - n],
-            c.gamma_multiply(0.25 * pulse),
-            Stroke::new(4.0 * pulse, c.gamma_multiply(0.35 * pulse)),
+            colour.gamma_multiply(0.25 * pulse),
+            Stroke::new(4.0 * pulse, colour.gamma_multiply(0.35 * pulse)),
         ));
         painter.add(egui::Shape::convex_polygon(
             vec![tip, base + n, base - n],
-            c,
+            colour,
             Stroke::new(1.0, Color32::from_black_alpha(180)),
         ));
         painter.ctx().request_repaint();
@@ -1014,11 +1104,15 @@ fn compass_view(w: &World) -> Option<CompassView> {
         Some(t) => Some((t.pos[0], t.pos[2], "focus")),
         None => target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| (e.pos.x, e.pos.z, "hp")),
     };
+    let name = match w.scan.tracking() {
+        Some(t) => w.npc_names.iter().find(|(id, _)| (*id & 0x3ff) as u16 == t.index & 0x3ff).map(|(_, n)| n.clone()),
+        None => target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| e.name.clone()),
+    };
     let arrow = aim.and_then(|(x, z, col)| {
         let d = vec2(w.pos.x - x, z - w.pos.z);
         (d.length() > 1e-3).then(|| (d.normalized().x, d.normalized().y, col))
     });
-    Some(CompassView { heading: f.x.atan2(-f.z), dots, range: rs.range, arrow })
+    Some(CompassView { heading: f.x.atan2(-f.z), dots, range: rs.range, arrow, name: arrow.and(name) })
 }
 
 pub fn cast_panel(p: &mut Panels, id: &str, label: &str, f: f32, text: &str) {
@@ -1042,7 +1136,20 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // ptw0 ("Solo") while our party has no leader.
     let title = if party.len() <= 1 && w.party.slots().leaders[0] == 0 { "Solo" } else { "Party" };
     let exp = exp_view(w, p.gu).filter(|_| !w.lua.hides("experience"));
-    let mut picked = party_panel(p, "party", title, &party, small, super::super::resttick::shown(w), exp.as_ref());
+    let pets: Vec<PetRow> = super::super::petrow::rows(w)
+        .into_iter()
+        .map(|r| PetRow {
+            id: r.id,
+            marked: w.target == Some(r.id),
+            name: r.name,
+            hpp: r.hpp,
+            gauge: r.model,
+            tp: r.pet.then_some(r.tp).flatten(),
+            pet: r.pet,
+        })
+        .collect();
+    let mut picked =
+        party_panel(p, "party", title, &party, &pets, small, super::super::resttick::shown(w), exp.as_ref());
     // The frame's top, under the experience bar's strip.
     let frame = p
         .this
@@ -1066,12 +1173,16 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     }
     for (id, rows) in ["alliance1", "alliance2"].into_iter().zip(&allies) {
         if let Some(rows) = rows {
-            picked = picked.or(party_panel(p, id, "Alliance", rows, small, None, None));
+            picked = picked.or(party_panel(p, id, "Alliance", rows, &[], small, None, None));
         }
     }
-    if let Some(k) = picked {
-        let t = target::slot_target(w, k);
-        target::pick(w, t);
+    match picked {
+        Some(PartyPick::Slot(k)) => {
+            let t = target::slot_target(w, k);
+            target::pick(w, t);
+        }
+        Some(PartyPick::Entity(id)) => target::pick(w, Some(id)),
+        None => {}
     }
     // An event takes the target window down unless it keeps it (EventPara2 bit 1, FUN_10085a00), as the retail HUD
     // does (client/mod.rs world_hud); the focus panel goes with it.
@@ -1080,10 +1191,6 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         target_view(w, p.gu).filter(|_| if w.target_event.is_some() { !w.target_suspended } else { keeps_target })
     {
         target_panel(p, &v);
-    }
-    let others = if keeps_target { others_view(w, p.gu) } else { Vec::new() };
-    if let Some(t) = others_panel(p, &others) {
-        target::pick(w, Some(t));
     }
     if let Some((total, left)) = w.cast_bar {
         let f = if total > 0.0 { ((total - left) / total).clamp(0.0, 1.0) } else { 1.0 };
@@ -1181,7 +1288,7 @@ fn where_view(p: Look, w: &World) -> Option<WhereView> {
         day: (day, name),
         weather: Some(w.weather).filter(|&id| id < 20),
         compass: compass_view(w),
-        clock: (w.earth_clock && !w.lua.hides("clock")).then(|| super::super::clock::parts(w)).flatten(),
+        clock: (!w.lua.hides("clock")).then(|| w.lua.clock_slot()).flatten(),
     })
 }
 
@@ -1310,44 +1417,35 @@ fn party_rows(p: Look, w: &World) -> (Vec<PartyRow>, [Option<Vec<PartyRow>>; 2])
     (party, allies)
 }
 
-/// The focus panel's rows: the focus target (a member of our six), then the last target (still here).
-fn others_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Vec<OtherRow> {
+/// A `targets` element's rows as drawn: the entity's name (a party member's when it is out of sight), its colour,
+/// its HP (a party member's, else the entity's when it shows a gauge), whether it is our target. Rows for nobody go.
+pub(super) fn other_views(
+    w: &World,
+    gu: Option<&super::super::game_ui::GameUi>,
+    rows: &[super::super::lua::window::TargetRow],
+) -> Vec<OtherRow> {
     let colour = |id: u32, e: &super::super::Entity| {
         gu.map(|gu| super::chat::colour(super::super::name_colour(id, e, w, |i| gu.ncol(i)).to_le_bytes()))
     };
-    let mut rows = Vec::new();
-    if let Some(id) = target::focus_member(w) {
-        let member = w.party.slots().slots.iter().flatten().find(|m| m.id == id).cloned();
-        let e = w.entities.get(&id);
-        let name = e
-            .map(|e| monstrosity::name(e).to_string())
-            .or_else(|| member.as_ref().map(|m| m.name.clone()))
-            .unwrap_or_default();
-        let hpp = member.as_ref().map(|m| m.hpp).or_else(|| e.map(|e| e.hpp));
-        rows.push(OtherRow {
-            label: "Focus",
-            tag: "<ft>",
-            id,
-            name,
-            hpp,
-            colour: e.and_then(|e| colour(id, e)),
-            current: w.target == Some(id),
-        });
-    }
-    if let Some((id, _)) = target::last_target(w)
-        && let Some(e) = w.entities.get(&id)
-    {
-        rows.push(OtherRow {
-            label: "Last",
-            tag: "<lt>",
-            id,
-            name: monstrosity::name(e).to_string(),
-            hpp: (!e.no_gauge).then_some(e.hpp),
-            colour: colour(id, e),
-            current: false,
-        });
-    }
-    rows
+    rows.iter()
+        .filter_map(|r| {
+            let id = r.entity;
+            let member = w.party.slots().slots.iter().flatten().find(|m| m.id == id).cloned();
+            let e = w.entities.get(&id);
+            let name =
+                e.map(|e| monstrosity::name(e).to_string()).or_else(|| member.as_ref().map(|m| m.name.clone()))?;
+            let hpp = member.as_ref().map(|m| m.hpp).or_else(|| e.filter(|e| !e.no_gauge).map(|e| e.hpp));
+            Some(OtherRow {
+                label: r.label.clone(),
+                tag: r.tag.clone(),
+                id,
+                name,
+                hpp,
+                colour: e.and_then(|e| colour(id, e)),
+                current: w.target == Some(id),
+            })
+        })
+        .collect()
 }
 
 fn target_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<TargetView> {
@@ -1388,6 +1486,6 @@ fn target_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<
         hp: (!e.no_gauge).then_some((e.hpp, w.target_gauge.1 as f32 / 100.0)),
         colour,
         cast: target_cast(w, id),
-        distance: w.target_distance.then(|| e.pos.distance(w.pos)),
+        distance: w.lua.slot_num("target_distance").map(|d| d as f32),
     })
 }

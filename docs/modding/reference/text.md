@@ -23,6 +23,8 @@ end)
 | [`text.from_shift_jis(bytes)`](#textfrom_shift_jis) | Shift-JIS bytes as a Lua string. |
 | [`text.to_shift_jis(text)`](#textto_shift_jis) | A Lua string as Shift-JIS bytes. |
 | [`text.plain(text)`](#textplain) | A line with its auto-translate phrases turned into plain words. |
+| [`text.strip(text)`](#textstrip) | A line without its in-line codes. |
+| [`text.colour(text, code)`](#textcolour) | Text in one of the log's in-line colours. |
 | [`text.phrase(group, id)`](#textphrase) | The phrase with this group and id, ready to put in chat text. |
 | [`text.autotranslate(text)`](#textautotranslate) | The phrase whose text is exactly this, ready to put in chat text. |
 
@@ -109,6 +111,53 @@ events.on("chat_message", function(line, sender, kind)
     log.info("tell from " .. sender .. ": " .. text.plain(line))
   end
 end)
+```
+
+## `text.strip`
+
+```lua
+text.strip(text) -> string
+```
+
+The line without its in-line codes: the colour and indent codes the game's text carries (and `text.colour` adds) are
+dropped, the words stay.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `text` | `string` | yes | A line, as a battle filter or the log has it. |
+
+**Returns** `string`.
+
+**Example**
+
+```lua
+print(text.strip(text.colour("Wild Rabbit", 8)))  --> Wild Rabbit
+```
+
+## `text.colour`
+
+```lua
+text.colour(text, code) -> string
+```
+
+`text` in one of the log's in-line colours, then back to the line's own colour, as the game colours names and items
+in its lines. Put it in a battle filter's lines, `chat.add` text, or a chat filter's rewrite.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `text` | `string` | yes | The text to colour. |
+| `code` | `integer` | yes | The colour code: 7 ours, 6 party, 3 alliance, 8 a monster our party claimed, 5 another's claim (Battle Names' colours), 2 an item's; 0 leaves the text as it is. |
+
+**Returns** `string`.
+
+**Example**
+
+```lua
+chat.add("Watch out for the " .. text.colour("Wild Rabbit", 8) .. "!")
 ```
 
 ## `text.phrase`

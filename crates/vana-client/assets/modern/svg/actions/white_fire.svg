@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="24" cy="21" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f1968c"/>
+      <stop offset="0.5" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="24" y1="13" x2="24" y2="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6bcb6"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="18.5" x2="32" y2="47.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f6bcb6"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="39.827" r="6.36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </radialGradient>
+  </defs>
+  <title>white_fire</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="27.7" fill="#0a1118"/>
+      <circle id="orb" cx="32" cy="32" r="25.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <path id="sheen" d="M34.253 13.406 C36.067 16.31 33.172 21.392 27.785 24.758 C22.399 28.124 16.562 28.498 14.747 25.594 C12.933 22.69 15.828 17.608 21.215 14.242 C26.601 10.876 32.438 10.502 34.253 13.406 Z" fill="url(#linear-gradient-1)" opacity="0.42"/>
+      <path id="flame" d="M32 18.5 C35.274 23.645 42.29 27.386 42.29 36.274 C42.29 42.634 37.613 47.5 32 47.5 C26.387 47.5 21.71 42.634 21.71 36.274 C21.71 31.129 24.984 28.322 26.387 24.113 C28.447 27.386 29.571 28.979 30.507 30.284 C31.623 26.542 31.064 22.619 32 18.5 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="core" d="M32 33.467 C34.429 36.274 37.055 38.334 37.055 41.329 C37.055 44.135 34.806 46.187 32 46.187 C29.194 46.187 26.945 44.135 26.945 41.329 C26.945 38.891 28.816 37.398 29.94 35.528 C30.687 36.651 31.253 37.021 31.623 37.398 C32 36.085 31.811 34.961 32 33.467 Z" fill="url(#radial-gradient-2)"/>
+    </g>
+  </g>
+</svg>

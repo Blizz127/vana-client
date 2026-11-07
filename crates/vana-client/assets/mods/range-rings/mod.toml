@@ -1,0 +1,27 @@
+name = "Range Rings"
+version = "1.0.0"
+description = "Rings on the ground around you at the distances you choose, such as how far your area spells and songs reach (the range display add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Range Rings"
+help = "Draws rings around you at the distances below."
+
+[settings.distances]
+type = "string"
+default = "6, 10, 20"
+label = "Distances"
+help = "Ring radii in yalms, separated by commas (for example 6 for area spells, 10 for songs, 20 for most spells)."
+
+[settings.colour]
+type = "colour"
+default = [90, 190, 255, 230]
+label = "Ring Colour"
+
+[settings.target]
+type = "bool"
+default = false
+label = "Around the Target Too"
+help = "Also rings your target at the first distance."

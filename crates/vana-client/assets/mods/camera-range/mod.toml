@@ -1,0 +1,37 @@
+name = "Camera Range"
+version = "1.0.0"
+description = "Sets how far the camera stands from you, in and out of battle, and how fast it pans (the camera add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Camera Range"
+help = "Uses the camera distance, battle distance and pan speed below instead of the game's."
+
+[settings.distance]
+type = "number"
+default = 1.0
+min = 0.5
+max = 10.0
+step = 0.25
+label = "Distance"
+help = "The camera's distance as a share of the game's usual one."
+
+[settings.battle]
+type = "number"
+default = 0.0
+min = 0.0
+max = 10.0
+step = 0.25
+label = "Battle Distance"
+help = "The distance while engaged; 0 keeps the one above."
+
+[settings.speed]
+type = "number"
+default = 1.0
+min = 0.1
+max = 5.0
+step = 0.1
+label = "Pan Speed"
+help = "How fast the camera turns; 1 is the game's speed."

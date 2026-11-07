@@ -21,15 +21,19 @@ end)
 | [`game.entities(filter?)`](#gameentities) | Every entity in the zone, optionally filtered by distance and kind. |
 | [`game.target()`](#gametarget) | Your current target. |
 | [`game.party()`](#gameparty) | Your party and alliance members. |
+| [`game.find_items(name, bags?)`](#gamefind_items) | Held items by name, in any bag or the ones given. |
 | [`game.items(bag)`](#gameitems) | The items in one bag. |
 | [`game.bag_size(bag)`](#gamebag_size) | How many slots a bag has. |
 | [`game.equipment()`](#gameequipment) | What you have equipped, by equipment slot. |
 | [`game.buffs()`](#gamebuffs) | Your status effects and their time left. |
 | [`game.recasts()`](#gamerecasts) | Seconds left on your spell and ability recasts, and their whole lengths. |
 | [`game.time()`](#gametime) | The Vana'diel date, clock and moon. |
+| [`game.synth()`](#gamesynth) | Whether a synthesis is under way, and whether the synthesis window is open. |
+| [`game.clock()`](#gameclock) | Earth time, the moon and the next Vana'diel day, as the clock slot shows them. |
 | [`game.weather()`](#gameweather) | The current weather id. |
 | [`game.key_items()`](#gamekey_items) | The key items you hold. |
 | [`game.treasure()`](#gametreasure) | The items in the treasure pool. |
+| [`game.countdown()`](#gamecountdown) | The content countdown the client shows: seconds left and the whole limit. |
 | [`game.event()`](#gameevent) | The event (cutscene, NPC talk) under way, and its menu. |
 | [`game.entity_by_tag(tag)`](#gameentity_by_tag) | The entity a target tag such as `<t>` or `<bt>`, a player's name or an id names. |
 | [`game.skills()`](#gameskills) | Your combat, magic and crafting skills. |
@@ -238,6 +242,183 @@ end
 
 Slots count from 1. Slot 0, where the server keeps your gil, is never in the list: use `game.gil()` for the gil.
 
+## `game.find_items`
+
+```lua
+game.find_items(name, bags?) -> table[]
+```
+
+The held items whose name or long log name is `name` (any case), bag by bag: what a gear set names, wherever it is.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | yes | The item's name or its log name (`"Hachi. Domaru +1"` or `"Hachiman Domaru +1"`). |
+| `bags` | `integer[]` | no | Only these bags (0 the inventory, 8 and 10..16 the wardrobes, as `game.items` numbers them); all when left out. |
+
+**Returns** a list of `{bag, slot, id, count, extdata, locked}`, as [`game.items`](#gameitems) gives them; empty when
+none is held.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
+  print(it.bag, it.slot)
+end
+```
+
+## `game.zone_lines`
+
+```lua
+game.zone_lines() -> table[]
+```
+
+The zone lines of the zone we are in: the boxes in the zone's data that zone us when we touch them (their names are 8
+letters, the line's own tag and its destination's).
+
+**Returns** a list of:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `name` | `string` | Its 8-letter name. |
+| `centre` | `{x, y, z}` | The box's centre. |
+| `size` | `{x, y, z}` | Its size along its own axes. |
+| `yaw` | `number` | Its turn about the vertical, in radians. |
+| `corners` | `{x, y, z}[]` | The four corners of the floor it stands on (its bottom face), in order around it. |
+
+Entity coordinates, as `game.entity().pos` (y goes down, so the floor is the centre's y plus half the height).
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for i, z in ipairs(game.zone_lines()) do
+  for k = 1, 4 do
+    draw.line("zl" .. i .. ":" .. k, { from = z.corners[k], to = z.corners[k % 4 + 1], colour = { 110, 220, 255, 220 } })
+  end
+end
+```
+
+## `game.quests`
+
+```lua
+game.quests() -> table
+```
+
+Every quest area's quests in the journal's order, and where we stand in each, as the server sent it (the Quests
+window's own data).
+
+**Returns** a table keyed by area: 0 San d'Oria, 1 Bastok, 2 Windurst, 3 Jeuno, 4 Other Areas, 5 Outlands, 6 Aht
+Urhgan, 7 Crystal War, 8 Abyssea, 9 Adoulin, 10 Coalition. Each is a list of:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `number` | `integer` | The quest's number in its area. |
+| `name` | `string` | Its name, as the Quests window shows it. |
+| `repeatable` | `boolean` | It can be taken again (the journal marks it). |
+| `current` | `boolean` | It is under way. |
+| `completed` | `boolean` | It has been completed (a repeatable one can be both). |
+
+Areas index from 0, so walk them with `for area = 0, 10` rather than `ipairs`.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local q = game.quests()
+local done = 0
+for _, quest in ipairs(q[0] or {}) do
+  if quest.completed then done = done + 1 end
+end
+print(("San d'Oria: %d of %d done"):format(done, #(q[0] or {})))
+```
+
+## `game.roe`
+
+```lua
+game.roe() -> table
+```
+
+Our Records of Eminence: the sparks and the objectives set now, as the server sent them (s2c 0x110 / 0x111).
+
+**Returns** `{sparks, active}`; `active` lists the objectives set (empty before the server has sent them):
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `slot` | `integer` | Its slot, 1..30. |
+| `id` | `integer` | The objective's number n; `res.item(0xE000 + n)` is its record (name, description). |
+| `progress` | `integer` | Its count so far. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+for _, o in ipairs(game.roe().active) do
+  print(o.slot, (res.item(0xE000 + o.id) or {}).name, o.progress)
+end
+```
+
+## `game.auction`
+
+```lua
+game.auction() -> table?
+```
+
+Our auction house listings while the auction house is open (the server sends them as it opens).
+
+**Returns** `table?`: nil while the auction house is closed; else `{slots}`, a list of our listings:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `slot` | `integer` | The listing's slot, from 1. |
+| `item` | `integer` | The item id. |
+| `count` | `integer` | How many (a stack's size, or 1). |
+| `price` | `integer` | The asking price in gil. |
+| `state` | `string` | `listed`, `sold`, `returned`, `sold, collected`, `returned, collected`, `being returned` or `selling`. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local ah = game.auction()
+for _, s in ipairs(ah and ah.slots or {}) do
+  print(s.slot, (res.item(s.item) or {}).name, s.price, s.state)
+end
+```
+
+## `game.can_wear`
+
+```lua
+game.can_wear(item) -> boolean
+```
+
+Whether our character can wear the item now, by the client's own rule (the one that colours wearable gear yellow in
+shops): the item's races, our main job and its level, the superior level, and no encumbrance on the item's slots.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `item` | `integer` | yes | The item id. |
+
+**Returns** `boolean`: false for an item that is not gear, and before the character's stats have come.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+-- Warp Cudgel needs level 36.
+if not game.can_wear(17040) then print("not yet") end
+```
+
 ## `game.bag_size`
 
 ```lua
@@ -379,6 +560,57 @@ print(("%d/%02d/%02d %02d:%02d, %s, %s (%d%%)"):format(
   t.year, t.month, t.day, t.hour, t.minute, res.day(t.weekday), res.moon(t.moon_phase), t.moon))
 ```
 
+## `game.synth`
+
+```lua
+game.synth() -> table
+```
+
+Our synthesis state.
+
+**Returns** a table:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `busy` | `boolean` | A synthesis is under way: its request waits for the answer (or for the 2 seconds after it), our synthesis animation plays, the synthesizing status holds, or the synthesis window is open. |
+| `window` | `boolean` | The synthesis window is open. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+if not game.synth().busy then actions.synth(4096, {640, 640}) end
+```
+
+## `game.clock`
+
+```lua
+game.clock() -> table?
+```
+
+What the line beside the game's clock shows ([`ui.native.slot`](ui.native.md#uinativeslot)'s `clock`), worded as the
+game words it.
+
+**Returns** `nil` until the server has sent the time and the game's message tables have loaded; then a table:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `earth` | `string` | Earth's local time in the player's 12 or 24 hour format (`"20:40"`, `"8:40 PM"`). |
+| `moon_name` | `string` | The moon phase's name (`"Waxing Crescent"`). |
+| `moon` | `integer` | The moon's percent. |
+| `next_day` | `string` | The next Vana'diel day's name. |
+| `next_minutes` | `integer` | Earth minutes until it. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local c = game.clock()
+if c then print(("%s, %s %d%%, %s in %d min"):format(c.earth, c.moon_name, c.moon, c.next_day, c.next_minutes)) end
+```
+
 ## `game.weather`
 
 ```lua
@@ -454,21 +686,50 @@ for _, t in ipairs(game.treasure()) do
 end
 ```
 
+## `game.countdown`
+
+```lua
+game.countdown() -> table?
+```
+
+The countdown the client shows for a timed content (a battlefield's or an instance's time limit, the bar at the top
+of the screen), as the server set it.
+
+**Returns** `table?`: nil while no countdown runs; else:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `left` | `integer` | Seconds left; 0 once it has run out. |
+| `length` | `integer` | The whole limit in seconds, as last set (an extension sets it anew). |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local c = game.countdown()
+if c then print(("%d:%02d left of %d minutes"):format(c.left // 60, c.left % 60, c.length // 60)) end
+```
+
 ## `game.event`
 
 ```lua
 game.event() -> table?
 ```
 
-The event (a cutscene or NPC conversation) under way, and the menu it shows, if any.
+The event (a cutscene or NPC conversation) under way, the menu it shows, and its message, if any.
 
-**Returns** `table?`: nil when no event runs. While one runs, a table that has a `menu` field only while the event shows a menu:
+**Returns** `table?`: nil when no event runs. While one runs, a table that has a `menu` field only while the event shows a menu, and a `text` field only while it shows a message:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `menu.question` | `string` | The menu's question. |
-| `menu.options` | `string[]` | The options' texts, in order. |
+| `menu.question` | `string` | The menu's question, as the window reads it: the game's curly quotes and full-width forms as ordinary characters, colour codes left out (`Teleport where?(Lower Jeuno)`). |
+| `menu.options` | `string[]` | The options' texts, in order, the same way. |
 | `menu.cursor` | `integer` | The option the cursor is on, from 1. |
+| `text.waiting` | `boolean` | The message waits for a key (Enter, or `actions.advance()`) before it goes on. |
+| `text.open` | `number` | Seconds its page has been on screen. |
+| `text.lines` | `string[]` | The page's lines as the log wraps them, read as the window shows them (colour codes left out). NPC talk starts with the speaker's name and ` : `. |
+| `text.actor` | `integer` | The event's NPC (or our own character) by server id: who was talked to. |
 
 **Errors** "game state is not available here" in the lobby or a chat filter.
 
@@ -484,7 +745,17 @@ if ev and ev.menu then
 end
 ```
 
-Pick an option with `actions.choose(i)`, using the same numbers.
+Pick an option with `actions.choose(i)`, using the same numbers. A message that waits goes on with `actions.advance()`:
+
+```lua
+-- Move waiting messages on after 3 seconds (needs automation).
+timer.every(0.1, function()
+  local ev = game.event()
+  if ev and ev.text and ev.text.waiting and not ev.menu and ev.text.open >= 3 then
+    actions.advance()
+  end
+end)
+```
 
 ## `game.entity_by_tag`
 
@@ -756,9 +1027,11 @@ The setup of your main and sub job as the server sent it: the blue magic set for
 | `job` | `integer` | The job id. |
 | `raw` | `string` | The setup's 156 bytes as the server sent them. |
 | `blue_spells` | `integer[]?` | Blue Mage (job 16) only: the spell ids set, in slot order, empty slots left out. |
+| `blue_slots` | `integer[]?` | Blue Mage only: the 20 slots in order, each a spell id or 0 when empty. |
 | `head` | `integer?` | Puppetmaster (job 18) only: the automaton head's item id; nil when none. |
 | `frame` | `integer?` | Puppetmaster only: the frame's item id; nil when none. |
 | `attachments` | `integer[]?` | Puppetmaster only: the attachments' item ids, empty slots left out. |
+| `attachment_slots` | `integer[]?` | Puppetmaster only: the 12 attachment slots in order, each an item id or 0 when empty. |
 
 **Errors** "game state is not available here" in the lobby or a chat filter.
 
@@ -817,12 +1090,14 @@ Run one with `actions.macro("ctrl", i)`; switch with `actions.macro_set(book, se
 game.map() -> table?
 ```
 
-The map the client shows for where you stand (a map the zone has and you own). Use it with `game.map_pos` and `hud.map` to draw on the map.
+The map record for where you stand, and how the map window shows it. Use it with `game.map_pos` and `hud.map` to draw on the map.
 
-**Returns** `table?`: nil when there is no such map. Otherwise:
+**Returns** `table?`: nil where no map exists (the map window says "There is no map for this area."). Otherwise:
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `kind` | `string` | `"map"`: the map, which you own. `"not_owned"`: the map exists but you don't have it (or the client doesn't know you do yet, just after zoning): the map window, and `hud.map`, show the game's NO MAP image over the map's place, markers where they would be. `"no_map_needed"`: a record whose place needs no map: its own image, no markers. |
+| `owned` | `boolean` | `kind == "map"`. |
 | `zone` | `integer` | The zone the map belongs to. |
 | `number` | `integer` | The map's number within the zone. |
 | `file` | `integer` | The map image's game file id (`res.dat(file)` reads it). |
@@ -848,7 +1123,8 @@ end
 game.map_pos(x, z) -> integer?, integer?
 ```
 
-Where a world position falls on the current map's 512 x 512 image.
+Where a world position falls on the current map's 512 x 512 image. It answers while the map is not yours too (the map
+window puts its markers there over NO MAP); nil where no map exists or the record needs none.
 
 **Parameters**
 

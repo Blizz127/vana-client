@@ -27,6 +27,11 @@ Your own character, as `game.player()` returns it. Fields that need data from th
 | `sub_job` | `integer?` | Support job id. |
 | `sub_level` | `integer?` | Support job level. |
 | `target` | `integer?` | Your target's server id; nil without a target. |
+| `focus_target` | `integer?` | The focus target's server id (`/focustarget`: a member of your party, not you); nil without one. |
+| `last_target` | `integer?` | The target before the current one, while it is here and can be targeted; nil otherwise. |
+| `away` | `boolean` | The /away flag as the server last sent it (/online clears it). |
+| `anonymous` | `boolean` | The /anon flag. |
+| `seeking` | `boolean` | Seeking a party (the search comment's flag). |
 
 `hp`, `mp`, `tp`, `hpp` and `mpp` are nil until the server has sent your vitals; `hp_max`, `mp_max` and the four job fields until it has sent your stats.
 
@@ -51,6 +56,7 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `heading` | `number` | The way it faces, in radians (0 east, π/2 south). |
 | `distance` | `number` | Its straight-line distance from you in yalms, height included; 0 for yourself. |
 | `hpp` | `integer` | HP percent. Yours is 100 until the server has sent your vitals. |
+| `gauge` | `boolean` | It has an HP gauge: the target window shows one for it. |
 | `status` | `integer` | The server's status, as `Player.status`. |
 | `speed` | `number` | Its movement speed, in yalms per second. |
 | `claim` | `integer` | The server id of whoever has claimed it; 0 when nobody has. Always 0 for yourself. |
@@ -60,15 +66,17 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `me` | `boolean?` | true for your own character; nil for everyone else. |
 | `race` | `integer?` | Its race number; nil when unknown. |
 | `model` | `integer?` | The model id of an NPC or monster; 0 for one drawn from a look. nil for your own entity. |
-| `look` | `table?` | A character-style look: the model ids `{face, head, body, hands, legs, feet, main, sub, range}` (all integers). nil when it has none, and for your own entity. With `race` added, it is what `res.model_files` takes. |
+| `look` | `table?` | A character-style look: the model ids `{face, head, body, hands, legs, feet, main, sub, range}` (all integers). nil when it has none; your own is the look your model was built from (before any `render.look`). With `race` added, it is what `res.model_files` takes. |
 | `in_party` | `boolean` | It is in your party. true for yourself. |
 | `in_alliance` | `boolean` | It is in your party or alliance. true for yourself. |
 | `hitbox` | `number` | Its model radius as the server gives it, in yalms. |
+| `height` | `number?` | Its model's height in yalms, standing at rest (a hat counts); nil until its model is loaded. Its head is near `pos.y - height` (y goes down). |
 | `target_index` | `integer?` | The index of what it is targeting (for yourself: your target's index); nil when none. |
 | `target_id` | `integer?` | That target's server id, when it is known; nil otherwise. |
 | `pet` | `boolean?` | true for your own pet; nil for anything else. |
 | `mpp` | `integer?` | Your pet only: its MP percent. |
 | `tp` | `integer?` | Your pet only: its TP. |
+| `pet_target` | `integer?` | Your pet only: the server id of what it fights, when it has a target. |
 
 ```lua
 local t = game.target()
@@ -188,6 +196,7 @@ The definition of a mod window, the second argument of `ui.window(id, spec)`. Th
 | `y` | `number?` | The window's top edge in the classic UI. Used only together with `x`. |
 | `modal` | `boolean?` | true: the window keeps the keys and the pointer while it is open; centred unless placed with `x` and `y`. Default false. |
 | `popup` | `boolean?` | true: a modal window opened at the pointer and closed by a click outside it. Default false. |
+| `opacity` | `number?` | The whole window's opacity, 0..1 (per-window opacity). Default 1. |
 | `elements` | `table[]?` | The window's elements in order, each with a `type` field (see [ui.md](ui.md)). |
 
 ```lua

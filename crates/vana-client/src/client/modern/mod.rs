@@ -22,6 +22,7 @@ mod favs;
 mod gametext;
 mod gmwin;
 mod hud;
+mod hudmods;
 mod inspect;
 mod items;
 mod journal;
@@ -84,7 +85,7 @@ pub use macros::key as macro_key;
 pub use status::key as status_key;
 pub use storage::key as storage_key;
 use theme::{Art, LABEL, NAME, STRONG};
-pub use theme::{Theme, frame_image};
+pub use theme::{Theme, frame_image, sprite_pixels};
 
 pub use crate::config::{ModernDock as Dock, ModernLayout as Layout, ModernPlace as Place};
 use std::collections::HashMap;
@@ -339,7 +340,11 @@ impl Modern {
         pointers(self, ctx, w);
         let focus = focus_panel(w);
         let mode = modes::current(w, &self.engaged_at, focus);
-        let vis = modes::visibility(ctx, &cfg.modern_modes, mode);
+        let mod_windows = w.lua.mode_windows();
+        let vis = modes::visibility(ctx, &cfg.modern_modes, mode, &mod_windows);
+        // The Lua mods' HUD elements, under every panel, as the modern layer draws its own (each HUD window faded by
+        // the mode as a panel is).
+        hudmods::draw(self, ctx, gu, w, &vis);
         // Places per display: this window size and UI scale's layout, else the character's last one (the
         // template); a change saves both. A display shown the template for 2 s keeps it as its own, so a change on
         // another display doesn't move its panels; sizes passed through while resizing store nothing.
@@ -369,10 +374,12 @@ impl Modern {
             folded: &mut cfg.modern_folded,
             scan_kinds: &mut cfg.modern_scan_kinds,
             this: HashMap::new(),
+            rooms: HashMap::new(),
             retail: HashMap::new(),
             focus,
             hidden: modern_hidden(w),
             placed: w.lua.placed(),
+            opacity: w.lua.window_opacities(&w.window_opacity),
         };
         // The chat window first: what sits on it places by this frame's height.
         self.chat_edge.set(None);
@@ -380,7 +387,6 @@ impl Modern {
         extras::draw(&mut p, w);
         hud::draw(&mut p, w);
         favs::draw(&mut p, w);
-        pending::draw(&mut p, w);
         command::draw(&mut p, w);
         combat::draw(&mut p, w);
         lists::draw(&mut p, w);
@@ -431,7 +437,7 @@ impl Modern {
         charlnk::draw(&mut p, w);
         mogdoor(&mut p, w);
         event_input(&mut p, w);
-        if modes::editor(&mut p, &mut w.uimodes_open, &mut cfg.modern_modes, mode) {
+        if modes::editor(&mut p, &mut w.uimodes_open, &mut cfg.modern_modes, mode, &mod_windows) {
             *p.changed = true;
         }
         ctxmenu::draw(self, ctx, w);
@@ -442,10 +448,12 @@ impl Modern {
         let ppp = ctx.pixels_per_point();
         let px = |r: &Rect| [r.min.x * ppp, r.min.y * ppp, r.width() * ppp, r.height() * ppp];
         let ghosts = std::mem::take(&mut *self.ghosts.borrow_mut());
+        let rooms = std::mem::take(&mut p.rooms);
         w.lua.set_native_rects(
             this.iter().map(|(k, r)| (k.clone(), px(r))).collect(),
             ghosts.iter().map(|(k, r)| (k.clone(), px(r))).collect(),
         );
+        w.lua.set_native_rooms(rooms.iter().map(|(k, r)| (k.clone(), px(r))).collect());
         *self.rects.borrow_mut() = this;
         if changed {
             cfg.modern_places.insert(w.name.clone(), layout.clone());
@@ -587,16 +595,20 @@ struct Panels<'a> {
     scan_kinds: &'a mut u8,
     /// The panels drawn this frame, as others dock on them (the chat window while it fades: its bottom edge).
     this: HashMap<String, Rect>,
+    /// The whole room of the panels drawn folded or growing this frame (Show::full).
+    rooms: HashMap<String, Rect>,
     /// Places retail works out this frame (the minimap left of the windows at the edge): the default until moved.
     retail: HashMap<String, Place>,
     /// The panel with the keys (focus_panel): drawn in the focused frame.
     focus: Option<&'static str>,
     /// The mode presets' panels' opacity this frame (modes.rs): 0 not drawn; others always drawn.
-    vis: HashMap<&'static str, f32>,
+    vis: HashMap<String, f32>,
     /// Panels a Lua mod hid (ui.native.hide).
     hidden: Vec<&'static str>,
     /// Panels a Lua mod placed, scaled or faded (ui.native.place).
     placed: HashMap<String, super::lua::Placed>,
+    /// Each window's opacity that is not 1 (per-window opacity: the player's, else its mod's), by panel id.
+    opacity: HashMap<String, f32>,
 }
 
 /// The panel that takes the keys now, as the key dispatch (client/mod.rs) routes them: the prompt, the chat line, an
@@ -654,7 +666,7 @@ const BOTTOM: [&str; 2] = ["chat", "party"];
 /// keep left of it; the edge windows stay put under it.
 const COLUMN: [&str; 3] = ["command", "command sub", "window"];
 /// The windows on a screen edge (extras.rs edge_window): they slide along it, so nothing docks on them.
-const EDGE: [&str; 4] = ["timers", "minimap", "widescan", "regime"];
+const EDGE: [&str; 7] = ["timers", "minimap", "widescan", "regime", "timers_recasts", "timers_buffs", "timers_debuffs"];
 
 impl Dock {
     /// The side of the panel it sits on that `dx` counts from.
@@ -698,6 +710,8 @@ fn default_place(id: &str) -> Place {
         "countdown" => at(0.02, 0.28),
         "objective" => at(0.02, 0.35),
         "timers" => at(0.0, 0.2187),
+        // The Timers' three windows down the same edge (the recasts where the one window was).
+        "timers_recasts" => at(0.0, 0.2187),
         // The training regime lower on the same edge.
         "regime" => at(0.0, 0.6),
         // The skillchain helper on the right edge, under the minimap.
@@ -980,6 +994,8 @@ struct Show<'s> {
     alpha: f32,
     fold: f32,
     cap: f32,
+    /// The height it grows back to, when it folds or grows (the chat window): its whole room for ui.native.rect.
+    full: Option<f32>,
 }
 
 impl Default for Show<'_> {
@@ -994,6 +1010,7 @@ impl Default for Show<'_> {
             alpha: 1.0,
             fold: 1.0,
             cap: 0.0,
+            full: None,
         }
     }
 }
@@ -1053,8 +1070,19 @@ impl<'a> Panels<'a> {
     /// A panel's place: the saved one, else its default (a bottom-placed panel saved before it had one keeps the
     /// default bottom).
     fn place(&self, id: &str) -> Place {
-        let mut p =
-            self.layout.get(id).cloned().or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id));
+        // The recasts' window takes the one Timers window's saved place, the buffs' and debuffs' windows steps under it
+        // (its sections' order) until they are moved.
+        let below = |k: f32| {
+            let r = self.place("timers_recasts");
+            Place { y: r.y + 0.12 * k, ..r }
+        };
+        let saved = self.layout.get(id).cloned().or_else(|| match id {
+            "timers_recasts" => self.layout.get("timers").cloned(),
+            "timers_buffs" => Some(below(1.0)),
+            "timers_debuffs" => Some(below(2.0)),
+            _ => None,
+        });
+        let mut p = saved.or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id));
         // A dock on an edge window (saved before they refused them) gives way to the place itself.
         if p.dock.as_ref().is_some_and(|d| EDGE.contains(&d.to.as_str())) {
             p.dock = None;
@@ -1169,9 +1197,10 @@ impl<'a> Panels<'a> {
     fn show(&mut self, id: &str, o: Show, add: impl FnOnce(&mut Ui, Vec2)) -> Option<Rect> {
         // Hidden by the mode (modes.rs) or by a Lua mod (ui.native.hide): not drawn, so what docks on it falls to
         // what it sits on.
-        // A mod's place (ui.native.place) fades it too; faded out, it is not drawn either.
+        // A mod's place (ui.native.place) fades it too, and its own opacity (per-window opacity); faded out, it is
+        // not drawn either.
         let placed = self.placed.get(id).copied();
-        let vis = self.vis(id) * placed.map_or(1.0, |p| p.alpha);
+        let vis = self.vis(id) * placed.map_or(1.0, |p| p.alpha) * self.opacity.get(id).copied().unwrap_or(1.0);
         if self.hidden.contains(&id) {
             // Where it would stand now at its last size, for a mod's replacement (ui.native.rect, HUD anchors).
             let size = self.m.sizes.borrow().get(id).copied();
@@ -1344,6 +1373,9 @@ impl<'a> Panels<'a> {
             log::debug!("panel {id}: pos {pos:?} h {h} rect {r:?} showing {showing:?} dock {:?}", place.dock);
         }
         self.this.insert(id.to_string(), showing);
+        if let Some(fh) = o.full {
+            self.rooms.insert(id.to_string(), zoom * Rect::from_min_max(pos2(r.min.x, r.max.y - fh), r.max));
+        }
         if at.is_some() {
             return Some(showing);
         }
@@ -1556,10 +1588,52 @@ impl Modern {
         });
         t.as_ref().map(|t| (t.id(), FULL_UV))
     }
+
+    /// A spell's or ability's list icon and its uv: ours for its picture (magic::picture), else the game's sprite.
+    fn list_icon(
+        &self,
+        ctx: &Context,
+        gu: &GameUi,
+        lib: &str,
+        index: usize,
+        picture: Option<u16>,
+    ) -> Option<(egui::TextureId, Rect)> {
+        if let Some(s) = picture.and_then(action_art).and_then(|id| self.art.sprite(id)) {
+            return Some((s.tex, s.uv));
+        }
+        self.sprite_icon(ctx, gu, lib, index).map(|t| (t, FULL_UV))
+    }
+
+    /// A magic or ability list row's icon (ours for spells and abilities, the game's for mounts and emotes).
+    fn row_icon(
+        &self,
+        ctx: &Context,
+        gu: &GameUi,
+        w: &World,
+        kind: super::magic::Kind,
+        id: u16,
+    ) -> Option<(egui::TextureId, Rect)> {
+        let (lib, k) = super::magic::row_icon(w, kind, id)?;
+        self.list_icon(ctx, gu, lib, k, super::magic::picture(w, kind, id))
+    }
 }
 
 /// A whole texture's uv.
 const FULL_UV: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+
+/// Our art for a spell's or ability's list picture (magic::picture; assets/modern/action_map.tsv, alike pictures
+/// sharing one), as a manifest id.
+pub fn action_art(picture: u16) -> Option<&'static str> {
+    static MAP: std::sync::OnceLock<HashMap<u16, String>> = std::sync::OnceLock::new();
+    let map = MAP.get_or_init(|| {
+        include_str!("../../../assets/modern/action_map.tsv")
+            .lines()
+            .filter_map(|l| l.split_once('\t'))
+            .filter_map(|(k, n)| Some((k.parse().ok()?, format!("actions/{n}"))))
+            .collect()
+    });
+    map.get(&picture).map(String::as_str)
+}
 
 /// A numbered effect's count (Copy Image, Finishing Move, Aftermath, the Dazes), drawn as text over our art, which
 /// leaves it out; none for a retail icon (its count is in the image).
@@ -1722,6 +1796,18 @@ mod layout_tests {
         assert!(layout_of(&k, "Naji") && layout_of("Naji", "Naji"));
         assert!(!layout_of(&k, "Naj") && !layout_of("Najim @1920x1080 60%", "Naji"));
     }
+
+    /// Every icon the picture map names is in an atlas, its SVG in the pack.
+    #[test]
+    fn action_art_is_packed() {
+        let svg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/modern/svg");
+        for l in include_str!("../../../assets/modern/action_map.tsv").lines() {
+            let (k, _) = l.split_once('\t').unwrap();
+            let id = super::action_art(k.parse().unwrap()).unwrap();
+            assert!(super::sprite_pixels(id).is_some_and(|(w, h, _)| (w, h) == (128, 128)), "{id}");
+            assert!(svg.join(format!("{id}.svg")).exists(), "{id}");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1764,10 +1850,12 @@ mod panel_tests {
                     folded: &mut Default::default(),
                     scan_kinds: &mut 7,
                     this: Default::default(),
+                    rooms: Default::default(),
                     retail: Default::default(),
                     focus: None,
                     hidden: Vec::new(),
                     placed: Default::default(),
+                    opacity: Default::default(),
                 };
                 let combat = p.panel("combat", None, 200.0, |ui| {
                     ui.label("Attack");
@@ -1846,10 +1934,12 @@ mod panel_tests {
                     folded: &mut Default::default(),
                     scan_kinds: &mut 7,
                     this: Default::default(),
+                    rooms: Default::default(),
                     retail: Default::default(),
                     focus: None,
                     hidden: Vec::new(),
                     placed,
+                    opacity: Default::default(),
                 };
                 seen.push(p.panel("focus", None, 200.0, |ui| {
                     ui.label("Focus");

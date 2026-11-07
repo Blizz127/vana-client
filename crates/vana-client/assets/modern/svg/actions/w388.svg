@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a5aef7"/>
+      <stop offset="0.45" stop-color="#505fd3"/>
+      <stop offset="1" stop-color="#23295b"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#23295b"/>
+      <stop offset="1" stop-color="#23295b"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="14" x2="32" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8db6f2"/>
+      <stop offset="0.45" stop-color="#2f7be8"/>
+      <stop offset="1" stop-color="#183e74"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="30.029" y1="24.157" x2="33.971" y2="46.515" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>w388</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <path id="stakes" d="M12.664 20 L16 14 L19.336 20 L19.336 50 L12.664 50 Z M28.664 20 L32 14 L35.336 20 L35.336 50 L28.664 50 Z M44.664 20 L48 14 L51.336 20 L51.336 50 L44.664 50 Z M20.664 22.664 L24 16.664 L27.336 22.664 L27.336 50 L20.664 50 Z M36.664 22.664 L40 16.664 L43.336 22.664 L43.336 50 L36.664 50 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.045" stroke-linejoin="round"/>
+      <path id="bands" d="M12 28.664 C12 27.933 12.597 27.336 13.336 27.336 L50.664 27.336 C51.403 27.336 52 27.933 52 28.664 L52 30 C52 30.731 51.403 31.336 50.664 31.336 L13.336 31.336 C12.597 31.336 12 30.731 12 30 Z M12 40.664 C12 39.933 12.597 39.336 13.336 39.336 L50.664 39.336 C51.403 39.336 52 39.933 52 40.664 L52 42 C52 42.731 51.403 43.336 50.664 43.336 L13.336 43.336 C12.597 43.336 12 42.731 12 42 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.746" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

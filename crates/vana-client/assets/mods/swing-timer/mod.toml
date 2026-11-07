@@ -1,0 +1,10 @@
+name = "Swing Timer"
+version = "1.0.0"
+description = "A small bar filling toward your next auto-attack while you fight, from your weapon's delay (the swing timer add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Swing Timer"
+help = "While engaged, a bar under your character fills toward your next auto-attack (from the weapon's delay; haste is not counted)."

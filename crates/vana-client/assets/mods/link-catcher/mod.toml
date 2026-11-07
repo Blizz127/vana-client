@@ -1,0 +1,10 @@
+name = "Link Catcher"
+version = "1.0.0"
+description = "Numbers the web links in chat so you can open or copy them (the chat link add-ons)."
+permissions = ["net"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Link Catcher"
+help = "Marks each web link in chat with a number. //links lists them to open or copy; //links <number> opens one in your browser."
