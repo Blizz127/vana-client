@@ -4820,6 +4820,8 @@ struct Actor {
     source: Option<Source>,
     character: Option<Arc<Model>>,
     gpu: Option<crate::render::ActorGpu>,
+    /// A changed look's model while its GPU copy goes up: the old one stays drawn (and targetable) until then.
+    next: Option<Arc<Model>>,
     /// Motion playing, and ticks (1/60 s, scaled by its rate) since it started.
     motion: String,
     ticks: f32,
@@ -5001,6 +5003,7 @@ impl Actor {
             source: None,
             character: None,
             gpu: None,
+            next: None,
             motion: String::new(),
             ticks: 0.0,
             prev: None,
@@ -8882,9 +8885,12 @@ impl App {
                         let files: Vec<u32> = ch.files.iter().chain(&ch.part_files).copied().collect();
                         world.effects.preload(&files);
                         for a in world.actors.values_mut().filter(|a| a.key == key) {
-                            if a.character.is_none() {
-                                wepfx::seed(a, &ch);
+                            // Drawn already: the old model stays until the new one is on the GPU.
+                            if a.character.is_some() {
+                                a.next = Some(ch.clone());
+                                continue;
                             }
+                            wepfx::seed(a, &ch);
                             a.character = Some(ch.clone());
                             a.gpu = None;
                             (a.motion_names, a.rebase, a.fresh) = (None, true, true);
@@ -10464,16 +10470,20 @@ impl App {
             // The off-hand flag is drawobj +0x840 bit 6, so a new model starts without it.
             actor.off_hand = false;
             actor.source = Some(source);
-            // A look already loaded is shared at once; one load serves every actor waiting for it.
+            // A look already loaded is shared at once; one load serves every actor waiting for it. An actor already
+            // drawn keeps its old model until the new one is on the GPU (no blink: retail drops it and its target).
+            actor.next = None;
             if let Some(m) = world.models.get(&key) {
-                if actor.character.is_none() {
+                if actor.character.is_some() {
+                    actor.next = Some(m.clone());
+                } else {
                     wepfx::seed(actor, m);
+                    actor.character = Some(m.clone());
+                    actor.gpu = None;
+                    (actor.motion_names, actor.rebase, actor.fresh) = (None, true, true);
+                    (actor.rest, actor.bones, actor.motion_link) = (crate::dat::character::pose(&m.skeleton, &[]), Vec::new(), None);
+                    (actor.anchors, actor.anchor_at) = (ANCHORS, [None; 2]);
                 }
-                actor.character = Some(m.clone());
-                actor.gpu = None;
-                (actor.motion_names, actor.rebase, actor.fresh) = (None, true, true);
-                (actor.rest, actor.bones, actor.motion_link) = (crate::dat::character::pose(&m.skeleton, &[]), Vec::new(), None);
-                (actor.anchors, actor.anchor_at) = (ANCHORS, [None; 2]);
             } else if world.models_loading.insert(key.clone()) {
                 wanted.push((key, source));
             }
@@ -14708,6 +14718,18 @@ impl App {
                 // FUN_100cd040's fishing fade needs our own drawobj (FUN_101cc4f0) and our place.
                 let (fish, my_pos) = (fishing::any_fishing_status(w.my_motion.status) && w.actors.get(&w.my_id).is_some_and(|a| a.character.is_some()), w.pos);
                 for (id, a) in w.actors.iter_mut() {
+                    // A changed look goes up in the background; the swap is one frame, the old model drawn till then.
+                    if let Some(nx) = a.next.clone()
+                        && let Some(g) = r.skinned_actor(&gfx.gpu, &nx)
+                    {
+                        a.next = None;
+                        a.character = Some(nx.clone());
+                        a.gpu = Some(g);
+                        a.top_key.clear();
+                        (a.motion_names, a.rebase, a.fresh) = (None, true, true);
+                        (a.rest, a.bones, a.motion_link) = (crate::dat::character::pose(&nx.skeleton, &[]), Vec::new(), None);
+                        (a.anchors, a.anchor_at) = (ANCHORS, [None; 2]);
+                    }
                     let Some(ch) = a.character.clone() else { continue };
                     let Some(&Place { pos, forward, tilt, status, ratio, size }) = places.get(id) else { continue };
                     if a.gpu.is_none() {

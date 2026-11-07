@@ -23033,3 +23033,17 @@ From `action-icon-dump` (30261006_0; every named spell and ability record, its i
 - Ours (modern UI): one icon per distinct picture, keyed by the record's HD value (+0x42 / +4; the standard icon when
   0xffff): assets/modern/action_map.tsv, magiconw N as N, magico2w N as 1000 + N; the standard images keep one icon
   per school and element. Drawn whichever set config 0x99 picks; the classic UI keeps the game's.
+
+## A changed look without the blink (2026-11-07)
+
+client/mod.rs (Actor::next). Ours, not retail, by the user's choice: retail rebuilds an actor whose look changes
+(FUN_10092900), and while it is rebuilt the character is not there: it blinks, and anyone targeting it loses the
+target, which ends a spell cast on it (the reason DressUp's blinking option and BlinkMeNot hold looks still). Ours blinked
+too: the new model's GPU copy goes up a part a frame under the copy budget (render `skinned_actor`), and the actor was
+not drawn, its name plate not shown and it was out of World::visible (target cycling, the sub-target cursor, the mouse)
+until it was up.
+- Now an actor already drawn keeps its old model (character and GPU copy) while the new one loads and goes up
+  (Actor::next); the swap is one frame. A newer look before that replaces the pending one.
+- Our main target never dropped for it anyway (held by server id; the drop rule, FUN_10152c70, reads the hidden bit,
+  status and distance). Live: Nine (the user) healed Lnxcsfix while she swapped her hat every 2 s; a swap 1.2 s into
+  the cast, the heal landed. Per-frame shots of two hat swaps: no frame without her (before: two).

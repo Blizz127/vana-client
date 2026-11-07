@@ -392,7 +392,7 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   in sight by name), `others <race | own>` (one race for every other player), `reset`. New `render.look(id, parts)`
   draws a player-style look with other parts (the rest follow the character's own changes); `game.entity` now gives
   our own look too. Seen live: Lnxcsfix as a Galka (kept across a relog), a Chainmail body, Daggao's look copied,
-  face 4b, reset. Not done: holding looks still through gear swaps (BlinkMeNot); whether our swaps blink is unchecked.
+  face 4b, reset. DressUp's blinking option (BlinkMeNot) is not needed: the client keeps a character drawn through a look change, so a gear swap neither blinks nor drops anyone's target (MODLOG "A changed look without the blink").
 - **Content Trackers** (assets/mods/content-trackers; dynamishelper, Omen, NyzulHelper, salvage2, cellhelp and kin): an
   edge window for the content you are in, read from its messages, with the time left counting down: Dynamis (the
   currency held and what it is worth in singles, the granules of time held), Abyssea (the seven lights from the
