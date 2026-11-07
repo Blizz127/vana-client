@@ -28,6 +28,7 @@ pub(super) mod window;
 pub(in crate::client) use state::Placed;
 
 use super::World;
+use crate::dat::battle::Who;
 use std::path::PathBuf;
 use vm::Vm;
 
@@ -485,7 +486,7 @@ macro_rules! bundled {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
     };
 }
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -1716,6 +1717,41 @@ mod tests {
         assert_eq!(hud::tip(&host).map(|t| (t.0, t.1)), Some((String::new(), "A".into())));
     }
 
+    /// The bundled Battle Text's short lines: the common forms; an unknown one stays as printed; names in their colours.
+    #[test]
+    fn battle_text_short_lines() {
+        let host = Host::default();
+        let vm = Vm::new(bundled_manifest("battle-text").unwrap(), PathBuf::from("."), vm::Source::Dir(PathBuf::from("."))).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let src = BUNDLED.iter().find(|b| b.0 == "battle-text").and_then(|b| b.2.iter().find(|f| f.0 == "init.lua")).unwrap().1;
+        let module: mlua::Table = vm.lua.load(src).eval().unwrap();
+        let shorten: mlua::Function = module.get("shorten").unwrap();
+        let who = |name: &str, pc: bool, colour: u8| {
+            let t = vm.lua.create_table().unwrap();
+            t.set("name", name).unwrap();
+            t.set("pc", pc).unwrap();
+            t.set("colour", colour).unwrap();
+            t
+        };
+        let (me, rabbit) = (who("Lnxcsfix", true, 0), who("Wild Rabbit", false, 0));
+        let s = |l: &[&str], a: &mlua::Table, t: &mlua::Table| shorten.call::<Option<String>>((l.to_vec(), a.clone(), t.clone())).unwrap();
+        assert_eq!(s(&["Lnxcsfix uses Fast Blade.", "The Wild Rabbit takes 123 points of damage."], &me, &rabbit).as_deref(), Some("Lnxcsfix [Fast Blade] → Wild Rabbit: 123"));
+        assert_eq!(s(&["Lnxcsfix hits the Wild Rabbit for 18 points of damage."], &me, &rabbit).as_deref(), Some("Lnxcsfix → Wild Rabbit: 18"));
+        assert_eq!(s(&["Lnxcsfix scores a critical hit!", "The Wild Rabbit takes 31 points of damage."], &me, &rabbit).as_deref(), Some("Lnxcsfix → Wild Rabbit: 31!"));
+        assert_eq!(s(&["Lnxcsfix misses the Wild Rabbit."], &me, &rabbit).as_deref(), Some("Lnxcsfix → Wild Rabbit: miss"));
+        assert_eq!(s(&["Lnxcsfix casts Dia.", "The Wild Rabbit gains the effect of dia."], &me, &rabbit).as_deref(), Some("Lnxcsfix [Dia] → Wild Rabbit: +Dia"));
+        assert_eq!(s(&["Lnxcsfix casts Fire.", "Magic Burst! The Wild Rabbit takes 80 points of damage."], &me, &rabbit).as_deref(), Some("Lnxcsfix [Fire] → Wild Rabbit: 80 (Magic Burst)"));
+        assert_eq!(s(&["The Wild Rabbit takes 48 points of damage."], &me, &rabbit).as_deref(), Some("Wild Rabbit: 48"));
+        assert_eq!(s(&["Lnxcsfix defeats the Wild Rabbit."], &me, &rabbit), None);
+        assert_eq!(s(&["Lnxcsfix uses Provoke on the Wild Rabbit."], &me, &rabbit).as_deref(), Some("Lnxcsfix [Provoke] → Wild Rabbit"));
+        assert_eq!(s(&["Lnxcsfix casts Cure.", "Lnxcsfix recovers 45 HP."], &me, &me).as_deref(), Some("Lnxcsfix [Cure] → Lnxcsfix: +45 HP"));
+        let red = who("Wild Rabbit", false, 8);
+        let c = s(&["Lnxcsfix misses the Wild Rabbit."], &me, &red).unwrap();
+        assert_eq!(crate::dat::font::strip_codes(&c), "Lnxcsfix → Wild Rabbit: miss");
+        assert!(c.contains(crate::dat::font::colour_code(8)));
+    }
+
     /// ui.native.place / rect / panels and ui.skin: names checked, the permission asked, each change its mod's (another
     /// mod's release leaves it), a skin change counted once; HUD anchors name panels.
     #[test]
@@ -2059,6 +2095,101 @@ impl Host {
             if changed { Filtered::Replace(text, mode) } else { Filtered::Keep }
         }))
     }
+}
+
+/// A battle message as the mods' battle filters see it (filters.battle).
+pub(in crate::client) struct BattleMsg {
+    pub id: u16,
+    /// The 0x028 action's category; none for a 0x029 / 0x02D message.
+    pub category: Option<u8>,
+    pub actor: u32,
+    pub target: u32,
+    pub value: i32,
+    pub mode: u8,
+}
+
+/// What the battle filters made of a message.
+pub(in crate::client) enum Verdict {
+    Keep,
+    Drop,
+    Replace(Vec<String>),
+}
+
+impl Host {
+    pub(in crate::client) fn has_battle_filters(&self) -> bool {
+        self.vms.iter().any(|v| v.suspended.is_none() && !v.st.borrow().battle_filters.is_empty())
+    }
+}
+
+/// The mods' battle filters in load order, with game state: each sees the lines so far and may drop the message,
+/// replace its lines, or set its names' colour codes (written back to `actor` / `target`).
+pub(in crate::client) fn filter_battle(w: &mut World, m: &BattleMsg, actor: &mut Option<Who>, target: &mut Option<Who>, mut lines: Vec<String>) -> Verdict {
+    let host = std::mem::take(&mut w.lua);
+    let mut verdict = Verdict::Keep;
+    for vm in host.vms.iter().filter(|v| v.suspended.is_none()) {
+        let funcs: Vec<mlua::Function> = vm.st.borrow().battle_filters.iter().filter_map(|(_, k)| vm.lua.registry_value(k).ok()).collect();
+        if funcs.is_empty() {
+            continue;
+        }
+        lend(vm, w, |vm| {
+            for f in funcs {
+                let r = (|| -> mlua::Result<()> {
+                    let lua = &vm.lua;
+                    let t = lua.create_table()?;
+                    t.set("id", m.id)?;
+                    t.set("category", m.category)?;
+                    t.set("value", m.value)?;
+                    t.set("mode", m.mode)?;
+                    t.set("lines", lua.create_sequence_from(lines.iter().map(String::as_str))?)?;
+                    // Each side by id; its name, flags and colour where it is known.
+                    for (key, id, x) in [("actor", m.actor, &*actor), ("target", m.target, &*target)] {
+                        if id == 0 {
+                            continue;
+                        }
+                        let p = lua.create_table()?;
+                        p.set("id", id)?;
+                        if let Some(x) = x {
+                            p.set("name", x.name.as_str())?;
+                            p.set("pc", x.pc)?;
+                            p.set("named", x.named)?;
+                            p.set("colour", x.colour)?;
+                        }
+                        t.set(key, p)?;
+                    }
+                    vm.st.borrow_mut().deadline = Some(std::time::Instant::now() + vm::FILTER_CAP);
+                    let r = f.call::<mlua::Value>(&t);
+                    vm.st.borrow_mut().deadline = None;
+                    let r = r?;
+                    for (key, x) in [("actor", &mut *actor), ("target", &mut *target)] {
+                        if let (Some(x), Some(p)) = (x.as_mut(), t.get::<Option<mlua::Table>>(key)?) {
+                            x.colour = p.get::<Option<u8>>("colour")?.unwrap_or(0);
+                        }
+                    }
+                    match r {
+                        mlua::Value::Boolean(false) => verdict = Verdict::Drop,
+                        mlua::Value::String(s) => lines = vec![s.to_string_lossy()],
+                        mlua::Value::Table(l) => lines = l.sequence_values::<String>().collect::<mlua::Result<_>>()?,
+                        _ => return Ok(()),
+                    }
+                    if !matches!(verdict, Verdict::Drop) {
+                        verdict = Verdict::Replace(lines.clone());
+                    }
+                    Ok(())
+                })();
+                if let Err(e) = r {
+                    vm.error(&e);
+                }
+                if matches!(verdict, Verdict::Drop) {
+                    return;
+                }
+            }
+        });
+        if matches!(verdict, Verdict::Drop) {
+            break;
+        }
+    }
+    w.lua = host;
+    verdict
 }
 
 /// The mods' typed-line filters (docs/lua-mods.md 4.3), before our command parser: the line as they left it, or none

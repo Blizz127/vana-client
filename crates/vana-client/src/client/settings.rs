@@ -28,9 +28,6 @@ pub struct Settings {
     pub actor_shadows: u32,
     pub shadow_map: u32,
     pub ssao: bool,
-    pub hide_ready_lines: bool,
-    pub short_battle: bool,
-    pub battle_name_colours: bool,
     pub timers: bool,
     pub timers_dock: u32,
     pub regime: bool,
@@ -78,9 +75,6 @@ impl Settings {
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
             ssao: c.ssao,
-            hide_ready_lines: c.hide_ready_lines,
-            short_battle: c.short_battle,
-            battle_name_colours: c.battle_name_colours,
             timers: c.timers,
             timers_dock: c.timers_dock,
             regime: c.regime,
@@ -125,9 +119,6 @@ impl Settings {
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
-        c.hide_ready_lines = self.hide_ready_lines;
-        c.short_battle = self.short_battle;
-        c.battle_name_colours = self.battle_name_colours;
         c.timers = self.timers;
         c.timers_dock = self.timers_dock;
         c.regime = self.regime;
@@ -182,9 +173,6 @@ enum Val {
     ActorShadows,
     ShadowMap,
     Ssao,
-    ReadyLines,
-    ShortBattle,
-    NameColours,
     Timers,
     TimersDock,
     Skillchains,
@@ -368,11 +356,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     ];
     const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, REGIME_ROW, SKILLCHAIN_ROW];
     // A page holds 7 rows: what touches battle has its own.
-    const EXTRA_BATTLE: &[SRow] = &[
-        row("Ready Lines", "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.", ReadyLines, &[(0, "All"), (1, "Mine, Monsters'")], Now),
-        row("Battle Text", "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".", ShortBattle, &[(0, "Retail"), (1, "Short")], Now),
-        row("Battle Names", "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.", NameColours, &[(0, "Plain"), (1, "Coloured")], Now),
-    ];
+    const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[
         row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
         row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
@@ -579,9 +563,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
-            Val::ReadyLines => self.s.hide_ready_lines as u32,
-            Val::ShortBattle => self.s.short_battle as u32,
-            Val::NameColours => self.s.battle_name_colours as u32,
             Val::Timers => self.s.timers as u32,
             Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
@@ -621,9 +602,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
-            Val::ReadyLines => self.s.hide_ready_lines = x != 0,
-            Val::ShortBattle => self.s.short_battle = x != 0,
-            Val::NameColours => self.s.battle_name_colours = x != 0,
             Val::Timers => self.s.timers = x != 0,
             Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,

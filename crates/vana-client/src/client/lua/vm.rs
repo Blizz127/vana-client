@@ -124,6 +124,8 @@ pub(super) struct ModState {
     /// Filters (docs/lua-mods.md 3.2): chat lines before they are kept, typed lines before the parser.
     pub chat_filters: Vec<(u64, RegistryKey)>,
     pub typed_filters: Vec<(u64, RegistryKey)>,
+    /// Battle messages with their data, before they print (filters.battle).
+    pub battle_filters: Vec<(u64, RegistryKey)>,
     pub filters_dirty: bool,
     /// The user's setting values by key (account and character scopes merged); declared defaults fill the rest.
     pub settings: serde_json::Map<String, serde_json::Value>,

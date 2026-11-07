@@ -453,6 +453,11 @@ end)
 A filter runs inside the client while the line passes, so it must be quick. It cannot `sleep` or read the game.
 [examples/chat-tools](examples/chat-tools/) hides lines with a chosen word.
 
+`filters.battle` sees each battle message before it prints, with what it is about: the message id, the action's
+category, the actor and the target (id, name), the lines. It can read the game, colour the names
+(`m.actor.colour = 6`), drop the message, or replace its lines. The bundled Battle Text mod's short lines and coloured
+names are written with it.
+
 ## Saving data
 
 ### Storage

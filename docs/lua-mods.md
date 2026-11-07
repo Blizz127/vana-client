@@ -60,7 +60,9 @@ Built (client/lua/, modern/modwin.rs), each checked live:
     radius, ours from 0x037); emote and hitbox checked live, invite and examined not (they need a second player)
 - **Chat and commands:**
   - `chat.add` (mode colours)
-  - `filters.chat` (keep, drop or rewrite every line) and `filters.typed` (typed lines before the parser)
+  - `filters.chat` (keep, drop or rewrite every line) and `filters.typed` (typed lines before the parser);
+    `filters.battle` (each battle message with its data, before it prints: drop it, colour its names, replace its
+    lines; `text.strip`, `text.colour`)
   - `commands.register` (`//name`, `/name`), `commands.run`
 - **Settings and storage:**
   - declared settings (bool, enum, int, number) on an Extras page per mod, in both UIs; per-scope files

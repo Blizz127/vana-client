@@ -50,7 +50,7 @@ pub struct Who {
     pub plural: bool,
     /// 0x00D u32 @0x20 bit 15 clear (our own: the race): [his/her] (7f 90 / 91).
     pub female: bool,
-    /// Ours (Extras' Battle Names): the name drawn in this `1e` colour code, 0 none (client/battlemod.rs).
+    /// Ours (the mods' battle filters, filters.battle): the name drawn in this `1e` colour code, 0 none.
     pub colour: u8,
 }
 

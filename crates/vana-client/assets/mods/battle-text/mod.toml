@@ -1,0 +1,37 @@
+name = "Battle Text"
+version = "1.0.0"
+description = "Battle lines in a short form, names coloured by who they are, and others' readies lines hidden (the battle log add-ons)."
+permissions = []
+
+[settings.ready]
+type = "bool"
+default = false
+options = ["All", "Mine, Monsters'"]
+values = [false, true]
+label = "Ready Lines"
+help = "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you."
+tab = "Battle"
+place = 3
+from = "hide_ready_lines"
+
+[settings.short]
+type = "bool"
+default = false
+options = ["Retail", "Short"]
+values = [false, true]
+label = "Battle Text"
+help = "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\"."
+tab = "Battle"
+place = 4
+from = "short_battle"
+
+[settings.names]
+type = "bool"
+default = false
+options = ["Plain", "Coloured"]
+values = [false, true]
+label = "Battle Names"
+help = "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims."
+tab = "Battle"
+place = 5
+from = "battle_name_colours"

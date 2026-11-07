@@ -269,9 +269,9 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
     )?;
     g.set("commands", commands)?;
 
-    // filters.chat(fn) / filters.typed(fn) -> id; filters.off(id). Run inline: no sleeping; chat filters have no game state.
+    // filters.chat / typed / battle(fn) -> id; filters.off(id). Run inline: no sleeping; chat filters have no game state.
     let filters = lua.create_table()?;
-    for (name, typed) in [("chat", false), ("typed", true)] {
+    for (name, kind) in [("chat", 0), ("typed", 1), ("battle", 2)] {
         filters.set(
             name,
             lua.create_function(move |lua, func: Function| {
@@ -279,7 +279,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 let id = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if typed { s.typed_filters.push((id, key)) } else { s.chat_filters.push((id, key)) }
+                match kind {
+                    0 => s.chat_filters.push((id, key)),
+                    1 => s.typed_filters.push((id, key)),
+                    _ => s.battle_filters.push((id, key)),
+                }
                 s.filters_dirty = true;
                 Ok(id)
             })?,
@@ -293,7 +297,7 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 let mut guard = st.borrow_mut();
                 let s: &mut ModState = &mut guard;
                 let mut gone = Vec::new();
-                for list in [&mut s.chat_filters, &mut s.typed_filters] {
+                for list in [&mut s.chat_filters, &mut s.typed_filters, &mut s.battle_filters] {
                     let (g, keep): (Vec<_>, Vec<_>) = std::mem::take(list).into_iter().partition(|(i, _)| *i == id);
                     *list = keep;
                     gone.extend(g.into_iter().map(|(_, k)| k));

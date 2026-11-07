@@ -340,8 +340,13 @@ function filters.chat(filter) end
 ---@return integer
 function filters.typed(filter) end
 
+--- Runs `filter` on every battle message before it prints, with game state: m = {id (the message), category (the 0x028 action's; nil for 0x029 / 0x02D), value, mode, lines (as printed so far, in-line codes kept), actor and target ({id; name, pc, named, colour where known})}. Set actor.colour / target.colour to a log colour code (text.colour) to draw that name in it; return false to drop the message, a string or a list of strings to replace its lines (not condensed then), nil to keep them. Runs inline: it cannot sleep.
+---@param filter fun(m: table): (string|string[]|false|nil) 
+---@return integer
+function filters.battle(filter) end
+
 --- Removes a filter.
----@param id integer what filters.chat / filters.typed returned
+---@param id integer what filters.chat / typed / battle returned
 function filters.off(id) end
 
 --- Adds or replaces a row in the Timers window (shown for mods' rows even with the Timers Extra off), counting down `seconds`: options section ('recast' | 'buff' (default) | 'debuff'), group (a heading, e.g. a target's name), icon {kind = 'status' | 'spell' | 'ability', id}, total (the gauge's whole length), fills (toward ready, as recasts do).
@@ -1447,6 +1452,17 @@ function text.phrase(group, id) end
 ---@param text string 
 ---@return string?
 function text.autotranslate(text) end
+
+--- A line without its in-line codes (colours, indents): the words alone.
+---@param text string 
+---@return string
+function text.strip(text) end
+
+--- `text` in the log's in-line colour code `code` (as the game colours names: 7 ours, 6 party, 3 alliance, 8 a monster we claimed, 5 another's), then back to the line's own colour; 0 leaves it.
+---@param text string 
+---@param code integer 
+---@return string
+function text.colour(text, code) end
 
 --- A line with its auto-translate phrases as plain words.
 ---@param text string 

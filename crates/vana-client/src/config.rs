@@ -220,12 +220,6 @@ pub struct Config {
     /// config from before the notes has none, so its first newer build shows that build's own.
     #[serde(default)]
     pub notes_seen: String,
-    /// Extra (Battlemod's filters): "readies" / "starts casting" lines only for us and monsters.
-    pub hide_ready_lines: bool,
-    /// Extras (Battlemod's simplify and colours, client/battlemod.rs): battle lines in their short form; names in
-    /// battle lines coloured by who they are.
-    pub short_battle: bool,
-    pub battle_name_colours: bool,
     /// Extra (the Timers add-on): the timers window, its dock (0 left, 1 right, 2 top), its drawer out, folded
     /// sections (a bit each).
     pub timers: bool,
@@ -460,9 +454,6 @@ impl Default for Config {
             actor_shadows: 0,
             shadow_map: 2048,
             ssao: false,
-            hide_ready_lines: false,
-            short_battle: false,
-            battle_name_colours: false,
             timers: false,
             timers_dock: 0,
             timers_out: true,

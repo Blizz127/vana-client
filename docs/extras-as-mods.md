@@ -65,6 +65,13 @@ Done so far (checked live, Lnxcsfix):
   distance and HP %); `game.clock` gives the clock line's parts; entities have `gauge`. Compared shot for shot with
   master in both UIs: the same text, font, place and colours; the settings carried over and their rows stand where
   they stood (a test pins each Extras tab's order).
+- **Ready Lines**, **Battle Text** and **Battle Names** (assets/mods/battle-text, one mod: the battle log add-ons):
+  `filters.battle` gives each battle message with its data (id, the action's category, actor and target, its lines)
+  to the mods with game state; a mod drops it, sets its names' colour codes (the client renders the lines with them,
+  and the modern chat condenses them as before) or replaces its lines (not condensed). The short forms moved to Lua
+  as they were (the old Rust test runs against the mod). Compared live against master in the modern UI: the same
+  lines, colour codes, modes and colours, the same look in the log. Ready Lines seen live with a trust (Kupipi): her
+  cures print, her "starts casting" lines do not; ours still print.
 
 ## Order
 
