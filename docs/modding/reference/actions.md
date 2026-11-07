@@ -1062,6 +1062,35 @@ end)
 
 Whether the shop takes the item is the server's to decide.
 
+## `actions.change_job`
+
+```lua
+actions.change_job(main, sub?) -> nil
+```
+
+Changes jobs as the moogle's Change Jobs window does: the moogle dances, the lockstyle goes off, and the server is
+asked for the jobs. Only in a Mog House, or in a zone whose moogle menu works outside one, as the window.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `main` | `integer` | yes | The main job's id, 1 (WAR) .. 22 (RUN); `res.job(id)` gives its abbreviation. |
+| `sub` | `integer` | no | The support job's id, 0 for none; left out, the support job stays. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //wardnc: Warrior with Dancer support.
+commands.register("wardnc", function() actions.change_job(1, 19) end)
+```
+
+Problems are printed in the log in red: `actions.change_job: only in a Mog House or where a moogle can change jobs`, `that main job is not unlocked`, `that support job cannot be set`, `a job change is under way`, `those are the jobs already`. Whether the server agrees is its own.
+
 ## `actions.auction_bid`
 
 ```lua

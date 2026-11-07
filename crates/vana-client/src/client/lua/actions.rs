@@ -38,6 +38,8 @@ pub(in crate::client) enum Action {
     Lock(bool),
     /// A BLU slot (0..19) set to a spell id or emptied (0), a PUP slot (0..13) to an item id or emptied.
     BlueSlot(usize, u16),
+    /// main, sub
+    ChangeJob(u8, u8),
     /// item, price, single
     AhBid(u16, u32, bool),
     /// inventory slot, price, single
@@ -293,6 +295,11 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                 w.chat.push_colour(format!("actions.{}: {e}", if spell == 0 { "blue_remove" } else { "blue_set" }), super::ERROR);
             }
         }
+        Action::ChangeJob(main, sub) => {
+            if let Err(e) = super::super::moogle::mod_change(w, main, sub) {
+                w.chat.push_colour(format!("actions.change_job: {e}"), super::ERROR);
+            }
+        }
         Action::AhBid(item, price, single) => {
             if let Err(e) = super::super::auction::mod_bid(w, item, price, single) {
                 w.chat.push_colour(format!("actions.auction_bid: {e}"), super::ERROR);
@@ -521,6 +528,17 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
                 return Err(mlua::Error::runtime(format!("spell {spell} is not blue magic")));
             }
             queue(lua, Action::BlueSlot(blue(slot)?, spell))
+        })?,
+    )?;
+    t.set(
+        "change_job",
+        lua.create_function(|lua, (main, sub): (u8, Option<u8>)| {
+            // no support job given: the one we have
+            let sub = match sub {
+                Some(s) => s,
+                None => super::api::world(lua)?.stats.as_ref().map_or(0, |s| s.sub.0),
+            };
+            queue(lua, Action::ChangeJob(main, sub))
         })?,
     )?;
     t.set(

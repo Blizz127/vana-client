@@ -1218,6 +1218,11 @@ function actions.sell(slot, count) end
 ---@param spell integer 
 function actions.blue_set(slot, spell) end
 
+--- Changes jobs as the moogle's Change Jobs window does (the moogle dances), in a Mog House or where a moogle menu is allowed. Needs actions.
+---@param main integer job id (1 WAR .. 22 RUN)
+---@param sub integer? support job id; 0 none; left out: the current one
+function actions.change_job(main, sub) end
+
 --- At an open auction house: the game's bid question for an item at a price, as the bid window asks it; the player answers. Needs actions.
 ---@param item integer item id
 ---@param price integer gil

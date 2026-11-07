@@ -403,6 +403,14 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `actions.auction_sell` and `game.auction`. Seen live at Southern San d'Oria's counter: the listings, the bid question
   for a Fire Crystal at 1.5k, the sale's 21 gil fee question for a Wind Crystal (both answered No). ahcolors' row
   colours are the client's own (the shops' rule: worn, wearable, learned, learnable). Not done: price lookups.
+- **NPC Errands** (assets/mods/npc-errands; Sparks, UnityNPC, temps, htmb, JobChange and kin): `//npc <name>: <option> >
+  <option> > ...` talks to the nearest NPC of that name (running up when it is near) and picks each row by its words,
+  passing pages that wait for a key; where a row is missing the menu is left to the player. `//errand save <name>
+  <the same>` keeps such a walk, `//errand <name>` runs it. `//job <main>[/<sub>]` changes jobs with the moogle
+  window's own request (new `actions.change_job`), only where that window could. Seen live: a saved Home Point errand
+  through three rows to the talk's end, Rolandienne's lines passed and "the talk ended before Spark", `//job` refused
+  outside a Mog House. Not done: shop-by-item-name searches (Sparks needs Records of Eminence progress to test), the
+  Gavlan wheel, Oseem and Ambuscade (not on LandSandBoat); the job change by command not seen in a Mog House.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
