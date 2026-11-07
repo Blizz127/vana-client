@@ -577,12 +577,18 @@ fn status_motion_posed(w: &World, id: u32, ch: &Character, posed: Option<f32>) -
     // that blank for 2 / 3 rather than "cor" (unless vtable +0x200). The death scheduler's own motions lay a body
     // down (ded, then cor0); a `sdep` one (a trust, a death-flagged entity) has none, so a released trust stays on its
     // feet while it vanishes. Ours: the stand the blank leaves playing, not a walk from a still-sliding position.
-    let (status, ratio) = if matches!(status, 2 | 3) && id != w.my_id && super::combat::sdep(w, id) { (0, 0.0) } else { (status, ratio) };
+    let (status, ratio) = sdep_stand(status, ratio, id != w.my_id && super::combat::sdep(w, id));
     let names = w.actors.get(&id).and_then(|a| a.motion_names).unwrap_or(ch.motions);
     // Our strafe / backpedal motions (FUN_100c8bb0) when not posed by an event.
     let dir = if id == w.my_id && posed.is_none() { w.my_strafe } else { 0 };
     let fixed = w.actors.get(&id).is_some_and(super::fixed_model);
     crate::motion::choose_strafed(&names, status, ratio, dir, fixed).0.to_string()
+}
+
+/// The status and ratio the status motion is picked with: a `sdep` entity (not us) in status 2 / 3 stands still
+/// (see `status_motion_posed`).
+pub(super) fn sdep_stand(status: u8, ratio: f32, sdep: bool) -> (u8, f32) {
+    if sdep && matches!(status, 2 | 3) { (0, 0.0) } else { (status, ratio) }
 }
 
 fn status(w: &World, id: u32) -> u8 {
