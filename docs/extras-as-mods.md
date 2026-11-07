@@ -195,6 +195,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Effect Remover** (assets/mods/effect-remover; cancel, Cancel, Ashita's debuff): `//cancel <effects>` cancels our
   status effects by name, `*` pattern or id, several separated by commas (macros too). Seen live: `//cancel sne*`
   ended a Sneak.
+- **Macro Book Switch** (assets/mods/macro-books; macrochanger, macromaster): the palette turns to the book and set
+  saved (`//macros save [sub]`) for main / sub or the main job, else to a book titled with the job, when the job
+  changes and once at the start (the first frame that knows the job and has the macros: the login event comes
+  before mods run). Seen live: book 2 set 3 saved for WAR, the palette there at the next login.
 
 Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
 regime's windows and under the mods' drawn before them, so two never open on one place.
