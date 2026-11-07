@@ -378,6 +378,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Warp Ring and "ready in 4:26" while it recharges. A Rust test walks the Home Point and Survival Guide menus.
   `game.event` now gives menu text as the window reads it (the game's curly quotes as characters), and
   `actions.choose` waits for a menu that shows before it takes input (a Survival Guide's region list did).
+- **Dialogue Bubbles** (assets/mods/dialogue-bubbles; Balloon, ffxi-balloon): the page of NPC talk being read in a bubble,
+  the speaker's name on a tab over it (from the page's "Name : "), a tail under it that blinks while the page waits
+  for a key; over the speaker's head (clear of the name plate) or at the bottom of the screen, above other mods' HUD.
+  The log keeps its copy and the keys stay the game's. `game.event().text` now has the page's `lines` and the event's
+  `actor`. Seen live with Daggao in Southern San d'Oria, both places. Not done: portraits (no portrait art).
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

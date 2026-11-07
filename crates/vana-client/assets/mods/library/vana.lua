@@ -958,7 +958,7 @@ function game.key_items() end
 ---@return table[]
 function game.treasure() end
 
---- The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (the text as the window reads it; cursor from 1); text = {waiting, open} while it shows a message (waiting: it waits for a key; open: seconds its page has been up).
+--- The event (cutscene, NPC talk) under way, or nil: {menu = {question, options, cursor}} while it shows a menu (the text as the window reads it; cursor from 1); text = {waiting, open, lines, actor} while it shows a message (waiting: it waits for a key; open: seconds its page has been up; lines: the page as the log wraps it, as the window reads it; actor: the event's NPC, or us, by server id).
 ---@return table?
 function game.event() end
 

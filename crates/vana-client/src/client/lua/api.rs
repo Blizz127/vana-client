@@ -957,6 +957,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 let m = lua.create_table()?;
                 m.set("waiting", waiting)?;
                 m.set("open", open)?;
+                if let Some((page, actor)) = super::super::event::message_page(w) {
+                    m.set("lines", page.iter().map(|l| crate::dat::font::plain(l)).collect::<Vec<_>>())?;
+                    m.set("actor", actor)?;
+                }
                 t.set("text", m)?;
             }
             Ok(Some(t))

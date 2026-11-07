@@ -2875,6 +2875,14 @@ pub fn message_wait(w: &World) -> Option<(bool, f32)> {
     Some((m.waits_key(), m.open / 60.0))
 }
 
+/// The open message's page as wrapped for the log (all its lines before the first wrap), and the event's actor.
+pub fn message_page(w: &World) -> Option<(Vec<String>, u32)> {
+    let l = w.event.as_ref()?;
+    let m = l.st.msg.as_ref()?;
+    let page = m.pages.as_ref().and_then(|(_, p)| p.get(m.page).cloned()).unwrap_or_else(|| m.lines.clone());
+    Some((page, l.st.start.target))
+}
+
 pub fn choice(w: &World) -> Option<&Choice> {
     w.event.as_ref()?.st.choice.as_ref()
 }

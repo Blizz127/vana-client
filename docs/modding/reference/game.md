@@ -579,6 +579,8 @@ The event (a cutscene or NPC conversation) under way, the menu it shows, and its
 | `menu.cursor` | `integer` | The option the cursor is on, from 1. |
 | `text.waiting` | `boolean` | The message waits for a key (Enter, or `actions.advance()`) before it goes on. |
 | `text.open` | `number` | Seconds its page has been on screen. |
+| `text.lines` | `string[]` | The page's lines as the log wraps them, read as the window shows them (colour codes left out). NPC talk starts with the speaker's name and ` : `. |
+| `text.actor` | `integer` | The event's NPC (or our own character) by server id: who was talked to. |
 
 **Errors** "game state is not available here" in the lobby or a chat filter.
 
