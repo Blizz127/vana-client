@@ -64,6 +64,7 @@ mod firstrun;
 mod desktop;
 mod target;
 mod gamepad;
+mod keepawake;
 mod swkbd;
 mod input;
 mod camera;
@@ -7139,6 +7140,7 @@ pub struct App {
     /// Retail key functions (DAT_103619f0 and FUN_1011ff30).
     input: input::Input,
     gamepad: gamepad::Gamepad,
+    keep_awake: keepawake::KeepAwake,
     /// Keys Lua mods pressed this frame, as egui events.
     synth_events: Vec<egui::Event>,
     /// The lobby mods before login (in the world, the World's host holds them).
@@ -7429,6 +7431,7 @@ impl App {
             voice_key: false,
             input: input::Input::default(),
             gamepad: gamepad::Gamepad::default(),
+            keep_awake: keepawake::KeepAwake::default(),
             synth_events: Vec::new(),
             lobby_mods: Default::default(),
             recorder: None,
@@ -14125,6 +14128,7 @@ impl App {
         let pad = self.gamepad.poll(&self.cfg, gfx.window.has_focus(), ctx, dt, &mut to_mods);
         self.input.set_pad(pad.pad);
         self.input.set_stick(pad.stick);
+        self.keep_awake.update(pad.used);
         if pad.pressed && !self.dragging && !self.left_down {
             self.mouse.visible = false;
         }
