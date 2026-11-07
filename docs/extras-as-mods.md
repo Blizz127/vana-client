@@ -447,6 +447,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   progress), list and delete; `//roeshow` lists what is set. New `game.roe`, `actions.roe_set` and
   `actions.roe_remove` (one change a second, as the list's). Seen live: First Step Forward set, saved, removed and put
   back by its set.
+- **Action Panel** (assets/mods/action-panel; Rhombus, wizardui, smnbar, colure): `//actions` opens a window with tabs
+  Magic (a School choice: the learned spells the jobs can cast now, blue magic only while set), Abilities, Weapon
+  Skills and Pet (`game.abilities`), each row with its icon, cost and recast (dim while it runs, counting down); a
+  click or Enter runs its text command as a macro line would (`<me>` for self-only actions, else `<st>`, the rule the
+  favourites use). Seen live: Berserk used from it, its 4:59 recast in the row.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
 
