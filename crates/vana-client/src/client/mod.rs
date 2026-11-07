@@ -16868,6 +16868,13 @@ impl App {
                     .collect();
                 let me = w.my_id;
                 let my_strafe = w.my_strafe;
+                // `sdep` entities (trusts, death-flagged): no corpse pose in status 2 / 3 (actmotion::sdep_stand).
+                let sdep_ids: HashSet<u32> = w
+                    .entities
+                    .iter()
+                    .filter(|(id, e)| **id != me && (e.marks.trust || e.marks.death_flag))
+                    .map(|(id, _)| *id)
+                    .collect();
                 let mut far_out: HashSet<u32> = HashSet::new();
                 // The event's actors log their motion changes as ours do (cutscene reports).
                 let event_ids: HashSet<u32> = w.event.as_ref().map(|l| l.st.bound.clone()).unwrap_or_default();
@@ -16897,6 +16904,7 @@ impl App {
                     }
                     let Some(ch) = a.character.clone() else { continue };
                     let Some(&Place { pos, forward, tilt, status, ratio, size }) = places.get(id) else { continue };
+                    let (pick_status, pick_ratio) = actmotion::sdep_stand(status, ratio, sdep_ids.contains(id));
                     if a.gpu.is_none() {
                         // Not drawn until its model is on the GPU (a few new models a frame).
                         let Some(g) = perf::timed(
@@ -16945,8 +16953,8 @@ impl App {
                             // FUN_100c8bb0: our strafe / backpedal motions over the walk / run, at its rate.
                             let (n, r) = crate::motion::choose_strafed(
                                 &a.motion_names.unwrap_or(ch.motions),
-                                status,
-                                ratio,
+                                pick_status,
+                                pick_ratio,
                                 if *id == me { my_strafe } else { 0 },
                                 fixed_model(a),
                             );
@@ -17091,8 +17099,8 @@ impl App {
                         None => {
                             let (b, r) = crate::motion::choose_strafed(
                                 &a.motion_names.unwrap_or(ch.motions),
-                                status,
-                                ratio,
+                                pick_status,
+                                pick_ratio,
                                 if *id == me { my_strafe } else { 0 },
                                 fixed_model(a),
                             );
