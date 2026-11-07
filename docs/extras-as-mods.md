@@ -241,6 +241,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   damage live in an edge window, a row per member with damage a second, total and share (its bar), the fight's span and
   total in the heading; `/dps` and `/dps reset` as before. Seen live: a hare fight, 62 damage at 6.9/s. Not yet:
   accuracy, the parse's details and export.
+- **Target Bar** (assets/mods/target-bar; enemybar, enemybar2, HitPoints): a wide HP gauge for the target near the
+  top (name, HP %, distance), with the line the game prints when it readies a move or starts a spell (the start's
+  message through res.message) until it finishes or 5 s pass; dragged by its top, it keeps the place. Seen live on
+  a Forest Hare; the readying line not seen yet (no move came). Not yet: the engaged enemies' bars.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
