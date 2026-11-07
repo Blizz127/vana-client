@@ -185,6 +185,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Inventory HUD** (assets/mods/inventory-hud; invtracker, giltracker, invmon, itemwatch, Packrat and kin): gil in
   the heading, the inventory's space (every bag with Every Bag), and the items and key items added with `//bags add`
   / `//bags addkey`, an item's bar how full its stack is. Seen live: 3/30, a Wind Crystal, a key item not held.
+- **Chat Alerts** (assets/mods/chat-alerts; chatmon, RAWR, chime, Audible and kin): one of the game's call sounds
+  (`<call0>`..`<call21>`, interface sounds 17..38) on a tell, our name, chosen words, party or linkshell lines,
+  invites, checks and emotes at us, optionally only while the window is in the background; one call a second at most.
+  A Rust test drives its handlers; live it ran on real chat without errors (the test runs have no sound).
 
 Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
 regime's windows and under the mods' drawn before them, so two never open on one place.
