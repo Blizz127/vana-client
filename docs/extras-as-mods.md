@@ -373,6 +373,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Monster comes within 50 yalms. Seen live: the box on a hare's move and the watched-monster alert; a Rust test covers
   the lines. It uses the game's own line through `res.message` given an action result's values in the game's order
   (the action's param, the result's value, ...), now documented; its own text is the fallback.
+- **Gathering Log** (assets/mods/gathering-log; yield, HGather, DigDig and kin): every try at a Harvesting, Logging,
+  Mining or Excavation Point (the point's event start, s2c 0x032 / 0x034: LandSandBoat's HELM puts what was found and
+  whether the tool broke in its first params) counted by kind with the success rate, broken tools and the items found
+  (`//gather reset`). Seen live in Ghelsba Outpost: two logging tries, one Elm Log. Not yet: chocobo digging, fishing.
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
