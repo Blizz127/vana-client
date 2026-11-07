@@ -81,6 +81,7 @@ mod skillchain;
 mod clock;
 mod lamps;
 mod shadows;
+mod portrait;
 pub use lamps::Lamps;
 mod mousecur;
 mod party;
@@ -7145,6 +7146,8 @@ pub struct App {
     /// A mod's recording (client.record), and the mods' post-process passes (render.shader).
     recorder: Option<record::Recorder>,
     post_fx: Option<crate::render::postfx::PostFx>,
+    /// The Lua HUD's portrait targets (client/portrait.rs).
+    portraits: portrait::Portraits,
     /// Frames per second, 0 = unlimited (config frame_limit), and the present mode must be picked again.
     frame_limit: u32,
     present_dirty: bool,
@@ -7430,6 +7433,7 @@ impl App {
             lobby_mods: Default::default(),
             recorder: None,
             post_fx: None,
+            portraits: Default::default(),
             frame_limit,
             present_dirty: false,
             window_dirty: false,
@@ -14554,6 +14558,8 @@ impl App {
             }
             let new_lamps = if w.renderer.as_ref().is_some_and(|r| r.ready(&gfx.gpu)) { w.lamps.update(&mut w.effects, w.ground.as_ref(), self.cfg.lamp_lights) } else { None };
             let ev_clock = event::clock(w);
+            // The Lua HUD's portraits: each wanted actor's face camera (client/portrait.rs).
+            let portrait_cams: Vec<(lua::hud::Wanted, crate::render::Camera)> = w.lua.portraits_wanted().into_iter().take(portrait::SLOTS).filter_map(|p| Some((p, portrait::camera(w, &places, p.entity, p.look.oval)?))).collect();
             if let Some(r) = &mut w.renderer {
                 if let Some(l) = &new_lamps {
                     r.set_lamps(&gfx.gpu, &l.iter().map(|l| (l.pos, l.slot)).collect::<Vec<_>>());
@@ -15352,6 +15358,10 @@ impl App {
                 r.prepare_faded(&gfx.gpu, &scene_tex);
                 perf::timed(|| "zone render".into(), || r.render(&gfx.gpu, &mut encoder, &scene_raw, &scene_depth, &camera, aspect, &actors));
                 mark!("scene");
+                // The portraits, of actors drawn this frame.
+                let want: Vec<(lua::hud::Wanted, crate::render::Camera, &crate::render::ActorGpu)> = portrait_cams.iter().filter_map(|(p, c)| Some((*p, *c, *drawn_map.get(&p.entity)?))).collect();
+                let drawn = self.portraits.draw(&gfx.gpu, &mut gfx.egui_renderer, self.game_ui.as_mut(), r, &mut encoder, scene_fmt, &want);
+                w.lua.set_portraits(drawn);
                 // The actors' ground shadows over the scene (client/shadows.rs, render/shadow.rs).
                 if !r.has_shadow_texture()
                     && let Some(t) = w.index.as_ref().and_then(|i| shadows::kage_texture(i))

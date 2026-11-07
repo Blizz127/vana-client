@@ -1,7 +1,7 @@
 # `hud`
 
-The `hud` namespace draws things over the game: texts, filled rectangles, bars, a map, PNG images and item, status,
-spell or ability icons. Each element has an id you choose. You create it once (`hud.text`, `hud.rect`, ...), change it with `hud.set`
+The `hud` namespace draws things over the game: texts, filled rectangles, speech bubbles, bars, a map, PNG images, live
+portraits of actors and item, status, spell or ability icons. Each element has an id you choose. You create it once (`hud.text`, `hud.rect`, ...), change it with `hud.set`
 as things happen, and it stays on screen until you remove it; you do not redraw it every frame. HUD elements draw over
 the game world and the name plates and under every window, in the game world only, and they hide while the player has
 the interface hidden. Each interface draws them as it draws its own: the classic UI with the game's art and fonts, the
@@ -23,9 +23,11 @@ end)
 | --- | --- |
 | [`hud.text(id, spec)`](#hudtext) | Creates or replaces a text. |
 | [`hud.rect(id, spec)`](#hudrect) | Creates or replaces a filled rectangle. |
+| [`hud.bubble(id, spec)`](#hudbubble) | Creates or replaces a speech bubble with a tail pointing at a place. |
 | [`hud.bar(id, spec)`](#hudbar) | Creates or replaces a bar filled from 0 to 1. |
 | [`hud.map(id, spec)`](#hudmap) | Creates or replaces a window onto the zone's map. |
 | [`hud.image(id, spec)`](#hudimage) | Creates or replaces a PNG image from the mod's folder. |
+| [`hud.portrait(id, spec)`](#hudportrait) | Creates or replaces a live portrait of an actor's face. |
 | [`hud.icon(id, spec)`](#hudicon) | Creates or replaces an item's, a status effect's, a spell's or an ability's icon. |
 | [`hud.set(id, fields)`](#hudset) | Changes some fields of an element. |
 | [`hud.remove(id)`](#hudremove) | Removes an element. |
@@ -165,6 +167,64 @@ hud.rect("flash", {x = 0, y = 0, w = hud.screen().width, h = 6, colour = {255, 4
 timer.after(0.5, function() hud.remove("flash") end)
 ```
 
+## `hud.bubble`
+
+```lua
+hud.bubble(id, spec)
+```
+
+Creates or replaces a speech bubble: a rectangle with rounded corners, an optional outline, and a short tail that
+points at a place on screen, such as a speaker's head. The tail leaves the side of the bubble that faces the point,
+as near the point as the corners allow, and is never longer than `tail_len` (it stops short of a near point, and leans
+out at most 60 degrees from its side). There is no tail while the point is inside the bubble. The outline goes round
+the tail too, and the edges are smoothed. Both interfaces draw the same shape. The bubble holds nothing itself: put
+texts, a portrait or icons over it on a higher `layer`.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The element's id. |
+| `spec` | `table` | yes | The bubble's fields. |
+
+**`spec` fields**
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `x`, `y`, `visible`, `layer` | | | As for [every element](#places-sizes-and-layers). |
+| `w`, `h` | `number` | `200`, `60` | Its size in window pixels, without the tail. |
+| `round` | `number` | `10` | The corners' radius in window pixels. |
+| `colour` | `{r, g, b, a}` | `{14, 16, 26, 235}` | The fill. |
+| `edge` | `{r, g, b, a}` or `false` | none | The outline's colour. |
+| `edge_w` | `number` | `2` | The outline's width in window pixels. |
+| `tail` | `{x, y}` or `false` | none | The point the tail aims at, in window pixels (as `draw.to_screen` gives). |
+| `tail_w` | `number` | `18` | The tail's width where it leaves the bubble. |
+| `tail_len` | `number` | `22` | The tail's longest length. |
+
+**Returns** nothing.
+
+**Errors**
+- A `tail` that is not a point or `false`: `tail is a point {x, y}, or false for none`.
+- A `colour` or `edge` that is not a table or `false`: `a colour is {r, g, b, a} (0..255), or false for none`.
+
+**Example**
+
+```lua
+-- a bubble over our target's head, its tail at the head
+events.on("frame", function()
+  local t = game.target()
+  local head = t and t.pos and draw.to_screen({x = t.pos.x, y = t.pos.y - (t.height or 1.8), z = t.pos.z})
+  if not (head and head.on_screen) then
+    hud.remove("say")
+    hud.remove("say_text")
+    return
+  end
+  hud.bubble("say", {x = head.x - 90, y = head.y - 90, w = 180, h = 50, round = 12, edge = {196, 160, 96},
+    tail = {x = head.x, y = head.y}})
+  hud.text("say_text", {x = head.x, y = head.y - 76, text = "Hello!", align = "center", layer = 1})
+end)
+```
+
 ## `hud.bar`
 
 ```lua
@@ -301,6 +361,63 @@ hud.image("logo", {x = -74, y = -74, path = "img/logo.png", w = 64, h = 64, colo
 ```
 
 `hud.set(id, {path = "img/other.png"})` swaps the picture; it takes the new file's size unless the same call gives `w` and `h`. A file changed on disk shows the next time it is loaded (`hud.image` or a `path` in `hud.set`).
+
+## `hud.portrait`
+
+```lua
+hud.portrait(id, spec)
+```
+
+Creates or replaces a portrait: the actor's head and shoulders drawn live every frame from its own model, from straight
+in front of its face, lit as the scene around it. It moves as the actor does (talking, turning its head, a changed
+look). An oval by default, or square; a backing and a frame ring are drawn into it, both following its shape. It shows
+only while the actor is drawn in the world: nothing while it is out of view, too far, hidden or not loaded, and nothing
+at all before its model is ready. Up to four actors have portraits at once; an actor shown by several elements is
+drawn once, as the first of them (by layer) asks.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | yes | The element's id. |
+| `spec` | `table` | yes | The portrait's fields. |
+
+**`spec` fields**
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `x`, `y`, `visible`, `layer` | | | As for [every element](#places-sizes-and-layers). |
+| `entity` | `integer` | (required) | The actor's server id, as `game.entity` and `game.target` give it. |
+| `size` | `number` | | Sets `w` and `h` at once. |
+| `w`, `h` | `number` | `96`, `96` | Its width and height in window pixels; the view widens or narrows with them. |
+| `shape` | `string` | `"oval"` | `"oval"` (the oval filling `w` by `h`) or `"square"`. |
+| `bg` | `{r, g, b, a}` or `false` | none (clear) | The backing behind the actor, in its shape. |
+| `frame` | `{r, g, b, a}` or `false` | none | A frame ring round its edge, lit from above. |
+| `frame_w` | `number` | `3` | The frame's width in window pixels. |
+| `colour` | `{r, g, b, a}` | white | A tint its colours are multiplied by; `a` fades it. |
+
+**Returns** nothing.
+
+**Errors**
+- No `entity`: `a portrait needs entity (a server id)`.
+- A `shape` other than those two: `shape "...": oval or square`.
+- A `colour`, `bg` or `frame` that is not a table or `false`: `a colour is {r, g, b, a} (0..255), or false for none`.
+
+**Example**
+
+```lua
+-- the current target's face in the top right corner
+events.on("target_change", function(id)
+  if id then
+    hud.portrait("face", {x = -120, y = 20, entity = id, w = 96, h = 120, bg = {14, 16, 26, 220},
+      frame = {196, 160, 96}})
+  else
+    hud.remove("face")
+  end
+end)
+```
+
+`hud.set(id, {entity = other})` moves the portrait to another actor.
 
 ## `hud.icon`
 

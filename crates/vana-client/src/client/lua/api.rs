@@ -1508,6 +1508,7 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     t.set("hidden", e.flags & 2 != 0)?;
     t.set("race", e.race.or(e.appearance.map(|l| l.race)))?;
     t.set("model", e.model)?;
+    t.set("height", model_height(w, id))?;
     if let Some(l) = e.appearance {
         let look = lua.create_table()?;
         for (k, v) in [("face", l.face), ("head", l.head), ("body", l.body), ("hands", l.hands), ("legs", l.legs), ("feet", l.feet), ("main", l.main), ("sub", l.sub), ("range", l.range)] {
@@ -1537,6 +1538,11 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     Ok(t)
 }
 
+/// An actor's model height in yalms (its top at rest, scaled), once its model is in.
+fn model_height(w: &World, id: u32) -> Option<f32> {
+    w.actors.get(&id).filter(|a| a.character.is_some()).map(|a| -a.top)
+}
+
 /// Our own character as an entity (the entity map holds the others only).
 /// Our facing (what 0x015 sends and the model shows), as entity headings are: radians, 0 east, pi / 2 south.
 fn my_heading(w: &World) -> f32 {
@@ -1556,6 +1562,7 @@ pub(super) fn self_entity(lua: &Lua, w: &World) -> mlua::Result<Table> {
     t.set("pos", pos)?;
     t.set("heading", my_heading(w))?;
     t.set("distance", 0.0)?;
+    t.set("height", model_height(w, w.my_id))?;
     t.set("hpp", w.vitals.map_or(100, |v| v.3))?;
     t.set("gauge", true)?;
     t.set("status", w.my_motion.status)?;

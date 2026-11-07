@@ -1594,6 +1594,32 @@ impl Host {
         self.started && !self.all_hidden
     }
 
+    /// The actors the mods' HUD portraits show (hud.portrait), first by layer, each once (as its first element asks).
+    pub(in crate::client) fn portraits_wanted(&self) -> Vec<hud::Wanted> {
+        if !self.hud_shown() {
+            return Vec::new();
+        }
+        let mut out: Vec<hud::Wanted> = Vec::new();
+        for (_, e) in hud::elements(self) {
+            if let hud::Kind::Portrait { entity, w, h, look, .. } = e.kind
+                && !out.iter().any(|p| p.entity == entity)
+            {
+                out.push(hud::Wanted { entity, size: [w, h], look });
+            }
+        }
+        out
+    }
+
+    /// The portraits drawn this frame: entity -> (game UI image, modern UI texture).
+    pub(in crate::client) fn set_portraits(&self, drawn: std::collections::HashMap<u32, (String, egui::TextureId)>) {
+        self.info.borrow_mut().portraits = drawn;
+    }
+
+    /// A portrait drawn this frame (hud.portrait's actor): its game UI image and modern UI texture.
+    pub(in crate::client) fn portrait(&self, entity: u32) -> Option<(String, egui::TextureId)> {
+        self.info.borrow().portraits.get(&entity).cloned()
+    }
+
     /// The mods' visible HUD elements by layer, then load order: (mod, element).
     pub(in crate::client) fn hud_elements(&self) -> Vec<(String, hud::Elem)> {
         hud::elements(self)
@@ -1782,6 +1808,79 @@ mod tests {
         assert!(t0.elapsed() < std::time::Duration::from_secs(2), "the test ran {:?}", t0.elapsed());
         assert!(vm.st.borrow().sleepers.is_empty());
         assert_eq!(vm.st.borrow().errors.len(), 1);
+    }
+
+    /// hud.bubble: the tail leaves the side facing its point and stops at its length; none for a point inside; the
+    /// outline and feathering go round it.
+    #[test]
+    fn hud_bubbles() {
+        let r = [100.0, 100.0, 200.0, 80.0];
+        let tail = |x: f32, y: f32| Some(hud::Tail { at: [x, y], w: 20.0, len: 25.0 });
+        let pts = |t: &[[([f32; 2], [f32; 4]); 3]]| t.iter().flat_map(|t| t.iter().map(|v| v.0)).collect::<Vec<_>>();
+        let fill = [10, 20, 30, 255];
+        // A point far below: the tip is 25 under the bottom edge's base (its mitred feather a little more).
+        let below = hud::bubble_tris(r, 12.0, tail(200.0, 400.0), fill, None);
+        let lowest = pts(&below).iter().map(|p| p[1]).fold(f32::MIN, f32::max);
+        assert!(lowest > 205.0 && lowest < 209.0, "{lowest}");
+        assert!(pts(&below).iter().all(|p| p[0].is_finite() && p[1].is_finite()));
+        // Off to the left: from the left side.
+        let left = hud::bubble_tris(r, 12.0, tail(0.0, 140.0), fill, None);
+        assert!(pts(&left).iter().map(|p| p[0]).fold(f32::MAX, f32::min) < 100.0 - 20.0);
+        // Inside: no tail, the plain rounded rect.
+        let none = hud::bubble_tris(r, 12.0, tail(150.0, 120.0), fill, None);
+        let plain = hud::bubble_tris(r, 12.0, None, fill, None);
+        assert_eq!(none.len(), plain.len());
+        // An outline adds a ring of quads; its colour is on them.
+        let edged = hud::bubble_tris(r, 12.0, tail(200.0, 400.0), fill, Some(([200, 160, 90, 255], 2.0)));
+        assert!(edged.len() > below.len());
+        assert!(edged.iter().any(|t| t[0].1[0] > 0.7));
+        let vm = Vm::new(manifest::Manifest { id: "t".into(), ..Default::default() }, PathBuf::from("."), vm::Source::Dir(PathBuf::from("."))).unwrap();
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.lua
+            .load(
+                r#"
+                hud.bubble("b", {x = 10, y = 10, w = 300, h = 90, round = 8, edge = {200, 160, 90}, tail = {x = 100, y = 300}, tail_w = 30})
+                assert(not pcall(hud.bubble, "c", {tail = 5}))
+            "#,
+            )
+            .exec()
+            .unwrap();
+        let tail_of = |vm: &Vm| vm.st.borrow().hud.iter().find_map(|e| match e.kind {
+            hud::Kind::Bubble { tail, w, .. } if e.id == "b" => Some((tail, w)),
+            _ => None,
+        });
+        assert_eq!(tail_of(&vm), Some((Some(hud::Tail { at: [100.0, 300.0], w: 30.0, len: 22.0 }), 300.0)));
+        vm.lua.load(r#"hud.set("b", {tail = false})"#).exec().unwrap();
+        assert_eq!(tail_of(&vm), Some((None, 300.0)));
+    }
+
+    /// hud.portrait: its actor is wanted once however many show it, a later entity moves it, none is an error.
+    #[test]
+    fn hud_portraits() {
+        let mut host = Host::default();
+        let vm = Vm::new(manifest::Manifest { id: "t".into(), ..Default::default() }, PathBuf::from("."), vm::Source::Dir(PathBuf::from("."))).unwrap();
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        vm.lua
+            .load(
+                r#"
+                hud.portrait("a", {entity = 7, size = 64, w = 50, bg = {0, 0, 0, 200}, shape = "square", frame = {200, 160, 90}})
+                hud.portrait("b", {entity = 7, layer = 3})
+                hud.portrait("c", {entity = 9})
+                hud.set("c", {entity = 11, frame_w = 5})
+                assert(not pcall(hud.portrait, "d", {size = 10}))
+                assert(not pcall(hud.portrait, "e", {entity = 1, shape = "star"}))
+            "#,
+            )
+            .exec()
+            .unwrap();
+        host.vms.push(vm);
+        host.started = true;
+        let want = host.portraits_wanted();
+        assert_eq!(want.iter().map(|p| p.entity).collect::<Vec<_>>(), vec![7, 11]);
+        assert_eq!((want[0].size, want[0].look), ([50.0, 64.0], hud::Look { bg: Some([0, 0, 0, 200]), oval: false, frame: Some([200, 160, 90, 255]), frame_w: 3.0 }));
+        assert_eq!((want[1].size, want[1].look.oval, want[1].look.frame_w), ([96.0, 96.0], true, 5.0));
+        host.all_hidden = true;
+        assert!(host.portraits_wanted().is_empty());
     }
 
     /// HUD elements: a press released in place is a click; one that moves is a drag, ending over another element that

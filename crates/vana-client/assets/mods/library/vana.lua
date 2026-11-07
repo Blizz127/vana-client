@@ -451,6 +451,11 @@ function hud.rect(id, spec) end
 ---@param spec table 
 function hud.bar(id, spec) end
 
+--- Creates or replaces a portrait: an actor's head and shoulders drawn live from its model, from in front of its face, lit as the scene: x, y, entity (its server id; required), w and h (window pixels, default 96; size sets both), shape ('oval' (the default) or 'square'), bg (the backing behind the actor), frame (a ring round the edge) and frame_w (its width, default 3), colour (tint). Shown only while the actor is drawn in the world; four actors at most.
+---@param id string 
+---@param spec table 
+function hud.portrait(id, spec) end
+
 --- Creates or replaces a HUD map: the zone's map where the client shows one, x, y, w, h, centre {x, z} (world; default: us), span (map pixels across, 16..2048; default 256), alpha (default the player's Map Overlay Opacity), me (our marker on it, as each UI draws it). Draw other markers over it with other elements at game.map_pos.
 ---@param id string 
 ---@param spec table 

@@ -70,6 +70,7 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `in_party` | `boolean` | It is in your party. true for yourself. |
 | `in_alliance` | `boolean` | It is in your party or alliance. true for yourself. |
 | `hitbox` | `number` | Its model radius as the server gives it, in yalms. |
+| `height` | `number?` | Its model's height in yalms, standing at rest (a hat counts); nil until its model is loaded. Its head is near `pos.y - height` (y goes down). |
 | `target_index` | `integer?` | The index of what it is targeting (for yourself: your target's index); nil when none. |
 | `target_id` | `integer?` | That target's server id, when it is known; nil otherwise. |
 | `pet` | `boolean?` | true for your own pet; nil for anything else. |

@@ -1,19 +1,24 @@
--- NPC talk in a speech bubble (the balloon add-ons): the page being read, the speaker's name on a tab over it,
--- placed over the speaker's head or at the bottom of the screen. The log keeps its copy; keys are the game's.
+-- NPC talk in a speech bubble (the balloon add-ons): the speaker's face, name and the page being read in a rounded
+-- bubble whose tail points at the speaker's head, over them or at the bottom of the screen. The log keeps its copy;
+-- keys are the game's.
 
 local BODY = { 240, 236, 224, 255 }
 local NAME = { 232, 200, 120, 255 }
 local BG = { 14, 16, 26, 235 }
-local EDGE = { 0, 0, 0, 200 }
+local FACE_BG = { 30, 34, 50, 255 }
+local FRAME = { 196, 160, 96, 255 }
+local CLEAR = { 0, 0, 0, 0 }
 -- over other mods' HUD (the hotbars use 0..4)
 local LAYER = 20
 
 local shown = false
+-- The page whose texts were measured last frame (drawn unseen), so this frame can fit the bubble round them.
+local measured
 
 local function hide()
-  if shown then
+  if shown or measured then
     hud.clear()
-    shown = false
+    shown, measured = false, nil
   end
 end
 
@@ -25,49 +30,80 @@ local function split(lines)
   return name, table.concat(body, "\n")
 end
 
--- The bubble's bottom centre: over the speaker's head when it is on screen, else above the log.
-local function anchor(actor, scr, u)
-  if settings.get("place") == "Over the Speaker" then
-    local e = actor and game.entity(actor)
-    if e and not e.me and e.pos then
-      -- clear of the name plate over the head
-      local p = draw.to_screen({ x = e.pos.x, y = e.pos.y - 2.6, z = e.pos.z })
-      if p and p.on_screen then return p.x, p.y - 34 * u end
-    end
-  end
-  return scr.width / 2, scr.height * 0.66
+-- A world point on screen, when it is in view.
+local function screen(e, up)
+  local p = draw.to_screen({ x = e.pos.x, y = e.pos.y - up, z = e.pos.z })
+  if p and p.on_screen then return p end
 end
 
-local function draw()
-  local e = settings.get("on") and game.event()
-  local t = e and not e.menu and e.text
+local function frame()
+  local ev = settings.get("on") and game.event()
+  local t = ev and not ev.menu and ev.text
   if not (t and t.lines and #t.lines > 0) then return hide() end
   local name, body = split(t.lines)
   local scr = hud.screen()
   local u = scr.ui_scale
   local size = settings.get("size")
-  local pad = 10 * u
-  -- last frame's box sizes this one (the first frame guesses)
-  local b = hud.bounds("body")
-  local w = b and b.w or 420 * u
-  local h = b and b.h or (#t.lines * 20 * size * u + 2 * pad)
-  local ax, ay = anchor(t.actor, scr, u)
-  local x = math.max(8 * u + w / 2, math.min(scr.width - 8 * u - w / 2, ax))
-  local y = math.max((name and 34 or 8) * u, ay - h)
-  hud.text("body", { x = x, y = y, text = body, size = size, align = "center", colour = BODY, bg = BG, pad = pad,
-    outline = EDGE, layer = LAYER })
+  -- This page's texts unseen, for their sizes next frame; until then the last page stays up as it is.
+  local key = (name or "") .. "\n" .. body
+  hud.text("m_body", { x = 0, y = 0, text = body, size = size, colour = CLEAR, layer = -100 })
   if name then
-    hud.text("name", { x = x - w / 2, y = y - 22 * size * u, text = name, size = size * 0.9, font = "bold",
-      colour = NAME, bg = BG, pad = 5 * u, outline = EDGE, layer = LAYER })
+    hud.text("m_name", { x = 0, y = 0, text = name, size = size * 0.9, font = "bold", colour = CLEAR, layer = -100 })
+  else
+    hud.remove("m_name")
+  end
+  local ready = measured == key
+  measured = key
+  local bb, nb = hud.bounds("m_body"), name and hud.bounds("m_name")
+  if not ready or not bb or (name and not nb) then return end
+
+  local pad = 12 * u
+  local text_w = math.max(bb.w, nb and nb.w or 0)
+  local name_h = nb and nb.h + 3 * u or 0
+  local text_h = name_h + bb.h + 10 * u
+  local e = t.actor and game.entity(t.actor)
+  local fh = settings.get("portrait") and e and math.max(80 * u, math.min(112 * u, text_h))
+  local fw = fh and math.floor(fh * 0.8)
+  local text_x = pad + (fw and fw + 12 * u or 0)
+  local bw = text_x + text_w + pad
+  local bh = 2 * pad + math.max(fh or 0, text_h)
+
+  -- Over the speaker, clear of their name plate, when their head is in view; else above the log. The tail points at
+  -- the head wherever the bubble is.
+  local height = e and e.height or 1.8
+  local head = e and e.pos and screen(e, height * 0.85)
+  local over = settings.get("place") == "Over the Speaker" and e and e.pos and screen(e, height + 0.9)
+  local cx, bottom
+  if over then
+    cx, bottom = over.x, over.y - 30 * u
+  else
+    cx, bottom = scr.width / 2, scr.height * 0.66
+  end
+  local bx = math.max(8 * u, math.min(scr.width - 8 * u - bw, cx - bw / 2))
+  local by = math.max(8 * u, math.min(scr.height - 8 * u - bh, bottom - bh))
+
+  hud.bubble("bubble", { x = bx, y = by, w = bw, h = bh, round = 14 * u, colour = BG, edge = FRAME, edge_w = 2 * u,
+    tail = head and { x = head.x, y = head.y } or false, tail_w = 24 * u, tail_len = 26 * u, layer = LAYER })
+  if fh then
+    hud.portrait("face", { entity = t.actor, x = bx + pad, y = by + (bh - fh) / 2, w = fw, h = fh, bg = FACE_BG,
+      frame = FRAME, frame_w = 2 * u, layer = LAYER + 1 })
+  else
+    hud.remove("face")
+  end
+  local ty = by + (bh - text_h) / 2
+  if name then
+    hud.text("name", { x = bx + text_x, y = ty, text = name, size = size * 0.9, font = "bold", colour = NAME,
+      layer = LAYER + 1 })
   else
     hud.remove("name")
   end
-  -- the tail under the bubble, blinking while the page waits for a key
-  local a = t.waiting and math.floor(140 + 115 * math.abs(math.sin(os.clock() * 4))) or 110
-  hud.text("more", { x = x, y = y + h - 9 * u, text = "▼", size = size, font = "game", align = "center",
-    colour = { NAME[1], NAME[2], NAME[3], a }, outline = EDGE, layer = LAYER })
+  hud.text("body", { x = bx + text_x, y = ty + name_h, text = body, size = size, colour = BODY, layer = LAYER + 1 })
+  -- blinking while the page waits for a key
+  local a = t.waiting and math.floor(140 + 115 * math.abs(math.sin(os.clock() * 4))) or 90
+  hud.text("more", { x = bx + bw - pad, y = by + bh - pad - 12 * size * u, text = "▼", size = size * 0.8,
+    font = "game", align = "right", colour = { NAME[1], NAME[2], NAME[3], a }, layer = LAYER + 1 })
   shown = true
 end
 
-events.on("frame", draw)
+events.on("frame", frame)
 events.on("settings_changed", hide)

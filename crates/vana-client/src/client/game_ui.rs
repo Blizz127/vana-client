@@ -250,6 +250,8 @@ pub struct GameUi {
     renderer: Option<UiRenderer>,
     /// The scene depth name plates are tested against this frame (taken by render).
     pub scene_depth: Option<wgpu::TextureView>,
+    /// Offscreen targets to show as images (client/portrait.rs), bound at the next render.
+    views: Vec<(String, wgpu::TextureView)>,
     /// What this frame draws, rebuilt by the UI code each frame.
     batch: UiBatch,
     /// The modern frame for the retail windows (made on first use; None inside when the pack has none).
@@ -384,7 +386,7 @@ pub struct WorldView<'a> {
 impl GameUi {
     pub fn new(data: GameUiData) -> Self {
         crate::render::ui::set_caption_words(caption_words(&data));
-        Self { data, renderer: None, scene_depth: None, batch: UiBatch::default(), modern_frame: None, skin_on: false, modern_scale: 1.0, ttf_text: false, modern_help: None, started: Instant::now(), pending: Vec::new(), images: Default::default(), help: HelpScroll::default(), party_window: "menu    ptw0".into(), log_top: None, style_index: 0, replaced: Vec::new(), stale: Vec::new(), style_saved: Default::default(), scroll_seen: Default::default(), hover: Default::default(), modern_order: Default::default(), bars: Vec::new(), bar_hold: None, anims: Default::default(), contents: Default::default(), anim_frame: 1, anim_acc: 0.0, open_ticks: 25.0, log_faded: false, log_bottom: None, target_up: false, walk: Walk::default(), focus: (None, None), presses: Default::default() }
+        Self { data, renderer: None, scene_depth: None, views: Vec::new(), batch: UiBatch::default(), modern_frame: None, skin_on: false, modern_scale: 1.0, ttf_text: false, modern_help: None, started: Instant::now(), pending: Vec::new(), images: Default::default(), help: HelpScroll::default(), party_window: "menu    ptw0".into(), log_top: None, style_index: 0, replaced: Vec::new(), stale: Vec::new(), style_saved: Default::default(), scroll_seen: Default::default(), hover: Default::default(), modern_order: Default::default(), bars: Vec::new(), bar_hold: None, anims: Default::default(), contents: Default::default(), anim_frame: 1, anim_acc: 0.0, open_ticks: 25.0, log_faded: false, log_bottom: None, target_up: false, walk: Walk::default(), focus: (None, None), presses: Default::default() }
     }
 
     /// FUN_1015e530 / FUN_101177d0 for a window drawn this frame with frame rect `r`: false while it opens (only the
@@ -1422,6 +1424,11 @@ impl GameUi {
         }
     }
 
+    /// Shows an offscreen target's view as the image `name` from the next render on.
+    pub fn view(&mut self, name: &str, view: wgpu::TextureView) {
+        self.views.push((name.to_string(), view));
+    }
+
     pub fn has_image(&self, name: &str) -> bool {
         self.images.contains(name)
     }
@@ -2022,6 +2029,9 @@ impl GameUi {
         }
         for (name, w, h, rgba) in self.replaced.drain(..) {
             r.replace_image(gpu, &name, w, h, &rgba);
+        }
+        for (name, view) in self.views.drain(..) {
+            r.insert_view(gpu, &name, &view);
         }
         // The modern text's glyph atlas when it grew, and the screen scale its next glyphs are made for.
         if let Some((side, rgba)) = mtext::take_dirty() {

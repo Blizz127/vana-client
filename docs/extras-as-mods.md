@@ -383,11 +383,15 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Warp Ring and "ready in 4:26" while it recharges. A Rust test walks the Home Point and Survival Guide menus.
   `game.event` now gives menu text as the window reads it (the game's curly quotes as characters), and
   `actions.choose` waits for a menu that shows before it takes input (a Survival Guide's region list did).
-- **Dialogue Bubbles** (assets/mods/dialogue-bubbles; Balloon, ffxi-balloon): the page of NPC talk being read in a bubble,
-  the speaker's name on a tab over it (from the page's "Name : "), a tail under it that blinks while the page waits
-  for a key; over the speaker's head (clear of the name plate) or at the bottom of the screen, above other mods' HUD.
-  The log keeps its copy and the keys stay the game's. `game.event().text` now has the page's `lines` and the event's
-  `actor`. Seen live with Daggao in Southern San d'Oria, both places. Not done: portraits (no portrait art).
+- **Dialogue Bubbles** (assets/mods/dialogue-bubbles; Balloon, ffxi-balloon): the page of NPC talk being read in a speech
+  bubble (`hud.bubble`: rounded, outlined, its tail pointing at the speaker's head wherever the bubble is), with the
+  speaker's face (`hud.portrait`: the speaker's own model drawn live from in front, in an oval with a frame), their
+  name (from the page's "Name : ") and the text inside, and a mark that blinks while the page waits for a key; over the
+  speaker's head (clear of the name plate) or at the bottom of the screen, above other mods' HUD. A new page's texts
+  are measured unseen for a frame first, so the bubble never jumps. The log keeps its copy and the keys stay the
+  game's. `game.event().text` has the page's `lines` and the event's `actor`; entities have a `height`. Seen live
+  with Daggao and Fulchia in Southern San d'Oria, both places, both interfaces; portraits of an Elvaan, a Mithra, a
+  Tarutaru and a Galka.
 - **Look Changer** (assets/mods/look-changer; DressUp, PlasticSurgeon, singlerace, Cosplay, sexchange): how characters
   are drawn on this screen only, kept per character: `//look race <race>`, `face <1a..8b>`, `<slot> <item | none |
   own>` (an item's model from LandSandBoat's equipment list, bundled), `copy [name]` (the target's look, or anyone's

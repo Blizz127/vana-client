@@ -48,6 +48,8 @@ pub(super) struct FrameInfo {
     /// Player looks mods set (render.look): server id -> (mod, the parts given); the version bumps on each change.
     pub models: std::collections::HashMap<u32, (String, super::render::Model)>,
     pub models_ver: u64,
+    /// The portraits drawn this frame (client/portrait.rs): entity -> (game UI image, modern UI texture).
+    pub portraits: std::collections::HashMap<u32, (String, egui::TextureId)>,
 }
 
 /// A modern panel's place from a mod: its top left in window pixels (negative from the right or bottom edge; none

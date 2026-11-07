@@ -23047,3 +23047,25 @@ until it was up.
 - Our main target never dropped for it anyway (held by server id; the drop rule, FUN_10152c70, reads the hidden bit,
   status and distance). Live: Nine (the user) healed Lnxcsfix while she swapped her hat every 2 s; a swap 1.2 s into
   the cast, the heal landed. Per-frame shots of two hat swaps: no frame without her (before: two).
+
+## HUD portraits and speech bubbles (2026-11-07)
+
+Ours, not retail (retail has neither). client/portrait.rs, render/portrait.rs, ZoneRenderer::render_portrait,
+lua/hud.rs (Kind::Portrait, Kind::Bubble, bubble_tris).
+- `hud.portrait`: an actor posed this frame drawn again, alone, after the scene pass: the skinned pipeline with its own
+  uniforms (frame_uniforms: this frame's lighting, fog and areas from the portrait camera) and globals bind group per
+  slot, into a target twice the shown size (steps of 16; bilinear down to the shown size smooths it), cleared to the
+  element's backing (premultiplied). Then render/portrait.rs cuts it to the inscribed oval (blend ZERO / SRCALPHA) and
+  draws the frame ring (premultiplied over, a first-order distance to the ellipse, lit from above). The target is the
+  scene's format (gamma-encoded), so the game UI binds it as an image (UiRenderer::insert_view) and egui as a native
+  texture without conversion. At most 4 slots; a slot keeps its actor while wanted; only actors drawn this frame
+  (drawn_map) are posed, so none is shown otherwise.
+- Its camera: level, from straight in front (Place.forward), centred between the model's top (pos.y + a.top) and
+  attach point 3. Point 3 (the point others look at, the head bone's) sits at about the neck, not the face: the span
+  top..point 3 is about the head and neck. Square: half height 0.66 span; oval 0.72 span, centre 0.55 span below the
+  top. Seen right on an Elvaan (Fulchia), and on a Mithra, Tarutaru and Galka (render.look race).
+- `hud.bubble`: one outline (rounded rect, corner arcs, the tail let into the side facing its point: base clamped clear
+  of the corners, tip at most tail_len out, leaning at most 60 degrees off the side's normal), filled by a fan from the
+  centre plus the tail triangle, a mitred outline strip centred on it and a pixel of feathering outside; the same
+  triangles go to the game UI (GameUi::quad) and to an egui mesh.
+- Entities in Lua have `height` (-a.top, the rest pose's top, scaled).

@@ -135,6 +135,28 @@ fn element(m: &Modern, ctx: &egui::Context, gu: &GameUi, w: &World, painter: &eg
             }
             r
         }
+        Kind::Portrait { entity, w: iw, h: ih, tint, .. } => {
+            let r = Rect::from_min_size(at, vec2(pt(*iw), pt(*ih)));
+            if let Some((_, t)) = w.lua.portrait(*entity) {
+                painter.image(t, r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), rgba(*tint));
+            }
+            r
+        }
+        Kind::Bubble { w: bw, h: bh, round, colour, edge, edge_w, tail } => {
+            // Built in window pixels from its place, as the game UI's.
+            let (px, py) = (at.x * ppp, at.y * ppp);
+            let mut mesh = egui::Mesh::default();
+            for tri in super::super::lua::hud::bubble_tris([px, py, *bw, *bh], *round, *tail, *colour, edge.map(|e| (e, *edge_w))) {
+                let base = mesh.vertices.len() as u32;
+                for (p, c) in tri {
+                    let c = c.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
+                    mesh.colored_vertex(pos2(pt(p[0]), pt(p[1])), Color32::from_rgba_unmultiplied(c[0], c[1], c[2], c[3]));
+                }
+                mesh.add_triangle(base, base + 1, base + 2);
+            }
+            painter.add(egui::Shape::mesh(mesh));
+            Rect::from_min_size(at, vec2(pt(*bw), pt(*bh)))
+        }
         Kind::Map { w: mw, h: mh, centre, span, alpha, me } => {
             let r = Rect::from_min_size(at, vec2(pt(*mw), pt(*mh)));
             let img = w.lua.hud_map_image(w, gu.map_regions())?;
