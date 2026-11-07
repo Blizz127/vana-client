@@ -289,6 +289,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Attendance** (assets/mods/attendance; Att, Attendance, EventTracker): `//attend [note]` writes the party, the
   alliance and players within 50 yalms with the time, zone and note to `attendance/<date>.txt`. Seen live. Not yet:
   DKP bids.
+- **Screen Capture** (assets/mods/screen-capture; SSOrganizer, DashCam, video capture): `//shot` saves a screenshot as
+  `<character>/<zone>/<date time>.png` under the game's screenshots folder; `//record` and `//record stop` record a
+  video. Seen live: a screenshot filed (then removed); recording not tried (it needs ffmpeg).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
