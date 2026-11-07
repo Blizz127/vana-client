@@ -51,7 +51,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     // Ours: the suggestions above the commands (suggest.rs); the cursor rides them as one ring with the commands.
     let sugg = w.battle_rows.clone();
     let on_sugg = w.suggest_sel.filter(|&k| k < sugg.len());
-    let shown: Vec<(String, Option<egui::TextureId>, bool)> = sugg
+    let shown: Vec<(String, Option<(egui::TextureId, egui::Rect)>, bool)> = sugg
         .iter()
         .map(|s| {
             let (kind, id) = match s.action {
@@ -64,7 +64,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 Some(t) => format!("{name}  \u{2192} {t}"),
                 None => name,
             };
-            let icon = p.gu.and_then(|gu| magic::row_icon(w, kind, id).and_then(|(lib, i)| m.sprite_icon(p.ctx, gu, lib, i)));
+            let icon = p.gu.and_then(|gu| m.row_icon(p.ctx, gu, w, kind, id));
             let off = match s.action {
                 Action::Spell(id) => magic::magic_check(w, id).is_some(),
                 Action::Ability(id) => magic::ability_check(w, id).is_some(),
@@ -97,8 +97,8 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 };
                 let painter = ui.painter();
                 super::rows::face(painter, m, r, face, Color32::WHITE);
-                if let Some(t) = icon {
-                    painter.image(*t, egui::Rect::from_min_size(pos2(r.min.x + 16.0, r.min.y + 6.0), vec2(24.0, 24.0)), super::FULL_UV, Color32::WHITE);
+                if let Some((t, uv)) = icon {
+                    painter.image(*t, egui::Rect::from_min_size(pos2(r.min.x + 16.0, r.min.y + 6.0), vec2(24.0, 24.0)), *uv, Color32::WHITE);
                 }
                 let room = r.max.x - r.min.x - 58.0;
                 let label = super::one_line(painter, label, FontId::new(m.theme.ui, FontFamily::Name(super::STRONG.into())), super::rows::label_colour(m, on, *off), room);
@@ -157,12 +157,12 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     if let (Some((k, c)), Some(row), Some(panel)) = (sub, sub_row, panel)
         && let Some(s) = sugg.get(k)
     {
-        let rows: Vec<(String, String, Option<egui::TextureId>)> = s
+        let rows: Vec<(String, String, Option<(egui::TextureId, egui::Rect)>)> = s
             .group
             .iter()
             .map(|&id| {
                 let mp = w.actions.as_ref().and_then(|a| a.spell(id)).map_or(String::new(), |r| format!("{} MP", r.mp));
-                let icon = p.gu.and_then(|gu| magic::row_icon(w, Kind::Magic, id).and_then(|(lib, i)| m.sprite_icon(p.ctx, gu, lib, i)));
+                let icon = p.gu.and_then(|gu| m.row_icon(p.ctx, gu, w, Kind::Magic, id));
                 (magic::spell_name(w, id), mp, icon)
             })
             .collect();
@@ -171,8 +171,8 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             let out = super::kit::list(ui, m, "suggest family", rows.len(), Some(c), true, follow, 34.0, 360.0, |_| false, |ui, r| {
                 let (name, mp, icon) = &rows[r.index];
                 let painter = ui.painter();
-                if let Some(t) = icon {
-                    painter.image(*t, egui::Rect::from_min_size(pos2(r.rect.min.x + 10.0, r.rect.center().y - 12.0), vec2(24.0, 24.0)), super::FULL_UV, Color32::WHITE);
+                if let Some((t, uv)) = icon {
+                    painter.image(*t, egui::Rect::from_min_size(pos2(r.rect.min.x + 10.0, r.rect.center().y - 12.0), vec2(24.0, 24.0)), *uv, Color32::WHITE);
                 }
                 painter.text(pos2(r.rect.min.x + 42.0, r.rect.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.ui), super::kit::ink(m, r));
                 painter.text(pos2(r.rect.max.x - 10.0, r.rect.center().y), Align2::RIGHT_CENTER, mp, FontId::proportional(m.theme.small), m.theme.color("muted"));

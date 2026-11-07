@@ -62,7 +62,7 @@ fn timers_panel(p: &mut Panels, w: &mut World) {
     let pulse = if t <= 20.0 { t } else { 40.0 - t } * 0.05;
     let icon = |i: &Icon| match *i {
         Icon::Status(id) => m.status_icon(ctx, gu, small, id).map(|(t, uv)| (t, uv, Some(id))),
-        Icon::List(lib, k) => m.sprite_icon(ctx, gu, lib, k).map(|t| (t, super::FULL_UV, None)),
+        Icon::List(lib, k, pic) => m.list_icon(ctx, gu, lib, k, pic).map(|(t, uv)| (t, uv, None)),
         Icon::None => None,
     };
     let icons: Vec<Vec<Vec<Option<(egui::TextureId, Rect, Option<u16>)>>>> = secs.iter().map(|s| s.iter().map(|g| g.rows.iter().map(|r| icon(&r.icon)).collect()).collect()).collect();

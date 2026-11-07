@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b2d91"/>
+      <stop offset="0.7" stop-color="#5b2d91"/>
+      <stop offset="1" stop-color="#2e1648"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2e1648"/>
+      <stop offset="1" stop-color="#2e1648"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="9" x2="32" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="32" y1="18" x2="32" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b69bd8"/>
+      <stop offset="0.42" stop-color="#7a4ab8"/>
+      <stop offset="1" stop-color="#3d255c"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="33.4" y1="18" x2="33.4" y2="31.065" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ded2ed"/>
+      <stop offset="1" stop-color="#a280cd"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-3" cx="32.468" cy="31.88" r="5.132" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </radialGradient>
+  </defs>
+  <title>w296</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#c6b6d8" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="ring" d="M55 32 C55 44.703 44.703 55 32 55 C19.297 55 9 44.703 9 32 C9 19.297 19.297 9 32 9 C44.703 9 55 19.297 55 32 Z M52 32 C52 43.046 43.046 52 32 52 C20.954 52 12 43.046 12 32 C12 20.954 20.954 12 32 12 C43.046 12 52 20.954 52 32 Z" fill="url(#linear-gradient-1)" fill-rule="evenodd" stroke="#0a1118" stroke-linejoin="round"/>
+      <polygon id="shard" points="32.935,18 40.4,27.335 37.6,43.2 29.2,46 23.6,34.8 26.4,23.6" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.731" stroke-linejoin="round"/>
+      <polygon id="facet" points="32.935,18 40.4,27.335 32.935,31.065 26.4,23.6" fill="url(#linear-gradient-3)" opacity="0.6"/>
+      <path id="eye" d="M27.335 31.065 C30.135 29.2 34.8 29.2 37.6 32 C34.8 34.8 30.135 34.8 27.335 31.065 Z" fill="url(#radial-gradient-3)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+      <path id="slit" d="M33.306 31.535 C33.306 32.616 32.93 33.494 32.465 33.494 C32.005 33.494 31.629 32.616 31.629 31.535 C31.629 30.449 32.005 29.571 32.465 29.571 C32.93 29.571 33.306 30.449 33.306 31.535 Z" fill="#0a1118"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="14" y1="12" x2="50" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.42" stop-color="#e3ddcf"/>
+      <stop offset="1" stop-color="#9c9483"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="20" y1="8" x2="20" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fbfaf6"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="29.486" y1="17.739" x2="34.514" y2="46.261" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+  </defs>
+  <title>ability_light</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M26.201 6.187 C29.405 2.984 34.595 2.984 37.799 6.187 L57.813 26.201 C61.016 29.405 61.016 34.595 57.813 37.799 L37.799 57.813 C34.595 61.016 29.405 61.016 26.201 57.813 L6.187 37.799 C2.984 34.595 2.984 29.405 6.187 26.201 Z" fill="#0a1118"/>
+      <path id="tile" d="M36.243 7.743 L56.257 27.757 C58.601 30.101 58.601 33.899 56.257 36.243 L36.243 56.257 C33.899 58.601 30.101 58.601 27.757 56.257 L7.743 36.243 C5.399 33.899 5.399 30.101 7.743 27.757 L27.757 7.743 C30.101 5.399 33.899 5.399 36.243 7.743 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <polygon id="facet_light" points="32,7.5 32,32 7.5,32" fill="url(#linear-gradient-2)" opacity="0.22"/>
+      <polygon id="facet_dark" points="56.5,32 32,32 32,56.5" fill="#0a1118" opacity="0.16"/>
+      <path id="bevel" d="M34.475 11.975 L52.025 29.525 C53.392 30.892 53.392 33.108 52.025 34.475 L34.475 52.025 C33.108 53.392 30.892 53.392 29.525 52.025 L11.975 34.475 C10.608 33.108 10.608 30.892 11.975 29.525 L29.525 11.975 C30.892 10.608 33.108 10.608 34.475 11.975 Z" fill="none" stroke="#fbfaf6" stroke-linejoin="round" opacity="0.55"/>
+      <polygon id="sparkle" points="29.885,28.41 32,19.5 34.115,28.41 37.419,26.581 35.59,29.885 44.5,32 35.59,34.115 37.419,37.419 34.115,35.59 32,44.5 29.885,35.59 26.581,37.419 28.41,34.115 19.5,32 28.41,29.885 26.581,26.581" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

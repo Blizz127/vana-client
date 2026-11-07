@@ -35,8 +35,9 @@ pub(super) fn icon_tex(m: &super::Modern, ctx: &egui::Context, gu: Option<&super
         model::Icon::Item(id) => world.and_then(|w| w.item_info.as_deref()).and_then(|c| m.item_icon(ctx, c, id)).map(|t| (t, super::FULL_UV)),
         model::Icon::Status(id) => gu.and_then(|g| m.status_icon(ctx, g, false, id)),
         model::Icon::Spell(_) | model::Icon::Ability(_) => {
-            let (lib, k) = world.and_then(|w| i.sprite(w))?;
-            gu.and_then(|g| m.sprite_icon(ctx, g, lib, k)).map(|t| (t, super::FULL_UV))
+            let w = world?;
+            let (lib, k) = i.sprite(w)?;
+            gu.and_then(|g| m.list_icon(ctx, g, lib, k, i.picture(w)))
         }
     }
 }

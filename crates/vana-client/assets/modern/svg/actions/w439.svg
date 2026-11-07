@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="32" y1="5" x2="32" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c0d893"/>
+      <stop offset="0.45" stop-color="#8db83a"/>
+      <stop offset="1" stop-color="#465c1d"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-1" cx="32" cy="32" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#465c1d"/>
+      <stop offset="1" stop-color="#465c1d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-2" x1="21.965" y1="22.009" x2="27.111" y2="51.195" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="21.777" y1="14.577" x2="21.777" y2="23.265" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="27.159" y1="44.902" x2="27.159" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f39da5"/>
+      <stop offset="0.42" stop-color="#e94c5b"/>
+      <stop offset="1" stop-color="#74262e"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="36.889" y1="22.009" x2="42.035" y2="51.195" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-6" x1="42.223" y1="14.577" x2="42.223" y2="23.265" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-7" x1="36.841" y1="44.902" x2="36.841" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f39da5"/>
+      <stop offset="0.42" stop-color="#e94c5b"/>
+      <stop offset="1" stop-color="#74262e"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-8" x1="29.316" y1="20.338" x2="34.684" y2="50.781" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.35" stop-color="#e4c077"/>
+      <stop offset="0.72" stop-color="#b88b49"/>
+      <stop offset="1" stop-color="#7a5426"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-9" x1="32" y1="12" x2="32" y2="20.099" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c8d2dc"/>
+      <stop offset="1" stop-color="#6b7889"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-10" x1="32" y1="45.131" x2="32" y2="51.757" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f39da5"/>
+      <stop offset="0.42" stop-color="#e94c5b"/>
+      <stop offset="1" stop-color="#74262e"/>
+    </linearGradient>
+  </defs>
+  <title>w439</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M2.8 15 C2.8 8.262 8.262 2.8 15 2.8 L49 2.8 C55.738 2.8 61.2 8.262 61.2 15 L61.2 49 C61.2 55.738 55.738 61.2 49 61.2 L15 61.2 C8.262 61.2 2.8 55.738 2.8 49 Z" fill="#0a1118"/>
+      <path id="plate" d="M15 5 L49 5 C54.523 5 59 9.477 59 15 L59 49 C59 54.523 54.523 59 49 59 L15 59 C9.477 59 5 54.523 5 49 L5 15 C5 9.477 9.477 5 15 5 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <path id="socket" d="M16 9 L48 9 C51.866 9 55 12.134 55 16 L55 48 C55 51.866 51.866 55 48 55 L16 55 C12.134 55 9 51.866 9 48 L9 16 C9 12.134 12.134 9 16 9 Z" fill="url(#radial-gradient-1)" opacity="0.35"/>
+      <path id="sheen" d="M11 7.5 L53 7.5 C54.657 7.5 55.437 8.72 54.743 10.224 L54.257 11.276 C53.563 12.78 51.657 14 50 14 L14 14 C12.343 14 10.437 12.78 9.743 11.276 L9.257 10.224 C8.563 8.72 9.343 7.5 11 7.5 Z" fill="#ffffff" opacity="0.22"/>
+      <polygon id="shaft" points="28.598,50.424 23.077,22.271 20.478,22.779 26,50.932" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="head" points="20.22,14.577 25.536,21.785 21.464,20.938 18.019,23.265" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="fletching" points="23.835,50.608 26.169,44.902 30.483,49.305 30.476,50.807 27.443,51.404 24.41,52" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.737" stroke-linejoin="round"/>
+      <polygon id="shaft-2" points="38,50.932 43.522,22.779 40.923,22.271 35.402,50.424" fill="url(#linear-gradient-5)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="head-2" points="43.78,14.577 45.981,23.265 42.536,20.938 38.464,21.785" fill="url(#linear-gradient-6)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="fletching-2" points="33.517,49.305 37.831,44.902 40.165,50.608 39.59,52 36.557,51.404 33.524,50.807" fill="url(#linear-gradient-7)" stroke="#0a1118" stroke-width="0.737" stroke-linejoin="round"/>
+      <rect id="shaft-3" x="30.675" y="20.099" width="2.65" height="30.921" fill="url(#linear-gradient-8)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="head-3" points="32,12 35.829,20.099 32,18.479 28.171,20.099" fill="url(#linear-gradient-9)" stroke="#0a1118" stroke-width="1.031" stroke-linejoin="round"/>
+      <polygon id="fletching-3" points="28.613,50.285 32,45.131 35.387,50.285 35.092,51.757 32,51.757 28.908,51.757" fill="url(#linear-gradient-10)" stroke="#0a1118" stroke-width="0.737" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

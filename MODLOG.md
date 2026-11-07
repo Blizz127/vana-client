@@ -23004,3 +23004,20 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
   blocks and tables. Classic: the game's frame and title strip, the game font with in-line colours (bold `1e 01`,
   code `1e 02`), the list scroll bar, OK. Modern: the pack's frame, Fira Sans with the strong face and mono, a thin
   bar. Up / Down, Page Up / Page Down (Space), Home / End and the wheel scroll; Enter or Escape closes, as does OK.
+
+## Spell and ability list icons: the standard and HD sets (2026-11-07)
+
+From `action-icon-dump` (30261006_0; every named spell and ability record, its icons as "Magic list" above picks them):
+- The standard icon (spell +0x40, ability +3, "menu    magiconw") is school x 8 + element (fire, ice, wind, earth,
+  lightning, water, light, dark): 0..7 plain orbs (white magic, support, Geomancy), 8..15 orbs with an eye (black
+  magic), 16..23 crystal shards (summoning, Blood Pacts; light also every Trust), 24..31 scrolls (ninjutsu), 32..39
+  notes (songs), 40..47 "Abi" tiles (weapon skills, job abilities, pet commands, Monstrosity; light is most of them),
+  48..55 cards (Quick Draw), 56..63 monster faces (blue magic); 64 (physical blue magic, element 15) is an empty image,
+  65 the gold die (Phantom Roll). 30 and 31 hold the same picture. 65 distinct images in all.
+- The HD icon (+0x42 / +4, the default set) is a picture per spell or ability: 688 distinct for the 2383 named
+  records (the tier numeral and the area star are drawn into it, but some tiers share one: Curing Waltz I..V; weapon
+  skills by weapon and element, Trusts by weapon). 55 of them are standard images (songs, ninjutsu, blue magic,
+  Geomancy, the generic ability tiles: 1206 records).
+- Ours (modern UI): one icon per distinct picture, keyed by the record's HD value (+0x42 / +4; the standard icon when
+  0xffff): assets/modern/action_map.tsv, magiconw N as N, magico2w N as 1000 + N; the standard images keep one icon
+  per school and element. Drawn whichever set config 0x99 picks; the classic UI keeps the game's.

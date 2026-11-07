@@ -81,7 +81,7 @@ pub use lists::key as magic_key;
 pub use macros::key as macro_key;
 pub use status::key as status_key;
 pub use storage::key as storage_key;
-pub use theme::{Theme, frame_image};
+pub use theme::{Theme, frame_image, sprite_pixels};
 use theme::{Art, LABEL, NAME, STRONG};
 
 pub use crate::config::{ModernDock as Dock, ModernLayout as Layout, ModernPlace as Place};
@@ -1394,10 +1394,34 @@ impl Modern {
         });
         t.as_ref().map(|t| (t.id(), FULL_UV))
     }
+
+    /// A spell's or ability's list icon and its uv: ours for its picture (magic::picture), else the game's sprite.
+    fn list_icon(&self, ctx: &Context, gu: &GameUi, lib: &str, index: usize, picture: Option<u16>) -> Option<(egui::TextureId, Rect)> {
+        if let Some(s) = picture.and_then(action_art).and_then(|id| self.art.sprite(id)) {
+            return Some((s.tex, s.uv));
+        }
+        self.sprite_icon(ctx, gu, lib, index).map(|t| (t, FULL_UV))
+    }
+
+    /// A magic or ability list row's icon (ours for spells and abilities, the game's for mounts and emotes).
+    fn row_icon(&self, ctx: &Context, gu: &GameUi, w: &World, kind: super::magic::Kind, id: u16) -> Option<(egui::TextureId, Rect)> {
+        let (lib, k) = super::magic::row_icon(w, kind, id)?;
+        self.list_icon(ctx, gu, lib, k, super::magic::picture(w, kind, id))
+    }
 }
 
 /// A whole texture's uv.
 const FULL_UV: Rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+
+/// Our art for a spell's or ability's list picture (magic::picture; assets/modern/action_map.tsv, alike pictures
+/// sharing one), as a manifest id.
+pub fn action_art(picture: u16) -> Option<&'static str> {
+    static MAP: std::sync::OnceLock<HashMap<u16, String>> = std::sync::OnceLock::new();
+    let map = MAP.get_or_init(|| {
+        include_str!("../../../assets/modern/action_map.tsv").lines().filter_map(|l| l.split_once('\t')).filter_map(|(k, n)| Some((k.parse().ok()?, format!("actions/{n}")))).collect()
+    });
+    map.get(&picture).map(String::as_str)
+}
 
 /// A numbered effect's count (Copy Image, Finishing Move, Aftermath, the Dazes), drawn as text over our art, which
 /// leaves it out; none for a retail icon (its count is in the image).
@@ -1543,6 +1567,18 @@ mod layout_tests {
         assert_eq!(k, "Naji @2560x1440 60%");
         assert!(layout_of(&k, "Naji") && layout_of("Naji", "Naji"));
         assert!(!layout_of(&k, "Naj") && !layout_of("Najim @1920x1080 60%", "Naji"));
+    }
+
+    /// Every icon the picture map names is in an atlas, its SVG in the pack.
+    #[test]
+    fn action_art_is_packed() {
+        let svg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/modern/svg");
+        for l in include_str!("../../../assets/modern/action_map.tsv").lines() {
+            let (k, _) = l.split_once('\t').unwrap();
+            let id = super::action_art(k.parse().unwrap()).unwrap();
+            assert!(super::sprite_pixels(id).is_some_and(|(w, h, _)| (w, h) == (128, 128)), "{id}");
+            assert!(svg.join(format!("{id}.svg")).exists(), "{id}");
+        }
     }
 }
 

@@ -335,6 +335,15 @@ Milestone 1:
   `status-dump`'s stock icons, the bare set (user's pick): atlases/status_0@2x.png, manifest "status/s<id>",
   status_map.tsv (status id -> icon); Modern::status_icon draws them everywhere (effects, party rows, Timers, Level
   Sync), the game's icons only for an id without one. Sources ~/ffxi/lab/scratch/uiupdate/vc/status.
+- Spell and ability icons (2026-11-07): one of ours for each distinct retail list picture (the HD set, 688 for 2383
+  named spells and abilities), drawn in VectorCraft from `action-icon-dump`'s stock pictures and approved batch by
+  batch. Abilities sit on a tile in their job's colour (SP abilities framed in gold), weapon skills show the weapon on
+  the element's colour, spells a disc in the element's colour (light: holy gold); retail's tier numerals and area star
+  are redrawn; the 66 standard images (songs, ninjutsu, blue magic, Geomancy, the generic ability tiles) one per
+  school and element. atlases/actions_<n>@2x.png, manifest "actions/<name>", action_map.tsv (list picture: magiconw N
+  as N, magico2w N as 1000 + N -> icon); Modern::list_icon / row_icon draw them in the magic and ability lists, search,
+  the battle menu and its suggestions, favourites, Timers, the BLU set and mods' windows and HUD icons; the game's
+  icon for a picture without one.
 - Weather icons and target markers (2026-10-27, bare): weather/w00..w19 by weather id (the location panel shows one
   icon, Clear and the skies too, a double weather drawn as a stronger icon); the target arrow, subtarget arrow
   and the five relation rings redrawn under their indicators/ ids; indicators/party_invite_pending in place of

@@ -42,8 +42,9 @@ fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, rows: &[RowLook
                 ui.painter().text(pos2(x, y), Align2::LEFT_CENTER, n.to_string(), FontId::monospace(m.theme.small), tint(m, band));
                 x += 22.0;
             }
-            if let Some(t) = r.icon.and_then(|i| m.sprite_icon(&ctx, gu, "menu    magiconw", i)) {
-                ui.painter().image(t, Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            // The row's standard icon: blue magic's HD pictures are the standard ones, so it keys our art too.
+            if let Some((t, uv)) = r.icon.and_then(|i| m.list_icon(&ctx, gu, "menu    magiconw", i, Some(i as u16))) {
+                ui.painter().image(t, Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)), uv, Color32::WHITE);
             }
             if icons {
                 x += ICON + 6.0;

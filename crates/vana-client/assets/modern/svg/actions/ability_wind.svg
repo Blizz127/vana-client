@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="14" y1="12" x2="50" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#95dfa4"/>
+      <stop offset="0.42" stop-color="#3fc45a"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="20" y1="8" x2="20" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="31.344" y1="22.027" x2="31.344" y2="41.703" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bceac5"/>
+    </linearGradient>
+  </defs>
+  <title>ability_wind</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M26.201 6.187 C29.405 2.984 34.595 2.984 37.799 6.187 L57.813 26.201 C61.016 29.405 61.016 34.595 57.813 37.799 L37.799 57.813 C34.595 61.016 29.405 61.016 26.201 57.813 L6.187 37.799 C2.984 34.595 2.984 29.405 6.187 26.201 Z" fill="#0a1118"/>
+      <path id="tile" d="M36.243 7.743 L56.257 27.757 C58.601 30.101 58.601 33.899 56.257 36.243 L36.243 56.257 C33.899 58.601 30.101 58.601 27.757 56.257 L7.743 36.243 C5.399 33.899 5.399 30.101 7.743 27.757 L27.757 7.743 C30.101 5.399 33.899 5.399 36.243 7.743 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.3" stroke-linejoin="round"/>
+      <polygon id="facet_light" points="32,7.5 32,32 7.5,32" fill="url(#linear-gradient-2)" opacity="0.22"/>
+      <polygon id="facet_dark" points="56.5,32 32,32 32,56.5" fill="#0a1118" opacity="0.16"/>
+      <path id="bevel" d="M34.475 11.975 L52.025 29.525 C53.392 30.892 53.392 33.108 52.025 34.475 L34.475 52.025 C33.108 53.392 30.892 53.392 29.525 52.025 L11.975 34.475 C10.608 33.108 10.608 30.892 11.975 29.525 L29.525 11.975 C30.892 10.608 33.108 10.608 34.475 11.975 Z" fill="none" stroke="#bceac5" stroke-linejoin="round" opacity="0.55"/>
+      <path id="gusts" d="M33.96 30.686 L21.791 30.686 C21.119 30.686 20.574 30.141 20.574 29.469 C20.574 28.797 21.119 28.252 21.791 28.252 L33.96 28.252 C36.359 28.252 37.876 26.892 36.847 25.074 C36.361 24.28 34.991 24.127 34.805 25.356 C34.705 26.021 34.084 26.478 33.42 26.377 C32.755 26.276 32.298 25.656 32.399 24.991 C32.928 21.503 37.28 21.065 38.94 23.832 C38.945 23.839 38.949 23.846 38.954 23.854 C40.817 27.116 38.566 30.686 33.96 30.686 Z M20.717 33.263 L38.255 33.263 C42.862 33.263 44.5 37.321 42.061 40.26 C39.908 42.935 35.606 41.71 35.606 38.059 C35.606 37.387 36.152 36.842 36.824 36.842 C37.496 36.842 38.04 37.387 38.04 38.059 C38.04 39.414 39.455 39.622 40.168 38.731 C40.173 38.724 40.179 38.718 40.184 38.712 C41.347 37.316 40.737 35.696 38.255 35.696 L20.717 35.696 C20.045 35.696 19.5 35.152 19.5 34.48 C19.5 33.808 20.045 33.263 20.717 33.263 Z M23.222 38.274 L30.739 38.274 C31.411 38.274 31.956 38.818 31.956 39.491 C31.956 40.163 31.411 40.707 30.739 40.707 L23.222 40.707 C22.55 40.707 22.006 40.163 22.006 39.491 C22.006 38.818 22.55 38.274 23.222 38.274 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

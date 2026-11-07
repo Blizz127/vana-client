@@ -1439,7 +1439,7 @@ fn apply(w: &mut World, gu: Option<&super::game_ui::GameUi>, op: Op) {
                 use super::timers::Icon;
                 let icon = match icon {
                     Some((k, id)) if k == "status" => Icon::Status(id),
-                    Some((k, id)) => super::magic::list_icon_of(w, k == "spell", id).map_or(Icon::None, |(l, i)| Icon::List(l, i)),
+                    Some((k, id)) => super::timers::list_icon(w, k == "spell", id),
                     None => Icon::None,
                 };
                 let end = std::time::Instant::now() + std::time::Duration::from_secs_f32(s.max(0.0));

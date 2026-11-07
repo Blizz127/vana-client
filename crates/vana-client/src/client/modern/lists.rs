@@ -25,7 +25,7 @@ enum Look {
 
 /// A row's frame (the pack's list rows), its icon and name, greyed when `off` (can't be used now); its response.
 #[allow(clippy::too_many_arguments)]
-fn row(ui: &mut Ui, m: &super::Modern, icon: Option<egui::TextureId>, pack: Option<&str>, name: &str, right: &str, look: Look, off: bool, star: Option<bool>) -> (egui::Response, bool) {
+fn row(ui: &mut Ui, m: &super::Modern, icon: Option<(egui::TextureId, Rect)>, pack: Option<&str>, name: &str, right: &str, look: Look, off: bool, star: Option<bool>) -> (egui::Response, bool) {
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW), Sense::click());
     // A row that can be a favourite keeps its right end for the star (favs.rs).
     let starred = star.map(|on| super::favs::star(ui, m, r, on, resp.hovered()));
@@ -41,8 +41,8 @@ fn row(ui: &mut Ui, m: &super::Modern, icon: Option<egui::TextureId>, pack: Opti
     super::rows::face(p, m, r, sprite, Color32::WHITE);
     let tint = if off { Color32::from_gray(110) } else { Color32::WHITE };
     let at = pos2(r.min.x + 10.0, r.center().y - 11.0);
-    if let Some(t) = icon {
-        p.image(t, Rect::from_min_size(at, vec2(22.0, 22.0)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), tint);
+    if let Some((t, uv)) = icon {
+        p.image(t, Rect::from_min_size(at, vec2(22.0, 22.0)), uv, tint);
     } else if let Some(s) = pack.and_then(|i| m.art.sprite(i)) {
         p.add(paint::image(&s, at, 22.0, tint));
     }
@@ -120,7 +120,7 @@ fn palette(p: &mut Panels, w: &mut World) {
 }
 
 /// The search field and its hits in place of the window's rows: what was clicked, what the pointer is over.
-pub(super) fn search_rows(ui: &mut Ui, m: &super::Modern, w: &World, icons: &[Option<egui::TextureId>], text: &str, sel: usize, hits: &[Hit]) -> Mouse {
+pub(super) fn search_rows(ui: &mut Ui, m: &super::Modern, w: &World, icons: &[Option<(egui::TextureId, Rect)>], text: &str, sel: usize, hits: &[Hit]) -> Mouse {
     // From a category window, the list each hit is in; spells and abilities grey as in their lists.
     let note = |h: &Hit| match (h.cat, w.cats) {
         (Some(c), Some(cats)) => magic::cat_rows(cats.menu).get(c).map_or("", |r| magic::cat_label(cats.menu, r.1)).to_string(),
@@ -133,7 +133,7 @@ pub(super) fn search_rows(ui: &mut Ui, m: &super::Modern, w: &World, icons: &[Op
 
 /// The field and the hits (each with its note and greyed by `dim` or its list): what was clicked.
 #[allow(clippy::too_many_arguments)]
-fn hit_rows(ui: &mut Ui, m: &super::Modern, icons: &[Option<egui::TextureId>], text: &str, sel: usize, hits: &[Hit], note: impl Fn(&Hit) -> String, dim: impl Fn(&Hit) -> bool, fav: impl Fn(&Hit) -> Option<(super::super::favs::Fav, bool)>) -> Mouse {
+fn hit_rows(ui: &mut Ui, m: &super::Modern, icons: &[Option<(egui::TextureId, Rect)>], text: &str, sel: usize, hits: &[Hit], note: impl Fn(&Hit) -> String, dim: impl Fn(&Hit) -> bool, fav: impl Fn(&Hit) -> Option<(super::super::favs::Fav, bool)>) -> Mouse {
     search_field(ui, m, text);
     let mut mouse = Mouse::default();
     if hits.is_empty() {
@@ -173,14 +173,15 @@ pub(super) fn search_field(ui: &mut Ui, m: &super::Modern, text: &str) {
 }
 
 /// The search's hits for the open window, their icons.
-pub(super) fn search_hits(p: &Panels, w: &World) -> Option<(String, usize, Vec<Hit>, Vec<Option<egui::TextureId>>)> {
+pub(super) fn search_hits(p: &Panels, w: &World) -> Option<(String, usize, Vec<Hit>, Vec<Option<(egui::TextureId, Rect)>>)> {
     let s = w.list_search.as_ref()?;
     let hits = listsearch::hits(w, &s.text);
+    let item = |id: u16| w.item_info.as_ref().and_then(|info| p.m.item_icon(p.ctx, info, id)).map(|t| (t, super::FULL_UV));
     let icon = |h: &Hit| match h.slot {
-        _ if matches!(h.journal, Some(listsearch::Journal::Auction(_) | listsearch::Journal::Row { item: true, .. })) => w.item_info.as_ref().and_then(|info| p.m.item_icon(p.ctx, info, h.id)),
+        _ if matches!(h.journal, Some(listsearch::Journal::Auction(_) | listsearch::Journal::Row { item: true, .. })) => item(h.id),
         _ if h.journal.is_some() => None,
-        Some(_) => w.item_info.as_ref().and_then(|info| p.m.item_icon(p.ctx, info, h.id)),
-        None => p.gu.and_then(|gu| magic::row_icon(w, h.kind, h.id).and_then(|(lib, k)| p.m.sprite_icon(p.ctx, gu, lib, k))),
+        Some(_) => item(h.id),
+        None => p.gu.and_then(|gu| p.m.row_icon(p.ctx, gu, w, h.kind, h.id)),
     };
     let icons = hits.iter().take(listsearch::MAX).map(icon).collect();
     // A journal hit's note: its quest area or mission log by the game's titles.
@@ -203,7 +204,7 @@ pub(super) struct Found {
     text: String,
     sel: usize,
     hits: Vec<Hit>,
-    icons: Vec<Option<egui::TextureId>>,
+    icons: Vec<Option<(egui::TextureId, Rect)>>,
     mouse: Mouse,
 }
 
@@ -385,7 +386,7 @@ fn list(p: &mut Panels, w: &mut World) {
         Kind::Emote => "Emotes",
     };
     let note = win.rows.len().to_string();
-    let icons: Vec<Option<egui::TextureId>> = win.rows.iter().skip(win.scroll).take(VISIBLE).map(|&id| p.gu.and_then(|gu| magic::row_icon(w, win.kind, id).and_then(|(lib, k)| m.sprite_icon(p.ctx, gu, lib, k)))).collect();
+    let icons: Vec<Option<(egui::TextureId, Rect)>> = win.rows.iter().skip(win.scroll).take(VISIBLE).map(|&id| p.gu.and_then(|gu| m.row_icon(p.ctx, gu, w, win.kind, id))).collect();
     let mut mouse = Mouse::default();
     let search = search_hits(p, w);
     let mut found = Mouse::default();

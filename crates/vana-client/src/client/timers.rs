@@ -39,8 +39,14 @@ pub const SECTIONS: [&str; 3] = ["Recasts", "Buffs", "Debuffs"];
 pub enum Icon {
     None,
     Status(u16),
-    /// A magic / ability list icon (library, sprite).
-    List(&'static str, usize),
+    /// A magic / ability list icon (library, sprite) and the record's picture (magic::picture, the modern UI's art).
+    List(&'static str, usize, Option<u16>),
+}
+
+/// A spell's or ability record's list icon.
+pub fn list_icon(w: &World, spell: bool, id: u16) -> Icon {
+    let kind = if spell { super::magic::Kind::Magic } else { super::magic::Kind::Ability };
+    super::magic::row_icon(w, kind, id).map_or(Icon::None, |(l, k)| Icon::List(l, k, super::magic::picture(w, kind, id)))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -761,7 +767,7 @@ fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, 
             continue;
         }
         let Some(a) = ability_for_timer(w, timer) else { continue };
-        let icon = super::magic::list_icon_of(w, false, a.id).map_or(Icon::None, |(l, k)| Icon::List(l, k));
+        let icon = list_icon(w, false, a.id);
         let mut name = name_of(a.id as u32, false);
         let calc = w.ability_calc.get(&timer).copied().unwrap_or((0, 0));
         let rule = charge_rule(w, charge_kind(w, a)).and_then(|(n, full)| charges(left.ceil() as i32, n, full, calc));
@@ -780,7 +786,7 @@ fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, 
         if left <= 0.0 {
             continue;
         }
-        let icon = super::magic::list_icon_of(w, true, spell).map_or(Icon::None, |(l, k)| Icon::List(l, k));
+        let icon = list_icon(w, true, spell);
         let total = t.total((1, spell as u32), left, seen);
         rows.push(Row { icon, name: name_of(spell as u32, true), left, total, fills: true });
     }
@@ -1086,7 +1092,7 @@ pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place
                             gu.image_rect(&t, rx, ly + 4.0, 16.0, 16.0, [c, c, c, 1.0]);
                         }
                     }
-                    Icon::List(lib, k) => {
+                    Icon::List(lib, k, _) => {
                         gu.sprite(lib, k, rx, ly + 4.0, N);
                     }
                     Icon::None => {}
@@ -1212,9 +1218,9 @@ pub fn shot(gu: &mut GameUi, acts: Option<&crate::dat::actions::Actions>, spec: 
         let Some(a) = acts else { return Icon::None };
         let r = if spell { a.spell(id).map(|r| (r.icon, r.icon_hd)) } else { a.abilities.get(id as usize).map(|r| (r.icon as u16, r.icon_hd)) };
         r.map_or(Icon::None, |(i, hd)| match hd {
-            0xffff => Icon::List("menu    magiconw", i as usize),
-            1000.. => Icon::List("menu    magico2w", (hd - 1000) as usize),
-            _ => Icon::List("menu    magiconw", hd as usize),
+            0xffff => Icon::List("menu    magiconw", i as usize, Some(i)),
+            1000.. => Icon::List("menu    magico2w", (hd - 1000) as usize, Some(hd)),
+            _ => Icon::List("menu    magiconw", hd as usize, Some(hd)),
         })
     };
     let row = |icon: Icon, name: &str, left: f32, total: f32, fills: bool| Row { icon, name: name.into(), left, total, fills };

@@ -41,18 +41,31 @@ impl Icon {
         }
     }
 
-    /// A spell's or an ability's list sprite (library, index).
-    pub fn sprite(self, w: &super::World) -> Option<(&'static str, usize)> {
+    /// A spell's or an ability's list row: its list and record index.
+    fn row(self, w: &super::World) -> Option<(super::super::magic::Kind, u16)> {
+        use super::super::magic::Kind;
         match self {
-            Icon::Spell(id) => super::super::magic::list_icon_of(w, true, id),
+            Icon::Spell(id) => Some((Kind::Magic, id)),
             Icon::Ability(id) => {
                 // The list takes a record's index; ids and indexes match, but look it up if one does not.
                 let acts = w.actions.as_ref()?;
                 let k = if acts.abilities.get(id as usize).is_some_and(|a| a.id == id) { id } else { acts.abilities.iter().position(|a| a.id == id)? as u16 };
-                super::super::magic::list_icon_of(w, false, k)
+                Some((Kind::Ability, k))
             }
             _ => None,
         }
+    }
+
+    /// A spell's or an ability's list sprite (library, index).
+    pub fn sprite(self, w: &super::World) -> Option<(&'static str, usize)> {
+        let (kind, k) = self.row(w)?;
+        super::super::magic::row_icon(w, kind, k)
+    }
+
+    /// A spell's or an ability's list picture, which picks the modern UI's art.
+    pub fn picture(self, w: &super::World) -> Option<u16> {
+        let (kind, k) = self.row(w)?;
+        super::super::magic::picture(w, kind, k)
     }
 }
 
@@ -1256,7 +1269,12 @@ pub(super) fn icon(gu: &mut GameUi, w: Option<&super::World>, i: Icon, x: f32, y
             }
         }
         Icon::Spell(_) | Icon::Ability(_) => {
-            if let Some((lib, k)) = w.and_then(|w| i.sprite(w)) {
+            let Some(w) = w else { return };
+            // The modern UI's art for the spell, as its own lists draw it.
+            if w.modern && i.picture(w).and_then(super::super::modern::action_art).is_some_and(|art| pack_icon(gu, art, x, y, s)) {
+                return;
+            }
+            if let Some((lib, k)) = i.sprite(w) {
                 let (sw, sh) = (gu.sprite_width(lib, k), gu.sprite_height(lib, k));
                 if sw > 0.0 && sh > 0.0 {
                     gu.sprite_scaled(lib, k, x, y, s / sw, s / sh, 0x8080_8080);
@@ -1264,6 +1282,17 @@ pub(super) fn icon(gu: &mut GameUi, w: Option<&super::World>, i: Icon, x: f32, y
             }
         }
     }
+}
+
+/// The modern pack's sprite `id` at (x, y), `s` square, uploaded on first use; false when the pack has none.
+fn pack_icon(gu: &mut GameUi, id: &str, x: f32, y: f32, s: f32) -> bool {
+    let key = format!("modern {id}");
+    if !gu.has_image(&key) {
+        let Some((iw, ih, rgba)) = super::super::modern::sprite_pixels(id) else { return false };
+        gu.image(&key, iw, ih, rgba);
+    }
+    gu.image_rect(&key, x, y, s, s, [1.0; 4]);
+    true
 }
 
 #[cfg(test)]

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3fc45a"/>
+      <stop offset="0.7" stop-color="#3fc45a"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20622d"/>
+      <stop offset="1" stop-color="#20622d"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="23.488" y1="33.968" x2="23.488" y2="49.502" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bfc8e1"/>
+      <stop offset="0.42" stop-color="#8a9bc8"/>
+      <stop offset="1" stop-color="#454e64"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="21.393" y1="29.088" x2="21.393" y2="35.245" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bfc8e1"/>
+      <stop offset="0.42" stop-color="#8a9bc8"/>
+      <stop offset="1" stop-color="#454e64"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="40.723" y1="18.981" x2="40.723" y2="34.515" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bfc8e1"/>
+      <stop offset="0.42" stop-color="#8a9bc8"/>
+      <stop offset="1" stop-color="#454e64"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="42.52" y1="14.16" x2="42.52" y2="19.69" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bfc8e1"/>
+      <stop offset="0.42" stop-color="#8a9bc8"/>
+      <stop offset="1" stop-color="#454e64"/>
+    </linearGradient>
+  </defs>
+  <title>w150</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#bceac5" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="sole_l" d="M28.331 40.71 C29.227 44.956 27.797 48.866 25.12 49.433 C22.443 50 19.555 47.02 18.645 42.76 C17.748 38.514 19.179 34.611 21.856 34.037 C24.526 33.47 27.421 36.451 28.331 40.71 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.923" stroke-linejoin="round"/>
+      <path id="toes_l" d="M22.265 29.125 C23.155 28.934 24.025 29.501 24.216 30.398 C24.228 30.449 24.236 30.501 24.242 30.552 C24.449 30.311 24.733 30.132 25.067 30.062 C25.871 29.89 26.669 30.411 26.847 31.215 C27.019 32.026 26.491 32.824 25.693 32.989 C24.882 33.16 24.085 32.646 23.913 31.835 C23.908 31.81 23.903 31.786 23.899 31.761 C23.669 32.052 23.338 32.269 22.944 32.356 C22.382 32.473 21.826 32.289 21.445 31.914 C21.289 32.531 20.797 33.039 20.135 33.18 C19.693 33.271 19.254 33.185 18.894 32.97 C18.95 33.085 18.994 33.208 19.021 33.338 C19.199 34.189 18.658 35.02 17.808 35.211 C16.957 35.389 16.12 34.842 15.942 33.998 C15.757 33.141 16.298 32.31 17.155 32.132 C17.541 32.047 17.928 32.115 18.251 32.295 L18.251 32.295 C18.18 32.16 18.125 32.012 18.091 31.855 C17.893 30.925 18.487 30.002 19.416 29.804 C20.018 29.681 20.616 29.882 21.015 30.292 C21.175 29.722 21.64 29.258 22.265 29.125 Z" fill="url(#linear-gradient-2)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+      <path id="sole_r" d="M45.566 27.774 C44.656 32.033 41.768 35.013 39.091 34.446 C36.414 33.873 34.984 29.969 35.88 25.723 C36.79 21.464 39.685 18.484 42.355 19.051 C45.032 19.624 46.463 23.527 45.566 27.774 Z" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="0.923" stroke-linejoin="round"/>
+      <path id="toes_r" d="M39.816 15.523 C40.014 14.593 40.924 14 41.86 14.198 C42.462 14.322 42.923 14.75 43.122 15.29 C43.5 14.83 44.109 14.597 44.735 14.725 C45.625 14.923 46.192 15.793 46.008 16.684 C45.996 16.737 45.981 16.789 45.965 16.84 C46.252 16.705 46.582 16.659 46.911 16.73 C47.722 16.895 48.243 17.692 48.065 18.503 C47.893 19.308 47.102 19.829 46.291 19.657 C45.48 19.486 44.966 18.681 45.137 17.884 C45.143 17.856 45.15 17.829 45.156 17.802 C44.829 17.976 44.441 18.04 44.049 17.956 C43.484 17.835 43.052 17.444 42.857 16.949 C42.46 17.447 41.804 17.708 41.142 17.567 C40.699 17.469 40.331 17.212 40.089 16.869 C40.093 16.998 40.082 17.131 40.054 17.264 C39.876 18.108 39.045 18.655 38.188 18.477 C37.344 18.292 36.797 17.455 36.975 16.611 C37.166 15.754 37.997 15.213 38.847 15.391 C39.236 15.476 39.56 15.695 39.78 15.99 C39.77 15.837 39.782 15.681 39.816 15.523 Z" fill="url(#linear-gradient-4)" stroke="#0a1118" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

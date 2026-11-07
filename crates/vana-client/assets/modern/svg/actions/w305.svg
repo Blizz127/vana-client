@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2f7be8"/>
+      <stop offset="0.7" stop-color="#2f7be8"/>
+      <stop offset="1" stop-color="#183e74"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#183e74"/>
+      <stop offset="1" stop-color="#183e74"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="30" y1="15" x2="30" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#b6d1f7"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="26.591" y1="25.036" x2="26.591" y2="36.041" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8db6f2"/>
+      <stop offset="0.42" stop-color="#2f7be8"/>
+      <stop offset="1" stop-color="#183e74"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="47" y1="39.5" x2="47" y2="54.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8a59c"/>
+      <stop offset="0.45" stop-color="#e5402d"/>
+      <stop offset="1" stop-color="#722016"/>
+    </linearGradient>
+  </defs>
+  <title>w305</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <path id="halo" d="M56.547 48.724 C55.833 52.701 52.701 55.833 48.724 56.547 C43.949 59.806 38.185 61.7 32 61.7 C15.597 61.7 2.3 48.403 2.3 32 C2.3 15.597 15.597 2.3 32 2.3 C48.403 2.3 61.7 15.597 61.7 32 C61.7 38.185 59.806 43.949 56.547 48.724 Z" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#b6d1f7" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="drop" d="M30 15 C33.897 21.819 40.228 27.176 40.228 34.482 C40.228 40.326 35.648 45 30 45 C24.352 45 19.772 40.326 19.772 34.482 C19.772 27.176 26.103 21.819 30 15 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="1.111" stroke-linejoin="round"/>
+      <path id="glint" d="M27.799 25.333 C28.228 24.924 28.905 24.94 29.314 25.368 C29.723 25.796 29.707 26.474 29.279 26.883 C27.251 28.817 25.713 31.365 25.713 34.969 C25.713 35.561 25.234 36.041 24.642 36.041 C24.05 36.041 23.571 35.561 23.571 34.969 C23.571 30.78 25.348 27.671 27.799 25.333 Z" fill="url(#linear-gradient-2)"/>
+      <circle id="badge_down" cx="47" cy="47" r="7.5" fill="url(#linear-gradient-3)" stroke="#0a1118" stroke-width="1.1" stroke-linejoin="round"/>
+      <path id="badge_down_mark" d="M47.277 51.911 L51.323 47.689 C51.476 47.529 51.421 47.4 51.2 47.4 L49.2 47.4 C48.979 47.4 48.8 47.221 48.8 47 L48.8 42.8 C48.8 42.579 48.621 42.4 48.4 42.4 L45.6 42.4 C45.379 42.4 45.2 42.579 45.2 42.8 L45.2 47 C45.2 47.221 45.021 47.4 44.8 47.4 L42.8 47.4 C42.579 47.4 42.524 47.529 42.677 47.689 L46.723 51.911 C46.876 52.071 47.124 52.071 47.277 51.911 Z" fill="#ffffff" stroke="#0a1118" stroke-width="0.8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="radial-gradient-1" cx="32" cy="26" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfae63"/>
+      <stop offset="0.7" stop-color="#cfae63"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <radialGradient id="radial-gradient-2" cx="32" cy="32" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6e5427"/>
+      <stop offset="1" stop-color="#6e5427"/>
+    </radialGradient>
+    <linearGradient id="linear-gradient-1" x1="32" y1="18.383" x2="32" y2="45.617" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7bf8a"/>
+      <stop offset="0.42" stop-color="#f08a2a"/>
+      <stop offset="1" stop-color="#784515"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient-3" cx="32" cy="32" r="19" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffbe0"/>
+      <stop offset="0.55" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f0a830"/>
+    </radialGradient>
+  </defs>
+  <title>w163</title>
+  <g id="Layer_1">
+    <g id="emblem">
+      <circle id="halo" cx="32" cy="32" r="29.7" fill="#0a1118"/>
+      <circle id="plate" cx="32" cy="32" r="27.5" fill="url(#radial-gradient-1)" stroke="#0a1118" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle id="socket" cx="32" cy="32" r="22" fill="url(#radial-gradient-2)" opacity="0.35"/>
+      <circle id="rim" cx="32" cy="32" r="24.8" fill="none" stroke="#fff6dc" opacity="0.5"/>
+      <ellipse id="sheen" cx="32" cy="14.5" rx="15" ry="5.5" fill="#ffffff" opacity="0.2"/>
+      <path id="ring" d="M18.383 32 C18.383 24.48 24.48 18.383 32 18.383 C39.52 18.383 45.617 24.48 45.617 32 C45.617 39.52 39.52 45.617 32 45.617 C24.48 45.617 18.383 39.52 18.383 32 Z M32 22.817 C26.929 22.817 22.817 26.929 22.817 32 C22.817 37.071 26.929 41.183 32 41.183 C37.071 41.183 41.183 37.071 41.183 32 C41.183 26.929 37.071 22.817 32 22.817 Z" fill="url(#linear-gradient-1)" stroke="#0a1118" stroke-width="0.993" stroke-linejoin="round"/>
+      <polygon id="cross" points="32,13 34.467,29.533 51,32 34.467,34.467 32,51 29.533,34.467 13,32 29.533,29.533" fill="url(#radial-gradient-3)" stroke="#0a1118" stroke-width="0.993" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

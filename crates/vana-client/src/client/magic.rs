@@ -578,9 +578,16 @@ pub(super) fn row_icon(w: &World, kind: Kind, id: u16) -> Option<(&'static str, 
     })
 }
 
-/// A spell's (or an ability record's) list icon, as the magic and ability lists draw it.
-pub fn list_icon_of(w: &World, spell: bool, id: u16) -> Option<(&'static str, usize)> {
-    row_icon(w, if spell { Kind::Magic } else { Kind::Ability }, id)
+/// A spell's or ability record's list picture, which picks the modern UI's art: the HD value (magiconw below 1000,
+/// magico2w from 1000), else (0xffff) the standard icon.
+pub fn picture(w: &World, kind: Kind, id: u16) -> Option<u16> {
+    let acts = w.actions.as_ref()?;
+    let (icon, hd) = match kind {
+        Kind::Magic => acts.spell(id).map(|r| (r.icon, r.icon_hd))?,
+        Kind::Ability => acts.abilities.get(id as usize).map(|a| (a.icon as u16, a.icon_hd))?,
+        Kind::Emote | Kind::Mount => return None,
+    };
+    Some(if hd == 0xffff { icon } else { hd })
 }
 
 pub(super) fn spell_name(w: &World, s: u16) -> String {
