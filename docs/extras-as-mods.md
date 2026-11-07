@@ -297,7 +297,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   with `lobby = true` now start in the lobby too (only folder mods did). Seen live: Lnxtest played from the title.
 - **Target Marker** (assets/mods/target-marker; Greed, customtarget): a ground ring under the target in a chosen
   colour and size (a band of four rings: draw lines are a pixel wide). Seen live under an NPC.
-- Not ported: Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
+- **Cast Grid** (assets/mods/cast-grid; Nostrum's cure grid, the click-to-cast parts of the party HUDs): over the
+  party list (above the chat window's full height in the modern UI), a row per party member with their name and a
+  button per chosen spell; a click casts it on them (`<me>` for us), unlearned or recasting spells dimmed. The rest of
+  the party HUD add-ons (HP / MP / TP, buffs) is the client's own party window. Seen live: the grid, a click casting.
+- Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
