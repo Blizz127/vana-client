@@ -40,28 +40,32 @@ fn bar_colour(left: f32) -> Color32 {
 /// Paints a row's icon: (section, group, row), its rect, the tint.
 pub(super) type IconPainter<'a> = dyn Fn(&egui::Painter, (usize, usize, usize), Rect, Color32) + 'a;
 
-/// The Timers window on a screen edge (edge_window): a heading that folds it (retail's drawer) to a tab; its sections
-/// fold (timers_body).
+/// An edge panel's layer held while nothing is drawn in it, as its built-in window held it: a layer that was not
+/// shown the frame before goes on top of the others when it shows (the mods start a few frames after the HUD).
+fn hold_layer(ctx: &egui::Context, name: &str) {
+    egui::Area::new(egui::Id::unique(("modern edge", name))).order(egui::Order::Middle).fixed_pos(pos2(-1.0e5, -1.0e5)).interactable(false).constrain(false).show(ctx, |_| {});
+}
+
+/// The Timers' sections, each an edge window of a mod's (the bundled Timers mod's panels timers_recasts,
+/// timers_buffs and timers_debuffs): its heading with the count folds it to a tab; the drawer in (/timers, T) folds
+/// all three.
 fn timers_panel(p: &mut Panels, w: &mut World) {
     let Some(gu) = p.gu else { return };
-    if !(w.extra_timers || !w.timers.mods.is_empty()) || hidden(w) {
+    if hidden(w) {
         return;
     }
-    let secs = timers::sections(w, gu);
-    if secs.iter().all(|s| s.iter().all(|g| g.rows.is_empty())) {
-        return;
-    }
+    let panels = w.lua.timers_panels();
+    let secs = if panels.iter().any(Option::is_some) { timers::sections(w, gu, panels) } else { Default::default() };
     let (m, ctx) = (p.m, p.ctx);
     let small = w.game.get(0x99) & 4 != 0;
     let t = 40.0 - (w.started.elapsed().as_secs_f32() * 60.0) % 40.0;
     let pulse = if t <= 20.0 { t } else { 40.0 - t } * 0.05;
-    let (out, folded) = (w.timers.out, w.timers.folded);
     let icon = |i: &Icon| match *i {
         Icon::Status(id) => m.status_icon(ctx, gu, small, id).map(|(t, uv)| (t, uv, Some(id))),
         Icon::List(lib, k) => m.sprite_icon(ctx, gu, lib, k).map(|t| (t, super::FULL_UV, None)),
         Icon::None => None,
     };
-    let icons: Vec<Vec<Vec<Option<(egui::TextureId, Rect, Option<u16>)>>>> = if out { secs.iter().map(|s| s.iter().map(|g| g.rows.iter().map(|r| icon(&r.icon)).collect()).collect()).collect() } else { Vec::new() };
+    let icons: Vec<Vec<Vec<Option<(egui::TextureId, Rect, Option<u16>)>>>> = secs.iter().map(|s| s.iter().map(|g| g.rows.iter().map(|r| icon(&r.icon)).collect()).collect()).collect();
     let paint = |painter: &egui::Painter, (k, gi, ri): (usize, usize, usize), r: Rect, tint: Color32| {
         if let Some(Some((t, uv, status))) = icons.get(k).and_then(|s| s.get(gi)).and_then(|g| g.get(ri)) {
             painter.image(*t, r, *uv, tint);
@@ -70,21 +74,47 @@ fn timers_panel(p: &mut Panels, w: &mut World) {
             }
         }
     };
-    let mut fold: Option<usize> = None;
-    // Clear of the menu's windows as the right edge's are (the item list grows over it on the left).
-    let toggle = edge_window(p, "timers", WIDTH, true, !out, "Timers", |ui, side, fixed| {
-        let toggle = flyout_header(ui, m, "Timers", side).clicked();
-        edge_body(ui, "timers", fixed, f32::INFINITY, |ui| fold = timers_body(ui, m, &secs, folded, pulse, &paint));
-        toggle
-    });
-    if toggle {
-        w.timers.toggle();
-        w.sounds.push(crate::audio::Ui::Cursor as u32);
+    for (k, key) in super::super::lua::TIMERS_PANELS.iter().enumerate() {
+        let n: usize = secs[k].iter().map(|g| g.rows.len()).sum();
+        let Some(win) = (n > 0).then(|| w.lua.edge_panel(key)).flatten() else {
+            hold_layer(ctx, key);
+            continue;
+        };
+        let folded = !w.timers.out || w.timers.folded & (1 << k) != 0;
+        let title = if win.title.is_empty() { SECTIONS[k].to_string() } else { win.title.clone() };
+        let heading = format!("{} ({n})", if win.heading.is_empty() { &title } else { &win.heading });
+        let toggle = edge_window(p, key, WIDTH, true, folded, &title, |ui, side, fixed| {
+            let toggle = flyout_header(ui, m, &heading, side).clicked();
+            ui.add_space(4.0);
+            edge_body(ui, key, fixed, f32::INFINITY, |ui| section_body(ui, m, &secs[k], k, pulse, &paint));
+            toggle
+        });
+        if toggle {
+            // A tab opened while the drawer is in opens alone.
+            if !w.timers.out {
+                w.timers.out = true;
+                w.timers.folded = 0b111;
+            }
+            w.timers.folded ^= 1 << k;
+            w.timers.dirty = true;
+            w.sounds.push(crate::audio::Ui::Cursor as u32);
+        }
     }
-    if let Some(k) = fold {
-        w.timers.folded ^= 1 << k;
-        w.timers.dirty = true;
-        w.sounds.push(crate::audio::Ui::Cursor as u32);
+}
+
+/// One section's groups: recasts as rows, the effects as cells by bearer (a name column as wide as the widest name,
+/// up to 38% of the window).
+fn section_body(ui: &mut Ui, m: &super::Modern, groups: &[Group], k: usize, pulse: f32, icon: &IconPainter) {
+    let font = FontId::proportional(m.theme.small);
+    let widest = groups.iter().filter(|g| !g.rows.is_empty()).filter_map(|g| g.name.as_ref()).map(|n| ui.ctx().fonts_mut(|f| f.layout_no_wrap(n.clone(), font.clone(), Color32::WHITE).size().x)).fold(0.0, f32::max);
+    let name_w = (widest + 2.0).min(ui.available_width() * 0.38);
+    for (gi, g) in groups.iter().enumerate().filter(|(_, g)| !g.rows.is_empty()) {
+        let at = |p: &egui::Painter, ri: usize, r: Rect, t: Color32| icon(p, (k, gi, ri), r, t);
+        if k == 0 {
+            group(ui, m, g, &at, pulse);
+        } else {
+            icon_group(ui, m, g, name_w, &at, pulse);
+        }
     }
 }
 
@@ -95,14 +125,13 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
     if hidden(w) {
         return;
     }
-    // A built-in panel's layer held while no mod's window is in it, as its built-in window held it: the mods start a
-    // few frames after the HUD, and a layer that was not shown the frame before goes on top of the others.
-    for name in super::super::lua::EDGE_PANELS {
+    // A built-in panel's layer held while no mod's window is in it (the timers' panels hold theirs in timers_panel).
+    for name in super::super::lua::EDGE_PANELS.iter().filter(|n| !n.starts_with("timers_")) {
         if w.lua.edge_panel(name).is_none() || w.lua.hides(name) {
-            egui::Area::new(egui::Id::unique(("modern edge", name))).order(egui::Order::Middle).fixed_pos(pos2(-1.0e5, -1.0e5)).interactable(false).constrain(false).show(p.ctx, |_| {});
+            hold_layer(p.ctx, name);
         }
     }
-    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge) {
+    for (mod_id, win) in w.lua.open_windows().into_iter().filter(|(_, x)| x.edge && !x.panel.as_deref().is_some_and(|n| n.starts_with("timers_"))) {
         if win.panel.as_deref().is_some_and(|n| w.lua.hides(n)) {
             continue;
         }

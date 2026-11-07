@@ -395,6 +395,7 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let e = w.elems.iter().find(|e| e.id() == Some(eid.as_str())).ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
             let t = lua.create_table()?;
             match e {
+                Elem::Timers { builtin, .. } => t.set("builtin", *builtin)?,
                 Elem::Text { text, .. } | Elem::Input { text, .. } => t.set("text", text.as_str())?,
                 Elem::Buttons { marked, .. } => t.set("at", marked.map(|m| m + 1))?,
                 Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => t.set("at", at + 1)?,
@@ -1606,6 +1607,16 @@ fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
         "choice" => Elem::Choice { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(), at: index("at")?.unwrap_or(0) },
         "colour" | "color" => Elem::Colour { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), value: super::hud::colour(t.get("value")?)?.unwrap_or([255; 4]), alpha: t.get::<Option<bool>>("alpha")?.unwrap_or(false) },
         "section" => Elem::Section { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), open: t.get::<Option<bool>>("open")?.unwrap_or(true) },
+        "timers" => Elem::Timers {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            section: match t.get::<Option<String>>("section")?.as_deref() {
+                None | Some("recasts") => 0,
+                Some("buffs") => 1,
+                Some("debuffs") => 2,
+                Some(s) => return Err(mlua::Error::runtime(format!("timers section {s:?}: recasts, buffs or debuffs"))),
+            },
+            builtin: t.get::<Option<bool>>("builtin")?.unwrap_or(true),
+        },
         "gauge" => Elem::Gauge {
             id: t.get::<Option<String>>("id")?.unwrap_or_default(),
             label: t.get::<Option<String>>("label")?.unwrap_or_default(),
@@ -1658,6 +1669,9 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
             if t.contains_key("columns")? { *c = columns(t.get("columns")?)?; }
             if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
             if let Some(v) = t.get::<Option<usize>>("height")? { *height = v.max(1); }
+        }
+        Elem::Timers { builtin, .. } => {
+            if let Some(v) = t.get::<Option<bool>>("builtin")? { *builtin = v; }
         }
         Elem::Gauge { label, value, text, kind, dim, .. } => {
             if let Some(v) = t.get::<Option<bool>>("dim")? { *dim = v; }

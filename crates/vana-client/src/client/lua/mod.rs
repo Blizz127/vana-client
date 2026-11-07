@@ -492,9 +492,12 @@ macro_rules! bundled {
     };
 }
 /// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
-pub(in crate::client) const EDGE_PANELS: [&str; 1] = ["regime"];
+pub(in crate::client) const EDGE_PANELS: [&str; 4] = ["regime", "timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime"];
+/// The timers' sections' panels, in section order.
+pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
+
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -1494,6 +1497,14 @@ impl Host {
     /// A built-in panel's slot a mod fills (ui.native.slot).
     pub(in crate::client) fn slot(&self, name: &str) -> Option<serde_json::Value> {
         self.info.borrow().slots.get(name).map(|s| s.1.clone())
+    }
+
+    /// The timers' sections shown: per section, whether its panel's window is open, and with the client's own rows.
+    pub(in crate::client) fn timers_panels(&self) -> [Option<bool>; 3] {
+        TIMERS_PANELS.map(|p| {
+            let win = self.edge_panel(p).filter(|_| !self.hides(p))?;
+            Some(win.elems.iter().any(|e| matches!(e, window::Elem::Timers { builtin: true, .. })))
+        })
     }
 
     /// The open edge window standing in for a built-in panel (the newest mod's).

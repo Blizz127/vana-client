@@ -135,6 +135,19 @@ A bar filled from 0 to 1, with a label and a text. It is not a cursor stop.
 | `style` | `string` | none | `"row"`: a list row, as the training regime window's: the label at the left, the text at the right, a thin bar under them (a `value` of 0 or less: no bar fill, the bar dim). |
 | `dim` | `boolean` | `false` | A `row` drawn dim, as a finished one is. |
 
+### timers
+
+A section of the client's timers, drawn as the Timers draw it: recasts as rows with their bars, effects as icon cells
+by who bears them. It shows in an edge window standing in for that section's panel (`panel = "timers_recasts"` and so
+on); in the classic UI the three panels make the one Timers window with three sections. It is not a cursor stop, and
+an edge window whose sections are empty is not drawn.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | `""` | Optional. |
+| `section` | `string` | `"recasts"` | `"recasts"`, `"buffs"` or `"debuffs"`. |
+| `builtin` | `boolean` | `true` | The client's own rows too (our recasts and effects, the effects we put on others); the mods' [`timers.add`](timers.md) rows show either way. |
+
 ### separator
 
 A gap between elements (the modern UI draws a line). It has no fields besides `type`, and no id.
@@ -377,7 +390,7 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `edge` | `boolean` | `false` | An edge window, drawn as the Timers and the training regime windows are: on a screen edge (in the modern UI the player drags it along the edges), folding to a tab that shows `title`, with `heading` as a line over the elements; a click on that line folds it. It is a HUD window: it never takes the keys. |
 | `heading` | `string` | the title | An edge window's line over its elements. |
 | `resize` | `boolean` | `false` | An edge window the player can make wider (modern UI). |
-| `panel` | `string` | none | `"regime"`: the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows. |
+| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"` or `"timers_debuffs"`: the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows. |
 
 **Returns** nothing.
 

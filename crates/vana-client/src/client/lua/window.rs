@@ -103,6 +103,9 @@ pub enum Elem {
     Colour { id: String, label: String, value: [u8; 4], alpha: bool },
     /// A heading that folds what is under it (to the next section or tabs).
     Section { id: String, label: String, open: bool },
+    /// One section of the client's timers (0 recasts, 1 buffs, 2 debuffs): the mods' timers.add rows, and with
+    /// `builtin` the client's own (our recasts and effects, the effects we put on others), drawn as the Timers draw them.
+    Timers { id: String, section: usize, builtin: bool },
     /// A region `w` x `h` the mod draws in (local units: classic pixels, modern points); a click sends where.
     Canvas { id: String, w: f32, h: f32, cmds: Vec<Cmd> },
 }
@@ -128,7 +131,7 @@ pub struct Meta {
 
 impl Elem {
     pub fn stop(&self) -> bool {
-        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. })
+        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. } | Elem::Timers { .. })
     }
 
     pub fn id(&self) -> Option<&str> {
@@ -142,7 +145,7 @@ impl Elem {
             | Elem::Colour { id, .. }
             | Elem::Section { id, .. }
             | Elem::Canvas { id, .. } => Some(id),
-            Elem::Text { id, .. } | Elem::Gauge { id, .. } if !id.is_empty() => Some(id),
+            Elem::Text { id, .. } | Elem::Gauge { id, .. } | Elem::Timers { id, .. } if !id.is_empty() => Some(id),
             _ => None,
         }
     }
@@ -920,6 +923,8 @@ impl Window {
             return 0.0;
         }
         match &self.elems[i] {
+            // The Timers' panels draw their sections (timers.rs, modern/extras.rs).
+            Elem::Timers { .. } => 0.0,
             Elem::Text { .. } => LINE,
             Elem::Buttons { .. } | Elem::Slider { .. } | Elem::Input { .. } | Elem::Choice { .. } => PITCH,
             Elem::List { height, columns, .. } => LINE * (*height + usize::from(has_header(columns))) as f32 + 6.0,
@@ -964,6 +969,7 @@ impl Window {
             }
             let here = self.focus && i == self.at;
             match e {
+                Elem::Timers { .. } => {}
                 Elem::Text { text, dim, colour, .. } => {
                     gu.text_fit(text, x + 20.0, ey, w - 40.0, colour.map_or(if *dim { DIM } else { N }, tint));
                 }

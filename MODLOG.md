@@ -13648,6 +13648,14 @@ From the research notes:
 - Not retail: the user's Ashita "Timers" add-on built in (Extras rows Timers and Timers Position; /timers [in | out]).
   client/timers.rs (rows, the window, the drawer, the tracking), client/durations.rs (LSB's lengths), tables
   data/timers/*.tsv made from LSB's scripts and data (ids and numbers only).
+- Since 2026-11-06 the windows are the bundled Timers mod's (assets/mods/timers): three edge windows, panels
+  timers_recasts / timers_buffs / timers_debuffs, each with a `timers` element for its section (the user, 2026-11-06:
+  three windows so /uimodes shows and hides each). The tracking stays the client's (timers.rs, durations.rs); an
+  element's `builtin` (the mod's setting, config `timers` carried over) adds the client's own rows, the mods'
+  timers.add rows show either way. The modern UI draws one edge window per section (its heading with the count folds
+  it; the drawer in folds all three; config timers_out / timers_folded keep the folds), the recasts' window in the one
+  window's saved place, modes and pins that named "timers" naming the three; the classic UI keeps the one window with
+  three sections, drawn from the panels that are open.
 - Retail's charge abilities (/recast's "[%s] %s (%d)", now done too): FUN_10222c90 maps an ability (or the sub-list
   row opening it, record +0xe 9 / 0xf / 0x12, via FUN_10222c10) by its kind (+2): 9 Quick Draw (COR main or sub;
   2 charges from level 0x28; full 0x78 s), 0xf Stratagems (SCH main or sub; (level - 10) / 0x14 + 1; full 0xf0 s),

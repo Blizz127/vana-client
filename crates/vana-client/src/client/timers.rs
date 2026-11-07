@@ -833,7 +833,9 @@ fn applied_rows(b: &Bearer, now: Instant) -> Vec<Row> {
 }
 
 /// The sections' groups: recasts; us, then others by party order, then the rest; monsters, ours targeted first.
-pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
+/// The sections as their panels show them: `builtin` per section the client's own rows, the mods' rows always; a
+/// section whose panel is not open is empty.
+pub fn sections(w: &mut World, gu: &GameUi, panels: [Option<bool>; 3]) -> [Vec<Group>; 3] {
     let now = Instant::now();
     maintain(w);
     let me = w.my_id;
@@ -858,9 +860,18 @@ pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
     mobs.sort_by_key(|(id, b)| (Some(**id) != w.target, b.effects.iter().map(|e| e.start).max().map(std::cmp::Reverse), b.name.clone()));
     let debuffs = mobs.into_iter().map(|(_, b)| Group { name: Some(b.name.clone()), rows: applied_rows(b, now) }).collect();
     let recasts = if recasts.is_empty() { Vec::new() } else { vec![Group { name: None, rows: recasts }] };
-    // With the Extra off only the mods' timers show.
-    let mut secs = if w.extra_timers { [recasts, buffs, debuffs] } else { Default::default() };
+    let mut secs = [recasts, buffs, debuffs];
+    for (k, s) in secs.iter_mut().enumerate() {
+        if panels[k] != Some(true) {
+            s.clear();
+        }
+    }
     mod_rows(w, now, &mut secs);
+    for (k, s) in secs.iter_mut().enumerate() {
+        if panels[k].is_none() {
+            s.clear();
+        }
+    }
     secs
 }
 
@@ -1134,10 +1145,11 @@ pub fn prepare(gu: &GameUi, w: &mut World, sw: f32, sh: f32, foot: f32) {
     let step = dt * 60.0 / SLIDE_TICKS;
     w.timers.slide = if w.timers.out { (w.timers.slide + step).min(1.0) } else { (w.timers.slide - step).max(0.0) };
     w.timers.frame = None;
-    if !(w.extra_timers || !w.timers.mods.is_empty()) || super::event::active(w) || w.map.is_some() || w.cnq.is_some() {
+    let panels = w.lua.timers_panels();
+    if panels.iter().all(Option::is_none) || super::event::active(w) || w.map.is_some() || w.cnq.is_some() {
         return;
     }
-    let secs = sections(w, gu);
+    let secs = sections(w, gu, panels);
     let place = base_place(gu, w, sw, sh, foot);
     let t = 40.0 - (w.started.elapsed().as_secs_f32() * 60.0) % 40.0;
     let pulse = if t <= 20.0 { t } else { 40.0 - t } * 0.05;

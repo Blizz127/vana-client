@@ -22,7 +22,7 @@ pub enum Mode {
 pub const MODES: [(Mode, &str); 3] = [(Mode::Exploration, "Exploration"), (Mode::Combat, "Combat"), (Mode::Management, "Management")];
 
 /// The panels a mode may hide (panel id, name). Windows the player opens are never hidden.
-pub const PANELS: [(&str, &str); 11] = [
+pub const PANELS: [(&str, &str); 13] = [
     ("status", "Status icons"),
     ("party", "Party"),
     ("alliance1", "Alliance 1"),
@@ -31,7 +31,9 @@ pub const PANELS: [(&str, &str); 11] = [
     ("where", "Location"),
     ("cast", "Cast bar"),
     ("minimap", "Minimap"),
-    ("timers", "Timers"),
+    ("timers_recasts", "Recasts"),
+    ("timers_buffs", "Buffs"),
+    ("timers_debuffs", "Debuffs"),
     ("regime", "Training"),
     ("skillchains", "Skillchains"),
 ];

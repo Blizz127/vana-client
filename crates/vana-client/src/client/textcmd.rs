@@ -638,7 +638,7 @@ pub(super) fn run_unfiltered(w: &mut World, line: &str, mode: Mode) {
     let line = if line.starts_with('/') { line.to_string() } else { format!("{}{line}", w.chat_prefix) };
     let first = line.split([' ', '\t']).next().unwrap_or("");
     // Ours (Extras, not retail): /timers [in | out] slides the timers window's drawer; alone it toggles.
-    if first.eq_ignore_ascii_case("/timers") && w.extra_timers {
+    if first.eq_ignore_ascii_case("/timers") && w.lua.timers_panels().iter().any(Option::is_some) {
         match line.split_whitespace().nth(1).map(str::to_ascii_lowercase).as_deref() {
             Some("in") if w.timers.out => w.timers.toggle(),
             Some("out") if !w.timers.out => w.timers.toggle(),

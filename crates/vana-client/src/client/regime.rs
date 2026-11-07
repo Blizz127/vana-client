@@ -173,7 +173,7 @@ pub fn prepare(gu: &GameUi, w: &mut World, base: Place) {
     if r.rows.is_empty() {
         return;
     }
-    let timers = if w.extra_timers { w.timers.rect() } else { None };
+    let timers = w.timers.rect();
     w.regime.frame = Some((r, place_by(base, timers)));
 }
 

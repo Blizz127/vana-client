@@ -2355,7 +2355,7 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                 egui::Key::E if modifiers.ctrl || modifiers.alt => items::open_equipment(world),
                 egui::Key::I if modifiers.ctrl || modifiers.alt => items::open_items(world),
                 // Ours (Extras): plain T slides the Timers out or in, with no window open (Ctrl / Alt + T is /tell).
-                egui::Key::T if !modifiers.ctrl && !modifiers.alt && world.extra_timers && world.win.is_none() && world.menu.is_none() && world.config.is_none() && world.settings.is_none() => {
+                egui::Key::T if !modifiers.ctrl && !modifiers.alt && world.lua.timers_panels().iter().any(Option::is_some) && world.win.is_none() && world.menu.is_none() && world.config.is_none() && world.settings.is_none() => {
                     world.timers.toggle();
                     world.sounds.push(crate::audio::Ui::Cursor as u32);
                 }
@@ -6750,8 +6750,6 @@ struct World {
     /// Each 0x119 timer's Calc1 / Calc2 (the charge shares' adjustments).
     ability_calc: HashMap<u16, (u8, i16)>,
     recasts_seen: bool,
-    /// Extras: the Timers window (on, dock) and its state.
-    extra_timers: bool,
     /// Config `skillchain_helper` (extra).
     extra_skillchain: bool,
     /// Extra: the minimap (client/minimap.rs), its map, its rect this frame, its config and an unsaved zoom.
@@ -6779,6 +6777,7 @@ struct World {
     inv_free: Option<u32>,
     sort_hold: bool,
     sort_wait: f32,
+    /// The Timers' classic dock and their state (the bundled Timers mod's windows).
     timers_dock: u32,
     timers: timers::Timers,
     regime: regime::Tracker,
@@ -7535,7 +7534,6 @@ impl App {
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
-            w.extra_timers = self.cfg.timers;
             w.extra_skillchain = self.cfg.skillchain_helper;
             w.timers_dock = self.cfg.timers_dock;
             (w.extra_minimap, w.minimap_dock, w.minimap_size) = (self.cfg.minimap, self.cfg.minimap_dock, self.cfg.minimap_size);
@@ -8765,7 +8763,6 @@ impl App {
                             spell_total: HashMap::new(),
                             ability_total: HashMap::new(),
                             ability_calc: HashMap::new(),
-                            extra_timers: self.cfg.timers,
                             extra_skillchain: self.cfg.skillchain_helper,
                             extra_minimap: self.cfg.minimap,
                             minimap: None,

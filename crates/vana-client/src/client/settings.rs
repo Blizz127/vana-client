@@ -26,7 +26,6 @@ pub struct Settings {
     pub actor_shadows: u32,
     pub shadow_map: u32,
     pub ssao: bool,
-    pub timers: bool,
     pub timers_dock: u32,
     pub skillchain_helper: bool,
     pub minimap: bool,
@@ -70,7 +69,6 @@ impl Settings {
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
             ssao: c.ssao,
-            timers: c.timers,
             timers_dock: c.timers_dock,
             skillchain_helper: c.skillchain_helper,
             minimap: c.minimap,
@@ -111,7 +109,6 @@ impl Settings {
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
         c.ssao = self.ssao;
-        c.timers = self.timers;
         c.timers_dock = self.timers_dock;
         c.skillchain_helper = self.skillchain_helper;
         c.minimap = self.minimap;
@@ -162,7 +159,6 @@ enum Val {
     ActorShadows,
     ShadowMap,
     Ssao,
-    Timers,
     TimersDock,
     Skillchains,
     Minimap,
@@ -334,14 +330,12 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
-    const TIMERS_ROW: SRow = row("Timers", "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers).", Timers, OFF_ON, Now);
     const SKILLCHAIN_ROW: SRow = row("Skillchain Helper", "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.", Skillchains, OFF_ON, Now);
     const TIMERS: &[SRow] = &[
-        TIMERS_ROW,
         row("Timers Position", "Docks the timers window on the left, on the right above the party list, or at the top.", TimersDock, &[(0, "Left"), (1, "Right"), (2, "Top")], Now),
         SKILLCHAIN_ROW,
     ];
-    const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, SKILLCHAIN_ROW];
+    const TIMERS_MODERN: &[SRow] = &[SKILLCHAIN_ROW];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[];
     const EXTRA_MISC: &[SRow] = &[];
@@ -545,7 +539,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
             Val::Ssao => self.s.ssao as u32,
-            Val::Timers => self.s.timers as u32,
             Val::Skillchains => self.s.skillchain_helper as u32,
             Val::TimersDock => self.s.timers_dock,
             Val::Minimap => self.s.minimap as u32,
@@ -581,7 +574,6 @@ impl SettingsUi {
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
             Val::Ssao => self.s.ssao = x != 0,
-            Val::Timers => self.s.timers = x != 0,
             Val::Skillchains => self.s.skillchain_helper = x != 0,
             Val::TimersDock => self.s.timers_dock = x,
             Val::Minimap => self.s.minimap = x != 0,
@@ -1724,15 +1716,11 @@ mod tests {
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.minimap_dock, 1);
-        // Timers: Timers Position (Left / Right / Top): the right dock; then the timers on.
-        ui.goto(1, 2);
+        // Timers: Timers Position (Left / Right / Top): the right dock.
+        ui.goto(1, 1);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.timers_dock, 1);
-        ui.key(egui::Key::ArrowUp);
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.timers);
     }
 
     /// Settings: Left / Right turn the page on a slider row, move between buttons on a buttons row, and always turn

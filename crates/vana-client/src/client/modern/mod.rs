@@ -602,7 +602,7 @@ const BOTTOM: [&str; 2] = ["chat", "party"];
 /// keep left of it; the edge windows stay put under it.
 const COLUMN: [&str; 3] = ["command", "command sub", "window"];
 /// The windows on a screen edge (extras.rs edge_window): they slide along it, so nothing docks on them.
-const EDGE: [&str; 4] = ["timers", "minimap", "widescan", "regime"];
+const EDGE: [&str; 7] = ["timers", "minimap", "widescan", "regime", "timers_recasts", "timers_buffs", "timers_debuffs"];
 
 impl Dock {
     /// The side of the panel it sits on that `dx` counts from.
@@ -643,6 +643,8 @@ fn default_place(id: &str) -> Place {
         "countdown" => at(0.02, 0.28),
         "objective" => at(0.02, 0.35),
         "timers" => at(0.0, 0.2187),
+        // The Timers' three windows down the same edge (the recasts where the one window was).
+        "timers_recasts" => at(0.0, 0.2187),
         // The training regime lower on the same edge.
         "regime" => at(0.0, 0.6),
         // The skillchain helper on the right edge, under the minimap.
@@ -937,7 +939,19 @@ impl<'a> Panels<'a> {
     /// A panel's place: the saved one, else its default (a bottom-placed panel saved before it had one keeps the
     /// default bottom).
     fn place(&self, id: &str) -> Place {
-        let mut p = self.layout.get(id).cloned().or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id));
+        // The recasts' window takes the one Timers window's saved place, the buffs' and debuffs' windows steps under it
+        // (its sections' order) until they are moved.
+        let below = |k: f32| {
+            let r = self.place("timers_recasts");
+            Place { y: r.y + 0.12 * k, ..r }
+        };
+        let saved = self.layout.get(id).cloned().or_else(|| match id {
+            "timers_recasts" => self.layout.get("timers").cloned(),
+            "timers_buffs" => Some(below(1.0)),
+            "timers_debuffs" => Some(below(2.0)),
+            _ => None,
+        });
+        let mut p = saved.or_else(|| self.retail.get(id).cloned()).unwrap_or_else(|| default_place(id));
         // A dock on an edge window (saved before they refused them) gives way to the place itself.
         if p.dock.as_ref().is_some_and(|d| EDGE.contains(&d.to.as_str())) {
             p.dock = None;

@@ -186,6 +186,8 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
         let here = win.focus && i == win.at;
         let top = ui.cursor().min.y;
         match e {
+            // The Timers' panels draw their sections (extras.rs).
+            Elem::Timers { .. } => {}
             Elem::Text { text, dim, colour, .. } => {
                 ui.label(RichText::new(text).size(m.theme.small).color(colour.map_or(if *dim { muted } else { text_c }, rgba)));
                 ui.add_space(4.0);

@@ -90,6 +90,13 @@ Done so far (checked live, Lnxcsfix):
   over into storage. The modern layer keeps the panel's egui layer shown (empty) until the mod's window is in it, so it
   stacks under the HUD panels as the built-in did (a layer first shown later goes on top). Compared with master in
   both UIs (the same kept regime); seen live at a Field Manual: accept, Review, cancel.
+- **Timers** (assets/mods/timers): three edge windows (panels timers_recasts, timers_buffs, timers_debuffs; the user:
+  so /uimodes controls each), each with a `timers` element for its section. The tracking and LSB's durations stay the
+  client's engine (timers.rs, durations.rs); the element's `builtin` (the mod's setting) adds its rows, the mods'
+  timers.add rows show either way. The modern UI: a window per section, its heading with the count folds it, the
+  drawer (/timers, T) folds all three, the recasts' window in the old window's saved place and the others under it,
+  mode presets that named "timers" name the three. The classic UI keeps the one window with three sections:
+  compared with master, the same.
 
 ### Edge windows
 

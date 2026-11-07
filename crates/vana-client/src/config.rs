@@ -215,9 +215,8 @@ pub struct Config {
     /// config from before the notes has none, so its first newer build shows that build's own.
     #[serde(default)]
     pub notes_seen: String,
-    /// Extra (the Timers add-on): the timers window, its dock (0 left, 1 right, 2 top), its drawer out, folded
-    /// sections (a bit each).
-    pub timers: bool,
+    /// The Timers (the bundled Timers mod's windows): the classic window's dock (0 left, 1 right, 2 top), its drawer
+    /// out, folded sections (a bit each; the modern UI's three windows' folds).
     pub timers_dock: u32,
     pub timers_out: bool,
     pub timers_folded: u8,
@@ -316,6 +315,17 @@ pub struct ModernModes {
     pub hidden: [Vec<String>; 3],
     pub pinned: Vec<String>,
     pub fades: bool,
+}
+
+impl ModernModes {
+    /// The one Timers window became three (recasts, buffs, debuffs): a mode or pin that named it names them.
+    pub fn split_timers(&mut self) {
+        for list in self.hidden.iter_mut().chain(std::iter::once(&mut self.pinned)) {
+            if let Some(k) = list.iter().position(|p| p == "timers") {
+                list.splice(k..=k, ["timers_recasts", "timers_buffs", "timers_debuffs"].map(String::from));
+            }
+        }
+    }
 }
 
 impl Default for ModernModes {
@@ -446,7 +456,6 @@ impl Default for Config {
             actor_shadows: 0,
             shadow_map: 2048,
             ssao: false,
-            timers: false,
             timers_dock: 0,
             timers_out: true,
             timers_folded: 0,
@@ -520,6 +529,7 @@ impl Config {
         if c.logins.is_empty() && !c.server.trim().is_empty() && !c.username.trim().is_empty() {
             c.remember_login();
         }
+        c.modern_modes.split_timers();
         c
     }
 
