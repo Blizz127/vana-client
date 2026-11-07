@@ -330,7 +330,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Window Placement** (assets/mods/window-placement; position_manager, WinControl, affinity and kin): `//winpos save`
   keeps the character's window size (and place where the system tells it; not on Wayland), restored at the next
   login; Always on Top; Priority. Seen live: the save and forget; the restore not tried (it would move the window).
-- Not ported: Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
+- **Range Rings** (assets/mods/range-rings; DistancePlus's rings, magiccircle, songcast): ground rings around us at
+  chosen radii (default 6, 10, 20 yalms), optionally around the target at the first; bands of three rings so they
+  read. Seen live in Southern San d'Oria. Not yet: geomancy bubbles, avatar Favor, hitboxes.
+- Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
