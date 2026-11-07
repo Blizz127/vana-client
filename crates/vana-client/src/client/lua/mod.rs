@@ -29,7 +29,7 @@ pub(in crate::client) use state::Placed;
 
 use super::World;
 use crate::dat::battle::Who;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use vm::Vm;
 
 /// What a mod asked the client to do, applied after the mod phase.
@@ -602,6 +602,21 @@ fn data_dir() -> PathBuf {
         Some(p) => PathBuf::from(p).with_file_name("mod-data"),
         None => crate::config::data_dir().join("mod-data"),
     }
+}
+
+/// The folder in `mods` of the mod `id` names: the folder of that name, else the one whose manifest has that id.
+fn folder_of(mods: &Path, id: &str) -> PathBuf {
+    let named = mods.join(id);
+    if named.join("mod.toml").is_file() {
+        return named;
+    }
+    std::fs::read_dir(mods)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| manifest::read(p).is_ok_and(|m| m.id == id))
+        .unwrap_or(named)
 }
 
 /// The mods' folders; a test run's own (`mods` beside its FFXI_CONFIG copy) when it has one, so test mods never sit
@@ -4194,6 +4209,25 @@ return "acxml flow ok"
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// The Mods page's on/off names a mod by its folder, which need not be its manifest id: either finds it.
+    #[test]
+    fn mods_named_by_folder_or_id() {
+        let base = std::env::temp_dir().join(format!("vana-lua-named-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("my-folder")).unwrap();
+        std::fs::write(base.join("my-folder/mod.toml"), "id = \"the-id\"\n").unwrap();
+        assert_eq!(folder_of(&base, "my-folder"), base.join("my-folder"));
+        assert_eq!(folder_of(&base, "the-id"), base.join("my-folder"));
+        let mut host = Host::default();
+        let dir = base.join("my-folder");
+        let m = manifest::Manifest { id: "the-id".into(), ..Default::default() };
+        host.vms.push(Vm::new(m, dir.clone(), vm::Source::Dir(dir)).unwrap());
+        assert_eq!(host.named("my-folder"), Some(0));
+        assert_eq!(host.named("the-id"), Some(0));
+        assert_eq!(host.named("other"), None);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     /// A /lua line as the host reads one, whatever its spaces, slashes or case.
     #[test]
     fn lua_lines() {
@@ -4774,13 +4808,20 @@ impl Host {
         pages
     }
 
+    /// The loaded mod `id` names: the Mods page names a mod by its folder, the rest by its manifest id, and the two
+    /// may differ (a manifest's id is its own); the folder first.
+    fn named(&self, id: &str) -> Option<usize> {
+        let by_folder = self.vms.iter().position(|v| v.dir.file_name().is_some_and(|f| f == id));
+        by_folder.or_else(|| self.vms.iter().position(|v| v.manifest.id == id))
+    }
+
     /// A setting changed on its Extras page: kept, written to its scope's file, and `settings_changed` sent.
     pub(super) fn apply_setting(&mut self, w: &World, id: &str, key: &str, value: serde_json::Value) {
         if key == ENABLED {
-            let k = self.vms.iter().position(|v| v.manifest.id == id);
+            let k = self.named(id);
             match (value.as_bool() == Some(true), k) {
                 (true, None) => {
-                    if let Err(e) = self.load_named(Some(w), id) {
+                    if let Err(e) = self.load(Some(w), folder_of(&mods_dir(), id)) {
                         log::warn!("lua mod {id}: {e}");
                     }
                 }
