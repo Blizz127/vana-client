@@ -427,6 +427,12 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   last one who wrote); `//chatfind <words>` lists this session's log lines with them. The tabs, the full log and a
   second log window are the client's own. Seen live: the Say window with the bots' lines, an answer sent from it and
   kept in it, a search.
+- **Multibox Control** (assets/mods/multibox; send, SubTarget, switch_focus, stna, chatPorter, MultiSend, Servo and kin):
+  across the game windows on this machine, on the player's input: `//send <name | all | others> <command>`,
+  `//sendtarget [name]` (our target for theirs), `//focus <name>` (that window takes the keys), `//stna [name]` (that
+  window casts the -na spell for the party's worst ailment it can remove, Erase for the rest), and tells relayed into
+  the other windows' logs (a setting). A Rust test routes each through ipc; seen live in one window (`//send all`
+  running here, `//stna` with nothing to remove). Not tried with two windows (one account signs in one character).
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
