@@ -554,6 +554,11 @@ function ui.native.panels() end
 ---@return boolean
 function ui.native.hidden(piece) end
 
+--- Leaves rows out of a game list while the mod is loaded (both UIs, the list search too): the magic list (spell ids), the ability lists (res.ability ids) or the mount list (mount ids); nil or an empty list gives them back. Using them by command or macro is unchanged. Needs ui.native.
+---@param list string 'magic', 'abilities' or 'mounts'
+---@param ids integer[]? 
+function ui.native.trim(list, ids) end
+
 --- Colours an item's name in the game's shop and auction house lists while the mod is loaded ({r, g, b, a} 0..255; nil gives the game's colour back).
 ---@param item integer 
 ---@param colour table? 

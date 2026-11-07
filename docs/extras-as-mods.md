@@ -462,6 +462,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   boxes: centre, size, yaw, the floor's corners; dat::zone Region::corners, tested against its containment). The box
   reaches below the street, so the outline is drawn at our feet' height while that is within the box. Seen live at
   Southern San d'Oria's east gate.
+- **List Trimmer** (assets/mods/list-trimmer; trimspells, HideActions): `//trim <spell, ability or mount>` leaves it
+  out of its game list (again: puts it back), list, clear; kept per character. New `ui.native.trim(list, ids)`: rows
+  left out of the magic, ability and mount lists as they are shown and searched (the skillchain helper and the
+  suggestions still see them; commands and macros still use them). Seen live (the user): the Mounts list with Raptor
+  left out.
 
 ### Built-ins that are not retail (the user, 2026-11-07)
 

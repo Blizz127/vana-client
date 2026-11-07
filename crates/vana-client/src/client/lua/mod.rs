@@ -526,6 +526,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "action-panel",
     "map-notes",
     "exit-markers",
+    "list-trimmer",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -668,6 +669,7 @@ impl Host {
             info.models_ver += 1;
         }
         info.item_tints.retain(|_, t| t.0 != vm.manifest.id);
+        info.trimmed.retain(|k, _| k.0 != vm.manifest.id);
         info.shaders.retain(|s| s.0 != vm.manifest.id);
         drop(info);
         self.filters_dirty = true;
@@ -1640,6 +1642,11 @@ impl Host {
         if let Some(vm) = self.vms.iter().find(|v| v.manifest.id == mod_id) {
             vm.st.borrow_mut().notices.push(format!("render.shader {id}: {e}"));
         }
+    }
+
+    /// Whether a mod leaves this row out of a game list (0 magic, 1 abilities, 2 mounts).
+    pub(in crate::client) fn trimmed(&self, list: u8, id: u16) -> bool {
+        self.info.borrow().trimmed.iter().any(|(k, ids)| k.1 == list && ids.contains(&id))
     }
 
     /// A mod's colour for an item's name in the game's lists (shops, the auction house).

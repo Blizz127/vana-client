@@ -38,6 +38,7 @@ end)
 | [`ui.native.rect(panel)`](#uinativerect) | Where a modern panel is on screen. |
 | [`ui.native.panels()`](#uinativepanels) | Every modern panel a mod may name, with where it is. |
 | [`ui.native.item_colour(item, colour?)`](#uinativeitem_colour) | Colours an item's name in shop and auction house lists. |
+| [`ui.native.trim(list, ids?)`](#uinativetrim) | Leaves spells, abilities or mounts out of the game's lists. |
 | [`ui.native.config(id)`](#uinativeconfig) | Reads a game config value. |
 | [`ui.native.set_config(id, value)`](#uinativeset_config) | Sets a game config value, as the Config window does. |
 
@@ -582,6 +583,39 @@ end
 ```
 
 The colours go away when your mod unloads.
+
+## `ui.native.trim`
+
+```lua
+ui.native.trim(list, ids?)
+```
+
+Leaves rows out of one of the game's lists while your mod is loaded, in both UIs and in the list search: spells you
+never cast, abilities you never use, mounts you never ride. Only the lists change: a command or macro still uses them.
+Each call replaces your mod's rows for that list; `nil` or an empty table gives them all back. Rows left out by any
+mod stay out.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `list` | `string` | yes | `"magic"` (spell ids), `"abilities"` (ids as `res.ability` takes them: weapon skills, job abilities, pet commands) or `"mounts"` (mount ids, as `res.mount`). |
+| `ids` | `integer[]` | no | The rows to leave out. |
+
+**Returns** nothing.
+
+**Needs** the `ui.native` permission.
+
+**Errors** `no list "<name>" (magic, abilities, mounts)`.
+
+**Example**
+
+```lua
+-- Raise and Raise II out of the magic list.
+ui.native.trim("magic", { 12, 13 })
+```
+
+The lists open whole again when your mod unloads.
 
 ## `ui.native.config`
 

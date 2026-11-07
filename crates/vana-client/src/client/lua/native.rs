@@ -324,6 +324,29 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             Ok(())
         })?,
     )?;
+    let me = mod_id.to_string();
+    t.set(
+        "trim",
+        lua.create_function(move |lua, (list, ids): (String, Option<Vec<u16>>)| {
+            let k = match list.as_str() {
+                "magic" => 0,
+                "abilities" => 1,
+                "mounts" => 2,
+                o => return Err(mlua::Error::runtime(format!("no list {o:?} (magic, abilities, mounts)"))),
+            };
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            match ids.filter(|v| !v.is_empty()) {
+                Some(v) => {
+                    f.trimmed.insert((me.clone(), k), v.into_iter().collect());
+                }
+                None => {
+                    f.trimmed.remove(&(me.clone(), k));
+                }
+            }
+            Ok(())
+        })?,
+    )?;
     t.set("config", lua.create_function(|lua, id: u16| Ok(world(lua)?.game.get(id)))?)?;
     t.set(
         "set_config",
