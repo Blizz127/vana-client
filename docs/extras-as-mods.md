@@ -213,6 +213,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Link Catcher** (assets/mods/link-catcher; ChatLink, links): web links in chat get a number (`[1]`); `//links`
   lists the last 30 to open in the browser or copy, `//links <n>` opens one. Seen live: the server's welcome link
   numbered and listed (not opened in the test).
+- **Trust Lineups** (assets/mods/trust-lineups; Trusts, trustme): `//trusts save <lineup> [trust, ...]` keeps named
+  trusts (or the party's), `//trusts <lineup>` calls those not in the party one after another, each once the last
+  stands in the party and the game takes a spell again (4 s after). Seen live: Kupipi and Nanaa Mihgo called in turn;
+  saving from the party not seen (names compare without spaces: the party shows "NanaaMihgo").
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
