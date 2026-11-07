@@ -295,6 +295,8 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Quick Play** (assets/mods/quick-play; autologin, autoenterkey): a lobby mod that plays the chosen character once
   the character list shows, once per start (the password stays the login screen's Remember password). Bundled mods
   with `lobby = true` now start in the lobby too (only folder mods did). Seen live: Lnxtest played from the title.
+- **Target Marker** (assets/mods/target-marker; Greed, customtarget): a ground ring under the target in a chosen
+  colour and size (a band of four rings: draw lines are a pixel wide). Seen live under an NPC.
 - Not ported: Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
