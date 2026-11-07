@@ -1,5 +1,5 @@
 -- The zone map over the game (the map add-ons). Ctrl or Alt + O opens and closes it: in a box in the middle of the
--- screen at the set opacity, what the map window shows where we stand (the map with our marker; retail's NO MAP while
+-- screen at the Map Overlay Opacity (the client applies it to HUD maps), what the map window shows where we stand (the map with our marker; retail's NO MAP while
 -- the map is not ours, or not ours yet), the error sound where no map exists. A left drag pans it, the wheel zooms at
 -- the pointer (the whole map up to 8x), Escape closes it. It follows us across zones and map pages.
 
@@ -60,7 +60,7 @@ local function show()
   end
   clamp(m)
   local centre = { x = view.cx / m.px_per_unit, z = -view.cy / m.px_per_unit }
-  hud.map("overlay", { x = x, y = y, w = side, h = side, centre = centre, span = view.span, alpha = settings.get("opacity"), me = true })
+  hud.map("overlay", { x = x, y = y, w = side, h = side, centre = centre, span = view.span, me = true })
   hud.on("overlay", function(_, e)
     if e.button ~= "left" or not view then return end
     if e.kind == "drag_start" then

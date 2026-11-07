@@ -49,7 +49,9 @@ Done so far (checked live, Lnxcsfix):
   `input.on_mouse` to zoom at the pointer, Escape through `input.on_key` after the game's windows. Seen live: opened
   with Ctrl+O and Alt+O at the 80 % carried over, zoomed, panned, closed by Escape and by Alt+O. Compared shot for
   shot with the built-in overlay (master) in both UIs: the same box, image, edge (rounded corners), marker and name
-  plates, and the minimap's marker shaded by the overlay's opacity (the minimap reads the mod's setting). To get
+  plates, and the minimap's marker shaded by the overlay's opacity. The Map Overlay Opacity stays a client setting
+  (config `map_overlay_opacity`, its Extras row where it was): the drawing code applies it to HUD maps that give no
+  alpha of their own, and the minimap's marker shades by it, as before (checked against master in the classic UI). To get
   there the modern UI draws mods' HUD elements with its own painter (modern/hudmods.rs), as its own panels draw:
   a mod's element looks as a built-in one does (user, 2026-11-06). It shows what the map window shows (user,
   2026-11-06: "no map exists" is not "you don't have it yet"): where no map exists (Mordion Gaol) the error sound and

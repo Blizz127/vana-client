@@ -15,9 +15,9 @@ pub(in crate::client) enum Kind {
     Icon { icon: super::window::Icon, size: f32 },
     /// A PNG from the mod's folder: its texture key, pixels (w, h, RGBA), drawn size and tint.
     Image { key: String, img: std::sync::Arc<(u32, u32, Vec<u8>)>, w: f32, h: f32, tint: [u8; 4] },
-    /// The zone's map (the one the client shows here): centred on world (x, z) or on us, `span` map pixels across;
-    /// our marker on it when `me`.
-    Map { w: f32, h: f32, centre: Option<(f32, f32)>, span: f32, alpha: f32, me: bool },
+    /// The zone's map (the one the client shows here): centred on world (x, z) or on us, `span` map pixels across, at
+    /// `alpha` (none: the player's Map Overlay Opacity); our marker on it when `me`.
+    Map { w: f32, h: f32, centre: Option<(f32, f32)>, span: f32, alpha: Option<f32>, me: bool },
 }
 
 #[derive(Clone)]
@@ -189,8 +189,9 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             if let Some(v) = t.get::<Option<f32>>("span")? {
                 *span = v.clamp(16.0, 2048.0);
             }
-            if let Some(v) = t.get::<Option<f32>>("alpha")? {
-                *alpha = v.clamp(0.0, 1.0);
+            // A value, or false for the player's Map Overlay Opacity.
+            if t.contains_key("alpha")? {
+                *alpha = t.get::<Option<f32>>("alpha").ok().flatten().map(|v| v.clamp(0.0, 1.0));
             }
         }
         Kind::Image { w, h, tint, .. } => {
@@ -297,7 +298,7 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None, round: 0.0 }, spec))?)?;
     t.set("bar", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Bar { w: 120.0, h: 8.0, value: 0.0, colour: None, kind: "hp".into() }, spec))?)?;
     t.set("icon", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Icon { icon: super::window::Icon::Item(0), size: 32.0 }, spec))?)?;
-    t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: 1.0, me: false }, spec))?)?;
+    t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: None, me: false }, spec))?)?;
     let (src3, mod3) = (vm.src.clone(), vm.manifest.id.clone());
     t.set(
         "set",
@@ -530,7 +531,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 if let Some(o) = m.as_mut() {
                     let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));
                     let marker = me.then_some(((w.pos.x, w.pos.z), facing));
-                    o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, *alpha, marker);
+                    o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, alpha.unwrap_or(w.map_opacity), marker);
                 }
                 [x, y, mw, mh]
             }

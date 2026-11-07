@@ -231,7 +231,7 @@ default it is centred on the player and follows them. Where no map exists, nothi
 | `h` | `number` | `200` | Its height in window pixels. |
 | `centre` | `{x, z}` | the player's position | A world position (both `x` and `z` required) to centre the map on, instead of following the player. |
 | `span` | `number` | `256` | How many map pixels show across the element's width (16 to 2048). The map image is 512 map pixels wide, so 512 shows the whole map across. |
-| `alpha` | `number` | `1` | Its opacity, 0 to 1. |
+| `alpha` | `number` | the player's Map Overlay Opacity | The map image's opacity, 0 to 1 (the marker stays solid). Left out (or `false` in `hud.set`), the client applies the player's Map Overlay Opacity, as it does to its own map overlay. |
 | `me` | `boolean` | `false` | Draws your marker at your position on the map, facing your way, as the game's map windows draw it in each interface (the classic map arrow, the modern UI's orange arrow). |
 
 **Returns** nothing.

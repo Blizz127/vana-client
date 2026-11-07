@@ -420,7 +420,7 @@ function hud.rect(id, spec) end
 ---@param spec table 
 function hud.bar(id, spec) end
 
---- Creates or replaces a HUD map: the zone's map where the client shows one, x, y, w, h, centre {x, z} (world; default: us), span (map pixels across, 16..2048; default 256), alpha, me (our marker on it, as each UI draws it). Draw other markers over it with other elements at game.map_pos.
+--- Creates or replaces a HUD map: the zone's map where the client shows one, x, y, w, h, centre {x, z} (world; default: us), span (map pixels across, 16..2048; default 256), alpha (default the player's Map Overlay Opacity), me (our marker on it, as each UI draws it). Draw other markers over it with other elements at game.map_pos.
 ---@param id string 
 ---@param spec table 
 function hud.map(id, spec) end

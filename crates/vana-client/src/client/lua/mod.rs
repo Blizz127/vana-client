@@ -1499,13 +1499,6 @@ impl Host {
         m.as_mut()?.modern_image()
     }
 
-    /// A running mod's setting, else its declared default (never a file read: callers ask every frame).
-    pub(in crate::client) fn setting(&self, id: &str, key: &str) -> Option<serde_json::Value> {
-        let vm = self.vms.iter().find(|v| v.manifest.id == id)?;
-        let st = vm.st.borrow();
-        st.settings.get(key).cloned().or_else(|| vm.manifest.settings.get(key)?.default.as_ref().and_then(|v| serde_json::to_value(v).ok()))
-    }
-
     /// The tooltip of the mod HUD element under the pointer: (title, text, seconds there).
     pub(in crate::client) fn hud_tip(&self) -> Option<(String, String, f32)> {
         hud::tip(self)

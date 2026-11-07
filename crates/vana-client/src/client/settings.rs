@@ -21,6 +21,7 @@ pub struct Settings {
     pub draw_distance: u32,
     pub send_interval: u32,
     pub party_tp: bool,
+    pub map_opacity: u32,
     pub synth_amount: bool,
     pub stamp_all_lines: bool,
     pub target_distance: bool,
@@ -73,6 +74,7 @@ impl Settings {
             draw_distance: c.draw_distance,
             send_interval: c.send_interval,
             party_tp: c.party_tp,
+            map_opacity: pct(c.map_overlay_opacity),
             synth_amount: c.synth_amount,
             stamp_all_lines: c.stamp_all_lines,
             target_distance: c.target_distance,
@@ -122,6 +124,7 @@ impl Settings {
         c.draw_distance = self.draw_distance;
         c.send_interval = self.send_interval;
         c.party_tp = self.party_tp;
+        c.map_overlay_opacity = self.map_opacity as f32 / 100.0;
         c.synth_amount = self.synth_amount;
         c.stamp_all_lines = self.stamp_all_lines;
         c.target_distance = self.target_distance;
@@ -217,6 +220,7 @@ enum Val {
     Gamepad,
     PadDeadZone,
     MouseCamSpeed,
+    MapOpacity,
     /// A Lua mod's declared setting: its row on the mod's page (docs/lua-mods.md 4.12).
     Mod(usize),
     /// A bundled mod's setting on one of our Extras tabs (`SettingsUi::tab_rows`).
@@ -360,6 +364,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Mouse Camera Speed", "How fast the camera turns when you hold a mouse button and move the mouse. Lower it if the camera spins too fast. Controllers are not affected (not retail).", MouseCamSpeed, &[(25, "25%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")], Now),
     ];
     const MAPS: &[SRow] = &[
+        row("Map Overlay Opacity", "How see-through the map overlay is.", MapOpacity, &[], Now),
         row("Minimap", "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom.", Minimap, OFF_ON, Now),
         row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
@@ -388,7 +393,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
         row("Clock", "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.", EarthClock, OFF_ON, Now),
     ];
     match kind {
-        Kind::Extras if modern => [&MAPS[..1], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
+        Kind::Extras if modern => [&MAPS[..2], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
@@ -534,7 +539,7 @@ impl SettingsUi {
 
     fn ctl(r: &Row) -> Ctl {
         match r.val {
-            Val::Size(..) | Val::Gamma | Val::FrameLimit | Val::Monitor | Val::Gpu | Val::Music | Val::Effects | Val::ModernOpacity => Ctl::Slider,
+            Val::Size(..) | Val::Gamma | Val::FrameLimit | Val::Monitor | Val::Gpu | Val::Music | Val::Effects | Val::MapOpacity | Val::ModernOpacity => Ctl::Slider,
             _ if r.choices.len() <= 3 => Ctl::Buttons(r.choices.len()),
             _ => Ctl::Slider,
         }
@@ -578,6 +583,7 @@ impl SettingsUi {
             Val::ModernUi => self.s.modern_ui as u32,
             Val::ModernScale => self.s.modern_scale,
             Val::ModernOpacity => self.s.modern_opacity,
+            Val::MapOpacity => self.s.map_opacity,
             Val::ResetPlaces => self.s.reset_places as u32,
             Val::Gamepad => self.s.gamepad as u32,
             Val::PadDeadZone => self.s.gamepad_dead,
@@ -701,6 +707,7 @@ impl SettingsUi {
             Val::Music => (21, (self.s.music / 5) as usize),
             Val::Effects => (21, (self.s.effects / 5) as usize),
             Val::ModernOpacity => (19, (self.s.modern_opacity.clamp(10, 100) / 5 - 2) as usize),
+            Val::MapOpacity => (19, (self.s.map_opacity.clamp(10, 100) / 5 - 2) as usize),
             v => {
                 let list: Vec<u32> = r.choices.iter().map(|c| c.0).collect();
                 (list.len(), pos(&list, self.get(v)))
@@ -732,6 +739,7 @@ impl SettingsUi {
             Val::Music => self.s.music = (i as u32 * 5).min(100),
             Val::Effects => self.s.effects = (i as u32 * 5).min(100),
             Val::ModernOpacity => self.s.modern_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
+            Val::MapOpacity => self.s.map_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
             v => {
                 if let Some(c) = r.choices.get(i) {
                     self.set(v, c.0);
@@ -756,6 +764,7 @@ impl SettingsUi {
             Val::Music => format!("{}%", self.s.music),
             Val::Effects => format!("{}%", self.s.effects),
             Val::ModernOpacity => format!("{}%", self.s.modern_opacity),
+            Val::MapOpacity => format!("{}%", self.s.map_opacity),
             Val::Monitor => self.monitors.iter().find(|m| m.0 == self.s.monitor).or(self.monitors.first()).map_or_else(|| "Default".into(), |m| m.0.clone()),
             Val::Gpu if self.s.gpu.is_empty() => "Default".into(),
             // The name without the driver's part ("AMD Radeon RX 6800 XT (RADV NAVI21)").
@@ -1737,15 +1746,19 @@ mod tests {
         ui.key(egui::Key::ArrowLeft);
         assert_eq!(ui.tab, 3);
         ui.key(egui::Key::ArrowRight);
+        // The first row is Map Overlay Opacity (a slider); the minimap's under it, on OFF.
         ui.key(egui::Key::ArrowDown);
-        assert_eq!((ui.row, ui.col), (1, 1));
+        assert_eq!(ui.row, 1);
+        ui.key(egui::Key::ArrowDown);
+        assert_eq!((ui.row, ui.col), (2, 1));
         ui.key(egui::Key::ArrowLeft);
         ui.key(egui::Key::Enter);
         assert!(ui.s.minimap && ui.dirty);
         // The last row, Minimap Size (Small / Medium / Large): Large; then its place, top left.
         ui.key(egui::Key::ArrowUp);
         ui.key(egui::Key::ArrowUp);
-        assert_eq!(ui.row, 3);
+        ui.key(egui::Key::ArrowUp);
+        assert_eq!(ui.row, 4);
         ui.key(egui::Key::ArrowRight);
         ui.key(egui::Key::Enter);
         assert_eq!(ui.s.minimap_size, 2);

@@ -6442,7 +6442,9 @@ struct World {
     log_find: Option<String>,
     /// The main menu's map window, and the key item bits by word (table * 16 + word, s2c 0x055).
     map: Option<map::MapWin>,
-    /// Extra: the synthesis amount.
+    /// Extra: the map overlay's opacity (HUD maps take it unless a mod gives its own; the minimap's marker shades by
+    /// it) and the synthesis amount.
+    map_opacity: f32,
     synth_amount: bool,
     /// Config `stamp_all_lines` (extra).
     stamp_all_lines: bool,
@@ -7538,6 +7540,7 @@ impl App {
             w.condense = self.cfg.modern_condense;
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
             w.synth_amount = self.cfg.synth_amount;
+            w.map_opacity = self.cfg.map_overlay_opacity;
             w.stamp_all_lines = self.cfg.stamp_all_lines;
             (w.target_distance, w.target_hpp) = (self.cfg.target_distance, self.cfg.target_hpp);
             (w.earth_clock, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_ready_lines);
@@ -8403,6 +8406,7 @@ impl App {
                             follow: None,
                             translating: false,
                             last_proposer: String::new(),
+                            map_opacity: self.cfg.map_overlay_opacity,
                             synth_amount: self.cfg.synth_amount,
                             stamp_all_lines: self.cfg.stamp_all_lines,
                             skillchain: Default::default(),
