@@ -451,6 +451,11 @@ function hud.rect(id, spec) end
 ---@param spec table 
 function hud.bar(id, spec) end
 
+--- Creates or replaces a speech bubble: a rounded rect x, y, w, h (window pixels), round (corner radius, default 10), colour (fill), edge and edge_w (an outline round it and its tail, default none, 2 wide), tail (a point {x, y} in window pixels the tail aims at, from the side facing it; false for none), tail_w (its base, default 18) and tail_len (its longest, default 22). Put texts and other elements over it on a higher layer.
+---@param id string 
+---@param spec table 
+function hud.bubble(id, spec) end
+
 --- Creates or replaces a portrait: an actor's head and shoulders drawn live from its model, from in front of its face, lit as the scene: x, y, entity (its server id; required), w and h (window pixels, default 96; size sets both), shape ('oval' (the default) or 'square'), bg (the backing behind the actor), frame (a ring round the edge) and frame_w (its width, default 3), colour (tint). Shown only while the actor is drawn in the world; four actors at most.
 ---@param id string 
 ---@param spec table 
@@ -986,6 +991,10 @@ function game.weather() end
 --- The key item ids we hold.
 ---@return integer[]
 function game.key_items() end
+
+--- The content countdown the client shows (a battlefield's or an instance's time limit): {left (seconds), length (the whole limit, seconds)}; nil while none runs.
+---@return {left: integer, length: integer}?
+function game.countdown() end
 
 --- The treasure pool: {slot (0..9), item, count, dropper, lotted, passed, lot, high_lot, high_name} per item in it.
 ---@return table[]

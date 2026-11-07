@@ -399,13 +399,26 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   draws a player-style look with other parts (the rest follow the character's own changes); `game.entity` now gives
   our own look too. Seen live: Lnxcsfix as a Galka (kept across a relog), a Chainmail body, Daggao's look copied,
   face 4b, reset. DressUp's blinking option (BlinkMeNot) is not needed: the client keeps a character drawn through a look change, so a gear swap neither blinks nor drops anyone's target (MODLOG "A changed look without the blink").
-- **Content Trackers** (assets/mods/content-trackers; dynamishelper, Omen, NyzulHelper, salvage2, cellhelp and kin): an
-  edge window for the content you are in, read from its messages, with the time left counting down: Dynamis (the
-  currency held and what it is worth in singles, the granules of time held), Abyssea (the seven lights from the
-  readout, a + when a light rose since, cruor), Salvage (the restrictions still on, with the cells held for each) and
-  Nyzul Isle (floor, objective, cleared, tokens this run). A Rust test feeds each content's lines; seen live in
-  Abyssea - Konschtat (the window and its lights). Not done: the contents LandSandBoat lacks (Omen, Delve, Odyssey,
-  Sortie), Reives, the pop item lists, cellhelp's lotting.
+- **Content Trackers** (assets/mods/content-trackers; dynamishelper, Omen, OmenHelper, NyzulHelper, salvage2,
+  cellhelp, plasmon, reive, SheolHelper, segments, muffins, EmpyPopTracker, zenihelper and kin): an edge window for
+  the content you are in, read from its messages, with the time left from the game's countdown (`game.countdown`,
+  new) or counted down from the lines: Dynamis (the currency held and what it is worth in singles, the granules of
+  time held), Abyssea (the seven lights from the readout, a + when a light rose since, cruor), Salvage (the
+  restrictions still on, with the cells held for each), Nyzul Isle (floor, objective, cleared, tokens this run), Omen
+  (floor, its objective and cleared, omens, the bonus timer, each numbered bonus objective with its progress, done in
+  green, failed in red), Delve (plasm this run and total, kills estimated from the gains, the fracture's stage from
+  the "Your ears" lines, the dreadful energy, airlixirs; a field zone's window opens on its first plasm line),
+  Odyssey (only for a run entered from Rabao: Sheol and difficulty, segments, izzat, Moogle Mastery, Gaol's RP,
+  translocators; back in Rabao the last run, and when another moglophone may be ready, the helpers' 20 hours), Sortie
+  (our gallimaufry, the #A..#H coffer reports, temporary items, the plate's seconds) and reives (while the Reive Mark
+  is on, or after our join line: bayld, experience or limit points, the last five momentum scores, bonuses by kind,
+  the lockout). `//pops [NM]` shows an Empyrean (or other) NM's pops as a tree, held in green, needed in red, how
+  many lie in the pool, items held outside the inventory, the weapon item's count (28 NMs); `//znm` the Zeni NMs by
+  path: each tier's seals, its ZNMs with their pop items and trophies (held trophy green, held pop gold), the salt,
+  and Enter on a ZNM prints where its ??? is. A Rust test feeds each content's lines and drives both pop windows;
+  seen live: Abyssea - Konschtat (the lights), `//pops` and `//znm` with a pop key item and a seal held. LandSandBoat
+  has no Omen, Delve, Odyssey or Sortie and sends no reive lines, so those are only tested with fed lines. Not done:
+  cellhelp's lotting; totals before the first gain line (the currencies are not in the API yet).
 - **Auction Desk** (assets/mods/auction-desk; AuctionHelper, Auctioneer, ahpro): at the auction house, `//ahbuy <item>
   <price> [stack]` and `//ahsell <item> <price> [stack]` (prices take k and m) start the game's own bid and sale, whose
   questions the player answers as in the windows; `//ahlist` prints our listings. New `actions.auction_bid`,

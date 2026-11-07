@@ -33,6 +33,7 @@ end)
 | [`game.weather()`](#gameweather) | The current weather id. |
 | [`game.key_items()`](#gamekey_items) | The key items you hold. |
 | [`game.treasure()`](#gametreasure) | The items in the treasure pool. |
+| [`game.countdown()`](#gamecountdown) | The content countdown the client shows: seconds left and the whole limit. |
 | [`game.event()`](#gameevent) | The event (cutscene, NPC talk) under way, and its menu. |
 | [`game.entity_by_tag(tag)`](#gameentity_by_tag) | The entity a target tag such as `<t>` or `<bt>`, a player's name or an id names. |
 | [`game.skills()`](#gameskills) | Your combat, magic and crafting skills. |
@@ -683,6 +684,31 @@ for _, t in ipairs(game.treasure()) do
   local mine = t.lotted and ("lot " .. tostring(t.lot)) or (t.passed and "passed" or "undecided")
   print(t.slot, r and r.name or t.item, mine, "high:", t.high_name, t.high_lot)
 end
+```
+
+## `game.countdown`
+
+```lua
+game.countdown() -> table?
+```
+
+The countdown the client shows for a timed content (a battlefield's or an instance's time limit, the bar at the top
+of the screen), as the server set it.
+
+**Returns** `table?`: nil while no countdown runs; else:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `left` | `integer` | Seconds left; 0 once it has run out. |
+| `length` | `integer` | The whole limit in seconds, as last set (an extension sets it anew). |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local c = game.countdown()
+if c then print(("%d:%02d left of %d minutes"):format(c.left // 60, c.left % 60, c.length // 60)) end
 ```
 
 ## `game.event`

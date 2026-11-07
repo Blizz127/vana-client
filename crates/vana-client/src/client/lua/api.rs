@@ -1037,6 +1037,21 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // The content countdown the client shows (s2c 0x075's cnttime): seconds left and its whole length; nil when none.
+    game.set(
+        "countdown",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let o = &w.objective;
+            if !o.counting() {
+                return Ok(None);
+            }
+            let t = lua.create_table()?;
+            t.set("left", o.left(super::super::vana_now(w) as u32))?;
+            t.set("length", o.duration)?;
+            Ok(Some(t))
+        })?,
+    )?;
     // An event (cutscene or NPC talk) under way: nil when none; its open menu (question, options, cursor from 1).
     game.set(
         "event",

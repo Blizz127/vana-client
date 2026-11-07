@@ -1,5 +1,14 @@
--- A window for the content we are in (Dynamis, Abyssea, Salvage, Nyzul Isle helpers), read from its messages;
--- the time left counts down between them. Filters cannot read the game, so lines are kept for the next tick.
+-- A window for the content we are in, read from its messages: Dynamis, Abyssea, Salvage, Nyzul Isle, Omen, Delve,
+-- Odyssey, Sortie and reives (the content tracker add-ons). The time left follows the content's countdown, else counts
+-- down from its lines. Pop lists for the Empyrean and other NMs (//pops) and the Zeni NMs (//znm). Filters cannot
+-- read the game, so lines are kept for the next tick.
+
+local Omen = require("src.omen")
+local Delve = require("src.delve")
+local Odyssey = require("src.odyssey")
+local Sortie = require("src.sortie")
+local Reive = require("src.reive")
+local Pops = require("src.pops")
 
 local pending = {}
 local st = {}
@@ -8,6 +17,11 @@ local function reset()
   st = { lights = {}, risen = {}, removed = {}, tokens = 0 }
 end
 reset()
+
+-- Contents known by their zone; the field zones where Delve's plasm lines open its window.
+local BY_ZONE = { [292] = "Omen", [264] = "Delve", [271] = "Delve", [275] = "Sortie", [133] = "Sortie", [189] = "Sortie" }
+local DELVE_FIELD = { [261] = true, [262] = true, [263] = true, [265] = true, [266] = true, [267] = true, [274] = true, [276] = true }
+local MODULES = { Omen = Omen, Delve = Delve, Odyssey = Odyssey, Sortie = Sortie }
 
 -- The content of a zone, by its name.
 local function content_of(name)
@@ -21,6 +35,14 @@ end
 local function set_left(n, unit)
   st.ends = os.clock() + tonumber(n) * ((unit or ""):find("^second") and 1 or 60)
 end
+
+-- What the content modules read lines with: who we are, and the time left.
+local ctx = {
+  set_left = set_left,
+  extend = function(secs)
+    if st.ends then st.ends = st.ends + secs end
+  end,
+}
 
 local LIGHTS = { "Pearlescent", "Ebon", "Golden", "Silvery", "Azure", "Ruby", "Amber" }
 
@@ -98,6 +120,13 @@ filters.chat(function(t)
   if settings.get("on") then pending[#pending + 1] = text.strip(t) end
 end)
 
+-- The content's countdown when the game shows one, else the time its lines gave.
+local function time_left()
+  local c = game.countdown and game.countdown()
+  if c then return c.left, c.length end
+  if st.ends then return math.floor(math.max(0, st.ends - os.clock())), 3600 end
+end
+
 local function held(id)
   local n = 0
   for _, bag in ipairs({ 0, 3 }) do
@@ -109,16 +138,22 @@ local function held(id)
 end
 
 local function left_row(out)
-  if not st.ends then return end
-  local left = math.floor(math.max(0, st.ends - os.clock()))
+  local left, len = time_left()
+  if not left then return end
   out[#out + 1] = { type = "gauge", style = "row", label = "Time left",
-    text = ("%d:%02d"):format(left // 60, left % 60), value = math.min(1, left / 3600) }
+    text = ("%d:%02d"):format(left // 60, left % 60), value = math.min(1, left / math.max(1, len)) }
 end
+
+local reive = Reive.new()
 
 local function rows(kind)
   local out = {}
   left_row(out)
-  if kind == "Dynamis" then
+  if MODULES[kind] then
+    MODULES[kind].rows(st.mod, out)
+  elseif kind == "Reive" then
+    Reive.rows(reive, out)
+  elseif kind == "Dynamis" then
     local total = 0
     for _, c in ipairs(DYNAMIS_CURRENCY) do
       local n = held(c[2])
@@ -157,26 +192,96 @@ local function rows(kind)
   return out
 end
 
-local here
+-- Where we are, the content there, and Odyssey's run between Rabao and the Walk of Echoes.
+local here_zone, here_kind
+local armed, last_run
+
+local function store()
+  return (storage and storage.character) or {}
+end
+
 timer.every(1, function()
   local lines = pending
   pending = {}
+  Pops.refresh()
   if not settings.get("on") then
     ui.close("content")
     return
   end
   local p = game.player()
-  local kind = content_of(p and res.zone(p.zone))
-  if kind ~= here then
-    -- a new content (or none): its own state, before its first messages are read
+  local zone = p and p.zone
+  ctx.me = p and p.name
+  if zone ~= here_zone then
+    -- a new zone: its content (or none) afresh, before its first messages are read
+    if here_kind == "Odyssey" and st.mod then last_run = Odyssey.finish(st.mod) end
+    local entered = armed
+    armed = nil
     reset()
-    here = kind
+    reive = Reive.new()
+    here_zone = zone
+    here_kind = BY_ZONE[zone] or content_of(zone and res.zone(zone))
+    if Odyssey.ZONES[zone] and entered then here_kind = "Odyssey" end
+    if MODULES[here_kind] then st.mod = MODULES[here_kind].new(entered) end
   end
-  for _, l in ipairs(lines) do read(l) end
-  if not kind then
+  for _, l in ipairs(lines) do
+    if zone == Odyssey.RABAO then armed = Odyssey.entering(l) or armed end
+    if MODULES[here_kind] then
+      MODULES[here_kind].read(st.mod, l, ctx)
+    elseif here_kind then
+      read(l)
+    else
+      if DELVE_FIELD[zone] then
+        st.mod = st.mod or Delve.new()
+        Delve.read(st.mod, l, ctx)
+      end
+      Reive.read(reive, l, ctx)
+    end
+  end
+  local kind = here_kind
+  if not kind and st.mod and st.mod.seen then kind = "Delve" end
+  if not kind and Reive.active(reive, game.buffs()) then kind = "Reive" end
+  local phone = Odyssey.watch_phone(game.key_items(), store())
+  local out
+  if kind then
+    out = rows(kind)
+  elseif zone == Odyssey.RABAO then
+    out = {}
+    Odyssey.rabao_rows(last_run, store(), phone, out)
+    if #out > 0 then kind = "Odyssey" else out = nil end
+  end
+  if not out then
     ui.close("content")
     return
   end
-  ui.window("content", { edge = true, width = 280, title = kind, heading = kind, elements = rows(kind) })
+  ui.window("content", { edge = true, width = 280, title = kind, heading = kind, elements = out })
   ui.open("content")
+end)
+
+-- //pops [NM]: an NM's pops (any case, a start of its name, or * wildcards); none: the list of NMs. //znm: the Zeni NMs.
+commands.register("pops", function(...)
+  if not settings.get("on") then return chat.add("Content Trackers is off (Config > Extras).") end
+  local q = table.concat({ ... }, " ")
+  if q == "" then return Pops.pick() end
+  local nm = Pops.find(q)
+  if nm then Pops.show(nm) else chat.add(("No pop list for \"%s\". //pops lists them."):format(q)) end
+end)
+
+commands.register("znm", function()
+  if not settings.get("on") then return chat.add("Content Trackers is off (Config > Extras).") end
+  Pops.znm()
+end)
+
+ui.on("pops", function(_, e)
+  if e.kind == "select" and e.id == "nms" then
+    Pops.show(Pops.EMPY[e.index])
+  elseif e.kind == "press" and e.id == "more" then
+    Pops.pick()
+  end
+end)
+
+ui.on("znm", function(_, e)
+  if e.kind == "select" then
+    local path, tier = e.id:match("^t(%d+)_(%d+)$")
+    if path then Pops.where(tonumber(path), tonumber(tier), e.index) end
+  end
 end)

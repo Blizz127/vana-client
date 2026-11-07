@@ -23069,3 +23069,37 @@ lua/hud.rs (Kind::Portrait, Kind::Bubble, bubble_tris).
   centre plus the tail triangle, a mitred outline strip centred on it and a pixel of feathering outside; the same
   triangles go to the game UI (GameUi::quad) and to an egui mesh.
 - Entities in Lua have `height` (-a.top, the rest pose's top, scaled).
+
+## Content trackers: Omen, Delve, Odyssey, Sortie, reives, pop lists (2026-11-07)
+
+Ours (a bundled Lua mod, assets/mods/content-trackers). The lines are matched as printed (numbers filled, plurals and
+[a/b] picks made, colour codes stripped). LandSandBoat has no Omen, Delve, Odyssey or Sortie and sends no reive lines;
+those are tested with fed lines only. Facts from the zone dialogue DATs of our install:
+- Omen (zone 292): floor objectives 7339..7346 ("Vanquish ...", "Open N treasure portents."), 7343 the free floor, 7347
+  "A spectral light flares up." (cleared), 7348 "... N omens from your foes!", 7350 / 7351 "You have N seconds
+  remaining." (the bonus timer), 7333 "Your stay has been extended by N minutes." (a new floor), 7331 the KO countdown.
+  Bonus objectives 7354..7371 start "N: " (slot 1..10) and pick their verb by num3: new, "You have <done> ..." (progress
+  or done), "You have failed to ..."; the count is the first number, for 7371 (cures) the second; damage objectives
+  (7363..7370) have a threshold, and their "You have" form is the success (inferred).
+- Delve: "You receive N corpuscle[s] of mweya plasm." and "..., making for a total of M." (ids per zone: 261 8036, 262
+  7932, 263 8769, 264 / 271 7501, 265 7825, 266 8149, 267 8048, 274 7934, 276 7902); after them six "Your ears ..."
+  stages, "A dreadful energy emanates ..." / "The oppressive energy passes." (inferred: the fracture's progress and its
+  boss); the Delve I time lines 7332..7337 of 264 / 271. Kills are estimated as plasmon does (a gain that is a multiple
+  of 50 but not of 500, 750 or 10000 is gain / 50 kills, else one).
+- Odyssey and Sortie lines are not in their zones' own dialogue files but in files numbered as zones 2019..2026 (Sheol
+  A, B, C, Gaol) and 2030..2032 (Sortie); 298 / 279 and 275 / 133 / 189 hold only the common block. Inferred, not
+  traced: our zone_text always loads the zone's own file, so retail's ids there would print the wrong entries.
+  Sheol: 7239 izzat, 7248 Moogle Mastery, 7249 "You receive N moogle segments for a total of M.", 7252 translocators,
+  7230 extensions; Gaol 7253 RP. Rabao 12109 "Entering Sheol B: Difficult." names the area and difficulty; 298 / 279
+  also host Selbina's fights, so a run counts only from Rabao. The moglophone is key item 3212 (3234..3236 the II);
+  the 20 hours to another is the helpers' figure, not the game's.
+- Sortie (2030): 7238 "<player> received N gallimaufry for a total of M.", 7239..7242 / 7248..7251 "#A..#H treasure
+  coffer status report: n/m #?: n/m." (inferred: the sector's objective and a hidden one), 7236 / 7237 temporary items,
+  7244 the plate's seconds (key items 3300 / 3301), 7230 extensions (its "Sorite" typo is the file's).
+- Reives (the same ids in every reive zone, 7175..7219): joined, victorious, "<player> obtained N bayld!" ("You have
+  obtained N bayld!" 7012 is a quest's), momentum scores and bonuses, the lockout; the Reive Mark is status 511.
+- Base time limits of Omen, Sortie, Odyssey and Delve II are in no line: they come as the s2c 0x075 countdown
+  (inferred), now given to mods as game.countdown().
+- Pop lists: the Empyrean (and other) NMs' pop trees as EmpyPopTracker has them (28 NMs: ids, droppers, how they
+  appear); the ZNMs by path with pop items, the seals Sanraku takes, trophies and the seals they give, salts 1016..1018
+  and each ???'s place.
