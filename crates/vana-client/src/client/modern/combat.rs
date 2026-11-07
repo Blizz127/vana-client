@@ -49,7 +49,7 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let Some(menu) = w.action_menu.clone().filter(|_| w.prompt.is_none()) else { return };
     let m = p.m;
     // Ours: the suggestions above the commands (suggest.rs); the cursor rides them as one ring with the commands.
-    let sugg = w.root_sugg.clone();
+    let sugg = w.battle_rows.clone();
     let on_sugg = w.suggest_sel.filter(|&k| k < sugg.len());
     let shown: Vec<(String, Option<egui::TextureId>, bool)> = sugg
         .iter()

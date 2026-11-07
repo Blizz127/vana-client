@@ -409,6 +409,7 @@ your mod unloads. If two mods fill one slot, the last call wins; a mod's `nil` o
 | `"clock"` | `{earth, moon_name, moon, next_day, next_minutes}`, the table [`game.clock`](game.md#gameclock) returns | Beside the game's clock: Earth time, the moon's percent and the next day (the modern location panel puts it on one line, the moon's name in its tooltip). |
 | `"target_distance"` | `number`, in yalms | The target window: left of the HP gauge in the classic UI (targets with a gauge), beside the name in the modern one. Shown with one decimal. |
 | `"target_hpp"` | `number`, a percent | The classic target window's right edge, on the gauge's row, in the HP colour. The modern one always shows the percent. |
+| `"battle_rows"` | a list of up to 8 rows | The modern battle menu, above its commands, as the menu's own rows: the action's icon and name (or `label`), `reason` in its tooltip. The cursor rides them with the commands. Enter or a click picks the action through Magic or Abilities and its list, as the player would, and the target prompt starts on `target` (a party member's name) when given; a row with a `group` (spell ids) opens a submenu of them with Right or Enter. Each row: `{kind = "spell" or "ability", id, target, reason, label, group}` (`id` a spell id or a `res.ability` id). The [`suggestions`](events.md#suggestions) event's rows come in this shape. Not drawn in the classic UI. |
 
 The target slots show on whatever is targeted, so set them as the target changes: every frame is simplest.
 
@@ -416,7 +417,7 @@ The target slots show on whatever is targeted, so set them as the target changes
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `slot` | `string` | yes | `"clock"`, `"target_distance"` or `"target_hpp"`. |
+| `slot` | `string` | yes | `"clock"`, `"target_distance"`, `"target_hpp"` or `"battle_rows"`. |
 | `value` | see above | no | `nil` (or `false`) empties the slot. |
 
 **Returns** nothing.

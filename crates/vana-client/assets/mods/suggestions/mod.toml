@@ -1,0 +1,10 @@
+name = "Battle Suggestions"
+version = "1.0.0"
+description = "Rows at the top of the modern battle menu naming a spell, ability or weapon skill worth using now, and why."
+permissions = ["ui.native"]
+
+[settings.on]
+type = "bool"
+default = true
+label = "Battle Suggestions"
+help = "In the modern UI, the battle menu shows a spell, ability or weapon skill worth using now at its top, and why. It never acts by itself."

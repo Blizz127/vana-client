@@ -281,7 +281,8 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             let ok = match name.as_str() {
                 "clock" => v.is_null() || ["earth", "moon_name", "next_day"].iter().all(|k| v.get(k).is_some_and(|x| x.is_string())) && ["moon", "next_minutes"].iter().all(|k| v.get(k).is_some_and(|x| x.is_number())),
                 "target_distance" | "target_hpp" => v.is_null() || v.is_number(),
-                _ => return Err(mlua::Error::runtime(format!("no slot {name:?} (clock, target_distance, target_hpp)"))),
+                "battle_rows" => v.is_null() || v.as_array().is_some_and(|a| a.len() <= 8 && a.iter().all(|r| super::super::suggest::Suggestion::from_row(r).is_some())),
+                _ => return Err(mlua::Error::runtime(format!("no slot {name:?} (clock, target_distance, target_hpp, battle_rows)"))),
             };
             if !ok {
                 return Err(mlua::Error::runtime(format!("slot {name}: the wrong shape of value (see ui.native.slot)")));

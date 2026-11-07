@@ -2495,7 +2495,7 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                 {
                     let engaged = world.my_motion.status == 1;
                     // Ours (the modern UI): the suggestions above the commands are rows of the same ring.
-                    let sugg = if world.modern { world.root_sugg.len() } else { 0 };
+                    let sugg = if world.modern { world.battle_rows.len() } else { 0 };
                     let on_sugg = world.suggest_sel.filter(|&k| k < sugg);
                     // A family suggestion's submenu takes its keys first.
                     let family = suggest::family_key(world, on_sugg, *key);
@@ -2531,7 +2531,7 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                             combat::right(world);
                         }
                         egui::Key::Enter if on_sugg.is_some() => {
-                            if let Some(sg) = on_sugg.and_then(|k| world.root_sugg.get(k)).cloned() {
+                            if let Some(sg) = on_sugg.and_then(|k| world.battle_rows.get(k)).cloned() {
                                 listsearch::pick_root(world, sg.action, sg.target.as_deref());
                             }
                         }
@@ -6512,6 +6512,9 @@ struct World {
     /// The battle menu's suggestions (suggest.rs::refresh_root), when they were taken, and the one the cursor is on.
     root_sugg: Vec<suggest::Suggestion>,
     root_sugg_at: Option<Instant>,
+    /// The rows above the battle menu's commands: a mod's (ui.native.slot battle_rows), and that slot's value.
+    battle_rows: Vec<suggest::Suggestion>,
+    battle_src: serde_json::Value,
     suggest_sel: Option<usize>,
     /// The open family submenu of the suggestion under the cursor: its cursor in the group.
     suggest_sub: Option<usize>,
@@ -8631,6 +8634,8 @@ impl App {
                             asked: None,
                             root_sugg: Vec::new(),
                             root_sugg_at: None,
+                            battle_rows: Vec::new(),
+                            battle_src: serde_json::Value::Null,
                             suggest_sel: None,
                             suggest_sub: None,
                             party_hp_max: HashMap::new(),

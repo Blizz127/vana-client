@@ -262,7 +262,9 @@ Milestone 1:
   sambas, debuffs, opening a chain with a partner, the strongest weapon skill, renewing buffs (MODLOG "Skillchain
   helper and the battle menu's suggestions"). They head the battle menu: Up from the first command walks into them,
   Enter or a click opens the list on the action and takes it, into retail's target prompt (on the member a
-  suggestion names). Seen live: Provoke, Berserk, a closing Fast Blade, an opening Red Lotus Blade.
+  suggestion names). Seen live: Provoke, Berserk, a closing Fast Blade, an opening Red Lotus Blade. Since 2026-11-07
+  the bundled Battle Suggestions mod shows them (on by default; off on its Extras page): the rules run while a mod
+  listens for the `suggestions` event, and the rows are the `battle_rows` slot, which any mod may fill.
 - The skillchain helper (an Extra, modern/extras.rs edge window; skillchain.rs): in a party, the open resonance on
   the target with its wait / window bar and closers, the chain made with its burst elements, and every chain the
   party can make with its elements and ways. Seen live with Naji and Ayame.

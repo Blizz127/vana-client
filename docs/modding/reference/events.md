@@ -114,7 +114,7 @@ Some things hold for all of them:
 | [Lifecycle](#lifecycle) | [`load`](#load), [`unload`](#unload), [`login`](#login), [`logout`](#logout), [`lobby_screen`](#lobby_screen), [`frame`](#frame) |
 | [Character](#character) | [`hp_change`](#hp_change), [`mp_change`](#mp_change), [`tp_change`](#tp_change), [`hpp_change`](#hpp_change), [`mpp_change`](#mpp_change), [`status_change`](#status_change), [`job_change`](#job_change), [`level_up`](#level_up), [`level_down`](#level_down), [`buff_gain`](#buff_gain), [`buff_lose`](#buff_lose), [`target_change`](#target_change) |
 | [Party](#party) | [`party_change`](#party_change), [`party_invite`](#party_invite) |
-| [Combat](#combat) | [`action`](#action), [`battle_message`](#battle_message), [`damage`](#damage) |
+| [Combat](#combat) | [`action`](#action), [`battle_message`](#battle_message), [`damage`](#damage), [`suggestions`](#suggestions) |
 | [Chat](#chat) | [`chat_message`](#chat_message), [`emote`](#emote), [`examined`](#examined) |
 | [Crafting](#crafting) | [`synth_amount`](#synth_amount), [`synth_result`](#synth_result) |
 | [Items](#items) | [`item_add`](#item_add), [`item_remove`](#item_remove), [`item_change`](#item_change) |
@@ -487,6 +487,24 @@ events.on("damage", function(actor, target, value)
   if actor == game.player().id then
     total = total + value
   end
+end)
+```
+
+## `suggestions`
+
+The client's suggestion rules picked new rows for the modern battle menu: a spell, ability or weapon skill worth using
+now, and why. The rules run only while the modern battle menu is open and some mod has a handler for this event; when
+the menu closes an empty list comes. While the player's cursor is on one of the rows they hold still, and only their
+submenus' spells are taken again.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `rows` | `table[]` | Rows as the `battle_rows` [slot](ui.native.md#uinativeslot) takes them: `{kind, id, target, reason, label, group}`. |
+
+```lua
+-- What the bundled Battle Suggestions mod does.
+events.on("suggestions", function(rows)
+  ui.native.slot("battle_rows", #rows > 0 and rows or nil)
 end)
 ```
 

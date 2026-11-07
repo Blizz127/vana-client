@@ -109,9 +109,12 @@ Done so far (checked live, Lnxcsfix):
 Every row of the Extras tabs is now a bundled mod's setting or a client setting for a native panel's place (Map
 Overlay Opacity, Minimap Position and Size, Timers Position).
 
-Deferred: the battle menu's suggestions (suggest.rs) have no Extras row (the modern battle menu always shows them);
-moving them needs mod rows in the battle menu (with their family submenus and the target prompt) and the engine as an
-API. The user's order puts the gear-swap mod next (2026-11-06), so they wait.
+The battle menu's suggestions had no Extras row (the modern battle menu always showed them). Now the bundled
+**Battle Suggestions** mod (assets/mods/suggestions, on by default) shows them: the rules stay the client's
+(suggest.rs) and run only while a mod listens for the `suggestions` event, which carries their rows; the mod puts
+them in the `battle_rows` slot, rows above the battle menu's commands that any mod may fill (the family submenus, the
+hold while the cursor is on them and the pick through Magic or Abilities into the target prompt are the menu's).
+Seen live: Berserk suggested while engaged, gone with the setting off, back with it on.
 
 ### Edge windows
 

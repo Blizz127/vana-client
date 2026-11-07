@@ -36,6 +36,7 @@
 ---| "chat_message" # A chat line from a player (or a GM): its text, sender, kind (0 say, 1 shout, 3 tell, 4 party, 5 linkshell, 0x1a yell, 0x1b linkshell 2, 0x21 unity) and whether a GM sent it.
 ---| "action" # A decoded action packet (s2c 0x028): actor, category, param, info and targets with their results.
 ---| "battle_message" # A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
+---| "suggestions" # The client's suggestion rules picked new rows for the modern battle menu (while it is open and a mod listens; none when it closes): a list of battle_rows rows ({kind, id, target, reason, label, group}); held still while the cursor is on one of them, only its submenu's spells retaken.
 ---| "synth_amount" # The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
 ---| "synth_result" # Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
 ---| "zone_text" # A zone dialogue line came (s2c 0x036 / 0x02A / 0x027): its id in the install (res.zone_text), its actor, whether MesNum's bit 15 marks it plain, the packet.
@@ -518,8 +519,8 @@ function ui.native.interface(show) end
 ---@param hidden? boolean default true; false shows it again
 function ui.native.hide(piece, hidden) end
 
---- Fills a built-in panel's slot, drawn by the panel in both UIs as its own text while the mod is loaded (the newest mod's value wins); nil empties it if it is this mod's. clock: {earth, moon_name, moon, next_day, next_minutes} (game.clock's table) beside the game's clock; target_distance: a number (yalms) in the target window; target_hpp: a number (percent) at the classic target window's right, in the HP colour. The target slots show on the current target. Needs ui.native.
----@param slot string clock, target_distance or target_hpp
+--- Fills a built-in panel's slot, drawn by the panel in both UIs as its own text while the mod is loaded (the newest mod's value wins); nil empties it if it is this mod's. clock: {earth, moon_name, moon, next_day, next_minutes} (game.clock's table) beside the game's clock; target_distance: a number (yalms) in the target window; target_hpp: a number (percent) at the classic target window's right, in the HP colour. The target slots show on the current target. battle_rows (the modern UI): up to 8 rows above the battle menu's commands, each {kind = 'spell' | 'ability', id, target (a party member's name: the target prompt starts on them), reason (its tip), label (in place of the action's name), group (spell ids: a submenu on the row, Right or Enter opens it)}; a pick goes through Magic or Abilities and the action's list, then the target prompt, as the player would (the suggestions event's rows come in this shape). Needs ui.native.
+---@param slot string clock, target_distance, target_hpp or battle_rows
 ---@param value? any nil empties it
 function ui.native.slot(slot, value) end
 
@@ -1656,6 +1657,7 @@ function settings.get(key) end
 --   chat_message(text: string, sender: string, kind: integer, gm: boolean): A chat line from a player (or a GM): its text, sender, kind (0 say, 1 shout, 3 tell, 4 party, 5 linkshell, 0x1a yell, 0x1b linkshell 2, 0x21 unity) and whether a GM sent it.
 --   action(action: vana.Action): A decoded action packet (s2c 0x028): actor, category, param, info and targets with their results.
 --   battle_message(actor: integer, target: integer, message: integer, param1: integer, param2: integer): A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
+--   suggestions(rows: table[]): The client's suggestion rules picked new rows for the modern battle menu (while it is open and a mod listens; none when it closes): a list of battle_rows rows ({kind, id, target, reason, label, group}); held still while the cursor is on one of them, only its submenu's spells retaken.
 --   synth_amount(count: integer, recipe: table): The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
 --   synth_result(result: integer, item: integer, count: integer, grade: integer): Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
 --   zone_text(id: integer, actor: integer, plain: boolean, packet: integer): A zone dialogue line came (s2c 0x036 / 0x02A / 0x027): its id in the install (res.zone_text), its actor, whether MesNum's bit 15 marks it plain, the packet.
