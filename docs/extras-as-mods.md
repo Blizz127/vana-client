@@ -319,7 +319,12 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Targeting Helpers** (assets/mods/targeting; SetTarget, TurnAround, autochecker, MobCompass's facing): `//tgt
   <name | id>` targets the nearest match, `//face` / `//face away` turn toward or away from the target, Check New
   Targets /checks each monster once. Seen live on an NPC. (`/target` is a game command, hence `//tgt`.)
-- Not ported: GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
+- **Entity Styles** (assets/mods/entity-styles; renamer, noname, BigMode): on our screen only, `//rename <name> as
+  <new>` renames a character or monster, Hide My Name hides our plate, My Size scales us (render.entity, applied twice
+  a second to what is in range). Seen live: an NPC renamed, our plate hidden, our size 1.3. Not yet: tints by kind
+  and the name colour table.
+- Not ported: Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
+  not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the

@@ -1,0 +1,25 @@
+name = "Entity Styles"
+version = "1.0.0"
+description = "Renames characters and monsters on your screen, hides your own name plate, and sets your size (the renamer and name plate add-ons). Only you see it."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Entity Styles"
+help = "//rename <name> as <new name> shows that character or monster under the new name on your screen; //rename <name> undoes it; //renames lists them. Only you see the changes."
+
+[settings.hide_name]
+type = "bool"
+default = false
+label = "Hide My Name"
+help = "Hides your own name plate."
+
+[settings.my_scale]
+type = "number"
+default = 1.0
+min = 0.5
+max = 2.0
+step = 0.05
+label = "My Size"
+help = "Draws your character larger or smaller, on your screen only."
