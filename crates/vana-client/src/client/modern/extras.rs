@@ -137,6 +137,10 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
             continue;
         }
         let key = win.panel.clone().unwrap_or_else(|| format!("mod:{mod_id}:{}", win.id));
+        if win.panel.is_none() && !p.layout.contains_key(&key) {
+            let y = stack_below(p);
+            p.retail.insert(key.clone(), super::Place { x: 0.0, y, ..Default::default() });
+        }
         let regime = win.panel.as_deref() == Some("regime");
         let folded = if regime { !w.regime.out } else { p.folded.get(&key).copied().unwrap_or(false) };
         let (m, ctx, gu) = (p.m, p.ctx, p.gu);
@@ -164,6 +168,17 @@ fn mod_edges(p: &mut Panels, w: &mut World) {
             super::super::lua::window_click(w, &mod_id, &win.id, c);
         }
     }
+}
+
+/// Where a mod's edge window that was never moved starts (a fraction of the screen's height): on the left edge, under
+/// the built-in windows there (last frame's) and the mods' drawn before it this frame, so none stand on another.
+fn stack_below(p: &Panels) -> f32 {
+    let screen = p.ctx.content_rect();
+    let on_left = |r: &Rect| r.min.x <= screen.min.x + 4.0;
+    let built: Vec<Rect> = p.m.rects.borrow().iter().filter(|(k, _)| ["timers_recasts", "timers_buffs", "timers_debuffs", "regime"].contains(&k.as_str())).map(|(_, r)| *r).collect();
+    let mods = p.this.iter().filter(|(k, _)| k.starts_with("mod:")).map(|(_, r)| *r);
+    let bottom = built.into_iter().chain(mods).filter(on_left).map(|r| r.max.y).fold(screen.height() * 0.3, f32::max);
+    ((bottom + 8.0 - screen.min.y) / screen.height().max(1.0)).min(0.9)
 }
 
 /// The skillchain helper (skillchain.rs's view) on a screen edge, in a party: on our target the open resonance (its

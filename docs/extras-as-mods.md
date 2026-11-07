@@ -179,3 +179,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Instant Log Lines, Commands While K.O., TrueType Text, Animation Speed. Seen live: Instant Log Lines and Animation
   Speed 2 reaching their switches. Not in it yet: instaLS's linkshell chat right after zoning, `//config`-style
   game settings by command.
+- **Equipment Grid** (assets/mods/equipment-grid; equipviewer, equipmon, EquipViewer): the worn gear as the equipment
+  menu's 4 x 4 grid of item icons (a canvas in an edge window) with the ammunition's count. Seen live: a sword, a cap
+  and pebbles in their cells.
+
+Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
+regime's windows and under the mods' drawn before them, so two never open on one place.
