@@ -5863,12 +5863,20 @@ Full spec: scratchpad iuse/SPEC.md of that session (sort windows, manual sort, t
   1 filled in so Enter goes on as before. Up / Down 1, Right 1, Left the most (complete sets of the crystal and every
   material at its count in unlocked stacks, 1..99), digits type the number, Backspace drops a digit, Escape back to
   tskill1. Bars: itemctrl's (0xd 0x3e, 0xe 0x10c).
-- The repeats (synth::repeat_frame): each next one goes when the last is over (its 0x06F in and the retail 2 s
+- The repeats (since 2026-11-06 the bundled Synthesis Amount mod: the count step is the client option
+  synth_amount, the count goes to the mods' synth_amount event, the mod sends the rest with actions.synth while
+  game.synth().busy is false): each next one goes when the last is over (its 0x06F in and the retail 2 s
   request lock gone, our animation done, out of status 0x2c, no synthesis window), from fresh stacks as /lastsynth
   finds them; LSB's own rule is 15 s from the last start (0x096_combine_ask.cpp), and a synthesis takes about 16 s.
   Failures go on; any other answer (interrupted, a cancel, wait longer), missing materials (group 9 0xe) or a zone
   change stop them. Sends actions by itself: the user asked for it as a standing feature (not an Extras toggle).
 - Live: History -> Synthesize -> 3 typed -> three in a row, about 5 s apart (two failures, one success).
+- LSB since its synthesis transactions (2026-10-19, items/transactions/synth.cpp): claimAndLock sends the crystal stack
+  with LockFlg 15, consumeCrystal takes one and releases the claim with no item packet, and unlockAll at the commit no
+  longer includes it, so the rest of the stack stays locked on the client until a zone change. Our find_units (as
+  retail's /lastsynth) skips locked stacks: a second synthesis from that stack is refused with group 9 0xe "Synthesis
+  canceled." Seen 2026-11-06 with the built-in repeats (master) and the mod's alike: one synthesis, then the refusal
+  2 s after its result. A server bug; the client keeps what the server sent.
 
 ## Effect element life: GPU and CPU in step (Bastok smoke flashes, 2026-10-23)
 

@@ -36,6 +36,8 @@
 ---| "chat_message" # A chat line from a player (or a GM): its text, sender, kind (0 say, 1 shout, 3 tell, 4 party, 5 linkshell, 0x1a yell, 0x1b linkshell 2, 0x21 unity) and whether a GM sent it.
 ---| "action" # A decoded action packet (s2c 0x028): actor, category, param, info and targets with their results.
 ---| "battle_message" # A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
+---| "synth_amount" # The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
+---| "synth_result" # Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
 ---| "damage" # A damage number: a battle message that puts one up (main and proc records), whatever the chat filters show.
 ---| "ipc_message" # Text the same mod sent from another game window on this machine (ipc.send; needs multibox).
 ---| "item_change" # A bag slot's count changed.
@@ -897,6 +899,10 @@ function game.recasts() end
 ---@return vana.Time
 function game.time() end
 
+--- Our synthesis state: busy (a request waiting for its answer or the 2 s after it, our synthesis animation, the synthesizing status, the window open), window (the synthesis window is open).
+---@return {busy: boolean, window: boolean}
+function game.synth() end
+
 --- What the clock slot shows (ui.native.slot): earth (Earth's local time in the player's 12 / 24 hour format), moon_name, moon (percent), next_day (the next Vana'diel day's name), next_minutes (Earth minutes until it); nil until the clock and the message tables are known.
 ---@return {earth: string, moon_name: string, moon: integer, next_day: string, next_minutes: integer}?
 function game.clock() end
@@ -1129,6 +1135,12 @@ function actions.cancel(status) end
 --- Picks an option of the event menu showing (game.event().menu), as the cursor and Enter would.
 ---@param option integer from 1
 function actions.choose(option) end
+
+--- Synthesizes by item ids, as the synthesis window's Synthesize does: the crystal and one material id per unit (1..8), from fresh unlocked stacks in the inventory. True when it goes out; false when it would not (its line prints: materials not held, a full inventory, a synthesis under way, a status that forbids it).
+---@param crystal integer the crystal's item id
+---@param items integer[] one material id per unit
+---@return boolean
+function actions.synth(crystal, items) end
 
 --- Moves the event's waiting text on, as Enter does (enternity, stepdialog).
 function actions.advance() end
@@ -1528,7 +1540,7 @@ function client.set_priority(level) end
 ---@return boolean|number|table
 function client.option(name) end
 
---- Sets a behaviour switch while the mod is loaded (the game's usual behaviour back when it unloads): macro_palette_delay (false: the Ctrl / Alt palette opens at once, not at the next whole second), ah_result_delay (false: a bid's result prints at once), equipset_delay (false: no 0.9 s wait between equip sets), log_slide (false: new log lines show at once), cutscene_speed (1..4: events play that much faster), animation_rate (0.25..4: the actors' animation speed), clear_colour and ambient ({r, g, b} 0..255 in place of the zone's background colour and ambient light; false gives the zone's back), minimap_span (the minimap's zoom, map pixels across, 48..512; kept as the minimap's own wheel keeps it); rules: move_lock (false: our abilities' and the weapon draw's move lock is lifted), all_maps (true: every map without its key item), dead_commands (true: text commands while K.O.), compass_monsters (true: monster dots on the compass for every job), player_collision (false: moving players never hold a step), occlusion (false: characters behind scenery still draw and target), menu_reach (false: the auction house and the nomad moogle menu stay open as we move away); send_interval (ms between the datagrams we send, 50..1000; the game's is 400); wireframe (true: the scenery drawn as lines, where the GPU draws them); ttf_text (true: the game font's text in the UI's TrueType face in the classic UI too: the log, the windows' text; sprite numbers and captions stay as the game draws them); stamp_all_lines (true: the game's chat timestamps on every log line, not only chat; with them off, hours, minutes and seconds). A value of the wrong type is an error.
+--- Sets a behaviour switch while the mod is loaded (the game's usual behaviour back when it unloads): macro_palette_delay (false: the Ctrl / Alt palette opens at once, not at the next whole second), ah_result_delay (false: a bid's result prints at once), equipset_delay (false: no 0.9 s wait between equip sets), log_slide (false: new log lines show at once), cutscene_speed (1..4: events play that much faster), animation_rate (0.25..4: the actors' animation speed), clear_colour and ambient ({r, g, b} 0..255 in place of the zone's background colour and ambient light; false gives the zone's back), minimap_span (the minimap's zoom, map pixels across, 48..512; kept as the minimap's own wheel keeps it); rules: move_lock (false: our abilities' and the weapon draw's move lock is lifted), all_maps (true: every map without its key item), dead_commands (true: text commands while K.O.), compass_monsters (true: monster dots on the compass for every job), player_collision (false: moving players never hold a step), occlusion (false: characters behind scenery still draw and target), menu_reach (false: the auction house and the nomad moogle menu stay open as we move away); send_interval (ms between the datagrams we send, 50..1000; the game's is 400); wireframe (true: the scenery drawn as lines, where the GPU draws them); ttf_text (true: the game font's text in the UI's TrueType face in the classic UI too: the log, the windows' text; sprite numbers and captions stay as the game draws them); stamp_all_lines (true: the game's chat timestamps on every log line, not only chat; with them off, hours, minutes and seconds); synth_amount (true: after Synthesize the synthesis window asks how many, 1 to the sets held, and gives the count to the mods' synth_amount event). A value of the wrong type is an error.
 ---@param name string 
 ---@param value boolean|number|table 
 function client.set_option(name, value) end
@@ -1621,6 +1633,8 @@ function settings.get(key) end
 --   chat_message(text: string, sender: string, kind: integer, gm: boolean): A chat line from a player (or a GM): its text, sender, kind (0 say, 1 shout, 3 tell, 4 party, 5 linkshell, 0x1a yell, 0x1b linkshell 2, 0x21 unity) and whether a GM sent it.
 --   action(action: vana.Action): A decoded action packet (s2c 0x028): actor, category, param, info and targets with their results.
 --   battle_message(actor: integer, target: integer, message: integer, param1: integer, param2: integer): A battle message (s2c 0x029 / 0x02D): actor, target, message id and its two parameters.
+--   synth_amount(count: integer, recipe: table): The synthesis window's count step (client option synth_amount) was answered: the first synthesis has gone out; recipe = {crystal, items (one material id per unit)} for actions.synth.
+--   synth_result(result: integer, item: integer, count: integer, grade: integer): Our synthesis was answered (s2c 0x06F): result 0 and 12 made, 1 failed (materials lost); others refused or cut short (the reason's line printed); item, count, grade (0 normal, 1..3 high quality) of what was made.
 --   damage(actor: integer, target: integer, value: integer, message: integer): A damage number: a battle message that puts one up (main and proc records), whatever the chat filters show.
 --   ipc_message(text: string, from: string): Text the same mod sent from another game window on this machine (ipc.send; needs multibox).
 --   item_change(bag: integer, slot: integer, id: integer, count: integer, previous: integer): A bag slot's count changed.

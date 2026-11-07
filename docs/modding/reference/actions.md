@@ -46,6 +46,7 @@ end)
 | [`actions.talk(id)`](#actionstalk) | Talks to an NPC. |
 | [`actions.choose(option)`](#actionschoose) | Picks an option of the event menu showing. |
 | [`actions.advance()`](#actionsadvance) | Moves the event's waiting text on, as Enter does. |
+| [`actions.synth(crystal, items)`](#actionssynth) | Synthesizes by item ids, as the synthesis window does. |
 | [`actions.trade(npc, items?, gil?)`](#actionstrade) | Hands items and gil to an NPC. |
 | [`actions.buy(row, count?)`](#actionsbuy) | Buys from the open NPC shop. |
 | [`actions.sell(slot, count?)`](#actionssell) | Sells an inventory item to the open NPC shop. |
@@ -898,6 +899,46 @@ end)
 ```
 
 Nothing happens outside an event. With a menu showing it picks the option under the cursor, as Enter would: check `game.event().menu` first.
+
+## `actions.synth`
+
+```lua
+actions.synth(crystal, items) -> boolean
+```
+
+Synthesizes as the synthesis window's Synthesize does: the same checks, refusal lines and request. The crystal and
+the materials are taken by item id from unlocked stacks in the inventory, so a run of synths keeps going while the
+stacks last.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `crystal` | `integer` | yes | The crystal's item id. |
+| `items` | `integer[]` | yes | One material item id per unit, 1 to 8 of them (two of one material: its id twice). |
+
+**Returns** `boolean`: true when the synthesis goes out; false when it would not, and then the game's line for why
+prints (the materials not held, a full inventory, another synthesis under way, a status that forbids it).
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //again 3: the last recipe made through the window's count step, three more times.
+local last
+events.on("synth_amount", function(_, recipe) last = recipe end)
+commands.register("again", function(n)
+  for _ = 1, tonumber(n) or 1 do
+    while game.synth().busy do sleep(0.5) end
+    if not last or not actions.synth(last.crystal, last.items) then break end
+    sleep(1)  -- the request goes out after this mod phase; busy shows it from the next frame
+  end
+end)
+```
+
+Wait for `game.synth().busy` to go false between synths: the server answers each one, and the game keeps a short lock
+after the answer. The bundled Synthesis Amount mod is written with it.
 
 ## `actions.trade`
 

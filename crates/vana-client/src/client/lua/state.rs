@@ -288,6 +288,16 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         })?,
     )?;
     game.set(
+        "synth",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let t = lua.create_table()?;
+            t.set("busy", super::super::synth::busy(w))?;
+            t.set("window", w.synth.win.is_some())?;
+            Ok(t)
+        })?,
+    )?;
+    game.set(
         "clock",
         lua.create_function(|lua, ()| {
             let w = world(lua)?;

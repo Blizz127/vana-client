@@ -116,6 +116,7 @@ Some things hold for all of them:
 | [Party](#party) | [`party_change`](#party_change), [`party_invite`](#party_invite) |
 | [Combat](#combat) | [`action`](#action), [`battle_message`](#battle_message), [`damage`](#damage) |
 | [Chat](#chat) | [`chat_message`](#chat_message), [`emote`](#emote), [`examined`](#examined) |
+| [Crafting](#crafting) | [`synth_amount`](#synth_amount), [`synth_result`](#synth_result) |
 | [Items](#items) | [`item_add`](#item_add), [`item_remove`](#item_remove), [`item_change`](#item_change) |
 | [World](#world) | [`zone_change`](#zone_change), [`time_change`](#time_change), [`day_change`](#day_change), [`moon_change`](#moon_change), [`weather_change`](#weather_change) |
 | [Input and UI](#input-and-ui) | [`focus_change`](#focus_change), [`settings_changed`](#settings_changed) |
@@ -544,6 +545,41 @@ Someone examined us with `/check` (the "X examines you." message).
 ```lua
 events.on("examined", function(id, name)
   print((name ~= "" and name or "Someone") .. " checked you.")
+end)
+```
+
+## Crafting
+
+## `synth_amount`
+
+The synthesis window's count step was answered (it asks how many after Synthesize while the client option
+`synth_amount` is on). The first synthesis has already gone out from the window.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `count` | `integer` | How many the player asked for, 1 or more. |
+| `recipe` | `table` | `{crystal, items}`: the crystal's item id and one material id per unit, as `actions.synth` takes them. |
+
+```lua
+events.on("synth_amount", function(count, recipe)
+  print(("%d to go"):format(count - 1))
+end)
+```
+
+## `synth_result`
+
+Our synthesis was answered (s2c 0x06F). The game has printed its lines.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `result` | `integer` | 0 and 12 made, 1 failed (materials lost); anything else: refused or cut short. |
+| `item` | `integer` | The item made. |
+| `count` | `integer` | How many were made. |
+| `grade` | `integer` | The quality: 0 normal, 1 to 3 high quality. |
+
+```lua
+events.on("synth_result", function(result, item, count)
+  if result == 0 or result == 12 then print(("made %d x %s"):format(count, res.item(item).name)) end
 end)
 ```
 

@@ -91,14 +91,14 @@ pub(in crate::client) struct WinReq {
 }
 
 /// The behaviour switches (client.set_option) by name; false for an unknown name or value.
-pub(super) const OPTIONS: [&str; 20] = [
+pub(super) const OPTIONS: [&str; 21] = [
     "macro_palette_delay", "ah_result_delay", "equipset_delay", "log_slide", "cutscene_speed", "animation_rate", "clear_colour", "ambient", "minimap_span",
     "move_lock", "all_maps", "dead_commands", "compass_monsters", "player_collision", "occlusion", "menu_reach", "send_interval", "wireframe", "ttf_text",
-    "stamp_all_lines",
+    "stamp_all_lines", "synth_amount",
 ];
 
 /// The switches retail has off.
-const OFF: [&str; 6] = ["all_maps", "dead_commands", "compass_monsters", "wireframe", "ttf_text", "stamp_all_lines"];
+const OFF: [&str; 7] = ["all_maps", "dead_commands", "compass_monsters", "wireframe", "ttf_text", "stamp_all_lines", "synth_amount"];
 
 /// An {r, g, b} (0..255) as gamma-space floats; false / nil: none.
 fn rgb_of(v: &serde_json::Value) -> Option<Option<[f32; 3]>> {
@@ -129,6 +129,7 @@ fn set_option(w: &mut World, name: &str, v: &serde_json::Value) -> bool {
         ("wireframe", Some(b)) => w.opts.wireframe = b,
         ("ttf_text", Some(b)) => w.opts.ttf_text = b,
         ("stamp_all_lines", Some(b)) => w.stamp_all_lines = b,
+        ("synth_amount", Some(b)) => w.opts.synth_amount = b,
         ("log_slide", Some(b)) => (w.log.anim.instant, w.log2.anim.instant, w.modern_log.anim.instant) = (!b, !b, !b),
         ("cutscene_speed", _) => match v.as_f64() {
             Some(k) => w.opts.cutscene_speed = (k as f32).clamp(1.0, 4.0),
@@ -185,6 +186,7 @@ pub(super) fn option(w: &World, name: &str) -> Option<serde_json::Value> {
         "wireframe" => json!(w.opts.wireframe),
         "ttf_text" => json!(w.opts.ttf_text),
         "stamp_all_lines" => json!(w.stamp_all_lines),
+        "synth_amount" => json!(w.opts.synth_amount),
         "log_slide" => json!(!w.log.anim.instant),
         "cutscene_speed" => json!(w.opts.cutscene_speed),
         "animation_rate" => json!(w.opts.anim_rate),
@@ -489,7 +491,7 @@ macro_rules! bundled {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
     };
 }
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {

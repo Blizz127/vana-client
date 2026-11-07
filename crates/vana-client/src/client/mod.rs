@@ -397,6 +397,8 @@ struct Opts {
     /// The scenery drawn as lines, and the game font's text in the TrueType face (a mod's switches).
     wireframe: bool,
     ttf_text: bool,
+    /// The synthesis window asks how many after Synthesize (ours; the bundled Synthesis Amount).
+    synth_amount: bool,
 }
 
 impl Default for Opts {
@@ -418,6 +420,7 @@ impl Default for Opts {
             menu_reach: true,
             wireframe: false,
             ttf_text: false,
+            synth_amount: false,
         }
     }
 }
@@ -6448,7 +6451,6 @@ struct World {
     map_opacity: f32,
     /// Per-window opacity the player set (config `window_opacity`).
     window_opacity: std::collections::BTreeMap<String, f32>,
-    synth_amount: bool,
     /// Retail's chat timestamps on every log line (client option stamp_all_lines; the bundled Timestamps mod).
     stamp_all_lines: bool,
     /// The skillchain helper's resonances and seen skills (client/skillchain.rs).
@@ -7533,7 +7535,6 @@ impl App {
             w.modern = self.cfg.modern_ui;
             w.condense = self.cfg.modern_condense;
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
-            w.synth_amount = self.cfg.synth_amount;
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
             w.extra_timers = self.cfg.timers;
@@ -8399,7 +8400,6 @@ impl App {
                             last_proposer: String::new(),
                             map_opacity: self.cfg.map_overlay_opacity,
                             window_opacity: self.cfg.window_opacity.clone(),
-                            synth_amount: self.cfg.synth_amount,
                             stamp_all_lines: false,
                             skillchain: Default::default(),
                             lamps: Default::default(),

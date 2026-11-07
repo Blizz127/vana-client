@@ -22,7 +22,6 @@ pub struct Settings {
     pub send_interval: u32,
     pub party_tp: bool,
     pub map_opacity: u32,
-    pub synth_amount: bool,
     pub lamp_lights: bool,
     pub actor_shadows: u32,
     pub shadow_map: u32,
@@ -68,7 +67,6 @@ impl Settings {
             send_interval: c.send_interval,
             party_tp: c.party_tp,
             map_opacity: pct(c.map_overlay_opacity),
-            synth_amount: c.synth_amount,
             lamp_lights: c.lamp_lights,
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
@@ -111,7 +109,6 @@ impl Settings {
         c.send_interval = self.send_interval;
         c.party_tp = self.party_tp;
         c.map_overlay_opacity = self.map_opacity as f32 / 100.0;
-        c.synth_amount = self.synth_amount;
         c.lamp_lights = self.lamp_lights;
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
@@ -164,7 +161,6 @@ enum Val {
     DrawDistance,
     SendRate,
     PartyTp,
-    SynthAmount,
     LampLights,
     ActorShadows,
     ShadowMap,
@@ -353,9 +349,7 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, REGIME_ROW, SKILLCHAIN_ROW];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[];
-    const EXTRA_MISC: &[SRow] = &[
-        row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
-    ];
+    const EXTRA_MISC: &[SRow] = &[];
     match kind {
         Kind::Extras if modern => [&MAPS[..2], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
@@ -552,7 +546,6 @@ impl SettingsUi {
             Val::Gamepad => self.s.gamepad as u32,
             Val::PadDeadZone => self.s.gamepad_dead,
             Val::MouseCamSpeed => self.s.mouse_camera_speed,
-            Val::SynthAmount => self.s.synth_amount as u32,
             Val::LampLights => self.s.lamp_lights as u32,
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
@@ -590,7 +583,6 @@ impl SettingsUi {
             Val::Gamepad => self.s.gamepad = x != 0,
             Val::PadDeadZone => self.s.gamepad_dead = x,
             Val::MouseCamSpeed => self.s.mouse_camera_speed = x,
-            Val::SynthAmount => self.s.synth_amount = x != 0,
             Val::LampLights => self.s.lamp_lights = x != 0,
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
@@ -1743,11 +1735,6 @@ mod tests {
         ui.key(egui::Key::ArrowLeft);
         ui.key(egui::Key::Enter);
         assert!(ui.s.timers);
-        // Misc.: Synthesis Amount.
-        ui.goto(3, 1);
-        ui.key(egui::Key::ArrowLeft);
-        ui.key(egui::Key::Enter);
-        assert!(ui.s.synth_amount);
     }
 
     /// Settings: Left / Right turn the page on a slider row, move between buttons on a buttons row, and always turn

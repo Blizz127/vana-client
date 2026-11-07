@@ -27,6 +27,7 @@ end)
 | [`game.buffs()`](#gamebuffs) | Your status effects and their time left. |
 | [`game.recasts()`](#gamerecasts) | Seconds left on your spell and ability recasts, and their whole lengths. |
 | [`game.time()`](#gametime) | The Vana'diel date, clock and moon. |
+| [`game.synth()`](#gamesynth) | Whether a synthesis is under way, and whether the synthesis window is open. |
 | [`game.clock()`](#gameclock) | Earth time, the moon and the next Vana'diel day, as the clock slot shows them. |
 | [`game.weather()`](#gameweather) | The current weather id. |
 | [`game.key_items()`](#gamekey_items) | The key items you hold. |
@@ -378,6 +379,29 @@ The Vana'diel clock and calendar, and the moon.
 local t = game.time()
 print(("%d/%02d/%02d %02d:%02d, %s, %s (%d%%)"):format(
   t.year, t.month, t.day, t.hour, t.minute, res.day(t.weekday), res.moon(t.moon_phase), t.moon))
+```
+
+## `game.synth`
+
+```lua
+game.synth() -> table
+```
+
+Our synthesis state.
+
+**Returns** a table:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `busy` | `boolean` | A synthesis is under way: its request waits for the answer (or for the 2 seconds after it), our synthesis animation plays, the synthesizing status holds, or the synthesis window is open. |
+| `window` | `boolean` | The synthesis window is open. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+if not game.synth().busy then actions.synth(4096, {640, 640}) end
 ```
 
 ## `game.clock`

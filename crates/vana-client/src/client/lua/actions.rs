@@ -53,6 +53,8 @@ pub(in crate::client) enum Action {
     /// A main menu row (page, child), as a pick there runs it; the nomad moogle menu.
     Menu(u8, u16),
     Moogle,
+    /// A synthesis by item ids: the crystal and one material per unit.
+    Synth(u16, Vec<u16>),
 }
 
 /// The main menu's rows by name: (name, page, child).
@@ -230,6 +232,9 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
             }
         }
         Action::Moogle => super::super::moogle::open(w, true),
+        Action::Synth(crystal, items) => {
+            super::super::synth::synth_ids(w, crystal, &items);
+        }
         Action::Advance => {
             if event::active(w) {
                 event::key(w, egui::Key::Enter);
@@ -517,6 +522,15 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
     t.set("mount", lua.create_function(|lua, name: String| queue(lua, Action::Line(format!("/mount \"{name}\""))))?)?;
     t.set("dismount", lua.create_function(|lua, ()| queue(lua, Action::Line("/dismount".into())))?)?;
     t.set("advance", lua.create_function(|lua, ()| queue(lua, Action::Advance))?)?;
+    // True when it goes out; false when it would not (its refusal line prints, as the synthesis window's would).
+    t.set(
+        "synth",
+        lua.create_function(|lua, (crystal, items): (u16, Vec<u16>)| {
+            let ok = super::super::synth::can_synth(super::api::world(lua)?, crystal, &items);
+            queue(lua, Action::Synth(crystal, items))?;
+            Ok(ok)
+        })?,
+    )?;
     t.set(
         "open_menu",
         lua.create_function(|lua, name: String| {

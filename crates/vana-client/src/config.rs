@@ -197,8 +197,6 @@ pub struct Config {
     /// Extra: how opaque the map overlay's map is, 0..1: the drawing code applies it to HUD maps (the Map Overlay
     /// mod's), and the minimap's marker shades by it (the two markers alike).
     pub map_overlay_opacity: f32,
-    /// Extra: Synthesize asks how many and repeats.
-    pub synth_amount: bool,
     /// Not retail (Settings' Lamp Lights): real point lights at the zones' lamps in place of their baked lamplight
     /// (client/lamps.rs).
     pub lamp_lights: bool,
@@ -443,7 +441,6 @@ impl Default for Config {
             party_tp: true,
             window_opacity: Default::default(),
             map_overlay_opacity: 0.6,
-            synth_amount: false,
             gm_window: false,
             notes_seen: env!("CARGO_PKG_VERSION").into(),
             lamp_lights: true,

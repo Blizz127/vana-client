@@ -76,6 +76,12 @@ Done so far (checked live, Lnxcsfix):
   set while the mod's setting is on. The classic log rewraps its lines when the switch changes (the modern chat
   stamps as it draws), so the lines that came before the mods started are stamped too. Compared with master in both
   UIs.
+- **Synthesis Amount** (assets/mods/synth-amount): the count step stays the synthesis window's own (client option
+  `synth_amount`: the same itemctrl under tskill1, keys and bars); its count goes to the mods (`synth_amount` event)
+  and the mod makes the rest with `actions.synth` once `game.synth().busy` is false, stopping on a refusal, a
+  `synth_result` that is neither made nor failed, or a zone change. Seen live in the classic UI: the count step, the
+  event, the next synthesis tried at the moment the built-in tried it. On LSB today both stop after one (the server
+  leaves the crystal stack locked: MODLOG "Ours, not retail: a synthesis amount"), master's built-in the same way.
 
 ## Order
 
