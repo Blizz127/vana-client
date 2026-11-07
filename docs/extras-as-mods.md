@@ -163,3 +163,7 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   line) with its recast shade and time, its macro in a tip; click, right-click menu, drag onto another slot to swap,
   hotkeys per bar, the manager window. The bars stand over the chat window at its full height (ui.native.rect's
   `room`; the classic log too), so they stay put while it grows and folds. Seen live in both UIs.
+- **XP Tracker** (assets/mods/xp-tracker; PointWatch, Ashita's points, Attainment and the like): experience, merits
+  and limit points, job points and capacity points as rows of an edge window, each with what came in per hour
+  (`//xp reset` starts again). Gains are read from game.stats and game.job_points once a second, a level, merit or
+  job point taken in counting what rolled over. Seen live (two `!givexp` gains: 33.8k/h over a minute).
