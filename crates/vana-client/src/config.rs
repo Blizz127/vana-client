@@ -374,7 +374,8 @@ pub struct ModRef {
 
 /// Where mod folders live.
 pub fn mods_dir() -> PathBuf {
-    data_dir().join("mods")
+    // VANA_MODS_DIR: another mods folder for test runs.
+    std::env::var_os("VANA_MODS_DIR").map_or_else(|| data_dir().join("mods"), PathBuf::from)
 }
 
 /// The enabled mods' folders, highest priority first (none with FFXI_NO_MODS set).
@@ -388,6 +389,11 @@ pub fn enabled_mod_dirs() -> Vec<PathBuf> {
 /// Merged overlay DATs (rebuilt when a source changes).
 pub fn merged_dir() -> PathBuf {
     app_dir(dirs::cache_dir()).join("merged")
+}
+
+/// The mod catalogue's last list and its downloads.
+pub fn catalogue_dir() -> PathBuf {
+    app_dir(dirs::cache_dir()).join("catalogue")
 }
 
 /// Config-tool values with our defaults (FFXiMain's own default in the comment where it differs).

@@ -6,6 +6,7 @@ use super::super::World;
 use super::super::configui::{self, Act, ConfigUi, Ctl};
 use super::super::configui2;
 use super::super::game_ui::GameUi;
+use super::super::modsui::Pick as Picked;
 use super::super::settings::{self, SettingsUi};
 use super::kit::{self, At, Btn, Stop};
 use super::{Panels, Title};
@@ -31,7 +32,7 @@ const SUBS: [(&str, Entry, &str); 5] = [
     ("Chat Filters", Entry::List("cfilter", None), "Choose which kinds of chat and battle messages show in the log."),
     ("Effects", Entry::List("fxfilter", None), "Choose whose visual effects you see: yours, your party's and other players'."),
     ("Font Colors", Entry::Colors, "Choose the colour of each kind of chat and battle message."),
-    ("Mods", Entry::Mods, "Turn mod packs on or off, change their order, and install or remove them."),
+    ("DAT Packs & Mods", Entry::Mods, "DAT packs (textures and other game files) and Lua mods: turn them on or off, and install, update or remove them."),
     ("Mod Settings", Entry::ModPages, "Settings for your Lua mods, one page per mod."),
 ];
 const SUB_CHAT: usize = 0;
@@ -807,18 +808,20 @@ fn shown_tabs(v: &settings::View, skip: usize) -> (Vec<&str>, usize) {
     (v.tabs.iter().skip(skip).map(String::as_str).collect(), v.tab.saturating_sub(skip))
 }
 
-/// The Mods page's stops: the tabs, Install from File, each pack's toggle / up / down / uninstall, each archive's
-/// Install; the picker's list while it is open.
+/// The Mods page's stops: the tabs, Install from File, each pack's toggle / up / down / uninstall, each offer's
+/// Install (archives found, catalogue mods); the picker's list while it is open.
 fn mods_stops(s: &SettingsUi, skip: usize) -> Vec<Stop> {
     if let Some(b) = s.mods_state().and_then(|m| m.browse.as_ref()) {
         return vec![Stop::List { n: b.entries.len(), page: 10 }];
     }
-    let (packs, archives) = s.mods_rows();
+    let (packs, offers) = s.mods_rows();
     let busy = s.mods_state().is_some_and(|m| m.installing().is_some());
     let n = packs.len();
     let mut out = vec![Stop::Tabs { n: s.view().tabs.len().saturating_sub(skip).max(1), at: s.view().tab.saturating_sub(skip) }, Stop::Buttons { n: 1, off: busy as u64, pair: None }];
-    out.extend((0..n).map(|i| Stop::Buttons { n: 4, off: ((i == 0) as u64) << 1 | ((i + 1 == n) as u64) << 2, pair: Some(1) }));
-    out.extend(archives.iter().map(|_| Stop::Buttons { n: 1, off: busy as u64, pair: None }));
+    // A Lua mod has no order: its chevrons stay off (and are not drawn).
+    let lua = s.lua_page();
+    out.extend((0..n).map(|i| Stop::Buttons { n: 4, off: ((i == 0 || lua) as u64) << 1 | ((i + 1 == n || lua) as u64) << 2, pair: Some(1) }));
+    out.extend(offers.iter().map(|_| Stop::Buttons { n: 1, off: busy as u64, pair: None }));
     out
 }
 
@@ -826,6 +829,7 @@ fn mods_stops(s: &SettingsUi, skip: usize) -> Vec<Stop> {
 fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
     let (packs, _) = s.mods_rows();
     let n = packs.len();
+    let lua = s.lua_page();
     if let Some(m) = s.mods_mut()
         && let Some(b) = m.browse.as_mut()
     {
@@ -859,7 +863,7 @@ fn mods_act(s: &mut SettingsUi, act: kit::Act, at: At, skip: usize) -> bool {
         kit::Act::Moved => s.m_mods = (at.stop, at.sub),
         kit::Act::Press(1, _) => {
             if let Some(m) = s.mods_mut() {
-                m.browse = Some(super::super::modsui::Browse::open());
+                m.browse = Some(super::super::modsui::Browse::open(lua));
                 m.error = None;
             }
             s.sounds.push(Se::Select);
@@ -1299,7 +1303,8 @@ enum ModDo {
 }
 
 /// The Mods page: Install from File at the top (or the file picker), each pack with its toggle, chevrons and
-/// Uninstall, the archives found with Install; the removal prompt in place while asked.
+/// Uninstall, the archives found and the catalogue's mods with Install or Update; the removal prompt in place while
+/// asked.
 fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow: bool, skip: usize, act: &mut Vec<ModDo>) {
     let v = s.view();
     let at = if open { Some(s.m_mods) } else { None };
@@ -1313,18 +1318,19 @@ fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow:
         ui.add_space(4.0);
         let tall = ui.ctx().content_rect().height() * 0.5;
         let out = kit::list(ui, m, "mods browse", b.entries.len(), Some(b.cursor), open, follow, 28.0, tall, |_| false, |ui, row| {
-            let (name, dir) = &b.entries[row.index];
+            let (name, pick) = &b.entries[row.index];
+            let dir = *pick == Picked::Folder;
             let p = ui.painter();
-            // A folder's tabbed outline, or an archive's box with its strap.
+            // A folder's tabbed outline, or an archive's box with its strap (gold for a Lua mod's folder).
             let r = Rect::from_center_size(pos2(row.rect.min.x + 22.0, row.rect.center().y), vec2(16.0, 12.0));
-            let st = egui::Stroke::new(1.5, if *dir { m.theme.color("gold") } else { m.theme.color("muted") });
+            let st = egui::Stroke::new(1.5, if *pick == Picked::Archive { m.theme.color("muted") } else { m.theme.color("gold") });
             p.rect_stroke(r, 2.0, st, egui::StrokeKind::Inside);
-            if *dir {
+            if dir {
                 p.line_segment([r.left_top() + vec2(1.0, -2.0), r.left_top() + vec2(7.0, -2.0)], st);
             } else {
                 p.line_segment([pos2(r.center().x, r.min.y), pos2(r.center().x, r.max.y)], st);
             }
-            let label = if *dir && name != ".." { format!("{name}/") } else { name.clone() };
+            let label = if dir && name != ".." { format!("{name}/") } else { name.clone() };
             p.text(pos2(row.rect.min.x + 40.0, row.rect.center().y), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), kit::ink(m, row));
         });
         if let Some(k) = out.clicked {
@@ -1353,8 +1359,9 @@ fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow:
             ui.label(egui::RichText::new(format!("The last install failed: {e}")).size(m.theme.small).color(m.theme.color("hp")));
         }
     });
-    let (packs, archives) = s.mods_rows();
+    let (packs, offers) = s.mods_rows();
     let n = packs.len();
+    let lua = s.lua_page();
     for (i, (name, enabled)) in packs.iter().enumerate() {
         let st = i + 2;
         let cur = on(st);
@@ -1368,7 +1375,9 @@ fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow:
                 Some(2) => Some(false),
                 _ => None,
             };
-            if let Some(up) = kit::chevrons(ui, m, ("mod move", i), ch, i == 0, i + 1 == n) {
+            if !lua
+                && let Some(up) = kit::chevrons(ui, m, ("mod move", i), ch, i == 0, i + 1 == n)
+            {
                 act.push(ModDo::Press(st, if up { 1 } else { 2 }));
             }
             let t = Btn { lit: *enabled, cursor: cur == Some(0), off: false };
@@ -1377,20 +1386,29 @@ fn mods_page(ui: &mut Ui, m: &super::Modern, s: &SettingsUi, open: bool, follow:
             }
         });
     }
-    if !archives.is_empty() {
+    let heading = |ui: &mut Ui, text: &str| {
         ui.add_space(6.0);
-        ui.label(egui::RichText::new("Found in the Downloads folder").size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("muted")));
+        ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("muted")));
         ui.add_space(4.0);
-    }
-    for (k, (name, pm)) in archives.iter().enumerate() {
+    };
+    for (k, o) in offers.iter().enumerate() {
+        if k == 0 && !o.catalogue {
+            heading(ui, "Found in the Downloads folder");
+        }
+        if o.catalogue && offers.get(k.wrapping_sub(1)).is_none_or(|p| !p.catalogue) {
+            heading(ui, "From the catalogue");
+        }
         let st = 2 + n + k;
-        let label = pm.map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
-        kit::line(ui, m, &label, on(st).is_some(), follow, |ui| {
+        kit::line(ui, m, &o.label, on(st).is_some(), follow, |ui| {
             let b = Btn { cursor: on(st).is_some(), off: busy.is_some(), ..Default::default() };
-            if kit::clicked(&kit::button(ui, m, "Install", 0.0, b), b) {
+            if kit::clicked(&kit::button(ui, m, o.button, 0.0, b), b) {
                 act.push(ModDo::Press(st, 0));
             }
         });
+    }
+    if let Some(e) = state.and_then(|m| m.list_error.as_ref()).filter(|_| !offers.iter().any(|o| o.catalogue)) {
+        heading(ui, "From the catalogue");
+        ui.label(egui::RichText::new(format!("The catalogue could not be read: {e}")).size(m.theme.small).color(m.theme.color("muted")));
     }
 }
 
@@ -2107,7 +2125,8 @@ mod tests {
         assert!(view(&c, Some(&s)).is_empty());
     }
 
-    /// A page of ours in the Settings window shows only its own tabs, and turning them keeps that offset.
+    /// A page of ours in the Settings window shows only its own tabs (DAT Packs and Mods), and turning them keeps
+    /// that offset.
     #[test]
     fn mod_tabs_only() {
         let mut s = SettingsUi::open(&crate::config::Config::default(), [1920, 1080]);
@@ -2115,8 +2134,8 @@ mod tests {
         let skip = s.mods_tab();
         let v = s.view();
         let (tabs, at) = shown_tabs(&v, skip);
-        assert_eq!((tabs, at), (vec!["Mods"], 0));
-        assert!(matches!(mods_stops(&s, skip)[0], Stop::Tabs { n: 1, at: 0 }));
+        assert_eq!((tabs, at), (vec!["DAT Packs", "Mods"], 0));
+        assert!(matches!(mods_stops(&s, skip)[0], Stop::Tabs { n: 2, at: 0 }));
     }
 
     /// A page's headings with nothing under them go (ours left out in game, here the lobby's volumes).

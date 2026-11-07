@@ -644,8 +644,12 @@ the "Lua" extension, for example) and you get completion, argument hints and che
 
 ## Sharing your mod
 
-A mod is its folder: zip it (with the folder inside the zip) and share the file. To install one, unzip it into the
-mods folder. It shows up on the Mods page switched off; switch it on, and grant the permissions it asks for on its
+A mod is its folder: zip it (with the folder inside the zip) and share the file. To install one, use Settings >
+Mods > Install from File and pick the zip (or the mod's folder), or unzip it into the mods folder yourself. A mod
+installed by hand shows up on the Mods page switched off; switch it on, and grant the permissions it asks for on its
 Extras page.
+
+To list it in the mod catalogue, so players can install and update it from the Mods page, publish the zip as a
+GitHub release and add an entry for it to [catalogue/mods.json](../../catalogue/README.md) with a pull request.
 
 Put a `README.md` in the folder saying what the mod does, its commands, and which permissions it asks for and why.

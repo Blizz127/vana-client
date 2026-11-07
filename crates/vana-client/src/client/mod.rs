@@ -57,6 +57,7 @@ mod configui;
 mod configui2;
 mod settings;
 mod modsui;
+mod catalogue;
 mod updater;
 mod notes;
 mod firstrun;
