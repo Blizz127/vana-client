@@ -33,7 +33,9 @@ events.on("action", function(a)
   end
   if not what or what == "" then return end
   local target = game.entity(t.id)
-  local line = a.category == READY and ("%s readies %s."):format(actor.name, what)
+  -- The game's own line (an action result's values: the action's param, then the result's value), else ours.
+  local m = res.message and res.message(r.message, { actor = a.actor, target = t.id, values = { a.param, r.value } })
+  local line = m and text.strip(m.text) or a.category == READY and ("%s readies %s."):format(actor.name, what)
     or ("%s starts casting %s%s."):format(actor.name, what, target and target.id ~= a.actor and (" on " .. target.name) or "")
   shown[#shown + 1] = { text = line, colour = a.category == READY and { 255, 190, 110 } or { 200, 160, 255 }, at = os.clock() }
   while #shown > KEEP do table.remove(shown, 1) end

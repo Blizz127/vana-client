@@ -1333,7 +1333,7 @@ function res.key_item(id) end
 ---@return {lines: string[]?, short: string?, pairs: {id: integer, value: integer}[]?}
 function res.augments(item, extdata) end
 
---- A battle / system message expanded as the log prints it: options {actor, target (server ids or names), values {param1, param2, ...}}; {text, mode} or nil for an id without text.
+--- A battle / system message expanded as the log prints it: options {actor, target (server ids or names), values {param1, param2, ...}} (a battle_message's param1, param2; an action result's as the game fills it: the action's param, the result's value, its proc's value, its react's value, its bit); {text, mode} or nil for an id without text.
 ---@param id integer message id
 ---@param options? table 
 ---@return {text: string, mode: integer?}?
