@@ -74,6 +74,11 @@ windows-sys = { version = "0.61.2", features = ["Win32_System_Time", "Win32_Foun
 # Keeps the screen awake while a controller plays (client/keepawake.rs); already in the tree through rfd.
 zbus = "5.19"
 
+[target."cfg(target_os = \"macos\")".dependencies]
+# Keeps the system and display awake while a controller plays (client/keepawake.rs); already in the tree through gilrs/winit.
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["CFString", "std"] }
+objc2-io-kit = { version = "0.3.2", default-features = false, features = ["pwr_mgt"] }
+
 [target."cfg(unix)".dependencies]
 libc = "0.2"
 
