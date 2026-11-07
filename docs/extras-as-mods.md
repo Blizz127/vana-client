@@ -192,6 +192,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Player Bars** (assets/mods/player-bars; xivbar, pbar, PlayerInfo and kin): our HP, MP and TP as large HUD gauges
   (the HUD's hp / mp / tp kinds) over the middle of the screen, MP only for a job with MP; width and height settings.
   Seen live (WAR: HP and TP).
+- **Effect Remover** (assets/mods/effect-remover; cancel, Cancel, Ashita's debuff): `//cancel <effects>` cancels our
+  status effects by name, `*` pattern or id, several separated by commas (macros too). Seen live: `//cancel sne*`
+  ended a Sneak.
 
 Mod edge windows without a built-in panel that were never moved start on the left edge under the Timers' and the
 regime's windows and under the mods' drawn before them, so two never open on one place.
