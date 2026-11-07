@@ -190,9 +190,6 @@ pub struct Config {
     pub send_interval: u32,
     /// Party and alliance rows show TP (retail config 0xae bit 0, default off; ours on, as the add-ons do).
     pub party_tp: bool,
-    /// Extra: the map overlay (Ctrl / Alt + O; the add-ons' map overlay) and its opacity 0..1.
-    pub map_overlay: bool,
-    pub map_overlay_opacity: f32,
     /// Extra: Synthesize asks how many and repeats.
     pub synth_amount: bool,
     /// Extra (the timestamp add-on): retail's chat timestamps (config 0xb5) on every log line; seconds while 0xb5 is
@@ -452,8 +449,6 @@ impl Default for Config {
             draw_distance: 0,
             send_interval: 400,
             party_tp: true,
-            map_overlay: false,
-            map_overlay_opacity: 0.6,
             synth_amount: false,
             stamp_all_lines: false,
             target_distance: false,

@@ -2272,19 +2272,8 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                     world.full_log = Some(logwin::FullLog::open(sh));
                     world.log_active = false;
                 }
-                // The map overlay closes first (after the windows, below).
-                egui::Key::Escape if world.log_active && world.overlay.is_none() => world.log_active = false,
+                egui::Key::Escape if world.log_active => world.log_active = false,
                 egui::Key::A if modifiers.ctrl || modifiers.alt => send_chat(world, "/attack".into()),
-                // Extra: the map overlay (a free Ctrl / Alt letter in retail's key set).
-                egui::Key::O if (modifiers.ctrl || modifiers.alt) && world.map_overlay => {
-                    if world.overlay.take().is_none() {
-                        let o = map::Overlay::open(world, gu.map_regions());
-                        if !o.has_map() {
-                            world.sounds.push(crate::audio::Ui::Error as u32);
-                        }
-                        world.overlay = Some(o);
-                    }
-                }
                 // The palette (FUN_101a3960): Left / Right move the cursor (wrapping), Down / Up the next / previous set,
                 // Enter runs the cell and closes, Escape closes. Other keys pass (Ctrl / Alt + M opens magic).
                 egui::Key::ArrowLeft | egui::Key::ArrowRight | egui::Key::ArrowDown | egui::Key::ArrowUp | egui::Key::Enter | egui::Key::Escape if world.palette.0 != 0 => {
@@ -2567,7 +2556,6 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                     modern::command_key(world, *key)
                 }
                 egui::Key::Escape if world.menu.is_some() => world.menu = None,
-                egui::Key::Escape if world.overlay.is_some() => world.overlay = None,
                 // FUN_102110c0: the raise prompt refuses Escape (+0x39 = 0: SE 0004) and keeps the key.
                 egui::Key::Escape if dead && world.ko_offer == 2 && world.confirm.is_none() => world.sounds.push(crate::audio::Ui::Error as u32),
                 // Escape also takes a line off the log (key 0x95, FUN_1015b830). Clearing the target is key 0x92,
@@ -3280,16 +3268,6 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
     }
     // The Lua mods' HUD elements, over the plates and under every window.
     lua::draw_hud(gu, world);
-    if world.overlay.as_ref().is_some_and(|o| o.zone != world.pos_zone) {
-        world.overlay = Some(map::Overlay::open(world, gu.map_regions()));
-    } else if let Some(mut o) = world.overlay.take() {
-        o.follow(world, gu.map_regions());
-        world.overlay = Some(o);
-    }
-    if let Some(o) = world.overlay.as_mut().filter(|_| !world.modern) {
-        let facing = world.net.me.lock().map_or(0.0, |m| event::rad_of(m.dir));
-        o.draw(gu, (world.pos.x, world.pos.z), facing, sw, sh, world.map_opacity);
-    }
     if let Some(m) = world.cnq.as_mut() {
         region::poll_image(gu, m);
     }
@@ -3510,7 +3488,6 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
             blockers.extend(gu.window_rect(n, sw, sh));
         }
     }
-    blockers.extend(world.overlay.as_ref().filter(|o| o.has_map()).map(|o| o.rect));
     blockers.extend(world.minimap_rect);
     // Window 2 (FUN_10161d60): its frame, text and caption 740 at its own (x0 + textw - 352, y0); drawn before window 1,
     // which comes later in the window list (reopened after it), so window 1's caption sits over window 2's bottom edge.
@@ -6465,11 +6442,7 @@ struct World {
     log_find: Option<String>,
     /// The main menu's map window, and the key item bits by word (table * 16 + word, s2c 0x055).
     map: Option<map::MapWin>,
-    /// The map overlay (extra, Ctrl / Alt + O).
-    overlay: Option<map::Overlay>,
-    map_opacity: f32,
-    /// Extras: the map overlay and the synthesis amount.
-    map_overlay: bool,
+    /// Extra: the synthesis amount.
     synth_amount: bool,
     /// Config `stamp_all_lines` (extra).
     stamp_all_lines: bool,
@@ -7564,8 +7537,6 @@ impl App {
             w.modern = self.cfg.modern_ui;
             w.condense = self.cfg.modern_condense;
             w.chat.set_fold(self.cfg.modern_ui && self.cfg.modern_condense);
-            w.map_opacity = self.cfg.map_overlay_opacity;
-            w.map_overlay = self.cfg.map_overlay;
             w.synth_amount = self.cfg.synth_amount;
             w.stamp_all_lines = self.cfg.stamp_all_lines;
             (w.target_distance, w.target_hpp) = (self.cfg.target_distance, self.cfg.target_hpp);
@@ -8432,9 +8403,6 @@ impl App {
                             follow: None,
                             translating: false,
                             last_proposer: String::new(),
-                            overlay: None,
-                            map_opacity: self.cfg.map_overlay_opacity,
-                            map_overlay: self.cfg.map_overlay,
                             synth_amount: self.cfg.synth_amount,
                             stamp_all_lines: self.cfg.stamp_all_lines,
                             skillchain: Default::default(),
@@ -14209,9 +14177,15 @@ impl App {
             }
             // act:wheel:N turns the wheel N notches (up positive): the focused list's, else the camera's.
             if let Some(n) = action.as_deref().and_then(|a| a.strip_prefix("wheel:")).and_then(|n| n.parse::<f32>().ok()) {
-                // Over a modern panel it is egui's, as egui-winit consumes the window's; off the world (the lobby's
-                // windows read it from egui) too.
-                if (consumed && matches!(&self.phase, Phase::World(w) if w.modern)) || !matches!(&self.phase, Phase::World(_)) {
+                // The mods' mouse filters first, as the window's wheel goes. Over a modern panel it is egui's, as
+                // egui-winit consumes the window's; off the world (the lobby's windows read it from egui) too.
+                let taken = match &mut self.phase {
+                    Phase::World(w) => lua::input::drive_wheel(w, n),
+                    _ => false,
+                };
+                if taken {
+                    // A mod's.
+                } else if (consumed && matches!(&self.phase, Phase::World(w) if w.modern)) || !matches!(&self.phase, Phase::World(_)) {
                     let (unit, delta, phase, source) = (egui::MouseWheelUnit::Line, egui::vec2(0.0, n), egui::TouchPhase::Move, egui::MouseWheelSource::Unknown);
                     raw.events.push(egui::Event::MouseWheel { unit, delta, phase, source, modifiers: Default::default() });
                 } else if self.game_ui.as_ref().is_some_and(|g| g.wants_wheel()) {
@@ -15997,18 +15971,6 @@ impl ApplicationHandler for App {
                 if self.look_grab.is_none() && self.last_cursor.is_none_or(|(x, y)| (position.x - x).abs() > 2.0 || (position.y - y).abs() > 2.0) {
                     self.mouse.visible = true;
                 }
-                // A left-drag that starts on the map overlay pans it instead of turning the camera.
-                let k = self.ui_k;
-                let on_overlay = |w: &World, p: (f64, f64)| w.overlay.as_ref().is_some_and(|o| o.has_map() && inside(&o.rect, (p.0 as f32 * k.0, p.1 as f32 * k.1)));
-                if let (true, Some(a), Some((x, y)), Phase::World(world)) = (self.left_down, self.press_at, self.last_cursor, &mut self.phase)
-                    && on_overlay(world, a)
-                {
-                    if let Some(o) = world.overlay.as_mut() {
-                        o.pan((position.x - x) as f32 * k.0, (position.y - y) as f32 * k.1);
-                    }
-                    self.last_cursor = Some((position.x, position.y));
-                    return;
-                }
                 let looking = self.dragging || self.middle_down || (self.left_down && self.press_at.is_some_and(|a| (a.0 - position.x).abs() + (a.1 - position.y).abs() >= 5.0));
                 if let (true, Some((x, y))) = (looking, self.last_cursor) {
                     if self.look_grab.is_none() {
@@ -16035,13 +15997,6 @@ impl ApplicationHandler for App {
                     };
                     let k = self.ui_k;
                     let at = self.last_cursor.map(|c| (c.0 as f32 * k.0, c.1 as f32 * k.1));
-                    if let (Some(o), Some(p)) = (world.overlay.as_mut(), at)
-                        && o.has_map()
-                        && inside(&o.rect, p)
-                    {
-                        o.zoom_at(p, d);
-                        return;
-                    }
                     if at.is_some_and(|p| minimap::wheel(world, p, d)) {
                         return;
                     }

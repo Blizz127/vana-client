@@ -1,6 +1,6 @@
 //! The Extras in the modern layer: the Timers window (timers.rs's sections: recasts, our effects and those we put on
-//! others, folding as retail's), the minimap (round, north up, centred on us, the radar's dots; the wheel zooms) and
-//! the map overlay (Ctrl / Alt + O: the zone map in a box at its opacity; the game's mouse still pans and zooms it).
+//! others, folding as retail's) and the minimap (round, north up, centred on us, the radar's dots; the wheel zooms).
+//! The map overlay is a bundled mod (assets/mods/map-overlay).
 
 use super::super::map::MapImage;
 use super::super::timers::{self, Group, Icon, SECTIONS};
@@ -14,7 +14,6 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     skillchain_panel(p, w);
     minimap_panel(p, w);
     widescan_panel(p, w);
-    overlay(p, w);
 }
 
 /// Hidden in events, under the map, the Region Info map.
@@ -1329,26 +1328,3 @@ fn kind_colour(bit: u8) -> Color32 {
     }
 }
 
-/// The map overlay: the zone map in its centred box at its opacity, a bronze edge, our arrow; under every panel.
-fn overlay(p: &mut Panels, w: &mut World) {
-    let (sw, sh) = w.ui_wh;
-    let opacity = w.map_opacity;
-    let facing = w.net.me.lock().map_or(0.0, |m| event::rad_of(m.dir));
-    let pos = (w.pos.x, w.pos.z);
-    let Some(o) = w.overlay.as_mut().filter(|o| o.has_map()) else { return };
-    let (Some(img), Some((rect, view, zoom))) = (o.modern_image(), o.modern_view(sw, sh)) else { return };
-    let (m, ctx) = (p.m, p.ctx);
-    let tex = map_texture(m, ctx, &img);
-    let screen = ctx.content_rect();
-    let k = Vec2::new(screen.width() / sw.max(1.0), screen.height() / sh.max(1.0));
-    let boxr = Rect::from_min_size(pos2(rect[0] * k.x, rect[1] * k.y), vec2(rect[2] * k.x, rect[3] * k.y));
-    let z = vec2(zoom * k.x, zoom * k.y);
-    let painter = ctx.layer_painter(egui::LayerId::background()).with_clip_rect(boxr);
-    let img_r = Rect::from_min_size(boxr.min + vec2((img.region.ox as f32 - view.0) * z.x, (img.region.oy as f32 - view.1) * z.y), vec2(512.0 * z.x, 512.0 * z.y));
-    painter.image(tex, img_r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::from_white_alpha((255.0 * opacity.clamp(0.0, 1.0)) as u8));
-    let (px, py) = img.region.px(pos.0, pos.1);
-    let me = boxr.min + vec2((px as f32 - view.0) * z.x, (py as f32 - view.1) * z.y);
-    arrow_in(&painter, me, facing, 11.0, ME);
-    let edge = ctx.layer_painter(egui::LayerId::background());
-    edge.rect_stroke(boxr, 6.0, Stroke::new(2.0, m.theme.color("bronze").gamma_multiply(0.8)), egui::StrokeKind::Outside);
-}

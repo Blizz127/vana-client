@@ -2167,11 +2167,6 @@ pub struct Overlay {
     texture: Option<String>,
     shade: Option<Shade>,
     rx: Option<Receiver<ShadedLoaded>>,
-    /// Screen pixels per map pixel, and the map pixel at the box's top-left (None until the first draw).
-    zoom: f32,
-    view: Option<(f32, f32)>,
-    /// The box as last drawn (x, y, w, h).
-    pub rect: [f32; 4],
     /// The decoded image (size, pixels), kept for the modern layer's own texture.
     image: Option<([usize; 2], Arc<Vec<u8>>)>,
 }
@@ -2184,10 +2179,6 @@ pub struct MapImage {
     pub region: Region,
 }
 
-/// The box's side as a share of the screen's shorter side, and the zoom range over fitting the whole map.
-const OVERLAY_SIZE: f32 = 0.7;
-const OVERLAY_ZOOM_MAX: f32 = 8.0;
-
 impl Overlay {
     pub fn open(w: &World, regions: &[Region]) -> Self {
         let region = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
@@ -2196,23 +2187,14 @@ impl Overlay {
 
     pub fn new(zone: u16, region: Option<Region>, index: Option<Arc<DatIndex>>) -> Self {
         let rx = region.zip(index).map(|(r, index)| load_shaded(index, r.file_id()));
-        Self { zone, region, texture: None, shade: None, rx, zoom: 1.0, view: None, rect: [0.0; 4], image: None }
+        Self { zone, region, texture: None, shade: None, rx, image: None }
     }
 
-    /// The player crossed onto another page of the zone (Windurst Waters' north and south): that map, at the same
-    /// zoom, the player where they were in the box.
+    /// The player crossed onto another page of the zone (Windurst Waters' north and south): that map.
     pub fn follow(&mut self, w: &World, regions: &[Region]) {
         let here = Region::here(regions, w).filter(|r| r.need() != Need::Nothing && owned(w, r));
-        if here == self.region {
-            return;
-        }
-        let old = std::mem::replace(self, Self::new(w.pos_zone, here, w.index.clone()));
-        if let (Some(from), Some(v), Some(to)) = (old.region, old.view, here) {
-            let (ox, oy) = from.px(w.pos.x, w.pos.z);
-            let (nx, ny) = to.px(w.pos.x, w.pos.z);
-            (self.rect, self.zoom) = (old.rect, old.zoom);
-            self.view = Some((nx as f32 - (ox as f32 - v.0), ny as f32 - (oy as f32 - v.1)));
-            self.clamp();
+        if here != self.region {
+            *self = Self::new(w.pos_zone, here, w.index.clone());
         }
     }
 
@@ -2255,50 +2237,6 @@ impl Overlay {
         Some(MapImage { name: name.clone(), size: *size, rgba: rgba.clone(), region })
     }
 
-    /// The overlay box for the modern layer: the box (layout pixels), the map pixel at its top-left, layout pixels per
-    /// map pixel. Opened or resized, the whole map (as `draw`).
-    pub fn modern_view(&mut self, sw: f32, sh: f32) -> Option<([f32; 4], (f32, f32), f32)> {
-        let region = self.region?;
-        let side = (sw.min(sh) * OVERLAY_SIZE).round();
-        let rect = [((sw - side) / 2.0).round(), ((sh - side) / 2.0).round(), side, side];
-        if rect != self.rect {
-            self.rect = rect;
-            self.zoom = self.fit();
-            self.view = Some((region.ox as f32, region.oy as f32));
-        }
-        Some((self.rect, self.view?, self.zoom))
-    }
-
-    fn fit(&self) -> f32 {
-        self.rect[2] / 512.0
-    }
-
-    /// Keeps the image over the whole box.
-    fn clamp(&mut self) {
-        let (Some(r), Some(v)) = (self.region, self.view.as_mut()) else { return };
-        let span = (512.0 - self.rect[2] / self.zoom).max(0.0);
-        v.0 = v.0.clamp(r.ox as f32, r.ox as f32 + span);
-        v.1 = v.1.clamp(r.oy as f32, r.oy as f32 + span);
-    }
-
-    /// Wheel notches (+ in) at screen point `p`: the map pixel under it stays put.
-    pub fn zoom_at(&mut self, p: (f32, f32), notches: f32) {
-        let Some(v) = self.view else { return };
-        let z = (self.zoom * 1.25f32.powf(notches)).clamp(self.fit(), self.fit() * OVERLAY_ZOOM_MAX);
-        let (dx, dy) = (p.0 - self.rect[0], p.1 - self.rect[1]);
-        self.view = Some((v.0 + dx / self.zoom - dx / z, v.1 + dy / self.zoom - dy / z));
-        self.zoom = z;
-        self.clamp();
-    }
-
-    /// A drag of (dx, dy) screen pixels.
-    pub fn pan(&mut self, dx: f32, dy: f32) {
-        if let Some(v) = self.view.as_mut() {
-            *v = (v.0 - dx / self.zoom, v.1 - dy / self.zoom);
-        }
-        self.clamp();
-    }
-
     /// The image once it is decoded, in the game UI's textures.
     fn poll(&mut self, gu: &mut GameUi) {
         self.receive();
@@ -2320,8 +2258,10 @@ impl Overlay {
     }
 
     /// A window onto the image (a Lua HUD map): `rect`, centred on world (x, z), `span` map pixels across, at
-    /// `alpha`; clipped to the rect.
-    pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32) {
+    /// `alpha`; clipped to the rect. `me`: our marker at world (x, z) facing, as the overlay draws it in each UI
+    /// (`modern`: the orange arrow).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32, me: Option<((f32, f32), f32, bool)>) {
         self.poll(gu);
         let (Some(region), Some(t)) = (self.region, self.texture.clone()) else { return };
         let (z, s) = (rect[2] / span.max(1.0), super::minimap::px_per_unit(&region));
@@ -2329,6 +2269,15 @@ impl Overlay {
         let (px, py) = (centre.0 * s, -centre.1 * s);
         gu.clip(Some(rect));
         gu.image_rect(&t, cx + (region.ox as f32 - px) * z, cy + (region.oy as f32 - py) * z, 512.0 * z, 512.0 * z, [1.0, 1.0, 1.0, alpha]);
+        if let Some(((x, wz), facing, modern)) = me {
+            let (mx, my) = (x * s, -wz * s);
+            let (sx, sy) = (cx + (mx - px) * z, cy + (my - py) * z);
+            if modern {
+                modern_marker(gu, sx, sy, facing);
+            } else {
+                marker(gu, sx, sy, facing, self.shade_at(&region, mx, my) * alpha);
+            }
+        }
         gu.clip(None);
     }
 
@@ -2360,33 +2309,9 @@ impl Overlay {
         marker(gu, cx, cy, facing, shade);
         gu.clip(None);
     }
-
-    /// The box centred on the screen, the image clipped to it at `opacity`, and the player marker.
-    pub fn draw(&mut self, gu: &mut GameUi, pos: (f32, f32), facing: f32, sw: f32, sh: f32, opacity: f32) {
-        self.poll(gu);
-        let Some(region) = self.region else { return };
-        let side = (sw.min(sh) * OVERLAY_SIZE).round();
-        let rect = [((sw - side) / 2.0).round(), ((sh - side) / 2.0).round(), side, side];
-        if rect != self.rect {
-            // Opened or resized: the whole map.
-            self.rect = rect;
-            self.zoom = self.fit();
-            self.view = Some((region.ox as f32, region.oy as f32));
-        }
-        let (Some(t), Some(v)) = (&self.texture, self.view) else { return };
-        let z = self.zoom;
-        gu.clip(Some(rect));
-        gu.image_rect(t, rect[0] + (region.ox as f32 - v.0) * z, rect[1] + (region.oy as f32 - v.1) * z, 512.0 * z, 512.0 * z, [1.0, 1.0, 1.0, opacity]);
-        let (px, py) = region.px(pos.0, pos.1);
-        let (sx, sy) = (rect[0] + (px as f32 - v.0) * z, rect[1] + (py as f32 - v.1) * z);
-        // At low opacity the scene shows through: the map counts for that much of what lies under the marker.
-        let shade = self.shade_at(&region, px as f32, py as f32) * opacity;
-        marker(gu, sx, sy, facing, shade);
-        gu.clip(None);
-    }
 }
 
-/// The overlay's and the minimap's marker: the map window's (keytops3 159) at its size. Its added orange glow fades
+/// The HUD map's and the minimap's marker: the map window's (keytops3 159) at its size. Its added orange glow fades
 /// out on light parchment, so over light ground (`shade`, the map's luminance under it) it turns into a solid dark
 /// red, alpha blended by the cells' alpha.
 fn marker(gu: &mut GameUi, x: f32, y: f32, facing: f32, shade: f32) {
@@ -2400,6 +2325,17 @@ fn marker(gu: &mut GameUi, x: f32, y: f32, facing: f32, shade: f32) {
     let a = (0x80 as f32 * t) as u32;
     if a > 0 {
         gu.sprite_affine_blend("menu    keytops3", MARKER, x, y, m, a << 24 | 0x60_0800, 0x44);
+    }
+}
+
+/// The modern overlay's arrow (modern/extras.rs `arrow_in`, our orange) drawn by the game UI: a dark edge under it.
+fn modern_marker(gu: &mut GameUi, x: f32, y: f32, facing: f32) {
+    let (d, n) = ((facing.cos(), facing.sin()), (-facing.sin(), facing.cos()));
+    let at = |a: f32, b: f32, size: f32| [x + (d.0 * a + n.0 * b) * size, y + (d.1 * a + n.1 * b) * size];
+    for (size, c) in [(13.5, [0.0, 0.0, 0.0, 0.86]), (11.0, [0xf2 as f32 / 255.0, 0x55 as f32 / 255.0, 0x22 as f32 / 255.0, 1.0])] {
+        let (tip, left, notch, right) = (at(1.0, 0.0, size), at(-0.55, 0.65, size), at(-0.25, 0.0, size), at(-0.55, -0.65, size));
+        gu.quad([tip, left, notch, notch], [c; 4]);
+        gu.quad([tip, notch, right, right], [c; 4]);
     }
 }
 
@@ -2490,30 +2426,6 @@ mod tests {
         let lossy = through_dxt3(&img.rgba, img.width, img.height);
         assert_eq!(lossy.len(), img.rgba.len());
         assert!(lossy != img.rgba);
-    }
-
-    /// The overlay keeps the map pixel under the cursor while zooming, and the image over the whole box.
-    #[test]
-    fn overlay_zoom_and_pan() {
-        let region = Region { zone: 1, key: 0, num: 0, flags: 0, scale: 1, ki: -1, file: 0, ox: -256, oy: -256 };
-        let mut o = Overlay::new(1, Some(region), None);
-        o.rect = [100.0, 50.0, 512.0, 512.0];
-        o.zoom = 1.0;
-        o.view = Some((-256.0, -256.0));
-        let p = (356.0, 306.0);
-        let under = |o: &Overlay| (o.view.unwrap().0 + (p.0 - o.rect[0]) / o.zoom, o.view.unwrap().1 + (p.1 - o.rect[1]) / o.zoom);
-        let before = under(&o);
-        o.zoom_at(p, 2.0);
-        assert!((o.zoom - 1.5625).abs() < 1e-4);
-        let after = under(&o);
-        assert!((before.0 - after.0).abs() < 1e-3 && (before.1 - after.1).abs() < 1e-3);
-        // Zoomed out past fitting: back to the whole map; panning can't leave the image.
-        o.zoom_at(p, -10.0);
-        assert_eq!((o.zoom, o.view), (1.0, Some((-256.0, -256.0))));
-        o.zoom_at(p, 3.0);
-        o.pan(10_000.0, -10_000.0);
-        let span = 512.0 - 512.0 / o.zoom;
-        assert_eq!(o.view, Some((-256.0, -256.0 + span)));
     }
 
     /// Mode 6 on Southern San d'Oria: nothing before the masks; then its 7 points (4 Home Points, 3 Beginner) as

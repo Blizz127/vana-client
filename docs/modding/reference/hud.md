@@ -147,6 +147,7 @@ Creates or replaces a filled rectangle. Use it as a panel behind other elements,
 | `w` | `number` | `100` | Its width in window pixels. |
 | `h` | `number` | `20` | Its height in window pixels. |
 | `colour` | `{r, g, b, a}` | `{0, 0, 0, 160}` | Its colour (a translucent black by default). |
+| `line` | `number` | none | Draws only its outline, this many window pixels wide (0.5 to 32), instead of filling it. `false` in `hud.set` fills it again. |
 
 **Returns** nothing.
 
@@ -227,6 +228,7 @@ nothing is drawn.
 | `centre` | `{x, z}` | the player's position | A world position (both `x` and `z` required) to centre the map on, instead of following the player. |
 | `span` | `number` | `256` | How many map pixels show across the element's width (16 to 2048). The map image is 512 map pixels wide, so 512 shows the whole map across. |
 | `alpha` | `number` | `1` | Its opacity, 0 to 1. |
+| `me` | `boolean` | `false` | Draws your marker at your position on the map, facing your way, as the game's map windows draw it in each interface (the classic map arrow, the modern UI's orange arrow). |
 
 **Returns** nothing.
 

@@ -485,7 +485,7 @@ macro_rules! bundled {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
     };
 }
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -2090,7 +2090,7 @@ impl Host {
                     }
                     _ => continue,
                 };
-                let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-9)).unwrap_or(0);
+                let at = choices.iter().position(|c| c.1 == current || c.1.as_f64().zip(current.as_f64()).is_some_and(|(a, b)| (a - b).abs() < 1e-6)).unwrap_or(0);
                 let label = if d.label.is_empty() { key.clone() } else { d.label.clone() };
                 rows.push(ModRow { key: key.clone(), label, help: d.help.clone(), choices, at, tab: d.tab.clone(), place: d.place });
             }

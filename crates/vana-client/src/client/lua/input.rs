@@ -251,6 +251,11 @@ pub(in crate::client) fn window_event(w: &mut World, event: &WindowEvent) -> boo
     }
 }
 
+/// A test drive's wheel notches through the mods' mouse filters, as the window's wheel goes: true when one took it.
+pub(in crate::client) fn drive_wheel(w: &mut World, notches: f32) -> bool {
+    w.lua.started && wheel(w, notches as f64)
+}
+
 /// A test drive's egui events through the mods, as the window's go: the ones no mod took. `ppp` is egui's pixels per
 /// point, so a drive's pixel lands where the window's would.
 pub(in crate::client) fn drive_events(w: &mut World, events: Vec<egui::Event>, ppp: f64) -> Vec<egui::Event> {

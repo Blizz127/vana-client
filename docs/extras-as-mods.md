@@ -44,6 +44,12 @@ Done so far (checked live, Lnxcsfix):
 - **Trust Speech** (assets/mods/trust-speech): s2c 0x029 / 0x02D with message 711 blocked while Hidden, nothing hooked
   while Shown; the setting carried over (not seen live: it needs a trust's party line).
 - **/find** (assets/mods/find): `/find crystal` listed the crystals by bag.
+- **Map Overlay** (assets/mods/map-overlay): binds for Ctrl / Alt + O, `hud.map` with our marker (`me`, drawn as each
+  UI draws it), a `hud.rect` outline (`line`) for the modern edge, `hud.on` drags to pan, the wheel through
+  `input.on_mouse` to zoom at the pointer, Escape through `input.on_key` after the game's windows. Seen live: opened
+  with Ctrl+O and Alt+O at the 80 % carried over, zoomed, panned, closed by Escape and by Alt+O. The modern UI's name
+  plates now draw over it (the HUD stands under them). The minimap's marker no longer takes the overlay's opacity
+  (its map is opaque). A script's `act:wheel` now passes the mods' mouse filters, as the window's wheel does.
 
 ## Order
 

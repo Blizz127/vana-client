@@ -9,13 +9,15 @@ use mlua::{Lua, Table, Value};
 pub(super) enum Kind {
     /// `font` None follows the UI; an outline (its colour and width) or a drop shadow under the text.
     Text { text: String, size: f32, colour: Option<[u8; 4]>, bg: Option<[u8; 4]>, align: u8, pad: f32, font: Option<HudFace>, outline: Option<[u8; 4]>, outline_w: f32, shadow: bool },
-    Rect { w: f32, h: f32, colour: [u8; 4] },
+    /// Filled, or outlined `line` wide.
+    Rect { w: f32, h: f32, colour: [u8; 4], line: Option<f32> },
     Bar { w: f32, h: f32, value: f32, colour: Option<[u8; 4]>, kind: String },
     Icon { icon: super::window::Icon, size: f32 },
     /// A PNG from the mod's folder: its texture key, pixels (w, h, RGBA), drawn size and tint.
     Image { key: String, img: std::sync::Arc<(u32, u32, Vec<u8>)>, w: f32, h: f32, tint: [u8; 4] },
-    /// The zone's map (the one the client shows here): centred on world (x, z) or on us, `span` map pixels across.
-    Map { w: f32, h: f32, centre: Option<(f32, f32)>, span: f32, alpha: f32 },
+    /// The zone's map (the one the client shows here): centred on world (x, z) or on us, `span` map pixels across;
+    /// our marker on it when `me`.
+    Map { w: f32, h: f32, centre: Option<(f32, f32)>, span: f32, alpha: f32, me: bool },
 }
 
 #[derive(Clone)]
@@ -133,7 +135,7 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
                 *shadow = v;
             }
         }
-        Kind::Rect { w, h, colour: c } => {
+        Kind::Rect { w, h, colour: c, line } => {
             if let Some(v) = t.get::<Option<f32>>("w")? {
                 *w = v;
             }
@@ -142,6 +144,10 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
             }
             if let Some(v) = colour(t.get("colour")?)? {
                 *c = v;
+            }
+            // A width, or false for filled.
+            if t.contains_key("line")? {
+                *line = t.get::<Option<f32>>("line").ok().flatten().map(|v| v.clamp(0.5, 32.0));
             }
         }
         Kind::Bar { w, h, value, colour: c, kind } => {
@@ -161,7 +167,10 @@ fn apply(e: &mut Elem, t: &Table) -> mlua::Result<()> {
                 *kind = v;
             }
         }
-        Kind::Map { w, h, centre, span, alpha } => {
+        Kind::Map { w, h, centre, span, alpha, me } => {
+            if let Some(v) = t.get::<Option<bool>>("me")? {
+                *me = v;
+            }
             if let Some(v) = t.get::<Option<f32>>("w")? {
                 *w = v;
             }
@@ -282,10 +291,10 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
         })?,
     )?;
     t.set("text", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Text { text: String::new(), size: 1.0, colour: None, bg: None, align: 0, pad: 4.0, font: None, outline: None, outline_w: 1.0, shadow: false }, spec))?)?;
-    t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160] }, spec))?)?;
+    t.set("rect", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Rect { w: 100.0, h: 20.0, colour: [0, 0, 0, 160], line: None }, spec))?)?;
     t.set("bar", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Bar { w: 120.0, h: 8.0, value: 0.0, colour: None, kind: "hp".into() }, spec))?)?;
     t.set("icon", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Icon { icon: super::window::Icon::Item(0), size: 32.0 }, spec))?)?;
-    t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: 1.0 }, spec))?)?;
+    t.set("map", lua.create_function(|lua, (id, spec): (String, Table)| put(lua, id, Kind::Map { w: 200.0, h: 200.0, centre: None, span: 256.0, alpha: 1.0, me: false }, spec))?)?;
     let (src3, mod3) = (vm.src.clone(), vm.manifest.id.clone());
     t.set(
         "set",
@@ -470,9 +479,17 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 let p = if bg.is_some() { *pad } else { 0.0 };
                 [left - p, y - p / 2.0, lw + p * 2.0, th + p]
             }
-            Kind::Rect { w: rw, h: rh, colour } => {
+            Kind::Rect { w: rw, h: rh, colour, line } => {
                 let (rw, rh) = (rw * k.0, rh * k.1);
-                gu.rect(x, y, rw, rh, rgba(*colour));
+                match line {
+                    Some(l) => {
+                        let (lx, ly) = (l * k.0, l * k.1);
+                        for r in [[x, y, rw, ly], [x, y + rh - ly, rw, ly], [x, y + ly, lx, rh - 2.0 * ly], [x + rw - lx, y + ly, lx, rh - 2.0 * ly]] {
+                            gu.rect(r[0], r[1], r[2], r[3], rgba(*colour));
+                        }
+                    }
+                    None => gu.rect(x, y, rw, rh, rgba(*colour)),
+                }
                 [x, y, rw, rh]
             }
             Kind::Bar { w: bw, h: bh, value, colour, kind } => {
@@ -483,7 +500,7 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                 }
                 [x, y, bw, bh]
             }
-            Kind::Map { w: mw, h: mh, centre, span, alpha } => {
+            Kind::Map { w: mw, h: mh, centre, span, alpha, me } => {
                 let (mw, mh) = (mw * k.0, mh * k.1);
                 let regions = gu.map_regions().to_vec();
                 let mut m = w.lua.map.borrow_mut();
@@ -492,7 +509,9 @@ pub(super) fn draw(gu: &mut super::super::game_ui::GameUi, w: &World) {
                     _ => *m = Some(super::super::map::Overlay::open(w, &regions)),
                 }
                 if let Some(o) = m.as_mut() {
-                    o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, *alpha);
+                    let facing = w.net.me.lock().map_or(0.0, |m| super::super::event::rad_of(m.dir));
+                    let marker = me.then_some(((w.pos.x, w.pos.z), facing, w.modern));
+                    o.draw_window(gu, [x, y, mw, mh], centre.unwrap_or((w.pos.x, w.pos.z)), *span, *alpha, marker);
                 }
                 [x, y, mw, mh]
             }
