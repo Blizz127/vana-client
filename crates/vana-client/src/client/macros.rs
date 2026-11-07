@@ -105,10 +105,26 @@ fn default_name(b: usize) -> [u8; 16] {
 
 /// mcr.dat's defaults (FUN_101a1fe0): titles from FFXiMain, lines from group 9 (read until an empty one).
 const DEFAULTS: [(&str, &[usize]); 20] = [
-    ("Find", &[0x87]), ("Pos", &[0x89]), ("Help", &[0x8b]), ("Link", &[0x8d]), ("", &[]), ("NameSW", &[0x8f]), ("InviteSW", &[0x91]),
-    ("AnonSW", &[0x93]), ("NoMP", &[0x95]), ("TP", &[0x97]), ("Yes", &[0x99]), ("No", &[0x9b]), ("Wave", &[0x9d]), ("PartyAdd", &[0x9f]),
-    ("JoinPT", &[0xa1, 0xa2, 0xa3, 0xa4, 0xa5]), ("SoloPlay", &[0xa7, 0xa8, 0xa9, 0xaa]), ("Nominate", &[0xac]), ("LeftAns", &[0xae]),
-    ("RightAns", &[0xb0]), ("Entice", &[0xb2, 0xb3, 0xb4, 0xb5]),
+    ("Find", &[0x87]),
+    ("Pos", &[0x89]),
+    ("Help", &[0x8b]),
+    ("Link", &[0x8d]),
+    ("", &[]),
+    ("NameSW", &[0x8f]),
+    ("InviteSW", &[0x91]),
+    ("AnonSW", &[0x93]),
+    ("NoMP", &[0x95]),
+    ("TP", &[0x97]),
+    ("Yes", &[0x99]),
+    ("No", &[0x9b]),
+    ("Wave", &[0x9d]),
+    ("PartyAdd", &[0x9f]),
+    ("JoinPT", &[0xa1, 0xa2, 0xa3, 0xa4, 0xa5]),
+    ("SoloPlay", &[0xa7, 0xa8, 0xa9, 0xaa]),
+    ("Nominate", &[0xac]),
+    ("LeftAns", &[0xae]),
+    ("RightAns", &[0xb0]),
+    ("Entice", &[0xb2, 0xb3, 0xb4, 0xb5]),
 ];
 
 #[derive(Clone, Debug)]
@@ -142,7 +158,11 @@ impl Order {
         if count >= max {
             return Self::empty(n);
         }
-        Order { bits: p[..nb].to_vec(), list: (0..n).map(|i| u16::from_le_bytes([p[nb + 2 * i], p[nb + 2 * i + 1]])).collect(), count }
+        Order {
+            bits: p[..nb].to_vec(),
+            list: (0..n).map(|i| u16::from_le_bytes([p[nb + 2 * i], p[nb + 2 * i + 1]])).collect(),
+            count,
+        }
     }
 
     fn payload(&self) -> Vec<u8> {
@@ -223,11 +243,32 @@ impl Macros {
     /// FUN_101c3d00: `<game>/USER/<content id, lowercase hex>`; everything is read at field entry.
     pub fn load(game: &Path, content_id: u32, group9: Box<dyn Fn(usize) -> Option<String>>) -> Self {
         let dir = game.join("USER").join(format!("{content_id:x}"));
-        let (mix, aix) = (Order::load(&dir.join("mix.dat"), 2, 0x400, 0x400), Order::load(&dir.join("aix.dat"), 4, 0xb00, 0x700));
-        let moix = read_file(&dir.join("moix.dat"), 1).filter(|p| p.len() == 0x80).map_or_else(|| (0..0x40).collect(), |p| p.chunks(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect());
-        let eix = read_file(&dir.join("eix.dat"), 1).filter(|p| p.len() == 0x100).map_or_else(|| (0..0x80).collect(), |p| p.chunks(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect());
+        let (mix, aix) =
+            (Order::load(&dir.join("mix.dat"), 2, 0x400, 0x400), Order::load(&dir.join("aix.dat"), 4, 0xb00, 0x700));
+        let moix = read_file(&dir.join("moix.dat"), 1)
+            .filter(|p| p.len() == 0x80)
+            .map_or_else(|| (0..0x40).collect(), |p| p.chunks(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect());
+        let eix = read_file(&dir.join("eix.dat"), 1)
+            .filter(|p| p.len() == 0x100)
+            .map_or_else(|| (0..0x80).collect(), |p| p.chunks(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect());
         let titles = (0..BOOKS).map(default_name).collect();
-        let mut m = Macros { dir, mix, aix, moix, eix, book: 0, set: 0, recs: vec![Macro::default(); 20], titles, run: None, acc: 0.0, group9, clip: None, set_copied: false, book_copied: None };
+        let mut m = Macros {
+            dir,
+            mix,
+            aix,
+            moix,
+            eix,
+            book: 0,
+            set: 0,
+            recs: vec![Macro::default(); 20],
+            titles,
+            run: None,
+            acc: 0.0,
+            group9,
+            clip: None,
+            set_copied: false,
+            book_copied: None,
+        };
         for (k, name) in ["mcr.ttl", "mcr_2.ttl"].iter().enumerate() {
             if let Some(p) = read_file(&m.dir.join(name), 1).filter(|p| p.len() == 0x140) {
                 for i in 0..20 {
@@ -286,7 +327,9 @@ impl Macros {
             .map(|(title, ids)| {
                 let mut m = Macro::default();
                 m.title[..title.len()].copy_from_slice(title.as_bytes());
-                for (k, line) in ids.iter().map_while(|&id| (self.group9)(id).filter(|l| !l.is_empty())).take(6).enumerate() {
+                for (k, line) in
+                    ids.iter().map_while(|&id| (self.group9)(id).filter(|l| !l.is_empty())).take(6).enumerate()
+                {
                     m.set_line(k, &crate::dat::font::encode_sjis(&line));
                 }
                 m
@@ -319,7 +362,15 @@ impl Macros {
     /// FUN_101a2890 / FUN_101a2920: switching writes the old set first; out of range wraps once, else the first.
     pub fn switch(&mut self, book: usize, set: usize) {
         self.save_set();
-        let wrap = |v: usize, n: usize| if v < n { v } else if v - n < n { v - n } else { 0 };
+        let wrap = |v: usize, n: usize| {
+            if v < n {
+                v
+            } else if v - n < n {
+                v - n
+            } else {
+                0
+            }
+        };
         (self.book, self.set) = (wrap(book, BOOKS), wrap(set, 10));
         self.load_set();
     }
@@ -574,7 +625,10 @@ mod tests {
         let mut m = Macros::load(&game, 0x2a, Box::new(g9));
         assert_eq!(m.recs[10].title(), "Yes");
         assert_eq!(m.recs[10].line(0), b"/yes");
-        assert_eq!((m.recs[14].line(0), m.recs[14].line(1), m.recs[14].line(2)), (&b"/join"[..], &b"/wait 3"[..], &b""[..]));
+        assert_eq!(
+            (m.recs[14].line(0), m.recs[14].line(1), m.recs[14].line(2)),
+            (&b"/join"[..], &b"/wait 3"[..], &b""[..])
+        );
         m.recs[0].set_line(0, b"/echo hi");
         m.switch(0, 1);
         assert!(game.join("USER/2a/mcr.dat").exists() && game.join("USER/2a/mcr1.dat").exists());
@@ -614,7 +668,9 @@ mod tests {
         assert_eq!(m.recs[1].line(0), b"/echo hi");
         m.rename_book(0, b"Mine");
         m.copy_book(0);
-        assert!((0..10).all(|k| game.join(if k == 0 { "USER/7/nmcr.dat".to_string() } else { format!("USER/7/nmcr{k}.dat") }).exists()));
+        assert!((0..10).all(|k| {
+            game.join(if k == 0 { "USER/7/nmcr.dat".to_string() } else { format!("USER/7/nmcr{k}.dat") }).exists()
+        }));
         m.paste_book(2);
         assert_eq!(m.raw_book_title(2), b"Mine");
         m.switch(2, 0);
@@ -631,7 +687,8 @@ mod tests {
         let game = scratch("t2");
         let mut m = Macros::load(&game, 1, Box::new(|_| None));
         let mut mac = Macro::default();
-        for (k, l) in [&b"// note"[..], b"/say a", b"/wait 1", b"/say b<wait 0>junk", b"/say c", b"", ].iter().enumerate() {
+        for (k, l) in [&b"// note"[..], b"/say a", b"/wait 1", b"/say b<wait 0>junk", b"/say c", b""].iter().enumerate()
+        {
             mac.set_line(k, l);
         }
         m.recs[3] = mac;

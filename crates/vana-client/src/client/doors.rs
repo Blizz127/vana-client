@@ -26,7 +26,19 @@ pub fn update(w: &mut World) {
     if !in_event {
         w.doors.event.clear();
     }
-    let doors: Vec<(u32, u32, u8, bool)> = w.entities.iter().filter(|(_, e)| e.door != 0).map(|(id, e)| (*id, e.door, w.doors.event.get(id).copied().filter(|_| in_event).unwrap_or(e.motion.status), e.quiet_status)).collect();
+    let doors: Vec<(u32, u32, u8, bool)> = w
+        .entities
+        .iter()
+        .filter(|(_, e)| e.door != 0)
+        .map(|(id, e)| {
+            (
+                *id,
+                e.door,
+                w.doors.event.get(id).copied().filter(|_| in_event).unwrap_or(e.motion.status),
+                e.quiet_status,
+            )
+        })
+        .collect();
     w.doors.state.retain(|id, _| w.entities.contains_key(id));
     for (id, door, want, quiet) in doors {
         // FUN_100acba0: doors with a group play open / clos, the others (effects only) evst / eved.
@@ -112,7 +124,12 @@ mod tests {
     fn count_manor_door() {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
-        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).map_err(anyhow::Error::from).and_then(|d| crate::dat::zone::Keys::from_ffximain(&d)) else { return };
+        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))
+            .map_err(anyhow::Error::from)
+            .and_then(|d| crate::dat::zone::Keys::from_ffximain(&d))
+        else {
+            return;
+        };
         let file = index.read(crate::dat::zone::file_id(230)).unwrap();
         let scene = crate::dat::zone::load_scene(&keys, &file).unwrap();
         let id = super::four("_6e1");

@@ -71,12 +71,17 @@ pub(super) fn plain(v: &Value, path: &str, skipped: &mut Vec<String>) -> Result<
             Value::LightUserData(p) if p.0.is_null() => J::Null,
             Value::Boolean(b) => J::Bool(*b),
             Value::Integer(i) => J::from(*i),
-            Value::Number(n) => serde_json::Number::from_f64(*n).map(J::Number).ok_or_else(|| format!("{path}: {n} is not a finite number"))?,
-            Value::String(s) => J::String(s.to_str().map_err(|_| format!("{path}: a string that is not text (UTF-8)"))?.to_string()),
+            Value::Number(n) => serde_json::Number::from_f64(*n)
+                .map(J::Number)
+                .ok_or_else(|| format!("{path}: {n} is not a finite number"))?,
+            Value::String(s) => {
+                J::String(s.to_str().map_err(|_| format!("{path}: a string that is not text (UTF-8)"))?.to_string())
+            }
             Value::Table(t) => {
                 let pairs: Vec<(Value, Value)> = t.pairs::<Value, Value>().filter_map(|p| p.ok()).collect();
                 let n = pairs.len();
-                let seq = n > 0 && pairs.iter().all(|(k, _)| matches!(k, Value::Integer(i) if *i >= 1 && (*i as usize) <= n));
+                let seq =
+                    n > 0 && pairs.iter().all(|(k, _)| matches!(k, Value::Integer(i) if *i >= 1 && (*i as usize) <= n));
                 if seq {
                     let mut out = vec![J::Null; n];
                     for (k, val) in &pairs {
@@ -88,7 +93,9 @@ pub(super) fn plain(v: &Value, path: &str, skipped: &mut Vec<String>) -> Result<
                     let mut out = serde_json::Map::new();
                     for (k, val) in &pairs {
                         let key = match k {
-                            Value::String(s) => s.to_str().map_err(|_| format!("{path}: a key that is not text"))?.to_string(),
+                            Value::String(s) => {
+                                s.to_str().map_err(|_| format!("{path}: a key that is not text"))?.to_string()
+                            }
                             Value::Integer(i) => i.to_string(),
                             Value::Number(x) if x.fract() == 0.0 && x.abs() < 1e15 => format!("{}", *x as i64),
                             Value::Number(x) => x.to_string(),
@@ -99,7 +106,11 @@ pub(super) fn plain(v: &Value, path: &str, skipped: &mut Vec<String>) -> Result<
                             }
                         };
                         let sub = format!("{path}.{key}");
-                        if matches!(val, Value::Function(_) | Value::Thread(_) | Value::UserData(_) | Value::LightUserData(_)) && !matches!(val, Value::LightUserData(p) if p.0.is_null()) {
+                        if matches!(
+                            val,
+                            Value::Function(_) | Value::Thread(_) | Value::UserData(_) | Value::LightUserData(_)
+                        ) && !matches!(val, Value::LightUserData(p) if p.0.is_null())
+                        {
                             skipped.push(sub);
                             continue;
                         }
@@ -119,7 +130,10 @@ pub(super) fn plain(v: &Value, path: &str, skipped: &mut Vec<String>) -> Result<
 
 /// A serde value (JSON) as Lua, null as nil.
 pub(super) fn to_lua(lua: &Lua, v: &(impl serde::Serialize + ?Sized)) -> mlua::Result<Value> {
-    lua.to_value_with(v, mlua::serde::SerializeOptions::new().serialize_none_to_null(false).serialize_unit_to_null(false))
+    lua.to_value_with(
+        v,
+        mlua::serde::SerializeOptions::new().serialize_none_to_null(false).serialize_unit_to_null(false),
+    )
 }
 
 pub(super) fn state(lua: &Lua) -> Rc<RefCell<ModState>> {
@@ -128,7 +142,9 @@ pub(super) fn state(lua: &Lua) -> Rc<RefCell<ModState>> {
 
 /// Queues an op for after the mod phase; in the lobby only lines, keys and lobby actions are carried out.
 pub(super) fn push_op(lua: &Lua, op: Op) -> mlua::Result<()> {
-    if !matches!(op, Op::Print(_) | Op::Chat { .. } | Op::Key(_) | Op::Lobby(_) | Op::Ipc(..)) && super::lobby::in_lobby(lua) {
+    if !matches!(op, Op::Print(_) | Op::Chat { .. } | Op::Key(_) | Op::Lobby(_) | Op::Ipc(..))
+        && super::lobby::in_lobby(lua)
+    {
         return Err(mlua::Error::runtime("not available in the lobby (before login)"));
     }
     state(lua).borrow_mut().ops.push(op);
@@ -142,7 +158,11 @@ pub(super) fn next_id(st: &Rc<RefCell<ModState>>) -> u64 {
 }
 
 /// Every global, for the mod `vm`.
-pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value, serde_json::Value)) -> mlua::Result<()> {
+pub(super) fn install(
+    lua: &Lua,
+    vm: &super::vm::Vm,
+    storage: (serde_json::Value, serde_json::Value),
+) -> mlua::Result<()> {
     let g = lua.globals();
     let m = &vm.manifest;
 
@@ -159,19 +179,28 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
     g.set(
         "print",
         lua.create_function(move |lua, args: Variadic<Value>| {
-            let text = args.iter().map(|v| v.to_string().unwrap_or_else(|_| format!("{v:?}"))).collect::<Vec<_>>().join("\t");
+            let text =
+                args.iter().map(|v| v.to_string().unwrap_or_else(|_| format!("{v:?}"))).collect::<Vec<_>>().join("\t");
             log::info!("lua {id}: {text}");
             push_op(lua, Op::Print(text))?;
             Ok(())
         })?,
     )?;
     let log = lua.create_table()?;
-    for (name, level) in [("info", log::Level::Info), ("warn", log::Level::Warn), ("error", log::Level::Error), ("debug", log::Level::Debug)] {
+    for (name, level) in [
+        ("info", log::Level::Info),
+        ("warn", log::Level::Warn),
+        ("error", log::Level::Error),
+        ("debug", log::Level::Debug),
+    ] {
         let id = m.id.clone();
-        log.set(name, lua.create_function(move |_, text: String| {
-            log::log!(level, "lua {id}: {text}");
-            Ok(())
-        })?)?;
+        log.set(
+            name,
+            lua.create_function(move |_, text: String| {
+                log::log!(level, "lua {id}: {text}");
+                Ok(())
+            })?,
+        )?;
     }
     g.set("log", log)?;
 
@@ -191,9 +220,13 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 return Err(mlua::Error::runtime(format!("require {name:?}: outside the mod's folder")));
             }
             let rel = name.replace('.', "/");
-            let file = [format!("{rel}.lua"), format!("{rel}/init.lua")].into_iter().find(|p| src.exists(p)).ok_or_else(|| mlua::Error::runtime(format!("module {name:?} not found in the mod's folder")))?;
+            let file = [format!("{rel}.lua"), format!("{rel}/init.lua")]
+                .into_iter()
+                .find(|p| src.exists(p))
+                .ok_or_else(|| mlua::Error::runtime(format!("module {name:?} not found in the mod's folder")))?;
             let text = src.read(&file).map_err(|e| mlua::Error::runtime(format!("{file}: {e}")))?;
-            let f = lua.load(text).set_name(format!("@{file}")).set_mode(mlua::chunk::ChunkMode::Text).into_function()?;
+            let f =
+                lua.load(text).set_name(format!("@{file}")).set_mode(mlua::chunk::ChunkMode::Text).into_function()?;
             let v: Value = f.call(name.as_str())?;
             let v = if v.is_nil() { Value::Boolean(true) } else { v };
             loaded.raw_set(name.as_str(), v.clone())?;
@@ -220,7 +253,8 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let st = state(lua);
             let removed: Vec<Handler> = {
                 let mut s = st.borrow_mut();
-                let (gone, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut s.handlers).into_iter().partition(|h| h.id == id);
+                let (gone, keep): (Vec<_>, Vec<_>) =
+                    std::mem::take(&mut s.handlers).into_iter().partition(|h| h.id == id);
                 s.handlers = keep;
                 gone
             };
@@ -279,7 +313,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 let id = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if typed { s.typed_filters.push((id, key)) } else { s.chat_filters.push((id, key)) }
+                if typed {
+                    s.typed_filters.push((id, key))
+                } else {
+                    s.chat_filters.push((id, key))
+                }
                 s.filters_dirty = true;
                 Ok(id)
             })?,
@@ -339,7 +377,9 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             w.anchor = w.popup.then(|| super::input::cursor(lua));
             let elems: Option<Table> = spec.get("elements")?;
             let parsed: Vec<(super::window::Elem, super::window::Meta)> = match elems {
-                Some(t) => t.sequence_values::<Table>().map(|e| e.and_then(|e| elem(&e))).collect::<mlua::Result<_>>()?,
+                Some(t) => {
+                    t.sequence_values::<Table>().map(|e| e.and_then(|e| elem(&e))).collect::<mlua::Result<_>>()?
+                }
                 None => Vec::new(),
             };
             (w.elems, w.meta) = parsed.into_iter().unzip();
@@ -352,8 +392,16 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         lua.create_function(|lua, (id, eid, fields): (String, String, Table)| {
             let st = state(lua);
             let mut s = st.borrow_mut();
-            let w = s.windows.iter_mut().find(|w| w.id == id).ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
-            let k = w.elems.iter().position(|e| e.id() == Some(eid.as_str())).ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
+            let w = s
+                .windows
+                .iter_mut()
+                .find(|w| w.id == id)
+                .ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
+            let k = w
+                .elems
+                .iter()
+                .position(|e| e.id() == Some(eid.as_str()))
+                .ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
             update(&mut w.elems[k], &fields)?;
             w.meta.resize(w.elems.len(), Default::default());
             if let Some(v) = fields.get::<Option<String>>("tip")? {
@@ -372,13 +420,23 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             use super::window::Elem;
             let st = state(lua);
             let s = st.borrow();
-            let w = s.windows.iter().find(|w| w.id == id).ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
-            let e = w.elems.iter().find(|e| e.id() == Some(eid.as_str())).ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
+            let w = s
+                .windows
+                .iter()
+                .find(|w| w.id == id)
+                .ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
+            let e = w
+                .elems
+                .iter()
+                .find(|e| e.id() == Some(eid.as_str()))
+                .ok_or_else(|| mlua::Error::runtime(format!("no element {eid:?} in {id:?}")))?;
             let t = lua.create_table()?;
             match e {
                 Elem::Text { text, .. } | Elem::Input { text, .. } => t.set("text", text.as_str())?,
                 Elem::Buttons { marked, .. } => t.set("at", marked.map(|m| m + 1))?,
-                Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => t.set("at", at + 1)?,
+                Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => {
+                    t.set("at", at + 1)?
+                }
                 Elem::Gauge { value, .. } => t.set("value", *value)?,
                 Elem::Colour { value: [r, g, b, a], .. } => {
                     let c = lua.create_table()?;
@@ -397,7 +455,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let pointer = super::input::cursor(lua);
             let st = state(lua);
             let mut s = st.borrow_mut();
-            let w = s.windows.iter_mut().find(|w| w.id == id).ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
+            let w = s
+                .windows
+                .iter_mut()
+                .find(|w| w.id == id)
+                .ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
             // A popup opens at the pointer as it is now.
             if w.popup && !w.open {
                 w.anchor = Some(pointer);
@@ -415,7 +477,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         lua.create_function(|lua, id: String| {
             let st = state(lua);
             let mut s = st.borrow_mut();
-            let w = s.windows.iter_mut().find(|w| w.id == id).ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
+            let w = s
+                .windows
+                .iter_mut()
+                .find(|w| w.id == id)
+                .ok_or_else(|| mlua::Error::runtime(format!("no window {id:?}")))?;
             w.open = true;
             w.settle();
             Ok(())
@@ -442,7 +508,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 _ => return Err(mlua::Error::runtime("ui.prompt(text, [buttons], handler)")),
             };
             let items = items.unwrap_or_else(|| vec!["Yes".into(), "No".into()]);
-            let elems = vec![Elem::Text { id: String::new(), text, dim: false, colour: None }, Elem::Buttons { id: "answer".into(), label: String::new(), items, marked: None }];
+            let elems = vec![
+                Elem::Text { id: String::new(), text, dim: false, colour: None },
+                Elem::Buttons { id: "answer".into(), label: String::new(), items, marked: None },
+            ];
             popup(lua, "__prompt", elems.into_iter().map(|e| (e, Meta::default())).collect(), false, handler)
         })?,
     )?;
@@ -452,11 +521,17 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             use super::window::{Elem, Meta, Row};
             let height = items.len().clamp(1, 12);
             let rows = items.iter().map(|s| Row::text(s)).collect();
-            let elems = vec![(Elem::List { id: "item".into(), rows, columns: Vec::new(), at: 0, top: 0, height }, Meta::default())];
+            let elems = vec![(
+                Elem::List { id: "item".into(), rows, columns: Vec::new(), at: 0, top: 0, height },
+                Meta::default(),
+            )];
             popup(lua, "__menu", elems, true, handler)
         })?,
     )?;
-    ui.set("is_open", lua.create_function(|lua, id: String| Ok(state(lua).borrow().windows.iter().any(|w| w.id == id && w.open)))?)?;
+    ui.set(
+        "is_open",
+        lua.create_function(|lua, id: String| Ok(state(lua).borrow().windows.iter().any(|w| w.id == id && w.open)))?,
+    )?;
     ui.set(
         "on",
         lua.create_function(|lua, (id, func): (String, Function)| {
@@ -487,12 +562,27 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 };
                 group = o.get("group")?;
                 if let Some(i) = o.get::<Option<Table>>("icon")? {
-                    icon = Some((i.get::<Option<String>>("kind")?.unwrap_or_else(|| "status".into()), i.get::<u16>("id")?));
+                    icon = Some((
+                        i.get::<Option<String>>("kind")?.unwrap_or_else(|| "status".into()),
+                        i.get::<u16>("id")?,
+                    ));
                 }
                 total = o.get::<Option<f32>>("total")?.unwrap_or(0.0);
                 fills = o.get::<Option<bool>>("fills")?.unwrap_or(section == 0);
             }
-            push_op(lua, super::Op::Timer { mod_id: me.clone(), name: Some(name), secs: Some(secs), section, group, icon, total, fills })?;
+            push_op(
+                lua,
+                super::Op::Timer {
+                    mod_id: me.clone(),
+                    name: Some(name),
+                    secs: Some(secs),
+                    section,
+                    group,
+                    icon,
+                    total,
+                    fills,
+                },
+            )?;
             Ok(())
         })?,
     )?;
@@ -500,7 +590,19 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
     timers.set(
         "remove",
         lua.create_function(move |lua, name: String| {
-            push_op(lua, super::Op::Timer { mod_id: me.clone(), name: Some(name), secs: None, section: 0, group: None, icon: None, total: 0.0, fills: false })?;
+            push_op(
+                lua,
+                super::Op::Timer {
+                    mod_id: me.clone(),
+                    name: Some(name),
+                    secs: None,
+                    section: 0,
+                    group: None,
+                    icon: None,
+                    total: 0.0,
+                    fills: false,
+                },
+            )?;
             Ok(())
         })?,
     )?;
@@ -508,7 +610,19 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
     timers.set(
         "clear",
         lua.create_function(move |lua, ()| {
-            push_op(lua, super::Op::Timer { mod_id: me.clone(), name: None, secs: None, section: 0, group: None, icon: None, total: 0.0, fills: false })?;
+            push_op(
+                lua,
+                super::Op::Timer {
+                    mod_id: me.clone(),
+                    name: None,
+                    secs: None,
+                    section: 0,
+                    group: None,
+                    icon: None,
+                    total: 0.0,
+                    fills: false,
+                },
+            )?;
             Ok(())
         })?,
     )?;
@@ -526,13 +640,22 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                     Value::Nil => None,
                     Value::Integer(i) if (0..=0x1ff).contains(&i) => Some(i as u16),
                     Value::Number(n) if n.fract() == 0.0 && (0.0..=511.0).contains(&n) => Some(n as u16),
-                    v => return Err(mlua::Error::runtime(format!("packet ids are 0..0x1FF, or nil for every packet ({} given)", v.type_name()))),
+                    v => {
+                        return Err(mlua::Error::runtime(format!(
+                            "packet ids are 0..0x1FF, or nil for every packet ({} given)",
+                            v.type_name()
+                        )));
+                    }
                 };
                 let st = state(lua);
                 let h = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if out { s.hooks_out.push((h, id, key)) } else { s.hooks_in.push((h, id, key)) }
+                if out {
+                    s.hooks_out.push((h, id, key))
+                } else {
+                    s.hooks_in.push((h, id, key))
+                }
                 Ok(h)
             })?,
         )?;
@@ -569,14 +692,20 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 let data = packet_bytes(a, b)?;
                 let st = state(lua);
                 let mut s = st.borrow_mut();
-                if out { s.inject_out.push(data) } else { s.inject_in.push(data) }
+                if out {
+                    s.inject_out.push(data)
+                } else {
+                    s.inject_in.push(data)
+                }
                 Ok(())
             })?,
         )?;
     }
     packets.set(
         "build",
-        lua.create_function(|lua, (id, body): (i64, mlua::LuaString)| lua.create_string(build_packet(id, &body.as_bytes())?))?,
+        lua.create_function(|lua, (id, body): (i64, mlua::LuaString)| {
+            lua.create_string(build_packet(id, &body.as_bytes())?)
+        })?,
     )?;
     packets.set(
         "last",
@@ -599,7 +728,13 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 Value::Nil => (None, None),
                 Value::Table(t) => (t.get::<Option<u8>>("mode")?, t.get::<Option<u8>>("colour")?),
                 // A number is checked as the table's fields are: 0..255.
-                v => (Some(u8::from_lua(v, lua).map_err(|_| mlua::Error::runtime("a chat mode is 0..255, or {mode = , colour = }"))?), None),
+                v => (
+                    Some(
+                        u8::from_lua(v, lua)
+                            .map_err(|_| mlua::Error::runtime("a chat mode is 0..255, or {mode = , colour = }"))?,
+                    ),
+                    None,
+                ),
             };
             push_op(lua, Op::Chat { text, mode, colour })?;
             Ok(())
@@ -655,7 +790,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             // One UDP datagram each: the encoded message (with room for the sender's name) must fit.
             let size = serde_json::json!({"mod": me, "from": "", "to": to, "text": text}).to_string().len() + 32;
             if size > ipc::MAX {
-                return Err(mlua::Error::runtime(format!("an ipc message is at most {} bytes encoded ({size} given)", ipc::MAX)));
+                return Err(mlua::Error::runtime(format!(
+                    "an ipc message is at most {} bytes encoded ({size} given)",
+                    ipc::MAX
+                )));
             }
             push_op(lua, Op::Ipc(me.clone(), to, text))?;
             Ok(())
@@ -676,7 +814,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             if key == w.my_id || key == u32::from(w.my_index) {
                 return self_entity(lua, w).map(Some);
             }
-            let e = w.entities.get(&key).map(|e| (key, e)).or_else(|| w.entities.iter().find(|(_, e)| u32::from(e.index) == key).map(|(id, e)| (*id, e)));
+            let e = w
+                .entities
+                .get(&key)
+                .map(|e| (key, e))
+                .or_else(|| w.entities.iter().find(|(_, e)| u32::from(e.index) == key).map(|(id, e)| (*id, e)));
             e.map(|(id, e)| entity(lua, w, id, e)).transpose()
         })?,
     )?;
@@ -685,9 +827,21 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         lua.create_function(|lua, opts: Option<Table>| {
             let w = world(lua)?;
             // A filter field of the wrong type is an error, not silently no filter.
-            let max = opts.as_ref().map(|o| o.get::<Option<f32>>("distance")).transpose().map_err(|_| mlua::Error::runtime("distance is a number"))?.flatten();
-            let kinds = opts.as_ref().map(|o| o.get::<Option<Vec<String>>>("kinds")).transpose().map_err(|_| mlua::Error::runtime("kinds is a list of \"player\", \"npc\", \"mob\""))?.flatten();
-            if let Some(k) = kinds.as_ref().and_then(|k| k.iter().find(|k| !["player", "npc", "mob"].contains(&k.as_str()))) {
+            let max = opts
+                .as_ref()
+                .map(|o| o.get::<Option<f32>>("distance"))
+                .transpose()
+                .map_err(|_| mlua::Error::runtime("distance is a number"))?
+                .flatten();
+            let kinds = opts
+                .as_ref()
+                .map(|o| o.get::<Option<Vec<String>>>("kinds"))
+                .transpose()
+                .map_err(|_| mlua::Error::runtime("kinds is a list of \"player\", \"npc\", \"mob\""))?
+                .flatten();
+            if let Some(k) =
+                kinds.as_ref().and_then(|k| k.iter().find(|k| !["player", "npc", "mob"].contains(&k.as_str())))
+            {
                 return Err(mlua::Error::runtime(format!("no entity kind {k:?} (player, npc, mob)")));
             }
             let out = lua.create_table()?;
@@ -714,7 +868,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let w = world(lua)?;
             match w.target {
                 Some(id) if id == w.my_id => self_entity(lua, w).map(Some),
-                t => t.and_then(|id| w.entities.get(&id).map(|e| (id, e))).map(|(id, e)| entity(lua, w, id, e)).transpose(),
+                t => t
+                    .and_then(|id| w.entities.get(&id).map(|e| (id, e)))
+                    .map(|(id, e)| entity(lua, w, id, e))
+                    .transpose(),
             }
         })?,
     )?;
@@ -951,7 +1108,9 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
         lua.create_function(|lua, id: u16| {
             use crate::dat::names::NameSource;
             let w = world(lua)?;
-            let Some(a) = w.actions.as_ref().and_then(|a| a.abilities.iter().find(|x| x.id == id)) else { return Ok(None) };
+            let Some(a) = w.actions.as_ref().and_then(|a| a.abilities.iter().find(|x| x.id == id)) else {
+                return Ok(None);
+            };
             let t = lua.create_table()?;
             t.set("id", id)?;
             t.set("name", w.names.as_ref().and_then(|n| n.ability(id as u32)))?;
@@ -1009,7 +1168,10 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             let w = world(lua)?;
             let ctx = gu(lua)?.aug_ctx().ok_or_else(|| mlua::Error::runtime("augment texts not loaded yet"))?;
             let bytes = ext.as_bytes();
-            let e: [u8; 24] = bytes.get(..24).and_then(|b| b.try_into().ok()).ok_or_else(|| mlua::Error::runtime("extdata is 24 bytes"))?;
+            let e: [u8; 24] = bytes
+                .get(..24)
+                .and_then(|b| b.try_into().ok())
+                .ok_or_else(|| mlua::Error::runtime("extdata is 24 bytes"))?;
             let t = w.item_info.as_ref().and_then(|c| c.item(item)).map_or(0, |it| it.item_type);
             let out = lua.create_table()?;
             if !((matches!(t, 4 | 5) && super::super::augment::applies(item, t, &e)) || t == 0x1a) {
@@ -1043,11 +1205,24 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                     Value::Integer(i) => {
                         let id = i as u32;
                         if id == w.my_id {
-                            return Some(crate::dat::battle::Who { name: w.name.clone(), pc: true, ..Default::default() });
+                            return Some(crate::dat::battle::Who {
+                                name: w.name.clone(),
+                                pc: true,
+                                ..Default::default()
+                            });
                         }
-                        w.entities.get(&id).map(|e| crate::dat::battle::Who { name: e.name.clone(), pc: id < 0x0100_0000, named: e.named, plural: e.plural, female: e.female, colour: 0 })
+                        w.entities.get(&id).map(|e| crate::dat::battle::Who {
+                            name: e.name.clone(),
+                            pc: id < 0x0100_0000,
+                            named: e.named,
+                            plural: e.plural,
+                            female: e.female,
+                            colour: 0,
+                        })
                     }
-                    Value::String(s) => Some(crate::dat::battle::Who { name: s.to_string_lossy(), pc: true, ..Default::default() }),
+                    Value::String(s) => {
+                        Some(crate::dat::battle::Who { name: s.to_string_lossy(), pc: true, ..Default::default() })
+                    }
                     _ => None,
                 }
             };
@@ -1083,7 +1258,12 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             }
             for (text, id) in hits {
                 let t = lua.create_table()?;
-                (t.set("text", text)?, t.set("group", id[2])?, t.set("id", id[3])?, t.set("phrase", super::runtime::phrase(id))?);
+                (
+                    t.set("text", text)?,
+                    t.set("group", id[2])?,
+                    t.set("id", id[3])?,
+                    t.set("phrase", super::runtime::phrase(id))?,
+                );
                 out.push(t)?;
             }
             Ok(Some(out))
@@ -1111,7 +1291,8 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             if !["item", "key_item", "spell", "ability", "zone", "title"].contains(&kind.as_str()) {
                 return Err(mlua::Error::runtime("kind: item, key_item, spell, ability, zone or title"));
             }
-            let lang = crate::dat::items::Lang::parse(lang.as_deref().unwrap_or("en")).ok_or_else(|| mlua::Error::runtime("lang: ja, en, de or fr"))?;
+            let lang = crate::dat::items::Lang::parse(lang.as_deref().unwrap_or("en"))
+                .ok_or_else(|| mlua::Error::runtime("lang: ja, en, de or fr"))?;
             let Some(n) = names_in(w, lang) else { return Ok(None) };
             Ok(match kind.as_str() {
                 "item" => n.item(id).map(|x| x.bare),
@@ -1134,7 +1315,12 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             }
         })?,
     )?;
-    res.set("dat_path", lua.create_function(|lua, id: u32| Ok(world(lua)?.index.as_ref().and_then(|i| i.path(id)).map(|p| p.display().to_string())))?)?;
+    res.set(
+        "dat_path",
+        lua.create_function(|lua, id: u32| {
+            Ok(world(lua)?.index.as_ref().and_then(|i| i.path(id)).map(|p| p.display().to_string()))
+        })?,
+    )?;
     res.set(
         "model_files",
         lua.create_function(|lua, v: Value| {
@@ -1143,8 +1329,20 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                 Value::Integer(m) => out.set("file", crate::dat::npc::model_file(m as u16))?,
                 Value::Table(t) => {
                     let g = |k: &str| -> mlua::Result<u16> { Ok(t.get::<Option<u16>>(k)?.unwrap_or(0)) };
-                    let look = crate::dat::character::Look { race: t.get::<Option<u8>>("race")?.unwrap_or(0), face: g("face")?, head: g("head")?, body: g("body")?, hands: g("hands")?, legs: g("legs")?, feet: g("feet")?, main: g("main")?, sub: g("sub")?, range: g("range")? };
-                    let (skel, parts) = crate::dat::character::file_ids(&look).map_err(|e| mlua::Error::runtime(format!("{e:#}")))?;
+                    let look = crate::dat::character::Look {
+                        race: t.get::<Option<u8>>("race")?.unwrap_or(0),
+                        face: g("face")?,
+                        head: g("head")?,
+                        body: g("body")?,
+                        hands: g("hands")?,
+                        legs: g("legs")?,
+                        feet: g("feet")?,
+                        main: g("main")?,
+                        sub: g("sub")?,
+                        range: g("range")?,
+                    };
+                    let (skel, parts) =
+                        crate::dat::character::file_ids(&look).map_err(|e| mlua::Error::runtime(format!("{e:#}")))?;
                     out.set("skeleton", skel)?;
                     let list = lua.create_table()?;
                     for (slot, model, file) in parts {
@@ -1154,7 +1352,11 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
                     }
                     out.set("parts", list)?;
                 }
-                _ => return Err(mlua::Error::runtime("res.model_files takes an NPC model id or a look {race, face, head, ...}")),
+                _ => {
+                    return Err(mlua::Error::runtime(
+                        "res.model_files takes an NPC model id or a look {race, face, head, ...}",
+                    ));
+                }
             }
             Ok(out)
         })?,
@@ -1162,12 +1364,40 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
     res.set("weather", lua.create_function(|_, id: usize| Ok(WEATHER.get(id).map(|w| w.0)))?)?;
     res.set("weather_element", lua.create_function(|_, id: usize| Ok(WEATHER.get(id).and_then(|w| w.1)))?)?;
     res.set("element", lua.create_function(|_, id: usize| Ok(ELEMENTS.get(id).copied()))?)?;
-    res.set("mount", lua.create_function(|lua, id: u16| Ok(Some(super::super::magic::mount_name(world(lua)?, id)).filter(|s| !s.is_empty())))?)?;
-    res.set("mob_skill", lua.create_function(|lua, id: u16| Ok(world(lua)?.battle.as_ref().map(|b| b.mob_skill(id)).filter(|s| !s.is_empty() && !s.starts_with('#'))))?)?;
-    res.set("skill", lua.create_function(|lua, id: u32| Ok(world(lua)?.battle.as_ref().and_then(|b| b.kind_name(2, id)).map(|s| crate::dat::font::decode_sjis(&s)).filter(|s| !s.is_empty())))?)?;
+    res.set(
+        "mount",
+        lua.create_function(|lua, id: u16| {
+            Ok(Some(super::super::magic::mount_name(world(lua)?, id)).filter(|s| !s.is_empty()))
+        })?,
+    )?;
+    res.set(
+        "mob_skill",
+        lua.create_function(|lua, id: u16| {
+            Ok(world(lua)?.battle.as_ref().map(|b| b.mob_skill(id)).filter(|s| !s.is_empty() && !s.starts_with('#')))
+        })?,
+    )?;
+    res.set(
+        "skill",
+        lua.create_function(|lua, id: u32| {
+            Ok(world(lua)?
+                .battle
+                .as_ref()
+                .and_then(|b| b.kind_name(2, id))
+                .map(|s| crate::dat::font::decode_sjis(&s))
+                .filter(|s| !s.is_empty()))
+        })?,
+    )?;
     res.set("day", lua.create_function(|lua, d: usize| Ok(world(lua)?.battle.as_ref().and_then(|b| b.day_name(d))))?)?;
-    res.set("moon", lua.create_function(|lua, p: usize| Ok(world(lua)?.battle.as_ref().and_then(|b| b.moon_name(p))))?)?;
-    res.set("job", lua.create_function(|_, id: usize| Ok(super::super::items::JOBS.get(id).filter(|s| !s.is_empty()).map(|s| s.to_string())))?)?;
+    res.set(
+        "moon",
+        lua.create_function(|lua, p: usize| Ok(world(lua)?.battle.as_ref().and_then(|b| b.moon_name(p))))?,
+    )?;
+    res.set(
+        "job",
+        lua.create_function(|_, id: usize| {
+            Ok(super::super::items::JOBS.get(id).filter(|s| !s.is_empty()).map(|s| s.to_string()))
+        })?,
+    )?;
     g.set("res", res)?;
 
     // storage.account / storage.character: plain data, saved at logout, unload and storage.save().
@@ -1294,7 +1524,17 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     t.set("model", e.model)?;
     if let Some(l) = e.appearance {
         let look = lua.create_table()?;
-        for (k, v) in [("face", l.face), ("head", l.head), ("body", l.body), ("hands", l.hands), ("legs", l.legs), ("feet", l.feet), ("main", l.main), ("sub", l.sub), ("range", l.range)] {
+        for (k, v) in [
+            ("face", l.face),
+            ("head", l.head),
+            ("body", l.body),
+            ("hands", l.hands),
+            ("legs", l.legs),
+            ("feet", l.feet),
+            ("main", l.main),
+            ("sub", l.sub),
+            ("range", l.range),
+        ] {
             look.set(k, v)?;
         }
         t.set("look", look)?;
@@ -1306,7 +1546,11 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     // Its target: the face target (0x00D / 0x00E facetarget), and that entity's server id when known.
     if e.face != 0 {
         t.set("target_index", e.face)?;
-        let tid = if e.face == w.my_index { Some(w.my_id) } else { w.entities.iter().find(|(_, x)| x.index == e.face).map(|(k, _)| *k) };
+        let tid = if e.face == w.my_index {
+            Some(w.my_id)
+        } else {
+            w.entities.iter().find(|(_, x)| x.index == e.face).map(|(k, _)| *k)
+        };
         t.set("target_id", tid)?;
     }
     // Our pet: its MP% and TP (s2c 0x068).
@@ -1382,7 +1626,11 @@ fn party(lua: &Lua) -> mlua::Result<Table> {
         t.set("sub_level", m.jobs[3])?;
         t.set("leader", s.leaders.get(slot / 6).is_some_and(|l| *l == m.id))?;
         t.set("alliance_leader", s.alliance_leader == m.id)?;
-        let buffs: Vec<u16> = w.party_buffs.get(&m.id).map(|b| b.iter().copied().filter(|&b| b != 0xffff && b != 0).collect()).unwrap_or_default();
+        let buffs: Vec<u16> = w
+            .party_buffs
+            .get(&m.id)
+            .map(|b| b.iter().copied().filter(|&b| b != 0xffff && b != 0).collect())
+            .unwrap_or_default();
         t.set("buffs", buffs)?;
         out.push(t)?;
     }
@@ -1424,7 +1672,13 @@ fn player(lua: &Lua) -> mlua::Result<Table> {
 }
 
 /// ui.prompt / ui.menu: a modal window whose answer (1-based, or nil when it is closed) goes to `handler`.
-fn popup(lua: &Lua, id: &str, elems: Vec<(super::window::Elem, super::window::Meta)>, at_pointer: bool, handler: Function) -> mlua::Result<()> {
+fn popup(
+    lua: &Lua,
+    id: &str,
+    elems: Vec<(super::window::Elem, super::window::Meta)>,
+    at_pointer: bool,
+    handler: Function,
+) -> mlua::Result<()> {
     let close = lua.create_function(|lua, id: String| {
         if let Some(w) = state(lua).borrow_mut().windows.iter_mut().find(|w| w.id == id) {
             (w.open, w.focus, w.edit) = (false, false, false);
@@ -1463,12 +1717,30 @@ fn cmds(v: Option<Table>) -> mlua::Result<Vec<super::window::Cmd>> {
             let colour = super::hud::colour(c.get("colour")?)?.unwrap_or([255; 4]);
             let kind: String = c.get("type")?;
             Ok(match kind.as_str() {
-                "line" => Cmd::Line { a: [n("x1")?, n("y1")?], b: [n("x2")?, n("y2")?], width: c.get::<Option<f32>>("width")?.unwrap_or(1.0), colour },
-                "rect" => Cmd::Rect { r: [n("x")?, n("y")?, n("w")?, n("h")?], colour, to: super::hud::colour(c.get("to")?)?, line: c.get("line")? },
+                "line" => Cmd::Line {
+                    a: [n("x1")?, n("y1")?],
+                    b: [n("x2")?, n("y2")?],
+                    width: c.get::<Option<f32>>("width")?.unwrap_or(1.0),
+                    colour,
+                },
+                "rect" => Cmd::Rect {
+                    r: [n("x")?, n("y")?, n("w")?, n("h")?],
+                    colour,
+                    to: super::hud::colour(c.get("to")?)?,
+                    line: c.get("line")?,
+                },
                 "circle" => Cmd::Circle { c: [n("x")?, n("y")?], radius: n("r")?, colour, line: c.get("line")? },
                 "tri" => Cmd::Tri { pts: [[n("x1")?, n("y1")?], [n("x2")?, n("y2")?], [n("x3")?, n("y3")?]], colour },
-                "text" => Cmd::Text { at: [n("x")?, n("y")?], text: c.get::<Option<String>>("text")?.unwrap_or_default(), colour },
-                "icon" => Cmd::Icon { at: [n("x")?, n("y")?], size: c.get::<Option<f32>>("size")?.unwrap_or(16.0), icon: super::window::Icon::of(c.get::<Option<String>>("kind")?.as_deref(), c.get("id")?) },
+                "text" => Cmd::Text {
+                    at: [n("x")?, n("y")?],
+                    text: c.get::<Option<String>>("text")?.unwrap_or_default(),
+                    colour,
+                },
+                "icon" => Cmd::Icon {
+                    at: [n("x")?, n("y")?],
+                    size: c.get::<Option<f32>>("size")?.unwrap_or(16.0),
+                    icon: super::window::Icon::of(c.get::<Option<String>>("kind")?.as_deref(), c.get("id")?),
+                },
                 other => return Err(mlua::Error::runtime(format!("unknown draw command {other:?}"))),
             })
         })
@@ -1497,7 +1769,10 @@ fn rows(v: Option<Table>) -> mlua::Result<Vec<super::window::Row>> {
                         None => t.sequence_values::<Value>().map(|v| v.map(cell)).collect::<mlua::Result<_>>()?,
                     };
                     let icon = match t.get::<Option<Table>>("icon")? {
-                        Some(i) => Some(super::window::Icon::of(i.get::<Option<String>>("kind")?.as_deref(), i.get::<u16>("id")?)),
+                        Some(i) => Some(super::window::Icon::of(
+                            i.get::<Option<String>>("kind")?.as_deref(),
+                            i.get::<u16>("id")?,
+                        )),
                         None => None,
                     };
                     Row { cells, icon, colour: super::hud::colour(t.get("colour")?)? }
@@ -1524,30 +1799,93 @@ fn columns(v: Option<Table>) -> mlua::Result<Vec<super::window::Col>> {
 
 /// One element of a window spec ({type = "text" | "buttons" | ..., tip, page}) and what every element carries.
 fn elem(t: &Table) -> mlua::Result<(super::window::Elem, super::window::Meta)> {
-    let meta = super::window::Meta { tip: t.get::<Option<String>>("tip")?.unwrap_or_default(), page: t.get::<Option<i64>>("page")?.map(|p| (p.max(1) - 1) as usize) };
+    let meta = super::window::Meta {
+        tip: t.get::<Option<String>>("tip")?.unwrap_or_default(),
+        page: t.get::<Option<i64>>("page")?.map(|p| (p.max(1) - 1) as usize),
+    };
     Ok((elem_only(t)?, meta))
 }
 
 fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
     use super::window::Elem;
     let kind: String = t.get("type")?;
-    let id = || -> mlua::Result<String> { t.get::<Option<String>>("id")?.ok_or_else(|| mlua::Error::runtime(format!("a {kind} element needs an id"))) };
-    let index = |k: &str| -> mlua::Result<Option<usize>> { Ok(t.get::<Option<i64>>(k)?.map(|i| (i.max(1) - 1) as usize)) };
+    let id = || -> mlua::Result<String> {
+        t.get::<Option<String>>("id")?.ok_or_else(|| mlua::Error::runtime(format!("a {kind} element needs an id")))
+    };
+    let index =
+        |k: &str| -> mlua::Result<Option<usize>> { Ok(t.get::<Option<i64>>(k)?.map(|i| (i.max(1) - 1) as usize)) };
     Ok(match kind.as_str() {
-        "text" => Elem::Text { id: t.get::<Option<String>>("id")?.unwrap_or_default(), text: t.get::<Option<String>>("text")?.unwrap_or_default(), dim: t.get::<Option<bool>>("dim")?.unwrap_or(false), colour: super::hud::colour(t.get("colour")?)? },
-        "canvas" => Elem::Canvas { id: id()?, w: t.get::<Option<f32>>("w")?.unwrap_or(200.0).max(1.0), h: t.get::<Option<f32>>("h")?.unwrap_or(100.0).max(1.0), cmds: cmds(t.get("draw")?)? },
-        "buttons" => Elem::Buttons { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(), marked: index("marked")? },
+        "text" => Elem::Text {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            dim: t.get::<Option<bool>>("dim")?.unwrap_or(false),
+            colour: super::hud::colour(t.get("colour")?)?,
+        },
+        "canvas" => Elem::Canvas {
+            id: id()?,
+            w: t.get::<Option<f32>>("w")?.unwrap_or(200.0).max(1.0),
+            h: t.get::<Option<f32>>("h")?.unwrap_or(100.0).max(1.0),
+            cmds: cmds(t.get("draw")?)?,
+        },
+        "buttons" => Elem::Buttons {
+            id: id()?,
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(),
+            marked: index("marked")?,
+        },
         "slider" => {
             let n = t.get::<Option<usize>>("steps")?.unwrap_or(2).max(1);
-            Elem::Slider { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), n, at: index("at")?.unwrap_or(0).min(n - 1), shown: t.get::<Option<String>>("shown")?.unwrap_or_default() }
+            Elem::Slider {
+                id: id()?,
+                label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+                n,
+                at: index("at")?.unwrap_or(0).min(n - 1),
+                shown: t.get::<Option<String>>("shown")?.unwrap_or_default(),
+            }
         }
-        "list" => Elem::List { id: id()?, rows: rows(t.get("rows")?)?, columns: columns(t.get("columns")?)?, at: index("at")?.unwrap_or(0), top: 0, height: t.get::<Option<usize>>("height")?.unwrap_or(8).max(1) },
-        "tabs" => Elem::Tabs { id: id()?, items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(), at: index("at")?.unwrap_or(0) },
-        "input" => Elem::Input { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), text: t.get::<Option<String>>("text")?.unwrap_or_default(), max: t.get::<Option<usize>>("max")?.unwrap_or(64).clamp(1, 1024) },
-        "choice" => Elem::Choice { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(), at: index("at")?.unwrap_or(0) },
-        "colour" | "color" => Elem::Colour { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), value: super::hud::colour(t.get("value")?)?.unwrap_or([255; 4]), alpha: t.get::<Option<bool>>("alpha")?.unwrap_or(false) },
-        "section" => Elem::Section { id: id()?, label: t.get::<Option<String>>("label")?.unwrap_or_default(), open: t.get::<Option<bool>>("open")?.unwrap_or(true) },
-        "gauge" => Elem::Gauge { id: t.get::<Option<String>>("id")?.unwrap_or_default(), label: t.get::<Option<String>>("label")?.unwrap_or_default(), value: t.get::<Option<f32>>("value")?.unwrap_or(0.0), text: t.get::<Option<String>>("text")?.unwrap_or_default(), kind: t.get::<Option<String>>("kind")?.unwrap_or_else(|| "hp".into()) },
+        "list" => Elem::List {
+            id: id()?,
+            rows: rows(t.get("rows")?)?,
+            columns: columns(t.get("columns")?)?,
+            at: index("at")?.unwrap_or(0),
+            top: 0,
+            height: t.get::<Option<usize>>("height")?.unwrap_or(8).max(1),
+        },
+        "tabs" => Elem::Tabs {
+            id: id()?,
+            items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(),
+            at: index("at")?.unwrap_or(0),
+        },
+        "input" => Elem::Input {
+            id: id()?,
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            max: t.get::<Option<usize>>("max")?.unwrap_or(64).clamp(1, 1024),
+        },
+        "choice" => Elem::Choice {
+            id: id()?,
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            items: t.get::<Option<Vec<String>>>("items")?.unwrap_or_default(),
+            at: index("at")?.unwrap_or(0),
+        },
+        "colour" | "color" => Elem::Colour {
+            id: id()?,
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            value: super::hud::colour(t.get("value")?)?.unwrap_or([255; 4]),
+            alpha: t.get::<Option<bool>>("alpha")?.unwrap_or(false),
+        },
+        "section" => Elem::Section {
+            id: id()?,
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            open: t.get::<Option<bool>>("open")?.unwrap_or(true),
+        },
+        "gauge" => Elem::Gauge {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            label: t.get::<Option<String>>("label")?.unwrap_or_default(),
+            value: t.get::<Option<f32>>("value")?.unwrap_or(0.0),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            kind: t.get::<Option<String>>("kind")?.unwrap_or_else(|| "hp".into()),
+        },
         "separator" => Elem::Separator,
         other => return Err(mlua::Error::runtime(format!("unknown element type {other:?}"))),
     })
@@ -1558,18 +1896,34 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
     use super::window::Elem;
     match e {
         Elem::Text { text, dim, colour, .. } => {
-            if let Some(v) = t.get::<Option<String>>("text")? { *text = v; }
-            if let Some(v) = t.get::<Option<bool>>("dim")? { *dim = v; }
-            if t.contains_key("colour")? { *colour = super::hud::colour(t.get("colour")?)?; }
+            if let Some(v) = t.get::<Option<String>>("text")? {
+                *text = v;
+            }
+            if let Some(v) = t.get::<Option<bool>>("dim")? {
+                *dim = v;
+            }
+            if t.contains_key("colour")? {
+                *colour = super::hud::colour(t.get("colour")?)?;
+            }
         }
         Elem::Canvas { w, h, cmds: c, .. } => {
-            if let Some(v) = t.get::<Option<f32>>("w")? { *w = v.max(1.0); }
-            if let Some(v) = t.get::<Option<f32>>("h")? { *h = v.max(1.0); }
-            if t.contains_key("draw")? { *c = cmds(t.get("draw")?)?; }
+            if let Some(v) = t.get::<Option<f32>>("w")? {
+                *w = v.max(1.0);
+            }
+            if let Some(v) = t.get::<Option<f32>>("h")? {
+                *h = v.max(1.0);
+            }
+            if t.contains_key("draw")? {
+                *c = cmds(t.get("draw")?)?;
+            }
         }
         Elem::Buttons { label, items, marked, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<Vec<String>>>("items")? { *items = v; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<Vec<String>>>("items")? {
+                *items = v;
+            }
             // false clears the mark (a nil field is not seen).
             match t.get::<Value>("marked")? {
                 Value::Nil => {}
@@ -1580,46 +1934,96 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
             }
         }
         Elem::Slider { label, n, at, shown, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<usize>>("steps")? { *n = v.max(1); }
-            if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
-            if let Some(v) = t.get::<Option<String>>("shown")? { *shown = v; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<usize>>("steps")? {
+                *n = v.max(1);
+            }
+            if let Some(v) = t.get::<Option<i64>>("at")? {
+                *at = (v.max(1) - 1) as usize;
+            }
+            if let Some(v) = t.get::<Option<String>>("shown")? {
+                *shown = v;
+            }
             *at = (*at).min(*n - 1);
         }
         Elem::List { rows: r, columns: c, at, height, .. } => {
-            if t.contains_key("rows")? { *r = rows(t.get("rows")?)?; }
-            if t.contains_key("columns")? { *c = columns(t.get("columns")?)?; }
-            if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
-            if let Some(v) = t.get::<Option<usize>>("height")? { *height = v.max(1); }
+            if t.contains_key("rows")? {
+                *r = rows(t.get("rows")?)?;
+            }
+            if t.contains_key("columns")? {
+                *c = columns(t.get("columns")?)?;
+            }
+            if let Some(v) = t.get::<Option<i64>>("at")? {
+                *at = (v.max(1) - 1) as usize;
+            }
+            if let Some(v) = t.get::<Option<usize>>("height")? {
+                *height = v.max(1);
+            }
         }
         Elem::Gauge { label, value, text, kind, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<f32>>("value")? { *value = v; }
-            if let Some(v) = t.get::<Option<String>>("text")? { *text = v; }
-            if let Some(v) = t.get::<Option<String>>("kind")? { *kind = v; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<f32>>("value")? {
+                *value = v;
+            }
+            if let Some(v) = t.get::<Option<String>>("text")? {
+                *text = v;
+            }
+            if let Some(v) = t.get::<Option<String>>("kind")? {
+                *kind = v;
+            }
         }
         Elem::Tabs { items, at, .. } => {
-            if let Some(v) = t.get::<Option<Vec<String>>>("items")? { *items = v; }
-            if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
+            if let Some(v) = t.get::<Option<Vec<String>>>("items")? {
+                *items = v;
+            }
+            if let Some(v) = t.get::<Option<i64>>("at")? {
+                *at = (v.max(1) - 1) as usize;
+            }
         }
         Elem::Choice { label, items, at, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<Vec<String>>>("items")? { *items = v; }
-            if let Some(v) = t.get::<Option<i64>>("at")? { *at = (v.max(1) - 1) as usize; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<Vec<String>>>("items")? {
+                *items = v;
+            }
+            if let Some(v) = t.get::<Option<i64>>("at")? {
+                *at = (v.max(1) - 1) as usize;
+            }
         }
         Elem::Input { label, text, max, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<String>>("text")? { *text = v; }
-            if let Some(v) = t.get::<Option<usize>>("max")? { *max = v.clamp(1, 1024); }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<String>>("text")? {
+                *text = v;
+            }
+            if let Some(v) = t.get::<Option<usize>>("max")? {
+                *max = v.clamp(1, 1024);
+            }
         }
         Elem::Colour { label, value, alpha, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = super::hud::colour(t.get("value")?)? { *value = v; }
-            if let Some(v) = t.get::<Option<bool>>("alpha")? { *alpha = v; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = super::hud::colour(t.get("value")?)? {
+                *value = v;
+            }
+            if let Some(v) = t.get::<Option<bool>>("alpha")? {
+                *alpha = v;
+            }
         }
         Elem::Section { label, open, .. } => {
-            if let Some(v) = t.get::<Option<String>>("label")? { *label = v; }
-            if let Some(v) = t.get::<Option<bool>>("open")? { *open = v; }
+            if let Some(v) = t.get::<Option<String>>("label")? {
+                *label = v;
+            }
+            if let Some(v) = t.get::<Option<bool>>("open")? {
+                *open = v;
+            }
         }
         Elem::Separator => {}
     }
@@ -1633,7 +2037,9 @@ pub(super) fn need(lua: &Lua, perm: &str) -> mlua::Result<()> {
     if s.granted.iter().any(|g| g == perm) {
         Ok(())
     } else {
-        Err(mlua::Error::runtime(format!("this needs the {perm} permission: list it in mod.toml, then /lua grant <mod> {perm}")))
+        Err(mlua::Error::runtime(format!(
+            "this needs the {perm} permission: list it in mod.toml, then /lua grant <mod> {perm}"
+        )))
     }
 }
 
@@ -1647,7 +2053,9 @@ pub(super) fn need_action(lua: &Lua) -> mlua::Result<()> {
     } else if has("actions") {
         Err(mlua::Error::runtime("a game action outside the player's input needs the automation permission"))
     } else {
-        Err(mlua::Error::runtime("game actions need the actions or automation permission: list it in mod.toml, then /lua grant <mod> actions"))
+        Err(mlua::Error::runtime(
+            "game actions need the actions or automation permission: list it in mod.toml, then /lua grant <mod> actions",
+        ))
     }
 }
 
@@ -1657,7 +2065,9 @@ fn packet_bytes(a: Value, b: Option<mlua::LuaString>) -> mlua::Result<Vec<u8>> {
         (Value::Integer(id), Some(body)) => build_packet(id, &body.as_bytes()),
         (Value::Number(id), Some(body)) => build_packet(id as i64, &body.as_bytes()),
         // A whole packet: its size field made to fit its length.
-        (Value::String(data), None) if (4..=MAX_PACKET).contains(&data.as_bytes().len()) => Ok(super::fit(data.as_bytes().to_vec())),
+        (Value::String(data), None) if (4..=MAX_PACKET).contains(&data.as_bytes().len()) => {
+            Ok(super::fit(data.as_bytes().to_vec()))
+        }
         (Value::String(_), None) => Err(mlua::Error::runtime(format!("a whole packet is 4 to {MAX_PACKET} bytes"))),
         _ => Err(mlua::Error::runtime("inject takes (id, body) or a whole sub-packet")),
     }
@@ -1672,7 +2082,11 @@ pub(super) fn build_packet(id: i64, body: &[u8]) -> mlua::Result<Vec<u8>> {
         return Err(mlua::Error::runtime(format!("packet id {id}: ids are 0 to 0x1FF")));
     }
     if body.len() > MAX_PACKET - 4 {
-        return Err(mlua::Error::runtime(format!("a packet body is at most {} bytes ({} given)", MAX_PACKET - 4, body.len())));
+        return Err(mlua::Error::runtime(format!(
+            "a packet body is at most {} bytes ({} given)",
+            MAX_PACKET - 4,
+            body.len()
+        )));
     }
     Ok(crate::net::map::session::build(id as u16, body))
 }

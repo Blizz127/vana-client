@@ -5,9 +5,9 @@
 use anyhow::{Context, Result, bail};
 use md5::{Digest, Md5};
 use std::io::{Read, Write};
+use std::net::{Ipv4Addr, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::net::{Ipv4Addr, TcpStream};
 use std::time::Duration;
 
 const MAGIC: &[u8; 4] = b"IXFF";
@@ -206,12 +206,25 @@ impl Lobby {
     /// `host`: the lobby (LSB's server, or ffxi00.pol.com); `data_port` is LSB's only. `content`: the installed
     /// ROMs (FUN_101c3400, dat::installed).
     #[allow(clippy::too_many_arguments)]
-    pub fn connect(host: &str, view_port: u16, data_port: u16, session: Session, ffximain: &[u8], version: &str, region: u32, content: u32, replies: Arc<AtomicU32>) -> Result<Self> {
+    pub fn connect(
+        host: &str,
+        view_port: u16,
+        data_port: u16,
+        session: Session,
+        ffximain: &[u8],
+        version: &str,
+        region: u32,
+        content: u32,
+        replies: Arc<AtomicU32>,
+    ) -> Result<Self> {
         let data = match session {
-            Session::Lsb { .. } => Some(super::tcp(host, data_port).with_context(|| format!("connecting to lobby data {host}:{data_port}"))?),
+            Session::Lsb { .. } => Some(
+                super::tcp(host, data_port).with_context(|| format!("connecting to lobby data {host}:{data_port}"))?,
+            ),
             Session::PlayOnline { .. } => None,
         };
-        let view = super::tcp(host, view_port).with_context(|| format!("connecting to the lobby {host}:{view_port}"))?;
+        let view =
+            super::tcp(host, view_port).with_context(|| format!("connecting to the lobby {host}:{view_port}"))?;
         let server_ip = match view.peer_addr()?.ip() {
             std::net::IpAddr::V4(ip) => ip,
             std::net::IpAddr::V6(ip) => ip.to_ipv4().unwrap_or(Ipv4Addr::LOCALHOST),
@@ -355,7 +368,10 @@ impl Lobby {
 
     /// The first free slot (status 1, name " ": FUN_1023df20), whose content id a new character takes.
     fn free_slot(&self) -> u32 {
-        self.records.iter().find(|r| rd_u16(&r[..], 8) == 1 && r[12] == b' ' && r[13] == 0).map_or(0, |r| rd_u32(&r[..], 0))
+        self.records
+            .iter()
+            .find(|r| rd_u16(&r[..], 8) == 1 && r[12] == b' ' && r[13] == 0)
+            .map_or(0, |r| rd_u32(&r[..], 0))
     }
 
     /// The record's u16 at +4 (ffxi_id_world), which 0x07 / 0x14 / 0x28 carry @0x20.
@@ -383,7 +399,10 @@ impl Lobby {
         }
         let pkt = self.read_view(0x20, 32)?;
         let count = (rd_u32(&pkt, 28) as usize).min(16);
-        self.records = (0..count).filter_map(|i| pkt.get(32 + i * CHAR_INFO_LEN..32 + (i + 1) * CHAR_INFO_LEN)).map(|r| r.try_into().unwrap()).collect();
+        self.records = (0..count)
+            .filter_map(|i| pkt.get(32 + i * CHAR_INFO_LEN..32 + (i + 1) * CHAR_INFO_LEN))
+            .map(|r| r.try_into().unwrap())
+            .collect();
         Ok(self.records.iter().map(|r| parse_char(r)).collect())
     }
 
@@ -579,7 +598,10 @@ mod create_tests {
         // LSB: m_look.size = ref<uint8>(buf, 57), buf from the packet start.
         for size in 0..3u8 {
             let pkt = make_body(7, &NewCharacter { race: 2, face: 5, size, job: 3, nation: 1 });
-            assert_eq!((pkt.len(), pkt[57], pkt[48], pkt[50], pkt[54], pkt[60], pkt[0x1C]), (0x90, size, 2, 3, 1, 5, 7));
+            assert_eq!(
+                (pkt.len(), pkt[57], pkt[48], pkt[50], pkt[54], pkt[60], pkt[0x1C]),
+                (0x90, size, 2, 3, 1, 5, 7)
+            );
         }
     }
 
@@ -587,7 +609,10 @@ mod create_tests {
     #[test]
     fn name_check_lands_where_lsb_reads_it() {
         let pkt = check_body(9, "Abcde", "Nameless", "1234567890");
-        assert_eq!((pkt.len(), &pkt[32..37], &pkt[0x40..0x48], &pkt[0x50..0x5a], pkt[0x1C]), (0x60, &b"Abcde"[..], &b"Nameless"[..], &b"1234567890"[..], 9));
+        assert_eq!(
+            (pkt.len(), &pkt[32..37], &pkt[0x40..0x48], &pkt[0x50..0x5a], pkt[0x1C]),
+            (0x60, &b"Abcde"[..], &b"Nameless"[..], &b"1234567890"[..], 9)
+        );
     }
 
     #[test]
@@ -640,7 +665,13 @@ mod create_tests {
                 m.finalize().into()
             };
             let p = read(&mut s);
-            assert!(md5_ok(&p) && p[8] == 0x26 && p.len() == 0x98 && p[0x34..0x74] == auth[..] && &p[0x74..0x7e] == b"30261006_0");
+            assert!(
+                md5_ok(&p)
+                    && p[8] == 0x26
+                    && p.len() == 0x98
+                    && p[0x34..0x74] == auth[..]
+                    && &p[0x74..0x7e] == b"30261006_0"
+            );
             let mut b = [0u8; 12];
             b[..4].copy_from_slice(&99u32.to_le_bytes());
             reply(&mut s, 0x05, &b);
@@ -670,12 +701,26 @@ mod create_tests {
             reply(&mut s, 0x0B, &b);
             c
         });
-        let mut l = Lobby::connect("127.0.0.1", port, 0, Session::PlayOnline { auth_code: auth, k16 }, b"dll", "30261006_0", 5, 0xfff, Default::default()).unwrap();
+        let mut l = Lobby::connect(
+            "127.0.0.1",
+            port,
+            0,
+            Session::PlayOnline { auth_code: auth, k16 },
+            b"dll",
+            "30261006_0",
+            5,
+            0xfff,
+            Default::default(),
+        )
+        .unwrap();
         let chars = l.characters().unwrap();
         let m = l.select(&chars[0]).unwrap();
         // The 0x07 hashed c; 0x0B makes it c + 2 and world entry c + 4 (MODLOG "PlayOnline sign-in").
         let c = server.join().unwrap();
-        assert_eq!((m.char_id, m.map.1, m.key[..16].to_vec(), u32::from_le_bytes(m.key[16..].try_into().unwrap())), (2 << 16 | 0x1234, 54230, k16.to_vec(), c + 4));
+        assert_eq!(
+            (m.char_id, m.map.1, m.key[..16].to_vec(), u32::from_le_bytes(m.key[16..].try_into().unwrap())),
+            (2 << 16 | 0x1234, 54230, k16.to_vec(), c + 4)
+        );
     }
 
     /// LSB's dialect with its old fixed counter seed: a plain login reaches world entry at xiloader's 0xAD5DE058, the
@@ -728,13 +773,27 @@ mod create_tests {
             reply(&mut v, 0x0B, &[0u8; 0x48 - 28]);
         });
         let hash = [0x33u8; 16];
-        let mut l = Lobby::connect("127.0.0.1", vp, dp, Session::Lsb { account_id: 1, hash }, b"dll", "30261006_0", 5, 0, Default::default()).unwrap();
+        let mut l = Lobby::connect(
+            "127.0.0.1",
+            vp,
+            dp,
+            Session::Lsb { account_id: 1, hash },
+            b"dll",
+            "30261006_0",
+            5,
+            0,
+            Default::default(),
+        )
+        .unwrap();
         let chars = l.characters().unwrap();
         l.worlds().unwrap();
         let m = l.select(&chars[0]).unwrap();
         server.join().unwrap();
         let old = m.old_key.unwrap();
-        assert_eq!((old[..16].to_vec(), u32::from_le_bytes(old[16..].try_into().unwrap())), (vec![0u8; 16], 0xAD5DE058));
+        assert_eq!(
+            (old[..16].to_vec(), u32::from_le_bytes(old[16..].try_into().unwrap())),
+            (vec![0u8; 16], 0xAD5DE058)
+        );
         assert_eq!((m.key[..16].to_vec(), m.key[16..].to_vec()), (Md5::digest(hash).to_vec(), old[16..].to_vec()));
     }
 
@@ -814,7 +873,18 @@ mod create_tests {
         let c = parse_char(&rec);
         assert_eq!(c.looks, [0, 0x130, 0x130, 0x130, 0x130, 0x130, 0x010, 0]);
         let l = &c.looks;
-        let look = crate::dat::character::Look { race: c.race as u8, face: c.face, head: l[1], body: l[2], hands: l[3], legs: l[4], feet: l[5], main: l[6], sub: l[7], range: 0 };
+        let look = crate::dat::character::Look {
+            race: c.race as u8,
+            face: c.face,
+            head: l[1],
+            body: l[2],
+            hands: l[3],
+            legs: l[4],
+            feet: l[5],
+            main: l[6],
+            sub: l[7],
+            range: 0,
+        };
         assert!(crate::dat::character::file_ids(&look).is_ok());
     }
 

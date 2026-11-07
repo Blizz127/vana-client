@@ -12,10 +12,20 @@ pub const NAME_MAX: usize = 32;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Packet {
     /// A beacon: who this is and the channel it talks on.
-    Hello { session: u64, name: String, channel: String },
+    Hello {
+        session: u64,
+        name: String,
+        channel: String,
+    },
     /// One frame (super::FRAME samples, 48 kHz mono 16-bit).
-    Audio { session: u64, seq: u32, pcm: Vec<i16> },
-    Bye { session: u64 },
+    Audio {
+        session: u64,
+        seq: u32,
+        pcm: Vec<i16>,
+    },
+    Bye {
+        session: u64,
+    },
 }
 
 /// Private, loopback and link-local IPv4: the only addresses voice goes to or is taken from.

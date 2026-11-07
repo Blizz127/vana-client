@@ -28,7 +28,8 @@ impl LogCfg {
     /// FUN_10162e20: max outside 4..24 is 24; FUN_10162e60: min = max unless reactive; FUN_10162ea0: under 3 s is 3 s,
     /// then x 60 (20 ticks at 0). Window 2's -1 width and time are resolved by cfgapply::normalise.
     pub fn for_window(v: &crate::gamecfg::Values, second: bool) -> Self {
-        let [fixed, max, min, secs, pct] = if second { [0xb6, 0xb7, 0xb8, 0xc6, 0xc5] } else { [0x0e, 0x0f, 0x10, 0x11, 0x9c] };
+        let [fixed, max, min, secs, pct] =
+            if second { [0xb6, 0xb7, 0xb8, 0xc6, 0xc5] } else { [0x0e, 0x0f, 0x10, 0x11, 0x9c] };
         let max = match v.get_i(max) {
             m @ 4..=24 => m as f32,
             _ => 24.0,
@@ -91,7 +92,31 @@ pub fn mode_bit(mode: u8) -> Option<u8> {
         61 | 65 | 87 | 92 | 107 | 112 | 174 | 176 | 182 => 42,
         63 | 67 | 68 | 69 | 170 | 189 => 43,
         21 | 26 | 33 | 41 | 71 | 72 | 89 | 94 | 109 | 114 | 164 | 173 | 181 | 184 | 186 => 44,
-        50..=52 | 55 | 58 | 62 | 66 | 80 | 83 | 85 | 88 | 90 | 93 | 100 | 103 | 105 | 108 | 110 | 113 | 122 | 168 | 169 | 171 | 172 | 177 | 179 | 180 => 45,
+        50..=52
+        | 55
+        | 58
+        | 62
+        | 66
+        | 80
+        | 83
+        | 85
+        | 88
+        | 90
+        | 93
+        | 100
+        | 103
+        | 105
+        | 108
+        | 110
+        | 113
+        | 122
+        | 168
+        | 169
+        | 171
+        | 172
+        | 177
+        | 179
+        | 180 => 45,
         8 | 16 => 46,
         121 | 127..=140 => 47,
         _ => return None,
@@ -313,7 +338,9 @@ impl LogAnim {
         if r.shrink {
             self.escape(&r.cfg);
         }
-        let keep = (r.typing && self.at_most_two(&r.cfg)) || r.stacked || r.page_rows.is_some_and(|n| self.lines() <= n.max(1));
+        let keep = (r.typing && self.at_most_two(&r.cfg))
+            || r.stacked
+            || r.page_rows.is_some_and(|n| self.lines() <= n.max(1));
         for _ in 0..frames {
             self.step(FRAME, keep, r.focused, r.line_open, &r.cfg);
         }
@@ -601,7 +628,11 @@ mod tests {
         assert_eq!(full_tabs(false), [0, 3, 4, 1, 2, 7, 10, 9, 6, 5]);
         assert_eq!((next_tab(0, true), next_tab(0, false), next_tab(5, true)), (8, 3, 0));
         let r = Route::default();
-        assert!(tab_shows(5, &r, Some(11), false) && tab_shows(1, &r, Some(0xd2), false) && !tab_shows(3, &r, Some(7), false));
+        assert!(
+            tab_shows(5, &r, Some(11), false)
+                && tab_shows(1, &r, Some(0xd2), false)
+                && !tab_shows(3, &r, Some(7), false)
+        );
     }
 
     /// Default masks with window 2 on: chat, emotes and NPC talk to window 2; battle, system and modeless lines to
@@ -633,10 +664,12 @@ mod tests {
         let (mut l, cfg) = (LogAnim::default(), LogCfg::default());
         l.fill(&cfg);
         l.add_line(&cfg);
-        let offs: Vec<i32> = (0..10).map(|_| {
-            l.step(2, false, false, false, &cfg);
-            l.off
-        }).collect();
+        let offs: Vec<i32> = (0..10)
+            .map(|_| {
+                l.step(2, false, false, false, &cfg);
+                l.off
+            })
+            .collect();
         assert_eq!(offs, [14, 12, 11, 9, 8, 6, 4, 3, 1, 0]);
         assert_eq!(l.pending, 0);
         l.add_line(&cfg);
@@ -728,10 +761,13 @@ impl LogWin {
         let Some(((line, colour), (time, is_chat, indent))) = chat.timed(k) else { return Vec::new() };
         let st = self.stamps.text(time, is_chat);
         let rows = gu.wrap_indent(&format!("{st}{line}"), tw, indent);
-        rows.into_iter().enumerate().map(|(i, piece)| {
-            let n = if i == 0 { st.trim_end().len().min(piece.len()) } else { 0 };
-            (piece, *colour, n, k)
-        }).collect()
+        rows.into_iter()
+            .enumerate()
+            .map(|(i, piece)| {
+                let n = if i == 0 { st.trim_end().len().min(piece.len()) } else { 0 };
+                (piece, *colour, n, k)
+            })
+            .collect()
     }
 
     /// The log line of the full log's row `back` rows above its newest on tab `filter`.
@@ -757,7 +793,18 @@ impl LogWin {
     /// open, `shrink` is Escape (key 0x95, FUN_1015b830). Lines this window's mask leaves out are not taken; stamps
     /// are added as lines come (a change of 0xb5 shows on new lines).
     #[allow(clippy::too_many_arguments)]
-    pub fn update(&mut self, gu: &GameUi, chat: &super::combat::ChatLog, sw: f32, keep: bool, shrink: bool, focused: bool, typing: bool, stamps: Stamps, route: Route) -> f32 {
+    pub fn update(
+        &mut self,
+        gu: &GameUi,
+        chat: &super::combat::ChatLog,
+        sw: f32,
+        keep: bool,
+        shrink: bool,
+        focused: bool,
+        typing: bool,
+        stamps: Stamps,
+        route: Route,
+    ) -> f32 {
         let tw = text_width(sw, self.cfg.pct);
         let window = self.second as usize;
         self.stamps = stamps;
@@ -815,7 +862,12 @@ impl LogWin {
                     if chat.mark(k) == 2 {
                         log::debug!("spool: line {k} held");
                         let rows = r.iter().map(|x| (x.0.clone(), x.1)).collect();
-                        self.spool.entries.push(SpoolEntry { line: k, rows, ticks: self.cfg.ticks.max(1.0), reached: false });
+                        self.spool.entries.push(SpoolEntry {
+                            line: k,
+                            rows,
+                            ticks: self.cfg.ticks.max(1.0),
+                            reached: false,
+                        });
                     }
                     self.wrapped.extend(r);
                 }
@@ -864,7 +916,14 @@ impl LogWin {
         while vis + self.spool.rows() >= max {
             // Retail walks max + 6 rows back from each row as it prints; rows printed together reach further back.
             let back = max + 6 + self.new_lines;
-            let hit = self.wrapped.iter().rev().take(back).enumerate().find(|(i, r)| *i as i64 >= lim && self.spool.waiting(r.3)).map(|(_, r)| r.3);
+            let hit = self
+                .wrapped
+                .iter()
+                .rev()
+                .take(back)
+                .enumerate()
+                .find(|(i, r)| *i as i64 >= lim && self.spool.waiting(r.3))
+                .map(|(_, r)| r.3);
             let Some(line) = hit else { break };
             for e in self.spool.entries.iter_mut().filter(|e| !e.reached && e.line <= line) {
                 e.reached = true;
@@ -879,7 +938,12 @@ impl LogWin {
     /// FUN_10136560's test after this frame's rows: the open message's page (wrapped rows, colour, waiting for a
     /// key) shows pinned when the top drawn row of a full log is still the page's. `open_at`: the log's length once
     /// its first page printed, none when no message is open. True when it showed now.
-    pub fn overflow(&mut self, chat: &super::combat::ChatLog, page: Option<(Vec<String>, [u8; 4], bool)>, open_at: Option<usize>) -> bool {
+    pub fn overflow(
+        &mut self,
+        chat: &super::combat::ChatLog,
+        page: Option<(Vec<String>, [u8; 4], bool)>,
+        open_at: Option<usize>,
+    ) -> bool {
         let Some(open_at) = open_at else {
             self.rem = Rem::default();
             return false;
@@ -903,8 +967,21 @@ impl LogWin {
         for newest in rows.into_iter().filter(|&i| i >= span && self.wrapped[i].3 >= open_at) {
             if chat.mark(self.wrapped[newest - span].3) == 1 {
                 self.rem.shown = true;
-                let tail: Vec<(usize, u8, String)> = self.wrapped.iter().rev().take(8).map(|r| (r.3, chat.mark(r.3), r.0.chars().take(30).collect())).collect();
-                log::debug!("rem shown (second {}): vis {} draw {} pending {} new {n} rows {:?}", self.second, self.anim.lines(), draw, self.anim.pending(), tail);
+                let tail: Vec<(usize, u8, String)> = self
+                    .wrapped
+                    .iter()
+                    .rev()
+                    .take(8)
+                    .map(|r| (r.3, chat.mark(r.3), r.0.chars().take(30).collect()))
+                    .collect();
+                log::debug!(
+                    "rem shown (second {}): vis {} draw {} pending {} new {n} rows {:?}",
+                    self.second,
+                    self.anim.lines(),
+                    draw,
+                    self.anim.pending(),
+                    tail
+                );
                 return true;
             }
         }
@@ -938,7 +1015,8 @@ impl LogWin {
             gu.frame_alpha(x0, y0, w, h, a);
             if self.spool.showing() {
                 gu.clip(Some([x0, y0, w, h]));
-                let rows: Vec<&(String, [u8; 4])> = self.spool.entries.iter().filter(|e| e.reached).flat_map(|e| e.rows.iter()).collect();
+                let rows: Vec<&(String, [u8; 4])> =
+                    self.spool.entries.iter().filter(|e| e.reached).flat_map(|e| e.rows.iter()).collect();
                 for (k, (line, colour)) in rows.iter().rev().take(5).enumerate() {
                     gu.text(line, x0 + 4.0, y0 + h - 18.0 + self.spool.slide - 16.0 * k as f32, 0, *colour);
                 }
@@ -1048,14 +1126,29 @@ impl LogWin {
     /// `band`: the cursor row is a player's line (+0x26): child 1 (the row) shows keytops3 538, a translucent blue band,
     /// instead of windowps 332 (blank) (FUN_10137c70; drawn under the text *(inf: the order)*).
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_full(&self, gu: &mut GameUi, fl: &FullLog, sw: f32, sh: f32, typing: bool, second: bool, band: bool) -> [f32; 4] {
+    pub fn draw_full(
+        &self,
+        gu: &mut GameUi,
+        fl: &FullLog,
+        sw: f32,
+        sh: f32,
+        typing: bool,
+        second: bool,
+        band: bool,
+    ) -> [f32; 4] {
         let (x0, y0, w, h) = (16.0, 48.0, text_width(sw, self.cfg.pct) + 14.0, sh - 64.0);
         gu.frame(x0, y0, w, h);
         let lines = full_lines(sh);
         let (n, yoff) = if typing { (lines - 1, -16.0) } else { (lines, 0.0) };
         let bottom = y0 + h - 4.0 + yoff;
         if band {
-            gu.sprite("menu    keytops3", 538, x0 + 3.0, bottom + yoff + 16.0 * (fl.row as f32 - lines as f32) - 15.0, 0x8080_8080);
+            gu.sprite(
+                "menu    keytops3",
+                538,
+                x0 + 3.0,
+                bottom + yoff + 16.0 * (fl.row as f32 - lines as f32) - 15.0,
+                0x8080_8080,
+            );
         }
         gu.clip(Some([x0, y0 + 3.0, w, (bottom - (y0 + 3.0)).max(0.0)]));
         let rows = self.full_rows(fl.filter);
@@ -1070,10 +1163,21 @@ impl LogWin {
         // FUN_10137840: the bar at x1 - 6 (resized at open), the log's lines, bottom-anchored top.
         let total = rows.len();
         gu.scroll_bar(x0 + w - 6.0, y0, h, total, lines, total.saturating_sub(fl.scroll + lines));
-        gu.bar_site(super::scrollbar::Owner::FullLog, x0 + w - 6.0, y0, h, total, lines, total.saturating_sub(fl.scroll + lines));
+        gu.bar_site(
+            super::scrollbar::Owner::FullLog,
+            x0 + w - 6.0,
+            y0,
+            h,
+            total,
+            lines,
+            total.saturating_sub(fl.scroll + lines),
+        );
         // Tabs (FUN_10137b80; list FUN_10138800): fep sprite pairs 0x10333b4c, unselected A[2p] / selected A[2p + 1];
         // the selected one advances 64, the others 30 (they overlap).
-        const A: [usize; 22] = [0x12, 0x1b, 0x13, 0x1c, 0x0a, 0x14, 0x0c, 0x16, 0x0d, 0x17, 0x0e, 0x18, 0x10, 0x19, 0x1d, 0x1f, 0x1e, 0x20, 0x11, 0x1a, 0x0b, 0x15];
+        const A: [usize; 22] = [
+            0x12, 0x1b, 0x13, 0x1c, 0x0a, 0x14, 0x0c, 0x16, 0x0d, 0x17, 0x0e, 0x18, 0x10, 0x19, 0x1d, 0x1f, 0x1e, 0x20,
+            0x11, 0x1a, 0x0b, 0x15,
+        ];
         let mut x = x0;
         for f in full_tabs(second) {
             let on = f == fl.filter;
@@ -1115,7 +1219,13 @@ impl LogWin {
 
     /// Draws the text: newest line at the bottom, lines 16 px apart, clipped to [x0, y0 + 3, x1, y1 - 4]; the
     /// input line takes the bottom 16 px. Returns the newest line's (x, y, text) for the kaipage arrow.
-    pub fn draw(&self, gu: &mut GameUi, f: &LogFrame, typing: bool, chat: &super::combat::ChatLog) -> Option<(f32, f32, String)> {
+    pub fn draw(
+        &self,
+        gu: &mut GameUi,
+        f: &LogFrame,
+        typing: bool,
+        chat: &super::combat::ChatLog,
+    ) -> Option<(f32, f32, String)> {
         let [x0, y0, w, h] = f.rect;
         // FUN_10162510: only while there are visible lines; from the displayed line up (FUN_101622e0), whole pixels.
         let a = &self.anim;
@@ -1133,7 +1243,9 @@ impl LogWin {
         gu.clip(Some(clip));
         // FUN_101622e0: the kaipage arrow after the newest drawn row of the waiting page (none once the rem took it).
         let mut newest = None;
-        for (k, (line, colour, st, n)) in self.wrapped.iter().rev().skip(a.pending).take(a.draw_n().saturating_sub(r)).enumerate() {
+        for (k, (line, colour, st, n)) in
+            self.wrapped.iter().rev().skip(a.pending).take(a.draw_n().saturating_sub(r)).enumerate()
+        {
             let y = (y1 - 4.0) - 16.0 * (k as f32 + 1.0) + a.off as f32;
             stamped(gu, line, *st, x0 + 4.0, y, *colour, self.stamps.colour);
             if newest.is_none() && !self.rem.shown && chat.mark(*n) == 1 {

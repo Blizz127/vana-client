@@ -195,7 +195,28 @@ pub fn update(w: &mut World, input: &mut Input, dt: f32, window: bool) {
         Some(f) => f,
         None => {
             let seed = w.started.elapsed().as_nanos() as u32 ^ w.my_id;
-            let mut f = Fishing { sub: 0, early: false, lockout: 180, frames: 0, game: None, arrow: -1, acc: 0, t: 0, good: 0, bad: 0, latch: false, clear: 0, answered: false, rng: seed, step: 0.0, enter: false, enter_free: false, escape: false, click: false, axis: 0.0 };
+            let mut f = Fishing {
+                sub: 0,
+                early: false,
+                lockout: 180,
+                frames: 0,
+                game: None,
+                arrow: -1,
+                acc: 0,
+                t: 0,
+                good: 0,
+                bad: 0,
+                latch: false,
+                clear: 0,
+                answered: false,
+                rng: seed,
+                step: 0.0,
+                enter: false,
+                enter_free: false,
+                escape: false,
+                click: false,
+                axis: 0.0,
+            };
             if w.hook_wait <= 0 {
                 w.hook_wait = f.rand() % 601 + 900;
             }
@@ -434,7 +455,12 @@ fn tick(w: &mut World, f: &mut Fishing) {
                     f.acc = (f.acc as f32 * 0.7) as i32;
                 }
                 (f.arrow, f.answered) = (2, false);
-                log::debug!("fishing: arrow {} gold {} for {} ticks", if g.dir == 0 { "right" } else { "left" }, g.gold, f.acc);
+                log::debug!(
+                    "fishing: arrow {} gold {} for {} ticks",
+                    if g.dir == 0 { "right" } else { "left" },
+                    g.gold,
+                    f.acc
+                );
             }
         }
         if f.arrow == 2 {

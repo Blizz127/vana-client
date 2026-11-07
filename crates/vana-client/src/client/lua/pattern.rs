@@ -255,7 +255,10 @@ impl<'a> State<'a> {
     }
 
     fn end_capture(&mut self, s: usize, p: usize) -> R<Option<usize>> {
-        let l = (0..self.level).rev().find(|&l| self.capture[l].1 == Cap::Unfinished).ok_or_else(|| err("invalid pattern capture"))?;
+        let l = (0..self.level)
+            .rev()
+            .find(|&l| self.capture[l].1 == Cap::Unfinished)
+            .ok_or_else(|| err("invalid pattern capture"))?;
         self.capture[l].1 = Cap::Len(s - self.capture[l].0);
         let r = self.do_match(s, p)?;
         if r.is_none() {
@@ -278,7 +281,11 @@ impl<'a> State<'a> {
         // A position capture has no text: C compares (size_t)-2 bytes, which never fits.
         let Cap::Len(len) = cap else { return Ok(None) };
         self.charge(len / 256)?;
-        if self.src.len() - s >= len && self.src[init..init + len] == self.src[s..s + len] { Ok(Some(s + len)) } else { Ok(None) }
+        if self.src.len() - s >= len && self.src[init..init + len] == self.src[s..s + len] {
+            Ok(Some(s + len))
+        } else {
+            Ok(None)
+        }
     }
 
     /// lstrlib's `match`: where the match of `pat[p..]` at `src[s..]` ends, if it matches.
@@ -300,7 +307,11 @@ impl<'a> State<'a> {
             }
             match self.pat[p] {
                 b'(' => {
-                    return if self.p_at(p + 1) == b')' { self.start_capture(s, p + 2, Cap::Position) } else { self.start_capture(s, p + 1, Cap::Unfinished) };
+                    return if self.p_at(p + 1) == b')' {
+                        self.start_capture(s, p + 2, Cap::Position)
+                    } else {
+                        self.start_capture(s, p + 1, Cap::Unfinished)
+                    };
                 }
                 b')' => return self.end_capture(s, p + 1),
                 b'$' if p + 1 == self.pat.len() => return Ok((s == self.src.len()).then_some(s)),
@@ -454,7 +465,11 @@ impl Args {
     /// luaL_checklstring: a string, or a number as its text.
     fn str(&self, lua: &Lua, n: usize) -> R<mlua::LuaString> {
         let v = self.get(n);
-        let s = if matches!(v, Value::String(_) | Value::Integer(_) | Value::Number(_)) { lua.coerce_string(v.clone())? } else { None };
+        let s = if matches!(v, Value::String(_) | Value::Integer(_) | Value::Number(_)) {
+            lua.coerce_string(v.clone())?
+        } else {
+            None
+        };
         s.ok_or_else(|| self.bad(n, &format!("string expected, got {}", self.type_name(n))))
     }
 
@@ -467,7 +482,11 @@ impl Args {
         if let Some(i) = lua.coerce_integer(v.clone())? {
             return Ok(i);
         }
-        let why = if lua.coerce_number(v.clone())?.is_some() { "number has no integer representation".to_string() } else { format!("number expected, got {}", self.type_name(n)) };
+        let why = if lua.coerce_number(v.clone())?.is_some() {
+            "number has no integer representation".to_string()
+        } else {
+            format!("number expected, got {}", self.type_name(n))
+        };
         Err(self.bad(n, &why))
     }
 }
@@ -489,7 +508,10 @@ fn find_aux(lua: &Lua, a: &Args, find: bool) -> R<MultiValue> {
     if find && (plain || !p.iter().any(|c| SPECIALS.contains(c))) {
         // A plain search (linear, so no budget needed).
         return Ok(match memchr::memmem::find(&s[init..], p) {
-            Some(k) => MultiValue::from_vec(vec![Value::Integer((init + k + 1) as i64), Value::Integer((init + k + p.len()) as i64)]),
+            Some(k) => MultiValue::from_vec(vec![
+                Value::Integer((init + k + 1) as i64),
+                Value::Integer((init + k + p.len()) as i64),
+            ]),
             None => MultiValue::from_vec(vec![Value::Nil]),
         });
     }
@@ -532,7 +554,12 @@ fn results(lua: &Lua, r: R<MultiValue>) -> mlua::Result<MultiValue> {
         Err(Fail::Raise(m)) => (1, m, 0),
         Err(Fail::Arg(n, m)) => (2, m, n as i64),
     };
-    Ok(MultiValue::from_vec(vec![failed(), Value::Integer(kind), Value::String(lua.create_string(m)?), Value::Integer(arg)]))
+    Ok(MultiValue::from_vec(vec![
+        failed(),
+        Value::Integer(kind),
+        Value::String(lua.create_string(m)?),
+        Value::Integer(arg),
+    ]))
 }
 
 /// The C function a mod calls: its Rust half (upvalue 1) returns a failure as values, raised here as luaL_error
@@ -585,12 +612,19 @@ pub(super) fn install(lua: &Lua, string: &mlua::Table) -> mlua::Result<()> {
     let find = lua.create_function(|lua, a: MultiValue| results(lua, find_aux(lua, &Args(a.into_vec()), true)))?;
     let r#match = lua.create_function(|lua, a: MultiValue| results(lua, find_aux(lua, &Args(a.into_vec()), false)))?;
     let gmatch = lua.create_function(|lua, a: MultiValue| results(lua, gmatch(lua, &Args(a.into_vec()))))?;
-    let gsub = lua.create_function(|lua, a: MultiValue| results(lua, gsub(lua, &Args(a.into_vec())).map(|(s, n)| MultiValue::from_vec(vec![s, Value::Integer(n)]))))?;
+    let gsub = lua.create_function(|lua, a: MultiValue| {
+        results(lua, gsub(lua, &Args(a.into_vec())).map(|(s, n)| MultiValue::from_vec(vec![s, Value::Integer(n)])))
+    })?;
     // SAFETY: the stack holds the five arguments; each closure takes one of them as its upvalue.
     unsafe {
         lua.exec_raw::<()>((string.clone(), find, r#match, gmatch, gsub), |l| {
             use mlua::ffi;
-            for (i, name, f) in [(2, c"find", raise as ffi::lua_CFunction), (3, c"match", raise), (4, c"gmatch", raise_gmatch), (5, c"gsub", raise)] {
+            for (i, name, f) in [
+                (2, c"find", raise as ffi::lua_CFunction),
+                (3, c"match", raise),
+                (4, c"gmatch", raise_gmatch),
+                (5, c"gsub", raise),
+            ] {
                 ffi::lua_pushvalue(l, i);
                 ffi::lua_pushcclosure(l, f, 1);
                 ffi::lua_setfield(l, 1, name.as_ptr());
@@ -643,7 +677,9 @@ fn gsub(lua: &Lua, a: &Args) -> R<(Value, i64)> {
     let (s, p): (&[u8], &[u8]) = (&src_b, &p_b);
     // A number replacement is its string form.
     let repl = match repl {
-        Value::Integer(_) | Value::Number(_) => Value::String(lua.coerce_string(repl)?.ok_or_else(|| err("bad replacement"))?),
+        Value::Integer(_) | Value::Number(_) => {
+            Value::String(lua.coerce_string(repl)?.ok_or_else(|| err("bad replacement"))?)
+        }
         r => r,
     };
     let anchor = p.first() == Some(&b'^');
@@ -885,7 +921,12 @@ mod tests {
             "string.find({}, 'a')",
         ];
         for case in CASES {
-            let run = |lua: &Lua| lua.load(format!("return {case}")).set_name("=case").eval::<mlua::MultiValue>().map(|v| v.iter().map(show).collect::<Vec<_>>());
+            let run = |lua: &Lua| {
+                lua.load(format!("return {case}"))
+                    .set_name("=case")
+                    .eval::<mlua::MultiValue>()
+                    .map(|v| v.iter().map(show).collect::<Vec<_>>())
+            };
             match (run(&ours), run(&theirs)) {
                 (Ok(a), Ok(b)) => assert_eq!(a, b, "{case}"),
                 (Err(a), Err(b)) => {
@@ -904,8 +945,8 @@ mod tests {
         super::install(&ours, &ours.globals().get("string").unwrap()).unwrap();
         let theirs = Lua::new();
         const PIECES: &[&str] = &[
-            "a", "b", ".", "%a", "%d", "%s", "%W", "[ab]", "[^a]", "[a-c]", "[%d.]", "*", "+", "-", "?", "(", ")", "()", "%1", "%b()", "%f[%a]", "^",
-            "$", "%%", "x",
+            "a", "b", ".", "%a", "%d", "%s", "%W", "[ab]", "[^a]", "[a-c]", "[%d.]", "*", "+", "-", "?", "(", ")",
+            "()", "%1", "%b()", "%f[%a]", "^", "$", "%%", "x",
         ];
         let mut seed = 0x2545f4914f6cdd1du64;
         let mut next = |n: usize| {
@@ -916,16 +957,26 @@ mod tests {
         };
         for _ in 0..4000 {
             let pat: String = (0..1 + next(6)).map(|_| PIECES[next(PIECES.len())]).collect();
-            let subject: String = (0..next(12)).map(|_| ["a", "b", "c", "1", " ", "(", ")", "x", "."][next(9)]).collect();
+            let subject: String =
+                (0..next(12)).map(|_| ["a", "b", "c", "1", " ", "(", ")", "x", "."][next(9)]).collect();
             let init = next(5) as i64 - 2;
             for f in ["find", "match", "gsub_s", "gsub_f", "gmatch"] {
                 let code = match f {
                     "gsub_s" => format!("return string.gsub({subject:?}, {pat:?}, '<%0>')"),
-                    "gsub_f" => format!("return string.gsub({subject:?}, {pat:?}, function(...) return select('#', ...) .. '' end, 3)"),
-                    "gmatch" => format!("local t = {{}} for a, b in string.gmatch({subject:?}, {pat:?}, {init}) do t[#t+1] = tostring(a) .. '/' .. tostring(b) end return table.concat(t, ',')"),
+                    "gsub_f" => format!(
+                        "return string.gsub({subject:?}, {pat:?}, function(...) return select('#', ...) .. '' end, 3)"
+                    ),
+                    "gmatch" => format!(
+                        "local t = {{}} for a, b in string.gmatch({subject:?}, {pat:?}, {init}) do t[#t+1] = tostring(a) .. '/' .. tostring(b) end return table.concat(t, ',')"
+                    ),
                     _ => format!("return string.{f}({subject:?}, {pat:?}, {init})"),
                 };
-                let run = |lua: &Lua| lua.load(code.as_str()).set_name("=case").eval::<mlua::MultiValue>().map(|v| v.iter().map(show).collect::<Vec<_>>());
+                let run = |lua: &Lua| {
+                    lua.load(code.as_str())
+                        .set_name("=case")
+                        .eval::<mlua::MultiValue>()
+                        .map(|v| v.iter().map(show).collect::<Vec<_>>())
+                };
                 match (run(&ours), run(&theirs)) {
                     (Ok(a), Ok(b)) => assert_eq!(a, b, "{code}"),
                     (Err(a), Err(b)) => {
@@ -968,7 +1019,10 @@ mod tests {
         lua.set_app_data(st);
         super::install(&lua, &lua.globals().get("string").unwrap()).unwrap();
         let t0 = std::time::Instant::now();
-        for code in ["return string.find(string.rep('a', 40000), '^.-.-b')", "return string.find(string.rep('a', 40000), '.-.-.-b')"] {
+        for code in [
+            "return string.find(string.rep('a', 40000), '^.-.-b')",
+            "return string.find(string.rep('a', 40000), '.-.-.-b')",
+        ] {
             let r = lua.load(code).eval::<mlua::MultiValue>();
             assert!(r.unwrap_err().to_string().contains("time budget"), "{code}");
         }
@@ -984,7 +1038,9 @@ mod tests {
         lua.set_app_data(st);
         super::install(&lua, &lua.globals().get("string").unwrap()).unwrap();
         let t0 = std::time::Instant::now();
-        let r = lua.load("return string.find(string.rep('b', 1000000), '[' .. string.rep('a', 1000000) .. ']')").eval::<mlua::MultiValue>();
+        let r = lua
+            .load("return string.find(string.rep('b', 1000000), '[' .. string.rep('a', 1000000) .. ']')")
+            .eval::<mlua::MultiValue>();
         assert!(r.unwrap_err().to_string().contains("time budget"));
         assert!(t0.elapsed() < std::time::Duration::from_secs(1), "took {:?}", t0.elapsed());
     }

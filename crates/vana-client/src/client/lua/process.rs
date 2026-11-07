@@ -4,11 +4,17 @@ use super::api::need;
 use mlua::{Lua, Table};
 
 /// Priority levels, lowest first, with the Unix nice value each is.
-const LEVELS: [(&str, i32); 6] = [("idle", 19), ("low", 10), ("below_normal", 5), ("normal", 0), ("above_normal", -5), ("high", -10)];
+const LEVELS: [(&str, i32); 6] =
+    [("idle", 19), ("low", 10), ("below_normal", 5), ("normal", 0), ("above_normal", -5), ("high", -10)];
 
 #[cfg(target_os = "linux")]
 fn tasks() -> Vec<i32> {
-    std::fs::read_dir("/proc/self/task").into_iter().flatten().flatten().filter_map(|e| e.file_name().to_str()?.parse().ok()).collect()
+    std::fs::read_dir("/proc/self/task")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| e.file_name().to_str()?.parse().ok())
+        .collect()
 }
 
 /// Every thread on these cores (Linux: each task; threads made later inherit it).
@@ -58,7 +64,11 @@ fn priority() -> i32 {
 fn set_affinity(cores: &[usize]) -> Result<(), String> {
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, SetProcessAffinityMask};
     let mask = cores.iter().filter(|&&c| c < usize::BITS as usize).fold(0usize, |m, &c| m | 1 << c);
-    if unsafe { SetProcessAffinityMask(GetCurrentProcess(), mask) } == 0 { Err(format!("SetProcessAffinityMask: {}", std::io::Error::last_os_error())) } else { Ok(()) }
+    if unsafe { SetProcessAffinityMask(GetCurrentProcess(), mask) } == 0 {
+        Err(format!("SetProcessAffinityMask: {}", std::io::Error::last_os_error()))
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(windows)]
@@ -101,7 +111,11 @@ fn set_priority(nice: i32) -> Result<(), String> {
         n if n > -10 => ABOVE_NORMAL_PRIORITY_CLASS,
         _ => HIGH_PRIORITY_CLASS,
     };
-    if unsafe { SetPriorityClass(GetCurrentProcess(), class) } == 0 { Err(format!("SetPriorityClass: {}", std::io::Error::last_os_error())) } else { Ok(()) }
+    if unsafe { SetPriorityClass(GetCurrentProcess(), class) } == 0 {
+        Err(format!("SetPriorityClass: {}", std::io::Error::last_os_error()))
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(windows)]
@@ -128,7 +142,11 @@ fn affinity() -> Vec<usize> {
 
 #[cfg(all(unix, not(target_os = "linux")))]
 fn set_priority(nice: i32) -> Result<(), String> {
-    if unsafe { libc::setpriority(libc::PRIO_PROCESS, 0, nice) } != 0 { Err(format!("setpriority: {}", std::io::Error::last_os_error())) } else { Ok(()) }
+    if unsafe { libc::setpriority(libc::PRIO_PROCESS, 0, nice) } != 0 {
+        Err(format!("setpriority: {}", std::io::Error::last_os_error()))
+    } else {
+        Ok(())
+    }
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
@@ -151,7 +169,9 @@ pub(super) fn install(lua: &Lua, client: &Table, mod_id: &str) -> mlua::Result<(
             let stamp = jiff::Zoned::now().strftime("%Y%m%d-%H%M%S").to_string();
             let name = name.unwrap_or(stamp).replace(['/', '\\'], "_");
             // Another mod's recording is not ours to end.
-            if let Some((owner, _)) = lua.app_data_ref::<super::Recording>().and_then(|r| r.0.borrow().clone()).filter(|r| r.0 != me) {
+            if let Some((owner, _)) =
+                lua.app_data_ref::<super::Recording>().and_then(|r| r.0.borrow().clone()).filter(|r| r.0 != me)
+            {
                 return Err(mlua::Error::runtime(format!("{owner} is recording")));
             }
             // A new name for each file: an earlier recording is never replaced.
@@ -177,7 +197,11 @@ pub(super) fn install(lua: &Lua, client: &Table, mod_id: &str) -> mlua::Result<(
     )?;
     client.set(
         "recording",
-        lua.create_function(|lua, ()| Ok(lua.app_data_ref::<super::Recording>().and_then(|r| r.0.borrow().as_ref().map(|p| p.1.display().to_string()))))?,
+        lua.create_function(|lua, ()| {
+            Ok(lua
+                .app_data_ref::<super::Recording>()
+                .and_then(|r| r.0.borrow().as_ref().map(|p| p.1.display().to_string())))
+        })?,
     )?;
     client.set(
         "process",

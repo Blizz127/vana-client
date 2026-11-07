@@ -32,7 +32,13 @@ const LINE: f32 = 24.0;
 
 /// The page shows: Status open with none of its own windows over it.
 fn shown(w: &World) -> bool {
-    w.modern && w.status.is_some() && w.currencies.is_none() && w.unity.is_none() && w.merits_ui.is_none() && w.jp_ui.is_none() && w.ae_ui.is_none()
+    w.modern
+        && w.status.is_some()
+        && w.currencies.is_none()
+        && w.unity.is_none()
+        && w.merits_ui.is_none()
+        && w.jp_ui.is_none()
+        && w.ae_ui.is_none()
 }
 
 fn cursor_row(sel: u16) -> usize {
@@ -82,13 +88,30 @@ pub fn key(w: &mut World, key: egui::Key) -> bool {
 /// A row of the page: the label at the left, the value at the right.
 fn pair(ui: &mut Ui, m: &super::Modern, label: &str, value: &str, colour: Color32) {
     let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
-    ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), m.theme.color("muted"));
-    ui.painter().text(pos2(r.max.x - 4.0, r.center().y), Align2::RIGHT_CENTER, value, FontId::proportional(m.theme.ui), colour);
+    ui.painter().text(
+        pos2(r.min.x + 4.0, r.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        FontId::proportional(m.theme.small),
+        m.theme.color("muted"),
+    );
+    ui.painter().text(
+        pos2(r.max.x - 4.0, r.center().y),
+        Align2::RIGHT_CENTER,
+        value,
+        FontId::proportional(m.theme.ui),
+        colour,
+    );
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
     ui.add_space(6.0);
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     ui.add_space(2.0);
 }
 
@@ -105,8 +128,20 @@ fn cells(ui: &mut Ui, m: &super::Modern, items: &[Cell], icons: &[Option<super::
                 ui.painter().add(paint::image(&s, pos2(x, r.center().y - 9.0), 18.0, Color32::WHITE));
                 x += 24.0;
             }
-            ui.painter().text(pos2(x, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), *nc);
-            ui.painter().text(pos2(r.max.x - 6.0, r.center().y), Align2::RIGHT_CENTER, value, FontId::monospace(m.theme.small), *vc);
+            ui.painter().text(
+                pos2(x, r.center().y),
+                Align2::LEFT_CENTER,
+                name,
+                FontId::proportional(m.theme.small),
+                *nc,
+            );
+            ui.painter().text(
+                pos2(r.max.x - 6.0, r.center().y),
+                Align2::RIGHT_CENTER,
+                value,
+                FontId::monospace(m.theme.small),
+                *vc,
+            );
         }
     }
 }
@@ -139,7 +174,11 @@ pub fn draw(p: &mut Panels, w: &mut World) {
 
     // The level: retail's level window as a gauge (the master level once one is unlocked).
     let ml = stats.ml.1 & 1 != 0;
-    let capped = if ml { stats.ml.1 & 2 != 0 && stats.ml_exp.0 >= stats.ml_exp.1.wrapping_sub(1) } else { w.merits.is_some_and(|x| x.1 & 0x4000 != 0) };
+    let capped = if ml {
+        stats.ml.1 & 2 != 0 && stats.ml_exp.0 >= stats.ml_exp.1.wrapping_sub(1)
+    } else {
+        w.merits.is_some_and(|x| x.1 & 0x4000 != 0)
+    };
     let (head, level, now, next) = if ml {
         (gu.lobby_msg(0xc, 0x203, "M. Level"), stats.ml.0, stats.ml_exp.0 as i64, stats.ml_exp.1 as i64)
     } else {
@@ -155,8 +194,15 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             let cells = rows
                 .iter()
                 .map(|&(job, lv)| {
-                    let name = caption("menu    windowps", 212 + job as usize).unwrap_or_else(|| hud::job(job).to_string());
-                    let c = if job == stats.main.0 { gold } else if job == stats.sub.0 { blue } else { white };
+                    let name =
+                        caption("menu    windowps", 212 + job as usize).unwrap_or_else(|| hud::job(job).to_string());
+                    let c = if job == stats.main.0 {
+                        gold
+                    } else if job == stats.sub.0 {
+                        blue
+                    } else {
+                        white
+                    };
                     (name, c, lv.to_string(), white)
                 })
                 .collect();
@@ -165,7 +211,14 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         3 | 4 => {
             let cells = status::skill_rows(w, sel == 4)
                 .into_iter()
-                .map(|(id, v)| (caption("menu    keytops3", 208 + id).unwrap_or_default(), white, (v & 0x7fff).to_string(), if v & 0x8000 != 0 { blue } else { white }))
+                .map(|(id, v)| {
+                    (
+                        caption("menu    keytops3", 208 + id).unwrap_or_default(),
+                        white,
+                        (v & 0x7fff).to_string(),
+                        if v & 0x8000 != 0 { blue } else { white },
+                    )
+                })
                 .collect();
             (cells, Vec::new())
         }
@@ -174,8 +227,17 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let crafts: Vec<(String, String, Color32, String)> = status::craft_rows(w)
         .into_iter()
         .map(|(id, v)| {
-            let rank = if v & 0x1f < 0x10 { caption("menu    keytops3", 193 + (v & 0x1f) as usize).unwrap_or_default() } else { String::new() };
-            (caption("menu    keytops3", 208 + id).unwrap_or_default(), rank, if v & 0x8000 != 0 { blue } else { white }, ((v >> 5) & 0x3ff).to_string())
+            let rank = if v & 0x1f < 0x10 {
+                caption("menu    keytops3", 193 + (v & 0x1f) as usize).unwrap_or_default()
+            } else {
+                String::new()
+            };
+            (
+                caption("menu    keytops3", 208 + id).unwrap_or_default(),
+                rank,
+                if v & 0x8000 != 0 { blue } else { white },
+                ((v >> 5) & 0x3ff).to_string(),
+            )
         })
         .collect();
     let money = if sel == 6 { currencies::merged(gu, &s.cur) } else { Vec::new() };
@@ -195,168 +257,330 @@ pub fn draw(p: &mut Panels, w: &mut World) {
 
     let mut click = None;
     let mut open = false;
-    p.panel("window", Some(Title { icon: Some("icons/status"), text: "Status", note: None, name: false }), SIDE_W + 18.0 + PAGE_W, |ui| {
-        equip::persona_row(ui, m, &persona, &stats);
-        ui.add_space(6.0);
-        if ready {
-            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
-            let bar = Rect::from_min_max(pos2(r.min.x, r.max.y - hud::BAR), r.max);
-            let f = if next > 0 { (now as f32 / next as f32).min(1.0) } else { 0.0 };
-            let value = format!("{} / {}", status::grouped(now, &sep), status::grouped(next, &sep));
-            let c = if capped { blue } else { white };
-            hud::labelled_bar(ui, m, "experience", bar, f, (&format!("{head} {level}   {exp_label}"), c), (&value, c));
-        }
-        ui.add_space(10.0);
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(SIDE_W);
-                for (k, (id, label)) in ROWS.iter().enumerate() {
-                    let (r, resp) = ui.allocate_exact_size(vec2(SIDE_W, ROW_H), Sense::click());
-                    let off = s.off.contains(id) || (*id == 6 && s.off.contains(&10) && s.off.contains(&6));
-                    let face = match () {
-                        _ if k == row => "controls/list_row_selected",
-                        _ if off => "controls/list_row_disabled",
-                        _ if resp.hovered() => "controls/list_row_hover",
-                        _ => "controls/list_row_normal",
-                    };
-                    super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
-                    ui.painter().text(pos2(r.min.x + 24.0, r.center().y), Align2::LEFT_CENTER, *label, FontId::proportional(m.theme.ui), if off { muted } else { white });
-                    if resp.clicked() {
-                        click = Some(k);
-                    }
-                    ui.add_space(2.0);
-                }
-            });
-            ui.add_space(18.0);
-            // The page as tall as it needs, up to most of the screen; at least the list beside it.
-            let height = (ui.ctx().content_rect().height() * 0.7).max(ROWS.len() as f32 * (ROW_H + 2.0));
-            let mut area = egui::ScrollArea::vertical().id_salt("status page").max_height(height).min_scrolled_height(height).auto_shrink([false, true]);
-            if s.m_page != 0 {
-                let off = ui.ctx().data(|d| d.get_temp::<f32>(egui::Id::unique("status page off"))).unwrap_or(0.0);
-                area = area.vertical_scroll_offset((off + s.m_page as f32 * (height - LINE)).max(0.0));
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/status"), text: "Status", note: None, name: false }),
+        SIDE_W + 18.0 + PAGE_W,
+        |ui| {
+            equip::persona_row(ui, m, &persona, &stats);
+            ui.add_space(6.0);
+            if ready {
+                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
+                let bar = Rect::from_min_max(pos2(r.min.x, r.max.y - hud::BAR), r.max);
+                let f = if next > 0 { (now as f32 / next as f32).min(1.0) } else { 0.0 };
+                let value = format!("{} / {}", status::grouped(now, &sep), status::grouped(next, &sep));
+                let c = if capped { blue } else { white };
+                hud::labelled_bar(
+                    ui,
+                    m,
+                    "experience",
+                    bar,
+                    f,
+                    (&format!("{head} {level}   {exp_label}"), c),
+                    (&value, c),
+                );
             }
-            let out = area.show(ui, |ui| ui.vertical(|ui| {
-                ui.set_width(PAGE_W);
-                ui.label(egui::RichText::new(ROWS[row].1).size(m.theme.title).family(FontFamily::Name(super::STRONG.into())).color(gold));
-                ui.add_space(4.0);
-                if !ready {
-                    ui.label(egui::RichText::new("Waiting for the status...").size(m.theme.small).color(muted));
-                    return;
+            ui.add_space(10.0);
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(SIDE_W);
+                    for (k, (id, label)) in ROWS.iter().enumerate() {
+                        let (r, resp) = ui.allocate_exact_size(vec2(SIDE_W, ROW_H), Sense::click());
+                        let off = s.off.contains(id) || (*id == 6 && s.off.contains(&10) && s.off.contains(&6));
+                        let face = match () {
+                            _ if k == row => "controls/list_row_selected",
+                            _ if off => "controls/list_row_disabled",
+                            _ if resp.hovered() => "controls/list_row_hover",
+                            _ => "controls/list_row_normal",
+                        };
+                        super::rows::face(ui.painter(), m, r, face, Color32::WHITE);
+                        ui.painter().text(
+                            pos2(r.min.x + 24.0, r.center().y),
+                            Align2::LEFT_CENTER,
+                            *label,
+                            FontId::proportional(m.theme.ui),
+                            if off { muted } else { white },
+                        );
+                        if resp.clicked() {
+                            click = Some(k);
+                        }
+                        ui.add_space(2.0);
+                    }
+                });
+                ui.add_space(18.0);
+                // The page as tall as it needs, up to most of the screen; at least the list beside it.
+                let height = (ui.ctx().content_rect().height() * 0.7).max(ROWS.len() as f32 * (ROW_H + 2.0));
+                let mut area = egui::ScrollArea::vertical()
+                    .id_salt("status page")
+                    .max_height(height)
+                    .min_scrolled_height(height)
+                    .auto_shrink([false, true]);
+                if s.m_page != 0 {
+                    let off = ui.ctx().data(|d| d.get_temp::<f32>(egui::Id::unique("status page off"))).unwrap_or(0.0);
+                    area = area.vertical_scroll_offset((off + s.m_page as f32 * (height - LINE)).max(0.0));
                 }
-                match sel {
-                    1 => {
-                        pair(ui, m, "Title", title.as_deref().unwrap_or(""), white);
-                        pair(ui, m, "Nation", nation.as_deref().unwrap_or("--"), white);
-                        pair(ui, m, "Race", race, white);
-                        pair(ui, m, "Home Point", &home, white);
-                        pair(ui, m, "Rank", &stats.rank.to_string(), white);
-                        let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
-                        let bar = Rect::from_min_max(pos2(r.min.x, r.max.y - hud::BAR), r.max);
-                        hud::labelled_bar(ui, m, "experience", bar, stats.rank_points as f32 / 4096.0, ("Rank Points", white), ("", white));
-                        if stats.ilvl != 0 {
-                            pair(ui, m, "Item Level", &format!("{}  Su{}", stats.ilvl as u32 + 99, stats.su), white);
-                        }
-                        heading(ui, m, "Attributes");
-                        pair(ui, m, "Max HP", &stats.hp_max.to_string(), if persona.enc & 1 << 0x17 != 0 { m.theme.color("hp") } else { white });
-                        pair(ui, m, "Max MP", &stats.mp_max.to_string(), if persona.enc & 1 << 0x18 != 0 { m.theme.color("hp") } else { white });
-                        for (k, (base, bonus)) in persona.stats.iter().enumerate() {
-                            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
-                            ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, ["STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR"][k], FontId::proportional(m.theme.small), muted);
-                            let mut job = egui::text::LayoutJob::default();
-                            let red = persona.enc & 1 << (0x10 + k) != 0;
-                            job.append(base.trim(), 0.0, egui::TextFormat::simple(FontId::proportional(m.theme.ui), if red { m.theme.color("hp") } else { white }));
-                            if let Some((b, c)) = bonus {
-                                job.append(b, 0.0, egui::TextFormat::simple(FontId::proportional(m.theme.ui), super::chat::colour(c.to_le_bytes())));
-                            }
-                            let g = ui.painter().layout_job(job);
-                            ui.painter().galley(pos2(r.max.x - 4.0 - g.size().x, r.center().y - g.size().y / 2.0), g, Color32::WHITE);
-                        }
-                        if let Some((_, rank, prestige)) = mon {
-                            heading(ui, m, "Monstrosity");
-                            pair(ui, m, "Gladiator Rank", ["Gladiator", "Colosseum Gladiator", "High Colosseum Gladiator"].get((rank >> 2 & 3) as usize).copied().unwrap_or(""), white);
-                            pair(ui, m, "Prestige", &prestige.to_string(), white);
-                            pair(ui, m, "Mastery Rank", &mastery.to_string(), white);
-                            pair(ui, m, "Mentor", &if mentor > 0 { format!("Mentor {mentor}") } else { "--".into() }, white);
-                        }
-                    }
-                    2..=4 | 12 => cells(ui, m, &page_cells, &page_icons),
-                    5 => {
-                        for (name, rank, rc, lv) in &crafts {
-                            let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), LINE + 4.0), Sense::hover());
-                            let r = Rect::from_min_size(r.min, vec2(r.width(), LINE));
-                            ui.painter().rect_filled(r, 4.0, m.theme.color("charcoal").gamma_multiply(0.6));
-                            ui.painter().text(pos2(r.min.x + 6.0, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), white);
-                            ui.painter().text(pos2(r.min.x + 170.0, r.center().y), Align2::LEFT_CENTER, rank, FontId::proportional(m.theme.small), *rc);
-                            ui.painter().text(pos2(r.max.x - 6.0, r.center().y), Align2::RIGHT_CENTER, lv, FontId::monospace(m.theme.small), white);
-                        }
-                    }
-                    6 => {
-                        if s.cur.iter().all(|c| c.is_none()) {
-                            ui.label(egui::RichText::new("Asking for the currencies...").size(m.theme.small).color(muted));
+                let out = area.show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.set_width(PAGE_W);
+                        ui.label(
+                            egui::RichText::new(ROWS[row].1)
+                                .size(m.theme.title)
+                                .family(FontFamily::Name(super::STRONG.into()))
+                                .color(gold),
+                        );
+                        ui.add_space(4.0);
+                        if !ready {
+                            ui.label(egui::RichText::new("Waiting for the status...").size(m.theme.small).color(muted));
                             return;
                         }
-                        let s = kit::Btn { lit: held_only, ..Default::default() };
-                        if kit::button(ui, m, "Only those held", 0.0, s).clicked() {
-                            held_only = !held_only;
-                        }
-                        ui.add_space(4.0);
-                        for (label, v, tip) in money.iter().filter(|x| !held_only || x.1 != 0) {
-                            let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
-                            let c = if *v == 0 { muted } else { white };
-                            ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, label, FontId::proportional(m.theme.small), c);
-                            ui.painter().text(pos2(r.max.x - 4.0, r.center().y), Align2::RIGHT_CENTER, status::grouped(*v, &sep), FontId::monospace(m.theme.small), c);
-                            if !tip.is_empty() {
-                                m.tip(ui, resp.rect, label, tip);
-                            }
-                        }
-                    }
-                    9 => {
-                        // Play Time at once (retail prints it to the log on Enter): days, hours, minutes and seconds
-                        // ticking, retail's line under them, Enter or the button still prints it.
-                        match played {
-                            None => {
-                                ui.label(egui::RichText::new("Waiting for the play time...").size(m.theme.small).color(muted));
-                            }
-                            Some(t) => {
-                                ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
-                                ui.horizontal(|ui| {
-                                    for (v, label) in [(t / 86400, "Days"), (t % 86400 / 3600, "Hours"), (t % 3600 / 60, "Minutes"), (t % 60, "Seconds")] {
-                                        let (r, _) = ui.allocate_exact_size(vec2(88.0, 62.0), Sense::hover());
-                                        ui.painter().rect_filled(r, 6.0, m.theme.color("charcoal").gamma_multiply(0.7));
-                                        let num = if label == "Days" { v.to_string() } else { format!("{v:02}") };
-                                        ui.painter().text(pos2(r.center().x, r.min.y + 24.0), Align2::CENTER_CENTER, num, FontId::monospace(m.theme.title + 4.0), gold);
-                                        ui.painter().text(pos2(r.center().x, r.max.y - 12.0), Align2::CENTER_CENTER, label, FontId::proportional(m.theme.small), muted);
+                        match sel {
+                            1 => {
+                                pair(ui, m, "Title", title.as_deref().unwrap_or(""), white);
+                                pair(ui, m, "Nation", nation.as_deref().unwrap_or("--"), white);
+                                pair(ui, m, "Race", race, white);
+                                pair(ui, m, "Home Point", &home, white);
+                                pair(ui, m, "Rank", &stats.rank.to_string(), white);
+                                let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
+                                let bar = Rect::from_min_max(pos2(r.min.x, r.max.y - hud::BAR), r.max);
+                                hud::labelled_bar(
+                                    ui,
+                                    m,
+                                    "experience",
+                                    bar,
+                                    stats.rank_points as f32 / 4096.0,
+                                    ("Rank Points", white),
+                                    ("", white),
+                                );
+                                if stats.ilvl != 0 {
+                                    pair(
+                                        ui,
+                                        m,
+                                        "Item Level",
+                                        &format!("{}  Su{}", stats.ilvl as u32 + 99, stats.su),
+                                        white,
+                                    );
+                                }
+                                heading(ui, m, "Attributes");
+                                pair(
+                                    ui,
+                                    m,
+                                    "Max HP",
+                                    &stats.hp_max.to_string(),
+                                    if persona.enc & 1 << 0x17 != 0 { m.theme.color("hp") } else { white },
+                                );
+                                pair(
+                                    ui,
+                                    m,
+                                    "Max MP",
+                                    &stats.mp_max.to_string(),
+                                    if persona.enc & 1 << 0x18 != 0 { m.theme.color("hp") } else { white },
+                                );
+                                for (k, (base, bonus)) in persona.stats.iter().enumerate() {
+                                    let (r, _) =
+                                        ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
+                                    ui.painter().text(
+                                        pos2(r.min.x + 4.0, r.center().y),
+                                        Align2::LEFT_CENTER,
+                                        ["STR", "DEX", "VIT", "AGI", "INT", "MND", "CHR"][k],
+                                        FontId::proportional(m.theme.small),
+                                        muted,
+                                    );
+                                    let mut job = egui::text::LayoutJob::default();
+                                    let red = persona.enc & 1 << (0x10 + k) != 0;
+                                    job.append(
+                                        base.trim(),
+                                        0.0,
+                                        egui::TextFormat::simple(
+                                            FontId::proportional(m.theme.ui),
+                                            if red { m.theme.color("hp") } else { white },
+                                        ),
+                                    );
+                                    if let Some((b, c)) = bonus {
+                                        job.append(
+                                            b,
+                                            0.0,
+                                            egui::TextFormat::simple(
+                                                FontId::proportional(m.theme.ui),
+                                                super::chat::colour(c.to_le_bytes()),
+                                            ),
+                                        );
                                     }
-                                });
-                                if let Some(line) = &played_line {
-                                    ui.add_space(8.0);
-                                    ui.label(egui::RichText::new(line).size(m.theme.small).color(white));
+                                    let g = ui.painter().layout_job(job);
+                                    ui.painter().galley(
+                                        pos2(r.max.x - 4.0 - g.size().x, r.center().y - g.size().y / 2.0),
+                                        g,
+                                        Color32::WHITE,
+                                    );
+                                }
+                                if let Some((_, rank, prestige)) = mon {
+                                    heading(ui, m, "Monstrosity");
+                                    pair(
+                                        ui,
+                                        m,
+                                        "Gladiator Rank",
+                                        ["Gladiator", "Colosseum Gladiator", "High Colosseum Gladiator"]
+                                            .get((rank >> 2 & 3) as usize)
+                                            .copied()
+                                            .unwrap_or(""),
+                                        white,
+                                    );
+                                    pair(ui, m, "Prestige", &prestige.to_string(), white);
+                                    pair(ui, m, "Mastery Rank", &mastery.to_string(), white);
+                                    pair(
+                                        ui,
+                                        m,
+                                        "Mentor",
+                                        &if mentor > 0 { format!("Mentor {mentor}") } else { "--".into() },
+                                        white,
+                                    );
+                                }
+                            }
+                            2..=4 | 12 => cells(ui, m, &page_cells, &page_icons),
+                            5 => {
+                                for (name, rank, rc, lv) in &crafts {
+                                    let (r, _) =
+                                        ui.allocate_exact_size(vec2(ui.available_width(), LINE + 4.0), Sense::hover());
+                                    let r = Rect::from_min_size(r.min, vec2(r.width(), LINE));
+                                    ui.painter().rect_filled(r, 4.0, m.theme.color("charcoal").gamma_multiply(0.6));
+                                    ui.painter().text(
+                                        pos2(r.min.x + 6.0, r.center().y),
+                                        Align2::LEFT_CENTER,
+                                        name,
+                                        FontId::proportional(m.theme.small),
+                                        white,
+                                    );
+                                    ui.painter().text(
+                                        pos2(r.min.x + 170.0, r.center().y),
+                                        Align2::LEFT_CENTER,
+                                        rank,
+                                        FontId::proportional(m.theme.small),
+                                        *rc,
+                                    );
+                                    ui.painter().text(
+                                        pos2(r.max.x - 6.0, r.center().y),
+                                        Align2::RIGHT_CENTER,
+                                        lv,
+                                        FontId::monospace(m.theme.small),
+                                        white,
+                                    );
+                                }
+                            }
+                            6 => {
+                                if s.cur.iter().all(|c| c.is_none()) {
+                                    ui.label(
+                                        egui::RichText::new("Asking for the currencies...")
+                                            .size(m.theme.small)
+                                            .color(muted),
+                                    );
+                                    return;
+                                }
+                                let s = kit::Btn { lit: held_only, ..Default::default() };
+                                if kit::button(ui, m, "Only those held", 0.0, s).clicked() {
+                                    held_only = !held_only;
+                                }
+                                ui.add_space(4.0);
+                                for (label, v, tip) in money.iter().filter(|x| !held_only || x.1 != 0) {
+                                    let (r, resp) =
+                                        ui.allocate_exact_size(vec2(ui.available_width(), LINE), Sense::hover());
+                                    let c = if *v == 0 { muted } else { white };
+                                    ui.painter().text(
+                                        pos2(r.min.x + 4.0, r.center().y),
+                                        Align2::LEFT_CENTER,
+                                        label,
+                                        FontId::proportional(m.theme.small),
+                                        c,
+                                    );
+                                    ui.painter().text(
+                                        pos2(r.max.x - 4.0, r.center().y),
+                                        Align2::RIGHT_CENTER,
+                                        status::grouped(*v, &sep),
+                                        FontId::monospace(m.theme.small),
+                                        c,
+                                    );
+                                    if !tip.is_empty() {
+                                        m.tip(ui, resp.rect, label, tip);
+                                    }
+                                }
+                            }
+                            9 => {
+                                // Play Time at once (retail prints it to the log on Enter): days, hours, minutes and seconds
+                                // ticking, retail's line under them, Enter or the button still prints it.
+                                match played {
+                                    None => {
+                                        ui.label(
+                                            egui::RichText::new("Waiting for the play time...")
+                                                .size(m.theme.small)
+                                                .color(muted),
+                                        );
+                                    }
+                                    Some(t) => {
+                                        ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
+                                        ui.horizontal(|ui| {
+                                            for (v, label) in [
+                                                (t / 86400, "Days"),
+                                                (t % 86400 / 3600, "Hours"),
+                                                (t % 3600 / 60, "Minutes"),
+                                                (t % 60, "Seconds"),
+                                            ] {
+                                                let (r, _) = ui.allocate_exact_size(vec2(88.0, 62.0), Sense::hover());
+                                                ui.painter().rect_filled(
+                                                    r,
+                                                    6.0,
+                                                    m.theme.color("charcoal").gamma_multiply(0.7),
+                                                );
+                                                let num =
+                                                    if label == "Days" { v.to_string() } else { format!("{v:02}") };
+                                                ui.painter().text(
+                                                    pos2(r.center().x, r.min.y + 24.0),
+                                                    Align2::CENTER_CENTER,
+                                                    num,
+                                                    FontId::monospace(m.theme.title + 4.0),
+                                                    gold,
+                                                );
+                                                ui.painter().text(
+                                                    pos2(r.center().x, r.max.y - 12.0),
+                                                    Align2::CENTER_CENTER,
+                                                    label,
+                                                    FontId::proportional(m.theme.small),
+                                                    muted,
+                                                );
+                                            }
+                                        });
+                                        if let Some(line) = &played_line {
+                                            ui.add_space(8.0);
+                                            ui.label(egui::RichText::new(line).size(m.theme.small).color(white));
+                                        }
+                                    }
+                                }
+                                ui.add_space(10.0);
+                                if kit::button(ui, m, "Show in the log", 0.0, kit::Btn::default()).clicked() {
+                                    open = true;
+                                }
+                            }
+                            _ => {
+                                ui.label(egui::RichText::new(&help).size(m.theme.small).color(white));
+                                ui.add_space(10.0);
+                                let off = s.off.contains(&sel);
+                                let b = kit::Btn { off, ..Default::default() };
+                                if kit::clicked(&kit::button(ui, m, "Open", 120.0, b), b) {
+                                    open = true;
+                                }
+                                if off {
+                                    ui.add_space(6.0);
+                                    ui.label(
+                                        egui::RichText::new("Not available to this character yet.")
+                                            .size(m.theme.small)
+                                            .color(muted),
+                                    );
                                 }
                             }
                         }
-                        ui.add_space(10.0);
-                        if kit::button(ui, m, "Show in the log", 0.0, kit::Btn::default()).clicked() {
-                            open = true;
-                        }
-                    }
-                    _ => {
-                        ui.label(egui::RichText::new(&help).size(m.theme.small).color(white));
-                        ui.add_space(10.0);
-                        let off = s.off.contains(&sel);
-                        let b = kit::Btn { off, ..Default::default() };
-                        if kit::clicked(&kit::button(ui, m, "Open", 120.0, b), b) {
-                            open = true;
-                        }
-                        if off {
-                            ui.add_space(6.0);
-                            ui.label(egui::RichText::new("Not available to this character yet.").size(m.theme.small).color(muted));
-                        }
-                    }
-                }
-            }));
-            ui.ctx().data_mut(|d| d.insert_temp(egui::Id::unique("status page off"), out.state.clamped_offset().y));
-        });
-    });
+                    })
+                });
+                ui.ctx().data_mut(|d| d.insert_temp(egui::Id::unique("status page off"), out.state.clamped_offset().y));
+            });
+        },
+    );
     m.held_only.set(held_only);
     if let Some(st) = w.status.as_mut() {
         st.m_page = 0;

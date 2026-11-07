@@ -97,7 +97,19 @@ pub fn parse(p: &[u8]) -> Result<Collision> {
     };
     let mut objects: HashMap<usize, u32> = HashMap::new();
     let mut seen: HashMap<(usize, usize), u32> = HashMap::new();
-    let mut out = Collision { tris: Vec::new(), flags: Vec::new(), cam_pass: Vec::new(), decal: Vec::new(), normals: Vec::new(), kinds: Vec::new(), object: Vec::new(), objects: Vec::new(), entries: Vec::new(), cells: vec![Vec::new(); w * h], grid: (w, h) };
+    let mut out = Collision {
+        tris: Vec::new(),
+        flags: Vec::new(),
+        cam_pass: Vec::new(),
+        decal: Vec::new(),
+        normals: Vec::new(),
+        kinds: Vec::new(),
+        object: Vec::new(),
+        objects: Vec::new(),
+        entries: Vec::new(),
+        cells: vec![Vec::new(); w * h],
+        grid: (w, h),
+    };
     let (mut lists, mut elsewhere) = (0usize, 0usize);
     for y in 0..h {
         for x in 0..w {
@@ -128,7 +140,18 @@ pub fn parse(p: &[u8]) -> Result<Collision> {
                     None => {
                         let next = objects.len() as u32;
                         let obj = *objects.entry(xf).or_insert_with(|| {
-                            out.objects.push(Object { flags: u32_at(p, xf + 0xa4).unwrap_or(0), area: u32_at(p, xf + 0xb0).unwrap_or(0), lights: light_keys(xf), y_range: (f32_at(p, xf + 0xb4).unwrap_or(f32::MIN), f32_at(p, xf + 0xb8).unwrap_or(f32::MAX)), link: u32_at(p, xf + 0xbc).unwrap_or(0), door: 0, vis: u32_at(p, xf + 0xa8).unwrap_or(0) });
+                            out.objects.push(Object {
+                                flags: u32_at(p, xf + 0xa4).unwrap_or(0),
+                                area: u32_at(p, xf + 0xb0).unwrap_or(0),
+                                lights: light_keys(xf),
+                                y_range: (
+                                    f32_at(p, xf + 0xb4).unwrap_or(f32::MIN),
+                                    f32_at(p, xf + 0xb8).unwrap_or(f32::MAX),
+                                ),
+                                link: u32_at(p, xf + 0xbc).unwrap_or(0),
+                                door: 0,
+                                vis: u32_at(p, xf + 0xa8).unwrap_or(0),
+                            });
                             next
                         });
                         let first = out.tris.len() as u32;
@@ -154,9 +177,32 @@ impl Collision {
     /// into the grid cells under it, after their own entries. Object flags bit 1 (resolved late), y range pos.y -/+
     /// size.y / 2; box triangles carry no surface bits *(inf: RID u32 @0x30 bits 6 / 8 are 0 in the zones seen)*.
     pub fn add_door_boxes(&mut self, regions: &[super::zone::Region]) {
-        const CORNERS: [[f32; 3]; 8] = [[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5]];
-        const NORMALS: [[f32; 3]; 6] = [[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
-        const TRIS: [[usize; 4]; 12] = [[2, 3, 6, 1], [3, 7, 6, 1], [0, 2, 4, 2], [2, 6, 4, 2], [1, 0, 5, 3], [0, 4, 5, 3], [3, 1, 7, 4], [1, 5, 7, 4], [6, 7, 4, 5], [7, 5, 4, 5], [0, 1, 2, 0], [1, 3, 2, 0]];
+        const CORNERS: [[f32; 3]; 8] = [
+            [-0.5, -0.5, 0.5],
+            [0.5, -0.5, 0.5],
+            [-0.5, -0.5, -0.5],
+            [0.5, -0.5, -0.5],
+            [-0.5, 0.5, 0.5],
+            [0.5, 0.5, 0.5],
+            [-0.5, 0.5, -0.5],
+            [0.5, 0.5, -0.5],
+        ];
+        const NORMALS: [[f32; 3]; 6] =
+            [[0.0, -1.0, 0.0], [0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        const TRIS: [[usize; 4]; 12] = [
+            [2, 3, 6, 1],
+            [3, 7, 6, 1],
+            [0, 2, 4, 2],
+            [2, 6, 4, 2],
+            [1, 0, 5, 3],
+            [0, 4, 5, 3],
+            [3, 1, 7, 4],
+            [1, 5, 7, 4],
+            [6, 7, 4, 5],
+            [7, 5, 4, 5],
+            [0, 1, 2, 0],
+            [1, 3, 2, 0],
+        ];
         let (w, h) = self.grid;
         for r in regions.iter().filter(|r| r.name.starts_with('_')) {
             let size = Vec3::from(r.scale).abs();
@@ -166,7 +212,15 @@ impl Collision {
             let turn = |v: Vec3| Vec3::new(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
             let verts: Vec<Vec3> = CORNERS.iter().map(|k| pos + turn(Vec3::from(*k) * size)).collect();
             let obj = self.objects.len() as u32;
-            self.objects.push(Object { flags: 2, y_range: (pos.y - size.y / 2.0, pos.y + size.y / 2.0), area: 0, lights: [0; 4], link: 0, door: r.tag(), vis: 0 });
+            self.objects.push(Object {
+                flags: 2,
+                y_range: (pos.y - size.y / 2.0, pos.y + size.y / 2.0),
+                area: 0,
+                lights: [0; 4],
+                link: 0,
+                door: r.tag(),
+                vis: 0,
+            });
             let first = self.tris.len() as u32;
             for t in TRIS {
                 self.tris.push([verts[t[0]], verts[t[1]], verts[t[2]]]);
@@ -181,8 +235,13 @@ impl Collision {
             self.entries.push(Entry { first, count: 12, object: obj });
             // One cell for a small box, else every 4-unit cell its footprint touches (FUN_10171930 samples every 4).
             let (lo, hi) = verts.iter().fold((Vec3::MAX, Vec3::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
-            let cell = |x: f32, z: f32| (((x + w as f32 * 2.0) * 0.25) as isize, ((z + h as f32 * 2.0) * 0.25) as isize);
-            let ((x0, z0), (x1, z1)) = if size.x > 7.0 || size.z > 7.0 { (cell(lo.x, lo.z), cell(hi.x, hi.z)) } else { (cell(pos.x, pos.z), cell(pos.x, pos.z)) };
+            let cell =
+                |x: f32, z: f32| (((x + w as f32 * 2.0) * 0.25) as isize, ((z + h as f32 * 2.0) * 0.25) as isize);
+            let ((x0, z0), (x1, z1)) = if size.x > 7.0 || size.z > 7.0 {
+                (cell(lo.x, lo.z), cell(hi.x, hi.z))
+            } else {
+                (cell(pos.x, pos.z), cell(pos.x, pos.z))
+            };
             for z in z0..=z1 {
                 for x in x0..=x1 {
                     if x >= 0 && z >= 0 && (x as usize) < w && (z as usize) < h {
@@ -194,7 +253,19 @@ impl Collision {
     }
 
     pub fn empty(grid: (usize, usize)) -> Collision {
-        Collision { tris: Vec::new(), flags: Vec::new(), cam_pass: Vec::new(), decal: Vec::new(), normals: Vec::new(), kinds: Vec::new(), object: Vec::new(), objects: Vec::new(), entries: Vec::new(), cells: vec![Vec::new(); grid.0 * grid.1], grid }
+        Collision {
+            tris: Vec::new(),
+            flags: Vec::new(),
+            cam_pass: Vec::new(),
+            decal: Vec::new(),
+            normals: Vec::new(),
+            kinds: Vec::new(),
+            object: Vec::new(),
+            objects: Vec::new(),
+            entries: Vec::new(),
+            cells: vec![Vec::new(); grid.0 * grid.1],
+            grid,
+        }
     }
 
     /// The zone's collision with a sub-area's merged in (FUN_10167be0): its faces join the zone's grid cells after
@@ -202,11 +273,25 @@ impl Collision {
     /// loaded id, FUN_10182700).
     pub fn merged(&self, sub: &Collision, link: u32) -> Collision {
         let (w, h) = self.grid;
-        let mut out = Collision { tris: Vec::new(), flags: Vec::new(), cam_pass: Vec::new(), decal: Vec::new(), normals: Vec::new(), kinds: Vec::new(), object: Vec::new(), objects: Vec::new(), entries: Vec::new(), cells: vec![Vec::new(); w * h], grid: self.grid };
+        let mut out = Collision {
+            tris: Vec::new(),
+            flags: Vec::new(),
+            cam_pass: Vec::new(),
+            decal: Vec::new(),
+            normals: Vec::new(),
+            kinds: Vec::new(),
+            object: Vec::new(),
+            objects: Vec::new(),
+            entries: Vec::new(),
+            cells: vec![Vec::new(); w * h],
+            grid: self.grid,
+        };
         for (src, skip) in [(self, Some(link)), (sub, None)] {
             let base = out.objects.len() as u32;
             // The camera lists are the zone's (a sub-area's offsets name its own MZB; interiors carry none).
-            out.objects.extend(src.objects.iter().cloned().map(|o| Object { vis: if skip.is_some() { o.vis } else { 0 }, ..o }));
+            out.objects.extend(
+                src.objects.iter().cloned().map(|o| Object { vis: if skip.is_some() { o.vis } else { 0 }, ..o }),
+            );
             let mut entry = vec![None; src.entries.len()];
             for (i, e) in src.entries.iter().enumerate() {
                 if skip.is_some_and(|l| src.objects[e.object as usize].link == l) {
@@ -251,12 +336,15 @@ fn add_geometry(p: &[u8], xf: usize, geo: usize, obj: u32, out: &mut Collision) 
     };
     let vec_at = |o: usize| Some(Vec3::new(f32_at(p, o)?, f32_at(p, o + 4)?, f32_at(p, o + 8)?));
     let nverts = (normals.saturating_sub(verts) / 12) as usize;
-    let world: Vec<Vec3> = (0..nverts).filter_map(|i| vec_at(verts as usize + i * 12).map(|v| mat.transform_point3(v))).collect();
+    let world: Vec<Vec3> =
+        (0..nverts).filter_map(|i| vec_at(verts as usize + i * 12).map(|v| mat.transform_point3(v))).collect();
     for t in 0..count as usize {
         let o = tris as usize + t * 8;
         let Some(w) = (0..4).map(|k| u16_at(p, o + k * 2)).collect::<Option<Vec<u16>>>() else { break };
         let idx = [(w[0] & 0x7FFF) as usize, (w[1] & 0x3FFF) as usize, (w[2] & 0x3FFF) as usize];
-        let (Some(&a), Some(&b), Some(&c)) = (world.get(idx[0]), world.get(idx[1]), world.get(idx[2])) else { continue };
+        let (Some(&a), Some(&b), Some(&c)) = (world.get(idx[0]), world.get(idx[1]), world.get(idx[2])) else {
+            continue;
+        };
         let Some(n) = vec_at(normals as usize + (w[3] & 0x7FFF) as usize * 12) else { continue };
         // The loader turns -NaN components into 0 and a zero normal into (0, 1e-6, 0).
         let n = Vec3::from_array(n.to_array().map(|v| if v.is_nan() { 0.0 } else { v }));
@@ -279,7 +367,8 @@ mod tests {
     fn load(zone: u32) -> Option<Collision> {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok()?;
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
         crate::dat::zone::load_scene(&keys, &index.read(crate::dat::zone::file_id(zone)).ok()?).ok()?.collision
     }
 
@@ -309,7 +398,12 @@ mod tests {
         let bounds: Vec<(Vec3, Vec3)> = c
             .entries
             .iter()
-            .map(|e| c.tris[e.first as usize..(e.first + e.count) as usize].iter().flatten().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v))))
+            .map(|e| {
+                c.tris[e.first as usize..(e.first + e.count) as usize]
+                    .iter()
+                    .flatten()
+                    .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)))
+            })
             .collect();
         let meets = |flip: bool| {
             let (mut inside, mut total) = (0, 0);
@@ -327,7 +421,10 @@ mod tests {
             (inside, total)
         };
         let (inside, total) = meets(false);
-        assert!(inside as f64 > total as f64 * 0.9 && (meets(true).0 as f64) < total as f64 * 0.1, "{inside} of {total} entries meet their cell");
+        assert!(
+            inside as f64 > total as f64 * 0.9 && (meets(true).0 as f64) < total as f64 * 0.1,
+            "{inside} of {total} entries meet their cell"
+        );
     }
 }
 

@@ -3,14 +3,14 @@
 //! prompt (and the log), choices to "menu    query"; scheduler cameras and fades, script-driven actors
 //! drawn from their VM bodies, and the 0x05B / 0x05C / 0x016 sends.
 
-use super::net::{EventStart, NetCommand, ZoneText};
 use super::World;
+use super::net::{EventStart, NetCommand, ZoneText};
 use crate::dat::DatIndex;
 use crate::dat::dialog::{self, Dialog};
 use crate::dat::event::Block;
 use crate::dat::font::decode_sjis;
 use crate::dat::title::{Key, Title, focal_of, fov_y, sample_from};
-use crate::event_vm::{Arg, Busy, Effect, Host, Packet, PLAYER, Runtime, Start};
+use crate::event_vm::{Arg, Busy, Effect, Host, PLAYER, Packet, Runtime, Start};
 use crate::render::Camera;
 use glam::{Mat4, Vec3};
 use std::collections::{HashMap, HashSet};
@@ -72,7 +72,8 @@ fn sched_ops(file: &[u8], tag: &str) -> Option<Vec<SOp>> {
             break;
         }
         let b = &pay[p..p + 4 * len];
-        let (wait, ticks) = if len >= 2 { (u16::from_le_bytes([b[4], b[5]]), u16::from_le_bytes([b[6], b[7]])) } else { (0, 0) };
+        let (wait, ticks) =
+            if len >= 2 { (u16::from_le_bytes([b[4], b[5]]), u16::from_le_bytes([b[6], b[7]])) } else { (0, 0) };
         out.push(SOp { op, wait, ticks, data: b.to_vec() });
         p += 4 * len;
         if op == 0 {
@@ -154,10 +155,23 @@ pub struct Screen {
     login_black: bool,
 }
 
-
 impl Default for Screen {
     fn default() -> Self {
-        Screen { scheds: Vec::new(), files: HashMap::new(), shot: None, tick: 0.0, fade: ([1.0; 3], [1.0; 3], 0.0, 0.0), level: ([1.0; 3], [1.0; 3], 0.0, 0.0), cross: None, flash: ([0.0; 4], [0.0; 4], 0.0, 0.0), blur: ([0.5, 0.5, 0.5, 0.0, 1.0], [0.5, 0.5, 0.5, 0.0, 1.0], 0.0, 0.0), blur_starts: 0, fx_shots: Vec::new(), fx_crosses: Vec::new(), login_black: false }
+        Screen {
+            scheds: Vec::new(),
+            files: HashMap::new(),
+            shot: None,
+            tick: 0.0,
+            fade: ([1.0; 3], [1.0; 3], 0.0, 0.0),
+            level: ([1.0; 3], [1.0; 3], 0.0, 0.0),
+            cross: None,
+            flash: ([0.0; 4], [0.0; 4], 0.0, 0.0),
+            blur: ([0.5, 0.5, 0.5, 0.0, 1.0], [0.5, 0.5, 0.5, 0.0, 1.0], 0.0, 0.0),
+            blur_starts: 0,
+            fx_shots: Vec::new(),
+            fx_crosses: Vec::new(),
+            login_black: false,
+        }
     }
 }
 
@@ -211,11 +225,23 @@ impl Screen {
         match code {
             // Case 0xf: from the colour drawn now (+0x320), an interrupted fade too.
             0x0f => {
-                self.fade = (self.lerp(self.fade), [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0), now, (ticks - 1.0).max(0.0));
+                self.fade = (
+                    self.lerp(self.fade),
+                    [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0),
+                    now,
+                    (ticks - 1.0).max(0.0),
+                );
                 self.login_black = false;
             }
             // Case 0x51 (all.c 66225): the 0x0f task on the level.
-            0x51 => self.level = (self.lerp(self.level), [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0), now, (ticks - 1.0).max(0.0)),
+            0x51 => {
+                self.level = (
+                    self.lerp(self.level),
+                    [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0),
+                    now,
+                    (ticks - 1.0).max(0.0),
+                )
+            }
             0x72 => self.flash = (self.flash.1, c.map(f), now, (ticks - 1.0).max(0.0)),
             0x0e => {
                 self.blur = (self.blur.1, [f(c[0]), f(c[1]), f(c[2]), f(c[3]), zoom], now, ticks.max(0.0));
@@ -278,7 +304,12 @@ impl Screen {
     /// FUN_100132b0's second block: last frame drawn over the scene while the alpha is not 0.
     pub fn blur(&self) -> Option<crate::render::screenfx::Blur> {
         let b = self.lerp(self.blur);
-        (b[3] * 255.0 >= 0.5).then(|| crate::render::screenfx::Blur { rgb: [b[0], b[1], b[2]], a: (2.0 * b[3]).min(1.0), zoom: b[4], start: self.blur_starts })
+        (b[3] * 255.0 >= 0.5).then(|| crate::render::screenfx::Blur {
+            rgb: [b[0], b[1], b[2]],
+            a: (2.0 * b[3]).min(1.0),
+            zoom: b[4],
+            start: self.blur_starts,
+        })
     }
 
     /// Alpha of the crossfade image (FUN_1005f020: remaining / total), None when there is none.
@@ -318,9 +349,18 @@ impl Screen {
                         let m = [c[0], c[1], c[2]].map(|v| v as f32 * 2.0 / 255.0);
                         level = Some((m, at, (op.ticks as f32 * s.speed - 1.0).max(0.0)));
                     }
-                    0x10 => cross = Some(Cross { start: at, len: (op.ticks as f32 * s.speed).max(1.0), camera: current, captured: false }),
+                    0x10 => {
+                        cross = Some(Cross {
+                            start: at,
+                            len: (op.ticks as f32 * s.speed).max(1.0),
+                            camera: current,
+                            captured: false,
+                        })
+                    }
                     // Case 0xb0 (FUN_1003bd70): the camera task playing path u32 @8 ends.
-                    0xb0 if op.data.len() >= 12 => stops.push(String::from_utf8_lossy(&op.data[8..12]).trim_end_matches('\0').to_string()),
+                    0xb0 if op.data.len() >= 12 => {
+                        stops.push(String::from_utf8_lossy(&op.data[8..12]).trim_end_matches('\0').to_string())
+                    }
                     _ => {}
                 }
                 s.next_at = at + op.wait as f32 * s.speed;
@@ -331,9 +371,26 @@ impl Screen {
             && let Some(path) = f.title.as_ref().and_then(|t| t.paths.iter().position(|p| p.name == name))
         {
             if let Some(p) = f.title.as_ref().and_then(|t| t.paths.get(path)) {
-                log::info!("event camera {tag}: path {} flags {:#x}, {} keys, {ticks} ticks{}", p.name, p.flags, p.keys.len(), if p.flags & crate::dat::title::FROM_CURRENT != 0 { ", from the current camera" } else { "" });
+                log::info!(
+                    "event camera {tag}: path {} flags {:#x}, {} keys, {ticks} ticks{}",
+                    p.name,
+                    p.flags,
+                    p.keys.len(),
+                    if p.flags & crate::dat::title::FROM_CURRENT != 0 { ", from the current camera" } else { "" }
+                );
             }
-            self.shot = Some(Shot { file: f, file_id: file, tag, path, start: at, ticks, from: current.map(key_of), follow, who, frame: None });
+            self.shot = Some(Shot {
+                file: f,
+                file_id: file,
+                tag,
+                path,
+                start: at,
+                ticks,
+                from: current.map(key_of),
+                follow,
+                who,
+                frame: None,
+            });
         }
         for name in stops {
             self.stop_path(&name);
@@ -343,11 +400,29 @@ impl Screen {
         }
         // The effect tasks' paths after the runner's (they ran this frame).
         for (f, file_id, tag, name, ticks, who) in std::mem::take(&mut self.fx_shots) {
-            let Some(path) = f.title.as_ref().and_then(|t| t.paths.iter().position(|p| p.name == name)) else { continue };
+            let Some(path) = f.title.as_ref().and_then(|t| t.paths.iter().position(|p| p.name == name)) else {
+                continue;
+            };
             if let Some(p) = f.title.as_ref().and_then(|t| t.paths.get(path)) {
-                log::info!("event camera {tag} (effect task): path {} flags {:#x}, {} keys, {ticks} ticks", p.name, p.flags, p.keys.len());
+                log::info!(
+                    "event camera {tag} (effect task): path {} flags {:#x}, {} keys, {ticks} ticks",
+                    p.name,
+                    p.flags,
+                    p.keys.len()
+                );
             }
-            self.shot = Some(Shot { file: f, file_id, tag, path, start: now, ticks, from: current.map(key_of), follow, who, frame: None });
+            self.shot = Some(Shot {
+                file: f,
+                file_id,
+                tag,
+                path,
+                start: now,
+                ticks,
+                from: current.map(key_of),
+                follow,
+                who,
+                frame: None,
+            });
         }
         if let Some((to, at, ticks)) = fade {
             self.fade = (self.lerp(self.fade), to, at, ticks);
@@ -378,7 +453,12 @@ fn follow_key(w: &World) -> Option<Key> {
     let f = super::forward_from_dir(dir);
     let h = w.actors.get(&w.my_id).map_or(2.0, |a| -a.top);
     let lift = if h > 0.1 { h * 0.6 } else { 1.2 };
-    Some(Key { eye: w.pos + Vec3::new(0.0, -h, 0.0) - f * 3.0, focal: 350.0, target: w.pos - Vec3::new(0.0, lift, 0.0), roll: 0.0 })
+    Some(Key {
+        eye: w.pos + Vec3::new(0.0, -h, 0.0) - f * 3.0,
+        focal: 350.0,
+        target: w.pos - Vec3::new(0.0, lift, 0.0),
+        roll: 0.0,
+    })
 }
 
 /// The open message (event message window, FUN_10131e30): its text, paged 4 lines at a time once wrapped.
@@ -867,7 +947,17 @@ impl Host for LiveHost<'_> {
                 }
                 let lines = text.split('\n').map(str::to_string).collect();
                 // Inferred: a 7f 34 / 7f 38 wait closes the line by itself, even before a 7f 31.
-                self.st.msg = Some(Msg { id, prompt: prompt && wait.is_none(), wait: wait.unwrap_or(0) as f32, open: 0.0, lines, pages: None, page: 0, logged: 0, mode });
+                self.st.msg = Some(Msg {
+                    id,
+                    prompt: prompt && wait.is_none(),
+                    wait: wait.unwrap_or(0) as f32,
+                    open: 0.0,
+                    lines,
+                    pages: None,
+                    page: 0,
+                    logged: 0,
+                    mode,
+                });
             }
             Effect::Choice { question, options, cursor, .. } => {
                 self.st.choice = Some(Choice { question, options, cursor, scroll: cursor.saturating_sub(2) });
@@ -875,9 +965,16 @@ impl Host for LiveHost<'_> {
             Effect::Scheduler { file, tag, actor, target, param } => {
                 // The same CMoSchedularTask runs the effects side (generators, sounds, motions): the set of a
                 // cutscene staged off the map is built from it.
-                let who = |a: u32| if a == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(a)) };
+                let who = |a: u32| {
+                    if a == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(a)) }
+                };
                 let who = [who(actor), who(target)];
-                self.w.effects.on_event_scheduler(file, u32::from_le_bytes(crate::dat::generator::fourcc(&tag)), who[0], who[1]);
+                self.w.effects.on_event_scheduler(
+                    file,
+                    u32::from_le_bytes(crate::dat::generator::fourcc(&tag)),
+                    who[0],
+                    who[1],
+                );
                 let Some(f) = self.w.screen.file(self.index, file) else { return };
                 let Some(ops) = sched_ops(&f.bytes, &tag) else {
                     log::warn!("event: no scheduler {tag} in {file}");
@@ -892,14 +989,36 @@ impl Host for LiveHost<'_> {
                 let sc = &mut self.w.screen;
                 let now = sc.tick;
                 sc.scheds.retain(|x| !(x.file == file && x.tag == tag && x.actor == actor && x.target == target));
-                sc.scheds.push(Sched { file, tag, actor, target, who, ops, cursor: 0, next_at: now, start: now, len, speed });
+                sc.scheds.push(Sched {
+                    file,
+                    tag,
+                    actor,
+                    target,
+                    who,
+                    ops,
+                    cursor: 0,
+                    next_at: now,
+                    start: now,
+                    len,
+                    speed,
+                });
                 let (cam, follow) = (self.w.last_camera, follow_key(self.w));
                 self.w.screen.advance(cam, follow);
             }
             Effect::SchedulerStop { file, tag, actor, target } => {
-                let who = |a: u32| if a == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(a)) };
-                self.w.effects.stop_event_scheduler(file, u32::from_le_bytes(crate::dat::generator::fourcc(&tag)), who(actor), who(target));
-                self.w.screen.scheds.retain(|x| !(x.file == file && x.tag == tag && x.actor == actor && x.target == target));
+                let who = |a: u32| {
+                    if a == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(a)) }
+                };
+                self.w.effects.stop_event_scheduler(
+                    file,
+                    u32::from_le_bytes(crate::dat::generator::fourcc(&tag)),
+                    who(actor),
+                    who(target),
+                );
+                self.w
+                    .screen
+                    .scheds
+                    .retain(|x| !(x.file == file && x.tag == tag && x.actor == actor && x.target == target));
                 self.w.screen.end_shot(|s| s.file_id == file && s.tag == tag);
             }
             // 0x46 sub 0 kills the camera tasks (FUN_1003c780) and puts the camera behind the player.
@@ -946,10 +1065,12 @@ impl Host for LiveHost<'_> {
                 if op != 0x2c && !name.is_empty() {
                     self.st.event_sched.insert(id, (name.clone(), self.wid(target)));
                 }
-                let target = (op == 0x2c).then(|| self.wid(target)).filter(|t| *t != id && self.w.actors.contains_key(t));
+                let target =
+                    (op == 0x2c).then(|| self.wid(target)).filter(|t| *t != id && self.w.actors.contains_key(t));
                 if let Some(a) = self.w.actors.get_mut(&id) {
                     let files = motion_files(op, file, id, a);
-                    a.pending = Some(super::actmotion::Pending { files, name, kind: super::actmotion::Kind::Event, target });
+                    a.pending =
+                        Some(super::actmotion::Pending { files, name, kind: super::actmotion::Kind::Event, target });
                 }
                 // FUN_100b2f80 calls +0x298 at once: op 0x2c plays from files the actor already has, so it starts now.
                 // The home point's 'bind' is the event's last op before event_end, and finish() drops a motion still
@@ -965,7 +1086,11 @@ impl Host for LiveHost<'_> {
             // model) (FUN_10084cc0: the type-7 resource of that name, its files first, then FUN_10056ef0 deletes
             // the scheduler tasks of it on that pair): `stop_scheduler`.
             Effect::Op { op: 0x50, args, .. } => {
-                let (Some(Arg::Actor(a1)), Some(Arg::Actor(a2)), Some(Arg::Name(name))) = (args.first(), args.get(1), args.get(2)) else { return };
+                let (Some(Arg::Actor(a1)), Some(Arg::Actor(a2)), Some(Arg::Name(name))) =
+                    (args.first(), args.get(1), args.get(2))
+                else {
+                    return;
+                };
                 let (id, target) = (self.wid(*a1), self.wid(*a2));
                 self.stop_scheduler(id, target, name);
             }
@@ -974,7 +1099,9 @@ impl Host for LiveHost<'_> {
             // goes, and the status motion (or the idle the script sets next) shows.
             Effect::Op { op: 0xd3, sub: Some(0), args, .. } => {
                 let Some(id) = self.arg_actor(&args, 0) else { return };
-                if let Some(p) = self.w.actors.get_mut(&id).filter(|a| a.character.is_some()).and_then(|a| a.play.as_mut()) {
+                if let Some(p) =
+                    self.w.actors.get_mut(&id).filter(|a| a.character.is_some()).and_then(|a| a.play.as_mut())
+                {
                     p.end_in(8.0);
                 }
             }
@@ -1017,11 +1144,25 @@ impl Host for LiveHost<'_> {
             Effect::Send(p) => match p {
                 Packet::EventUpdate { head, option } => {
                     super::regime::on_send(self.w, true, option);
-                    self.send(NetCommand::EventEnd { target: head.target, index, option, zone: head.zone, event: head.event, mode: 1 })
+                    self.send(NetCommand::EventEnd {
+                        target: head.target,
+                        index,
+                        option,
+                        zone: head.zone,
+                        event: head.event,
+                        mode: 1,
+                    })
                 }
                 Packet::EventEnd { head, option } => {
                     super::regime::on_send(self.w, false, option);
-                    self.send(NetCommand::EventEnd { target: head.target, index, option, zone: head.zone, event: head.event, mode: 0 })
+                    self.send(NetCommand::EventEnd {
+                        target: head.target,
+                        index,
+                        option,
+                        zone: head.zone,
+                        event: head.event,
+                        mode: 0,
+                    })
                 }
                 Packet::Passwords { head, text } => {
                     let mut body = Vec::with_capacity(24);
@@ -1031,14 +1172,25 @@ impl Host for LiveHost<'_> {
                     body.extend_from_slice(&text);
                     self.send(NetCommand::Packet { id: 0x060, body });
                 }
-                Packet::EventPos { head, x, y, z, dir, option } => {
-                    self.send(NetCommand::EventPos { pos: [x, y, z], dir: dir_of(dir), target: head.target, index, option, zone: head.zone, event: head.event })
-                }
+                Packet::EventPos { head, x, y, z, dir, option } => self.send(NetCommand::EventPos {
+                    pos: [x, y, z],
+                    dir: dir_of(dir),
+                    target: head.target,
+                    index,
+                    option,
+                    zone: head.zone,
+                    event: head.event,
+                }),
                 Packet::Raw { id, body } => self.send(NetCommand::Packet { id, body }),
             },
             Effect::Position { op: op @ (0x36 | 0x37), actor, pos, dir } => {
                 let id = self.wid(actor);
-                log::debug!("event position {op:#x}: {id:#x} at ({:.2}, {:.2}, {:.2}) dir {dir:.3}", pos[0], pos[1], pos[2]);
+                log::debug!(
+                    "event position {op:#x}: {id:#x} at ({:.2}, {:.2}, {:.2}) dir {dir:.3}",
+                    pos[0],
+                    pos[1],
+                    pos[2]
+                );
                 self.st.snap.insert(id);
             }
             // 0x4b on an unbound actor turns the actor itself (+0x18).
@@ -1085,7 +1237,8 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: op @ (0x95 | 0x96), actor, args, .. } => {
                 let id = self.wid(actor);
                 if let Some(e) = self.w.entities.get_mut(&id) {
-                    e.ev_mon_stat = if op == 0x95 { Some((Self::arg_int(&args, 0).unwrap_or(0) & 3) as u8) } else { None };
+                    e.ev_mon_stat =
+                        if op == 0x95 { Some((Self::arg_int(&args, 0).unwrap_or(0) & 3) as u8) } else { None };
                     remake_model(self.w, id);
                 }
             }
@@ -1248,7 +1401,11 @@ impl Host for LiveHost<'_> {
             // Subs 5 / 6: actor@6's motion clock never runs ahead of actor@2's (model +0x798, FUN_100cb400); 6 ends
             // actor@2's.
             Effect::Op { op: 0xae, sub: Some(s @ (5 | 6)), args, .. } => {
-                let (leader, follower) = if s == 5 { (self.arg_actor(&args, 0), self.arg_actor(&args, 1)) } else { (None, self.arg_actor(&args, 0)) };
+                let (leader, follower) = if s == 5 {
+                    (self.arg_actor(&args, 0), self.arg_actor(&args, 1))
+                } else {
+                    (None, self.arg_actor(&args, 0))
+                };
                 if let Some(a) = follower.and_then(|f| self.w.actors.get_mut(&f)) {
                     a.motion_link = leader;
                 }
@@ -1304,7 +1461,9 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: 0xae, sub: Some(s @ (3 | 4)), args, .. } => {
                 if let Some(id) = self.arg_actor(&args, 0) {
                     let v = if s == 4 { 0 } else { Self::arg_int(&args, 1).unwrap_or(-1) };
-                    if let (Some(n), Some(a)) = (usize::try_from(v).ok().and_then(|v| ["mou4", "kut4"].get(v)), self.w.actors.get_mut(&id)) {
+                    if let (Some(n), Some(a)) =
+                        (usize::try_from(v).ok().and_then(|v| ["mou4", "kut4"].get(v)), self.w.actors.get_mut(&id))
+                    {
                         a.mouth_name = n;
                     }
                 }
@@ -1330,7 +1489,15 @@ impl Host for LiveHost<'_> {
                         1 => Some(super::ride::Model::Chocobo(39_275)),
                         7 => Some(super::ride::Model::Mount((v(1) + 1) as u8)),
                         _ => {
-                            let look = crate::dat::character::Look { race: (v(1) + 0x20) as u8, body: v(2) as u16, head: v(3) as u16, feet: v(4) as u16, hands: v(5) as u16, legs: if s == 6 { v(6) as u16 } else { 0 }, ..Default::default() };
+                            let look = crate::dat::character::Look {
+                                race: (v(1) + 0x20) as u8,
+                                body: v(2) as u16,
+                                head: v(3) as u16,
+                                feet: v(4) as u16,
+                                hands: v(5) as u16,
+                                legs: if s == 6 { v(6) as u16 } else { 0 },
+                                ..Default::default()
+                            };
                             (0x20..=0x24).contains(&look.race).then_some(super::ride::Model::Custom(look))
                         }
                     };
@@ -1379,7 +1546,11 @@ impl Host for LiveHost<'_> {
                 if let (Some(h), Some(wt)) = (Self::arg_int(&args, 0), Self::arg_int(&args, 1)) {
                     if h != 0xff {
                         let held = self.st.clock;
-                        self.st.clock = Some(HeldClock { day: held.and_then(|c| c.day), minute: h as u32 * 60, moon: held.is_some_and(|c| c.moon) });
+                        self.st.clock = Some(HeldClock {
+                            day: held.and_then(|c| c.day),
+                            minute: h as u32 * 60,
+                            moon: held.is_some_and(|c| c.moon),
+                        });
                     }
                     // FUN_100940b0: the weather's effects switch at once too.
                     if wt != 0xff {
@@ -1463,10 +1634,14 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: op @ (0x73 | 0xad | 0xc4), sub, args, .. } => {
                 let (kind, rest) = match op {
                     0x73 => (1, &args[..]),
-                    0xad => (Self::arg_int(&args, 0).filter(|k| k & 0xf0 == 0).unwrap_or(-1) as u8, args.get(1..).unwrap_or_default()),
+                    0xad => (
+                        Self::arg_int(&args, 0).filter(|k| k & 0xf0 == 0).unwrap_or(-1) as u8,
+                        args.get(1..).unwrap_or_default(),
+                    ),
                     _ => (sub.map_or(0xff, |s| 0x10 + s), &args[..]),
                 };
-                if let (Some(id), Some(Arg::Actor(a)), Some(Arg::Actor(b))) = (Self::arg_int(rest, 0), rest.get(1), rest.get(2))
+                if let (Some(id), Some(Arg::Actor(a)), Some(Arg::Actor(b))) =
+                    (Self::arg_int(rest, 0), rest.get(1), rest.get(2))
                     && *a != 0
                     && *b != 0
                 {
@@ -1491,12 +1666,21 @@ impl Host for LiveHost<'_> {
                 let (a, b) = (who(args.first()), who(args.get(1)));
                 if let (Some(Arg::Name(n)), Some(file)) = (args.get(2), self.w.effects.zone_file()) {
                     let name = u32::from_le_bytes(crate::dat::generator::fourcc(n));
-                    if op == 0x2d { self.w.effects.on_event_scheduler(file, name, a, b) } else { self.w.effects.stop_event_scheduler(file, name, a, b) }
+                    if op == 0x2d {
+                        self.w.effects.on_event_scheduler(file, name, a, b)
+                    } else {
+                        self.w.effects.stop_event_scheduler(file, name, a, b)
+                    }
                 }
             }
             Effect::Op { op: 0x60, sub: Some(2), args, .. } => {
                 if let (Some(Arg::Int(n)), Some(file)) = (args.first(), self.w.effects.zone_file()) {
-                    self.w.effects.on_event_scheduler(file, *n as u32, crate::fx::sched::Who::None, crate::fx::sched::Who::None);
+                    self.w.effects.on_event_scheduler(
+                        file,
+                        *n as u32,
+                        crate::fx::sched::Who::None,
+                        crate::fx::sched::Who::None,
+                    );
                 }
             }
             Effect::Op { op: 0xd9, args, .. } => self.w.event_voices = Self::arg_int(&args, 0) == Some(0),
@@ -1509,7 +1693,8 @@ impl Host for LiveHost<'_> {
             // FUN_100b5b90 / FUN_100b5bf0: FUN_10132030(1, x, y) / (0, 0, 0) on both event message windows.
             Effect::Op { op: 0x67, args, .. } => {
                 self.st.place_on = true;
-                self.st.place = (Self::arg_int(&args, 0).unwrap_or(0) as i16, Self::arg_int(&args, 1).unwrap_or(0) as i16);
+                self.st.place =
+                    (Self::arg_int(&args, 0).unwrap_or(0) as i16, Self::arg_int(&args, 1).unwrap_or(0) as i16);
             }
             Effect::Op { op: 0x68, .. } => {
                 self.st.place_on = false;
@@ -1525,7 +1710,8 @@ impl Host for LiveHost<'_> {
                 }
                 Some(2) => {
                     let who = self.arg_actor(&args, 0).unwrap_or(self.wid(actor));
-                    let (pitch, yaw) = (Self::arg_int(&args, 1).unwrap_or(0) as i16, Self::arg_int(&args, 2).unwrap_or(0) as i16);
+                    let (pitch, yaw) =
+                        (Self::arg_int(&args, 1).unwrap_or(0) as i16, Self::arg_int(&args, 2).unwrap_or(0) as i16);
                     if let Some(a) = self.w.actors.get_mut(&who).filter(|a| a.character.is_some()) {
                         a.look.mode = super::actmotion::LookMode::Facing(pitch, yaw);
                     }
@@ -1554,7 +1740,12 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: 0xd4, sub: Some(0), .. } => {
                 self.st.map_preview = true;
                 self.w.map_open = Some(self.w.pos_zone);
-                self.w.map_cmds.push(super::map::Cmd::Preview { zone: self.w.pos_zone as i16, key: -1, arrow: true, point_y: 0.0 });
+                self.w.map_cmds.push(super::map::Cmd::Preview {
+                    zone: self.w.pos_zone as i16,
+                    key: -1,
+                    arrow: true,
+                    point_y: 0.0,
+                });
             }
             Effect::Op { op: 0xd4, sub: Some(1), args, .. } => {
                 let int = |i| Self::arg_int(&args, i).unwrap_or(0);
@@ -1695,10 +1886,16 @@ impl Host for LiveHost<'_> {
             Effect::Op { op: 0xb4, sub: Some(0xb), .. } => self.w.event_timer = None,
             // FUN_100b0a00 0xf..0x12: the toteboard (colour val@2, seconds val@4) and the race card (colour val@2).
             Effect::Op { op: 0xb4, sub: Some(0xf), args, .. } => {
-                super::racing::open_board(self.w, Self::arg_int(&args, 0).unwrap_or(0) as u8 as i8, Self::arg_int(&args, 1).unwrap_or(0));
+                super::racing::open_board(
+                    self.w,
+                    Self::arg_int(&args, 0).unwrap_or(0) as u8 as i8,
+                    Self::arg_int(&args, 1).unwrap_or(0),
+                );
             }
             Effect::Op { op: 0xb4, sub: Some(0x10), .. } => super::racing::close_board(self.w),
-            Effect::Op { op: 0xb4, sub: Some(0x11), args, .. } => super::racing::open_card(self.w, Self::arg_int(&args, 0).unwrap_or(0) as u8 as i8),
+            Effect::Op { op: 0xb4, sub: Some(0x11), args, .. } => {
+                super::racing::open_card(self.w, Self::arg_int(&args, 0).unwrap_or(0) as u8 as i8)
+            }
             Effect::Op { op: 0xb4, sub: Some(0x12), .. } => super::racing::close_card(self.w),
             // FUN_100b0a00 0xd / 0xe: hold the voyage (V identity, t still) / let it go on.
             Effect::Op { op: 0xb4, sub: Some(s @ (0xd | 0xe)), .. } => self.w.voyage.hold = s == 0xd,
@@ -1715,7 +1912,14 @@ impl Host for LiveHost<'_> {
                     Some(Arg::Name(n)) => n.replace('_', " "),
                     _ => String::new(),
                 };
-                let m = super::map::Cmd::Mark { zone: int(0) as i16, key: -1, slot: int(1) as usize, x: int(2) as f32 * 0.001, z: int(3) as f32 * 0.001, name };
+                let m = super::map::Cmd::Mark {
+                    zone: int(0) as i16,
+                    key: -1,
+                    slot: int(1) as usize,
+                    x: int(2) as f32 * 0.001,
+                    z: int(3) as f32 * 0.001,
+                    name,
+                };
                 self.w.map_cmds.push(m);
             }
             // FUN_100b9600: as 0x8b with the sub-key val@3.
@@ -1725,14 +1929,26 @@ impl Host for LiveHost<'_> {
                     Some(Arg::Name(n)) => n.replace('_', " "),
                     _ => String::new(),
                 };
-                let m = super::map::Cmd::Mark { zone: int(0) as i16, key: int(1) as i16, slot: int(2) as usize, x: int(3) as f32 * 0.001, z: int(4) as f32 * 0.001, name };
+                let m = super::map::Cmd::Mark {
+                    zone: int(0) as i16,
+                    key: int(1) as i16,
+                    slot: int(2) as usize,
+                    x: int(3) as f32 * 0.001,
+                    z: int(4) as f32 * 0.001,
+                    name,
+                };
                 self.w.map_cmds.push(m);
             }
             // FUN_100b9780 / FUN_100b9820: set 1's slot emptied (zone, [key,] slot); sub 0 through the file.
             Effect::Op { op: op @ (0xa8 | 0xb9), sub: Some(s @ (0 | 1)), args, .. } => {
                 let int = |i| Self::arg_int(&args, i).unwrap_or(0);
                 let (key, slot) = if op == 0xa8 { (-1, int(1)) } else { (int(1) as i16, int(2)) };
-                self.w.map_cmds.push(super::map::Cmd::Unmark { zone: int(0) as i16, key, slot: slot as usize, file: s == 0 });
+                self.w.map_cmds.push(super::map::Cmd::Unmark {
+                    zone: int(0) as i16,
+                    key,
+                    slot: slot as usize,
+                    file: s == 0,
+                });
             }
             Effect::Fault { actor, pc, op } => log::warn!("event: op {op:#x} at {pc:#x} on {actor:#x} cannot run"),
             Effect::StopTurn { actor } => {
@@ -1753,7 +1969,12 @@ impl Host for LiveHost<'_> {
             return self.w.map_open.is_some() || self.w.map.is_some();
         }
         match b {
-            Busy::Scheduler { file, tag, actor, target } => self.w.screen.scheds.iter().any(|s| s.file == *file && &s.tag == tag && s.actor == *actor && s.target == *target),
+            Busy::Scheduler { file, tag, actor, target } => self
+                .w
+                .screen
+                .scheds
+                .iter()
+                .any(|s| s.file == *file && &s.tag == tag && s.actor == *actor && s.target == *target),
             // Done turning: FUN_10089810 stops the step schedulers.
             Busy::Turning { actor } => {
                 let id = self.wid(*actor);
@@ -1770,7 +1991,10 @@ impl Host for LiveHost<'_> {
             // a file already resident costs one call (request, ready, start, advance, yield), not two.
             Busy::MotionLoad { actor, .. } => {
                 let id = self.wid(*actor);
-                let Some(files) = self.w.actors.get(&id).and_then(|a| a.pending.as_ref()).map(|p| p.files.clone()) else { return false };
+                let Some(files) = self.w.actors.get(&id).and_then(|a| a.pending.as_ref()).map(|p| p.files.clone())
+                else {
+                    return false;
+                };
                 let Some(index) = self.w.index.clone() else { return true };
                 if self.w.motion_files.all(&index, &files).is_none() {
                     return true;
@@ -1798,7 +2022,9 @@ impl Host for LiveHost<'_> {
             }
             // Actor +0x1b8 (action state) is nonzero while an emote loads and plays.
             Busy::ZoneAction { name, a, b } => {
-                let who = |x: &u32| if *x == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(*x)) };
+                let who = |x: &u32| {
+                    if *x == 0 { crate::fx::sched::Who::None } else { crate::fx::sched::Who::Actor(self.wid(*x)) }
+                };
                 let n = u32::from_le_bytes(crate::dat::generator::fourcc(name));
                 self.w.effects.zone_file().is_some_and(|f| self.w.effects.event_scheduler_running(f, n, who(a), who(b)))
             }
@@ -1806,17 +2032,22 @@ impl Host for LiveHost<'_> {
             // motion files are in flight (an actor that never gets a model does not hold the event).
             Busy::Op { op: 0x80, actor, .. } => {
                 let id = self.wid(*actor);
-                self.w.actors.get(&id).is_some_and(|a| (a.character.is_none() && self.w.models_loading.contains(&a.key)) || a.pending.is_some())
+                self.w.actors.get(&id).is_some_and(|a| {
+                    (a.character.is_none() && self.w.models_loading.contains(&a.key)) || a.pending.is_some()
+                })
             }
             // FUN_100bac90 sub 4: while the event status is 0 and the actor still rides or dismounts (+0x1bc).
             Busy::Op { op: 0xab, sub: Some(4), actor } => {
                 let id = self.wid(*actor);
-                self.st.bound.contains(&id) && self.st.event_status.get(&id).copied().unwrap_or(0) == 0 && self.w.rides.contains_key(&id)
+                self.st.bound.contains(&id)
+                    && self.st.event_status.get(&id).copied().unwrap_or(0) == 0
+                    && self.w.rides.contains_key(&id)
             }
             // FUN_100b8b80 sub 2: until actor@2's chocobo / mount has its model (only while it is getting one).
             Busy::Op { op: 0x7e, sub: Some(2), actor } => {
                 let id = self.wid(*actor);
-                self.w.rides.contains_key(&id) && !self.w.actors.get(&(super::ride::ANIMAL | id)).is_some_and(|a| a.character.is_some())
+                self.w.rides.contains_key(&id)
+                    && !self.w.actors.get(&(super::ride::ANIMAL | id)).is_some_and(|a| a.character.is_some())
             }
             // 0x9a: until the music change has loaded.
             Busy::Op { op: 0x9a, .. } => self.w.music_changing,
@@ -1824,7 +2055,9 @@ impl Host for LiveHost<'_> {
             // FUN_100b8630 (0x98): ends the frame while one runs (DAT_10631f24 +0x44).
             Busy::Op { op: 0x75 | 0x98, .. } => self.w.sub.loading.is_some() || self.w.sub.asked.is_some(),
             // Op 0xb6 sub 0x10: until the player's model is up.
-            Busy::Op { op: 0xb6, sub: Some(0x10), .. } => self.w.actors.get(&self.w.my_id).is_none_or(|a| a.character.is_none()),
+            Busy::Op { op: 0xb6, sub: Some(0x10), .. } => {
+                self.w.actors.get(&self.w.my_id).is_none_or(|a| a.character.is_none())
+            }
             Busy::Op { op: 0x99, actor, .. } | Busy::Op { op: 0x59, sub: Some(6), actor } => {
                 let id = self.wid(*actor);
                 self.w.actors.get(&id).is_some_and(super::actmotion::emoting)
@@ -1849,7 +2082,13 @@ impl Host for LiveHost<'_> {
         if id == self.w.my_id {
             return super::monstrosity::my_name(self.w).to_string();
         }
-        self.w.entities.get(&id).map(|e| super::monstrosity::name(e).to_string()).filter(|n| !n.is_empty()).or_else(|| self.w.npc_names.get(&id).cloned()).unwrap_or_default()
+        self.w
+            .entities
+            .get(&id)
+            .map(|e| super::monstrosity::name(e).to_string())
+            .filter(|n| !n.is_empty())
+            .or_else(|| self.w.npc_names.get(&id).cloned())
+            .unwrap_or_default()
     }
 
     fn camera_free(&self) -> bool {
@@ -1971,7 +2210,11 @@ impl Host for LiveHost<'_> {
     fn ground(&self, actor: u32, p: [f32; 3]) -> Option<f32> {
         // The VM names us PLAYER; the flags live under our world id.
         let actor = self.wid(actor);
-        let no_snap = if actor == self.w.my_id { self.w.my_plate.no_snap } else { self.w.entities.get(&actor).is_some_and(|e| e.no_snap) };
+        let no_snap = if actor == self.w.my_id {
+            self.w.my_plate.no_snap
+        } else {
+            self.w.entities.get(&actor).is_some_and(|e| e.no_snap)
+        };
         if no_snap {
             return None;
         }
@@ -2010,13 +2253,32 @@ pub fn queue(w: &mut World, s: EventStart) {
     (w.partymenu, w.status) = (None, None);
     if w.event.is_some() {
         // 1009e8a0: an event is already running (group 9 message 0x81).
-        log::warn!("event {:#x} ignored: event {:#x} is running", s.event, w.event.as_ref().map_or(0, |l| l.st.start.event));
+        log::warn!(
+            "event {:#x} ignored: event {:#x} is running",
+            s.event,
+            w.event.as_ref().map_or(0, |l| l.st.start.event)
+        );
         return;
     }
-    log::info!("event start: zone {} event {:#x} target {:#x} index {} mode {:#x} params {:?}", s.zone, s.event, s.target, s.index, s.mode, s.params);
+    log::info!(
+        "event start: zone {} event {:#x} target {:#x} index {} mode {:#x} params {:?}",
+        s.zone,
+        s.event,
+        s.target,
+        s.index,
+        s.mode,
+        s.params
+    );
     // FUN_100ad2c0 clears the post-event re-request (+0x1f8 / +0x1fa) of every actor.
     w.self_lock = None;
-    w.event_pending = Some(Box::new(Waiting { start: s, blocks: None, asked: HashSet::new(), timer: ASK_AGAIN, joined: HashSet::new(), since: Instant::now() }));
+    w.event_pending = Some(Box::new(Waiting {
+        start: s,
+        blocks: None,
+        asked: HashSet::new(),
+        timer: ASK_AGAIN,
+        joined: HashSet::new(),
+        since: Instant::now(),
+    }));
     w.menu = None;
     super::maze::event_start(w);
     // Event start (FUN_1015f3e0(0x800)) closes the battle set too; it does not come back at the event's end.
@@ -2052,7 +2314,14 @@ fn resolve(me: (u32, u16), actor: u32) -> Option<(u32, u16)> {
 
 /// FUN_100ad460's walk in block order: the first bound actor that is missing (`true`) or still without its
 /// model (`false`); None once all are ready. Every actor passed takes part (`joined`, +0x120 bit 8).
-fn first_waiting(blocks: &[Block], event: u16, me: (u32, u16), present: &dyn Fn(u32) -> bool, model: &dyn Fn(u32) -> bool, joined: &mut HashSet<u32>) -> Option<(u32, u16, bool)> {
+fn first_waiting(
+    blocks: &[Block],
+    event: u16,
+    me: (u32, u16),
+    present: &dyn Fn(u32) -> bool,
+    model: &dyn Fn(u32) -> bool,
+    joined: &mut HashSet<u32>,
+) -> Option<(u32, u16, bool)> {
     for b in blocks.iter().filter(|b| bound_block(b, event)) {
         let Some((id, index)) = resolve(me, b.actor) else { continue };
         if !present(id) {
@@ -2176,13 +2445,22 @@ pub fn update(w: &mut World, dt: f32) {
         } else {
             if wt.blocks.is_none() {
                 let fz = file_zone(&wt.start, w.zone.unwrap_or(wt.start.zone));
-                let blocks = crate::dat::event::load(&index, fz).map_err(|e| log::warn!("event file of zone {fz}: {e:#}")).unwrap_or_default();
+                let blocks = crate::dat::event::load(&index, fz)
+                    .map_err(|e| log::warn!("event file of zone {fz}: {e:#}"))
+                    .unwrap_or_default();
                 if !blocks.iter().any(|b| bound_block(b, wt.start.event)) {
                     // Nothing would ever end it: answer at once so the server lets go.
                     let s = &wt.start;
                     log::warn!("event {:#x}: no script in zone {fz}; ending it", s.event);
                     w.screen.release_black();
-                    let _ = w.net.commands.send(NetCommand::EventEnd { target: s.target, index: s.index, option: 0, zone: s.zone, event: s.event, mode: 0 });
+                    let _ = w.net.commands.send(NetCommand::EventEnd {
+                        target: s.target,
+                        index: s.index,
+                        option: 0,
+                        zone: s.zone,
+                        event: s.event,
+                        mode: 0,
+                    });
                     w.control_lock = None;
                     return;
                 }
@@ -2251,7 +2529,14 @@ pub fn update(w: &mut World, dt: f32) {
         let since = *live.st.idle_since.get_or_insert_with(Instant::now);
         if live.st.released || since.elapsed().as_secs_f32() > 10.0 {
             let s = &live.st.start;
-            let _ = w.net.commands.send(NetCommand::EventEnd { target: s.target, index: s.index, option: 0x4000_0000, zone: s.zone, event: s.event, mode: 0 });
+            let _ = w.net.commands.send(NetCommand::EventEnd {
+                target: s.target,
+                index: s.index,
+                option: 0x4000_0000,
+                zone: s.zone,
+                event: s.event,
+                mode: 0,
+            });
             log::info!("event {:#x}: idle, cancelled", s.event);
             finish(w, live);
             return;
@@ -2400,7 +2685,13 @@ fn finish(w: &mut World, live: Box<Live>) {
         && let Some(p) = live.st.poses.get(&w.my_id).copied()
     {
         if (p.pos - w.pos).length() > 0.5 {
-            log::info!("event {:#x}: we stay where it left us ({:.2}, {:.2}, {:.2})", live.st.start.event, p.pos.x, p.pos.y, p.pos.z);
+            log::info!(
+                "event {:#x}: we stay where it left us ({:.2}, {:.2}, {:.2})",
+                live.st.start.event,
+                p.pos.x,
+                p.pos.y,
+                p.pos.z
+            );
         }
         keep_pose(w, p);
     }
@@ -2655,7 +2946,9 @@ pub fn ride_model(w: &World, id: u32) -> Option<super::ride::Model> {
 
 /// Bound actors whose event status rides (5 / 0x55).
 pub fn riding(w: &World) -> Vec<u32> {
-    w.event.as_ref().map_or_else(Vec::new, |l| l.st.event_status.iter().filter(|(_, s)| matches!(s, 5 | 0x55)).map(|(id, _)| *id).collect())
+    w.event.as_ref().map_or_else(Vec::new, |l| {
+        l.st.event_status.iter().filter(|(_, s)| matches!(s, 5 | 0x55)).map(|(id, _)| *id).collect()
+    })
 }
 
 pub fn event_status(w: &World, id: u32) -> u8 {
@@ -2665,7 +2958,10 @@ pub fn event_status(w: &World, id: u32) -> u8 {
 /// FUN_1003d220: points 2 (with bits 19 / 20) are lerped in the world; one key and 3 or more points are placed in
 /// the frame.
 fn framed(p: &crate::dat::title::CameraPath) -> bool {
-    p.keys.len() + (p.flags & crate::dat::title::FROM_CURRENT != 0) as usize + (p.flags & crate::dat::title::TO_FOLLOW != 0) as usize != 2
+    p.keys.len()
+        + (p.flags & crate::dat::title::FROM_CURRENT != 0) as usize
+        + (p.flags & crate::dat::title::TO_FOLLOW != 0) as usize
+        != 2
 }
 
 /// Per frame once the actors are placed: the running path's frame on its scheduler's actors. One key takes it
@@ -2729,7 +3025,8 @@ fn unloads(pc: bool, flags: u32, structure: bool, reserved: bool, trust: bool) -
 /// Mode) & 0x02 for player characters and & 0x10 for NPCs and monsters (+0x120 bit 0x800000).
 pub fn hidden(w: &World) -> HashSet<u32> {
     let mut out = HashSet::new();
-    let (flags, script, part): (u32, Option<&HashSet<u32>>, Option<&HashSet<u32>>) = match (&w.event, &w.event_pending) {
+    let (flags, script, part): (u32, Option<&HashSet<u32>>, Option<&HashSet<u32>>) = match (&w.event, &w.event_pending)
+    {
         (Some(l), _) => (l.st.flags(), Some(&l.st.hidden), Some(&l.st.bound)),
         (None, Some(p)) => (p.start.mode as u32, None, Some(&p.joined)),
         _ => (0, None, None),
@@ -2741,7 +3038,11 @@ pub fn hidden(w: &World) -> HashSet<u32> {
         let trust = w.game.get(0x99) & 0x20 != 0 && e.marks.trust && !w.party.party().any(|m| m.index == e.index);
         let hide = match script {
             Some(h) if takes_part(id) => h.contains(id),
-            _ => e.flags & 2 != 0 || (!takes_part(id) && unloads(*id >> 24 == 0, flags, matches!(e.sub_kind, 2..=4), e.ev_reserved, trust)),
+            _ => {
+                e.flags & 2 != 0
+                    || (!takes_part(id)
+                        && unloads(*id >> 24 == 0, flags, matches!(e.sub_kind, 2..=4), e.ev_reserved, trust))
+            }
         };
         // FUN_100cd040: a listed-only NPC the s2c 0x077 list lacks is not drawn (+0xb2 bit 7), events included; nor
         // one outside our fenced content's gate (+0xb2 bit 5).
@@ -2870,7 +3171,11 @@ fn move_cursor(c: &mut Choice, to: isize, page: bool) {
     }
     let row = c.cursor.saturating_sub(c.scroll);
     c.cursor = to.clamp(0, n as isize - 1) as usize;
-    c.scroll = if page { c.cursor.saturating_sub(row).min(n.saturating_sub(3)) } else { c.scroll.min(c.cursor).max(c.cursor.saturating_sub(2)) };
+    c.scroll = if page {
+        c.cursor.saturating_sub(row).min(n.saturating_sub(3))
+    } else {
+        c.scroll.min(c.cursor).max(c.cursor.saturating_sub(2))
+    };
 }
 
 pub fn choice(w: &World) -> Option<&Choice> {
@@ -2879,7 +3184,10 @@ pub fn choice(w: &World) -> Option<&Choice> {
 
 /// The mouse's cursor move onto option `k` (the view follows, as a step). True when it moved.
 pub(super) fn set_choice(w: &mut World, k: usize) -> bool {
-    let Some(c) = w.event.as_mut().and_then(|l| l.st.choice.as_mut()).filter(|c| c.cursor != k && k < c.options.len()) else { return false };
+    let Some(c) = w.event.as_mut().and_then(|l| l.st.choice.as_mut()).filter(|c| c.cursor != k && k < c.options.len())
+    else {
+        return false;
+    };
     move_cursor(c, k as isize, false);
     true
 }
@@ -2983,7 +3291,10 @@ fn key_live(w: &mut World, l: &mut Live, key: egui::Key) {
     }
     // Cinema mode: FUN_1015dd00 hands no menu key to the choice window (batch 8); the event waits on it.
     if l.st.choice.is_some() && l.st.place_on {
-        log::warn!("event {:#x}: a choice is open in cinema mode; it can't be answered until op 0x68", l.st.start.event);
+        log::warn!(
+            "event {:#x}: a choice is open in cinema mode; it can't be answered until op 0x68",
+            l.st.start.event
+        );
         return;
     }
     if let Some(c) = &mut l.st.choice {
@@ -3160,8 +3471,14 @@ impl dialog::Texts for EventTexts {
         use crate::dat::merits::{AeTables, JobPointTables, MeritTables};
         let index = self.index.as_ref()?;
         let t = match sub {
-            0xb0 => self.merits.get_or_init(|| Some(Arc::new(MeritTables::load(index, self.files[0])))).as_ref()?.name_of_id(id)?,
-            0xb1 => self.jp.get_or_init(|| Some(Arc::new(JobPointTables::load(index, self.files[1])))).as_ref()?.name(id),
+            0xb0 => self
+                .merits
+                .get_or_init(|| Some(Arc::new(MeritTables::load(index, self.files[0]))))
+                .as_ref()?
+                .name_of_id(id)?,
+            0xb1 => {
+                self.jp.get_or_init(|| Some(Arc::new(JobPointTables::load(index, self.files[1])))).as_ref()?.name(id)
+            }
             _ => self.ae.get_or_init(|| Some(Arc::new(AeTables::load(index, self.files[3])))).as_ref()?.name(id),
         };
         Some(crate::dat::font::encode_sjis(&t)).filter(|t| !t.is_empty())
@@ -3182,7 +3499,9 @@ impl dialog::Texts for EventTexts {
                 let k = (kind == 0x86) as usize;
                 let words = self.words[k].get_or_init(|| {
                     let f = [55473, 55474][k];
-                    crate::dat::names::DMsg::load(self.index.as_ref()?, f).map_err(|e| log::warn!("grammar words {f}: {e:#}")).ok()
+                    crate::dat::names::DMsg::load(self.index.as_ref()?, f)
+                        .map_err(|e| log::warn!("grammar words {f}: {e:#}"))
+                        .ok()
                 });
                 Some(crate::dat::font::encode_sjis(&words.as_ref()?.text(id as usize)?)).filter(|t| !t.is_empty())
             }
@@ -3240,7 +3559,8 @@ pub fn zone_text(w: &mut World, t: &ZoneText) {
         return;
     };
     let named = t.mes & 0x8000 == 0;
-    let entity = w.entities.get(&t.actor).filter(|e| e.index == t.index).map(|e| super::monstrosity::name(e).to_string());
+    let entity =
+        w.entities.get(&t.actor).filter(|e| e.index == t.index).map(|e| super::monstrosity::name(e).to_string());
     // Bit 15 clear: the speaker must be here with that id and index, else the line is dropped (0x02A naming its
     // speaker excepted, inf).
     if named && entity.is_none() && t.name.is_empty() {
@@ -3248,13 +3568,23 @@ pub fn zone_text(w: &mut World, t: &ZoneText) {
         return;
     }
     let speaker = if t.name.is_empty() { entity.clone().unwrap_or_default() } else { t.name.clone() };
-    let speaker_female = if t.actor == w.my_id { matches!(w.my_race, 2 | 4 | 6 | 7) } else { w.entities.get(&t.actor).filter(|e| e.index == t.index).is_some_and(|e| e.female) };
+    let speaker_female = if t.actor == w.my_id {
+        matches!(w.my_race, 2 | 4 | 6 | 7)
+    } else {
+        w.entities.get(&t.actor).filter(|e| e.index == t.index).is_some_and(|e| e.female)
+    };
     // msg+0xc10: FUN_100ad5e0 / FUN_100ad660 get the speaker entity's name, else sName; 0x027 none.
     let msg_name = if t.packet == 0x027 { String::new() } else { entity.clone().unwrap_or_else(|| t.name.clone()) };
     // The "%s : " prefix (FUN_100abbb0; MesNum bit 15 none). 0x027: String1's, or with String2 / Flags 1 the NPC's
     // own name (a PC: String2); bit 15 set: String2 when set and Flags 2.
     let prefix = match t.packet {
-        0x027 if named && (!t.name2.is_empty() || t.flags & 1 != 0) => if t.actor >> 24 != 0 { entity.unwrap_or_default() } else { t.name2.clone() },
+        0x027 if named && (!t.name2.is_empty() || t.flags & 1 != 0) => {
+            if t.actor >> 24 != 0 {
+                entity.unwrap_or_default()
+            } else {
+                t.name2.clone()
+            }
+        }
         0x027 if named => t.strings.first().cloned().unwrap_or_default(),
         0x027 if !t.name2.is_empty() && t.flags & 2 != 0 => t.name2.clone(),
         _ if named => speaker.clone(),
@@ -3317,7 +3647,9 @@ pub fn coded_chat(text: &str) -> Option<CodedChat<'_>> {
     }
     let (source, id) = (v[0] as u16, v[1] as u16);
     let num = [v[2], v[3], v[4], v[5], v[6]];
-    let printed = format!("{source:02x},{id:04x},{:08x},{:08x},{:08x},{:08x},{:08x},", num[0], num[1], num[2], num[3], num[4]).len();
+    let printed =
+        format!("{source:02x},{id:04x},{:08x},{:08x},{:08x},{:08x},{:08x},", num[0], num[1], num[2], num[3], num[4])
+            .len();
     Some(CodedChat { source, id, num, rest: text.get(printed..).unwrap_or_default() })
 }
 
@@ -3343,7 +3675,9 @@ fn source_text(w: &mut World, source: u16, id: u16) -> Option<Vec<u8>> {
     let file = *w.msg_files.get(source as usize)?;
     let index = w.index.clone()?;
     let d = w.msg_texts.entry(source).or_insert_with(|| {
-        let d = file.and_then(|f| index.read(f).ok()).and_then(|b| Dialog::parse(&b).map_err(|e| log::warn!("message source {source}: {e:#}")).ok());
+        let d = file
+            .and_then(|f| index.read(f).ok())
+            .and_then(|b| Dialog::parse(&b).map_err(|e| log::warn!("message source {source}: {e:#}")).ok());
         d.map(Arc::new)
     });
     d.as_ref()?.raw(id as u32)
@@ -3474,11 +3808,30 @@ mod tests {
         let names = Arc::new(crate::dat::names::Names::load(&index, crate::dat::items::Lang::En).unwrap());
         let file = crate::dat::msg::current_slot_file(&dll, 1, 0x6a).unwrap();
         let d = Dialog::parse(&index.read(file).unwrap()).unwrap();
-        let texts = EventTexts { bt: Some(bt), index: Some(index), files: [None; 6], merits: Default::default(), jp: Default::default(), ae: Default::default(), mon: Default::default(), words: Default::default() };
-        let ctx = dialog::Ctx { num: [9, 0x2d, 0x123, 2, 2, 0, 0, 0], names: Some(names), texts: Some(Arc::new(texts)), ..Default::default() };
+        let texts = EventTexts {
+            bt: Some(bt),
+            index: Some(index),
+            files: [None; 6],
+            merits: Default::default(),
+            jp: Default::default(),
+            ae: Default::default(),
+            mon: Default::default(),
+            words: Default::default(),
+        };
+        let ctx = dialog::Ctx {
+            num: [9, 0x2d, 0x123, 2, 2, 0, 0, 0],
+            names: Some(names),
+            texts: Some(Arc::new(texts)),
+            ..Default::default()
+        };
         let e = dialog::expand(&d.raw(0x1bd).unwrap(), &ctx);
         let text: Vec<String> = e.lines.iter().map(|l| decode_sjis(l)).collect();
-        assert_eq!(text, ["{Flaviria} Alright then, it seems a group of Quetzalcoatl's minions is looking to set the stage at ?-? in Reisenjima. Go introduce yourself!"]);
+        assert_eq!(
+            text,
+            [
+                "{Flaviria} Alright then, it seems a group of Quetzalcoatl's minions is looking to set the stage at ?-? in Reisenjima. Go introduce yourself!"
+            ]
+        );
     }
 
     /// Op 0x82's regions are RID records by 4cc: Lower Jeuno's e6t0 / e6t1 hold their own centres.
@@ -3486,7 +3839,12 @@ mod tests {
     fn region_ops() {
         let cfg = crate::config::Config::load();
         let Ok(index) = crate::dat::DatIndex::open(&cfg.ffxi_dir()) else { return };
-        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).map_err(anyhow::Error::from).and_then(|d| crate::dat::zone::Keys::from_ffximain(&d)) else { return };
+        let Ok(keys) = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))
+            .map_err(anyhow::Error::from)
+            .and_then(|d| crate::dat::zone::Keys::from_ffximain(&d))
+        else {
+            return;
+        };
         let scene = crate::dat::zone::load_scene(&keys, &index.read(crate::dat::zone::file_id(245)).unwrap()).unwrap();
         for t in [*b"e6t0", *b"e6t1"] {
             let r = scene.regions.iter().find(|r| r.tag() == u32::from_le_bytes(t)).expect("region");
@@ -3520,7 +3878,9 @@ mod tests {
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let Ok(blocks) = crate::dat::event::load(&index, 230) else { return };
         let mut host = Scripted::new(&[]);
-        host.sched_ticks = Some(crate::event_vm::sched_timer(crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()).unwrap()));
+        host.sched_ticks = Some(crate::event_vm::sched_timer(
+            crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()).unwrap(),
+        ));
         let start = Start { zone: 230, event: 0x01f7, target: 0x010e_601b, ..Default::default() };
         let mut rt = Runtime::start(blocks, Dialog::load(&index, 230).ok(), start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60 * 60 * 10).expect("finished");
@@ -3528,7 +3888,11 @@ mod tests {
         let mut st = State::new(EventStart { zone: 230, event: 0x01f7, mode: 0x83, ..Default::default() });
         st.loaded = true;
         st.cancellable = st.cb0;
-        let ops: Vec<u8> = host.log.iter().filter_map(|e| if let Effect::Op { op: op @ (0x2e | 0x42 | 0x38), .. } = e { Some(*op) } else { None }).collect();
+        let ops: Vec<u8> = host
+            .log
+            .iter()
+            .filter_map(|e| if let Effect::Op { op: op @ (0x2e | 0x42 | 0x38), .. } = e { Some(*op) } else { None })
+            .collect();
         assert_eq!(ops.first(), Some(&0x42));
         assert!(!ops.contains(&0x2e));
         for e in &host.log {
@@ -3550,7 +3914,10 @@ mod tests {
     }
 
     /// LSB's "cutscene only" NPCs bound by 0x1f7 (npcs.yaml status 6), per the validation report.
-    const CUTSCENE_ONLY: [u32; 23] = [0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0x67, 0x4d, 0x78, 0x79, 0x7a, 0x7c, 0x7d];
+    const CUTSCENE_ONLY: [u32; 23] = [
+        0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0x67, 0x4d,
+        0x78, 0x79, 0x7a, 0x7c, 0x7d,
+    ];
 
     /// 0x1f7 waits for every bound actor, asking for one at a time in block order, then shows the cutscene-only
     /// ones when the script does: the gate knights for the s006 narration, the expedition before "Wait, the
@@ -3565,7 +3932,9 @@ mod tests {
         let mut have: HashSet<u32> = HashSet::from([me.0]);
         let mut asked = Vec::new();
         let mut joined = HashSet::new();
-        while let Some((id, idx, missing)) = first_waiting(&blocks, 0x1f7, me, &|id| have.contains(&id), &|_| true, &mut joined) {
+        while let Some((id, idx, missing)) =
+            first_waiting(&blocks, 0x1f7, me, &|id| have.contains(&id), &|_| true, &mut joined)
+        {
             assert!(missing && !asked.contains(&idx), "{id:#x} asked twice");
             asked.push(idx);
             have.insert(id);
@@ -3580,7 +3949,9 @@ mod tests {
         assert_eq!(w, Some((0x010e_60d5, 0xd5, false)));
 
         let mut host = Scripted::new(&[]);
-        host.sched_ticks = Some(crate::event_vm::sched_timer(crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()).unwrap()));
+        host.sched_ticks = Some(crate::event_vm::sched_timer(
+            crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()).unwrap(),
+        ));
         let start = Start { zone: 230, event: 0x01f7, target: me.0, ..Default::default() };
         let mut rt = Runtime::start(blocks, Dialog::load(&index, 230).ok(), start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60 * 60 * 20).expect("finished");
@@ -3590,12 +3961,20 @@ mod tests {
             match e {
                 Effect::Op { op: 0x22, actor, args, .. } if *actor != PLAYER => {
                     if let Some(Arg::Int(v)) = args.first() {
-                        if *v != 0 { hidden.insert(*actor) } else { hidden.remove(actor) };
+                        if *v != 0 {
+                            hidden.insert(*actor)
+                        } else {
+                            hidden.remove(actor)
+                        };
                     }
                 }
                 Effect::Op { op: 0x4e, args, .. } => {
                     if let (Some(Arg::Int(v)), Some(Arg::Actor(a))) = (args.first(), args.get(1)) {
-                        if *v != 0 { hidden.insert(*a) } else { hidden.remove(a) };
+                        if *v != 0 {
+                            hidden.insert(*a)
+                        } else {
+                            hidden.remove(a)
+                        };
                     }
                 }
                 Effect::Message { id, .. } => {
@@ -3659,7 +4038,13 @@ mod tests {
             return;
         }
         let who = [crate::fx::sched::Who::None; 2];
-        let cam = |path: &str| crate::fx::EventCamera { file: 30777, tag: *b"x000", path: u32::from_le_bytes(crate::dat::generator::fourcc(path)), ticks: 50.0, who };
+        let cam = |path: &str| crate::fx::EventCamera {
+            file: 30777,
+            tag: *b"x000",
+            path: u32::from_le_bytes(crate::dat::generator::fourcc(path)),
+            ticks: 50.0,
+            who,
+        };
         let mut sc = Screen::default();
         sc.fx_camera(&index, cam("d000"));
         sc.advance(None, None);
@@ -3708,11 +4093,35 @@ mod tests {
             data.extend_from_slice(&rgba);
             SOp { op: 0x0f, wait: 60, ticks: 60, data }
         };
-        sc.scheds.push(Sched { file: 30904, tag: "fdo1".into(), actor: 0, target: 0, who: Default::default(), ops: vec![op([0, 0, 0, 0x80])], cursor: 0, next_at: 0.0, start: 0.0, len: Some(60.0), speed: 1.0 });
+        sc.scheds.push(Sched {
+            file: 30904,
+            tag: "fdo1".into(),
+            actor: 0,
+            target: 0,
+            who: Default::default(),
+            ops: vec![op([0, 0, 0, 0x80])],
+            cursor: 0,
+            next_at: 0.0,
+            start: 0.0,
+            len: Some(60.0),
+            speed: 1.0,
+        });
         sc.advance(None, None);
         sc.tick = 59.0;
         assert!(sc.multiply()[0] < 1e-6);
-        sc.scheds.push(Sched { file: 30904, tag: "fdi1".into(), actor: 0, target: 0, who: Default::default(), ops: vec![op([0x80, 0x80, 0x80, 0])], cursor: 0, next_at: 59.0, start: 59.0, len: Some(60.0), speed: 1.0 });
+        sc.scheds.push(Sched {
+            file: 30904,
+            tag: "fdi1".into(),
+            actor: 0,
+            target: 0,
+            who: Default::default(),
+            ops: vec![op([0x80, 0x80, 0x80, 0])],
+            cursor: 0,
+            next_at: 59.0,
+            start: 59.0,
+            len: Some(60.0),
+            speed: 1.0,
+        });
         sc.advance(None, None);
         sc.tick = 59.0 + 29.5;
         let m = sc.multiply()[0];

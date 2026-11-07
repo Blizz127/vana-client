@@ -104,7 +104,9 @@ impl Roster {
 
     /// FUN_100ea140: the first free record past ours, else the one updated longest ago.
     fn alloc(&mut self) -> usize {
-        let i = (1..RECORDS).find(|&i| self.recs[i].id == 0).unwrap_or_else(|| (1..RECORDS).min_by_key(|&i| self.recs[i].time).unwrap_or(1));
+        let i = (1..RECORDS)
+            .find(|&i| self.recs[i].id == 0)
+            .unwrap_or_else(|| (1..RECORDS).min_by_key(|&i| self.recs[i].time).unwrap_or(1));
         self.recs[i] = Member::default();
         i
     }
@@ -196,7 +198,8 @@ impl Roster {
         let Some(i) = self.find(u.id) else { return };
         let t = self.tick();
         let r = &mut self.recs[i];
-        (r.index, r.hp, r.mp, r.tp, r.hpp, r.mpp, r.jobs, r.time) = (u.index, u.hp, u.mp, u.tp, u.hpp, u.mpp, u.jobs, t);
+        (r.index, r.hp, r.mp, r.tp, r.hpp, r.mpp, r.jobs, r.time) =
+            (u.index, u.hp, u.mp, u.tp, u.hpp, u.mpp, u.jobs, t);
         (r.mon, r.mon_ids) = (u.mon, u.mon_ids);
         r.mon_short.clear();
     }
@@ -434,7 +437,10 @@ mod tests {
         r.list(&mog(0x300, 0, "Bo"), ME, false);
         assert_eq!(r.recs[2].mog_zone, 230);
         assert_eq!(r.mog_mask(ME), 1 << 2);
-        assert_eq!((r.mog_member(ME, 0), r.mog_member(ME, 1), r.mog_member(ME, 2), r.mog_member(ME, 3)), (0, 0, 0x300, 0));
+        assert_eq!(
+            (r.mog_member(ME, 0), r.mog_member(ME, 1), r.mog_member(ME, 2), r.mog_member(ME, 3)),
+            (0, 0, 0x300, 0)
+        );
         // Bo leaves the Mog House.
         r.list(&listed(0x300, 0x402, 0, 231, "Bo"), ME, false);
         assert_eq!((r.mog_mask(ME), r.mog_member(ME, 2)), (0, 0));

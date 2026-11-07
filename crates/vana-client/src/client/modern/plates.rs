@@ -88,18 +88,38 @@ fn rasterize(text: &str, px: f32) -> Option<(Raster, Vec<u8>)> {
             if a > 0.0 {
                 // White over a near-black outline.
                 let c = (255.0 * f + 12.0 * o * (1.0 - f)) / a;
-                out[k..k + 4].copy_from_slice(&[c as u8, c as u8, (c + 2.0 * o * (1.0 - f)).min(255.0) as u8, (a * 255.0) as u8]);
+                out[k..k + 4].copy_from_slice(&[
+                    c as u8,
+                    c as u8,
+                    (c + 2.0 * o * (1.0 - f)).min(255.0) as u8,
+                    (a * 255.0) as u8,
+                ]);
             }
         }
     }
-    Some((Raster { w: w as u32, h: h as u32, left: pad, right: pad + caret - TRACKING * px, baseline: pad + sf.ascent() }, out))
+    Some((
+        Raster { w: w as u32, h: h as u32, left: pad, right: pad + caret - TRACKING * px, baseline: pad + sf.ascent() },
+        out,
+    ))
 }
 
 /// A plate: the name centred on x with its baseline BASELINE units below y, tinted (ARGB, 0x80 = 1.0) and pulsed;
 /// retail's badges just left of it and its master stars above, darkened with the name by the screen fade `shade`
 /// (`tint` and `icon` come faded already).
 #[allow(clippy::too_many_arguments)]
-pub fn draw(gu: &mut GameUi, prefix: &[u8], name: &str, x: f32, y: f32, scale: [f32; 2], tint: u32, pulse: f32, icon: u32, stars: bool, shade: [f32; 3]) {
+pub fn draw(
+    gu: &mut GameUi,
+    prefix: &[u8],
+    name: &str,
+    x: f32,
+    y: f32,
+    scale: [f32; 2],
+    tint: u32,
+    pulse: f32,
+    icon: u32,
+    stars: bool,
+    shade: [f32; 3],
+) {
     if name.is_empty() {
         return;
     }
@@ -123,7 +143,14 @@ pub fn draw(gu: &mut GameUi, prefix: &[u8], name: &str, x: f32, y: f32, scale: [
     let left = x - text_w / 2.0 - raster.left * k;
     let top = y + BASELINE * scale[1] - raster.baseline * k;
     let c = |sh: u32| ((tint >> sh & 0xff) as f32 / 128.0).min(1.0);
-    gu.image_rect(&key, left.round(), top.round(), raster.w as f32 * k, raster.h as f32 * k, [c(16), c(8), c(0), pulse.clamp(0.0, 1.0)]);
+    gu.image_rect(
+        &key,
+        left.round(),
+        top.round(),
+        raster.w as f32 * k,
+        raster.h as f32 * k,
+        [c(16), c(8), c(0), pulse.clamp(0.0, 1.0)],
+    );
     // Retail's badges (GM, new adventurer, linkshell ...) end just left of the name; the stars stay above.
     // The badges right to left from the name: the first at the text's height, those after it smaller; the job master
     // stars above the name.
@@ -135,7 +162,11 @@ pub fn draw(gu: &mut GameUi, prefix: &[u8], name: &str, x: f32, y: f32, scale: [
         let d = if i == 0 { size } else { size * 0.75 };
         bx -= d;
         // The pearl takes its linkshell's colour (retail's icon tint for 0x92).
-        let c = if b == 0x92 { [16, 8, 0].map(|sh| ((icon >> sh & 0xff) as f32 / 128.0).min(1.0)) } else { shade.map(|k| k.min(1.0)) };
+        let c = if b == 0x92 {
+            [16, 8, 0].map(|sh| ((icon >> sh & 0xff) as f32 / 128.0).min(1.0))
+        } else {
+            shade.map(|k| k.min(1.0))
+        };
         gu.image_rect(&key, bx.round(), (cy - d / 2.0).round(), d, d, [c[0], c[1], c[2], pulse.clamp(0.0, 1.0)]);
         bx -= 1.0 * scale[0];
     }
@@ -144,7 +175,14 @@ pub fn draw(gu: &mut GameUi, prefix: &[u8], name: &str, x: f32, y: f32, scale: [
         for (dx, big) in [(-1.0, false), (0.0, true), (1.0, false)] {
             let s = if big { d * 1.25 } else { d };
             let [r, g, b] = shade.map(|k| k.min(1.0));
-            gu.image_rect(&key, x + dx * d * 1.1 - s / 2.0, top - s + 2.0 * scale[1], s, s, [r, g, b, pulse.clamp(0.0, 1.0)]);
+            gu.image_rect(
+                &key,
+                x + dx * d * 1.1 - s / 2.0,
+                top - s + 2.0 * scale[1],
+                s,
+                s,
+                [r, g, b, pulse.clamp(0.0, 1.0)],
+            );
         }
     }
 }

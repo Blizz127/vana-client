@@ -28,7 +28,14 @@ pub struct Store {
 
 impl Default for Store {
     fn default() -> Self {
-        Store { lines: Default::default(), sent: Default::default(), kind: 0, sent_kind: 0xff, own_in: false, entered: false }
+        Store {
+            lines: Default::default(),
+            sent: Default::default(),
+            kind: 0,
+            sent_kind: 0xff,
+            own_in: false,
+            entered: false,
+        }
     }
 }
 
@@ -159,7 +166,9 @@ pub fn text_events(w: &mut World, events: &[egui::Event]) {
                     line.pop();
                 }
             }
-            egui::Event::Key { key: egui::Key::ArrowDown | egui::Key::Enter, pressed: true, .. } => e.line = (e.line + 1).min(2),
+            egui::Event::Key { key: egui::Key::ArrowDown | egui::Key::Enter, pressed: true, .. } => {
+                e.line = (e.line + 1).min(2)
+            }
             egui::Event::Key { key: egui::Key::ArrowUp, pressed: true, .. } => e.line = e.line.saturating_sub(1),
             egui::Event::Key { key: egui::Key::Escape, pressed: true, .. } => {
                 w.sounds.push(Ui::Cancel as u32);
@@ -325,7 +334,10 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             gu.text_fit(&l, x, y, width, WHITE);
         }
     }
-    let list = w.field_fep.as_ref().map(|f| super::fep::draw_list(gu, &f.cands, f.sel, x0 + dx - 8.0, y0 + 2.0 + 16.0 * e.line as f32));
+    let list = w
+        .field_fep
+        .as_ref()
+        .map(|f| super::fep::draw_list(gu, &f.cands, f.sel, x0 + dx - 8.0, y0 + 2.0 + 16.0 * e.line as f32));
     let g = (w.seacom.kind >> 4 & 0xf) as usize;
     if e.mode == 2
         && let Some(&s) = super::search::GENRE.get(g.wrapping_sub(1))

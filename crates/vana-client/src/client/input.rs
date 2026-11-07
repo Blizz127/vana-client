@@ -31,28 +31,80 @@ pub mod mode {
 /// Pad bit each key function's callback 0 tests (PTR_FUN_10361e28; MODLOG "Input layer"): the compact keys' and a
 /// controller's (client/gamepad.rs) slots.
 const PAD: &[(u8, u64)] = &[
-    (0x00, 0x40), (0x27, 0x40), (0x2b, 0x40), (0x31, 0x40),
-    (0x01, 0x80), (0x28, 0x80), (0x2c, 0x80), (0x32, 0x80),
-    (0x02, 0x10), (0x29, 0x10), (0x2d, 0x10), (0x33, 0x10),
-    (0x03, 0x20), (0x2a, 0x20), (0x2e, 0x20), (0x34, 0x20),
-    (0x0d, 1), (0x0e, 1), (0x8f, 1), (0x91, 1), (0x93, 1),
-    (0x0f, 8), (0x90, 8), (0x92, 8), (0x94, 8), (0x95, 8), (0x9c, 8),
-    (0x11, 4), (0x22, 4), (0x78, 4),
-    (0x18, 2), (0x19, 2), (0x25, 2), (0x35, 2), (0x8d, 2),
-    (0x10, 0x4000), (0x7d, 0x4000), (0xa7, 0x4000),
-    (0x12, 0x100), (0x15, 0x100), (0x1c, 0x100), (0x1f, 0x100),
-    (0x13, 0x8000), (0x14, 0x8000),
-    (0x16, 0x200), (0x21, 0x200), (0x86, 0x200), (0x89, 0x200),
-    (0x17, 0x2000), (0x20, 0x2000), (0x85, 0x2000), (0x8a, 0x2000), (0x9a, 0x2000),
-    (0x1a, 0x1000), (0x1e, 0x1000), (0x24, 0x1000),
-    (0x26, 0x10000), (0x2f, 0x10000), (0x56, 0x10000),
-    (0x30, 0x400), (0x44, 0x400), (0x7e, 0x400), (0xa6, 0x400),
+    (0x00, 0x40),
+    (0x27, 0x40),
+    (0x2b, 0x40),
+    (0x31, 0x40),
+    (0x01, 0x80),
+    (0x28, 0x80),
+    (0x2c, 0x80),
+    (0x32, 0x80),
+    (0x02, 0x10),
+    (0x29, 0x10),
+    (0x2d, 0x10),
+    (0x33, 0x10),
+    (0x03, 0x20),
+    (0x2a, 0x20),
+    (0x2e, 0x20),
+    (0x34, 0x20),
+    (0x0d, 1),
+    (0x0e, 1),
+    (0x8f, 1),
+    (0x91, 1),
+    (0x93, 1),
+    (0x0f, 8),
+    (0x90, 8),
+    (0x92, 8),
+    (0x94, 8),
+    (0x95, 8),
+    (0x9c, 8),
+    (0x11, 4),
+    (0x22, 4),
+    (0x78, 4),
+    (0x18, 2),
+    (0x19, 2),
+    (0x25, 2),
+    (0x35, 2),
+    (0x8d, 2),
+    (0x10, 0x4000),
+    (0x7d, 0x4000),
+    (0xa7, 0x4000),
+    (0x12, 0x100),
+    (0x15, 0x100),
+    (0x1c, 0x100),
+    (0x1f, 0x100),
+    (0x13, 0x8000),
+    (0x14, 0x8000),
+    (0x16, 0x200),
+    (0x21, 0x200),
+    (0x86, 0x200),
+    (0x89, 0x200),
+    (0x17, 0x2000),
+    (0x20, 0x2000),
+    (0x85, 0x2000),
+    (0x8a, 0x2000),
+    (0x9a, 0x2000),
+    (0x1a, 0x1000),
+    (0x1e, 0x1000),
+    (0x24, 0x1000),
+    (0x26, 0x10000),
+    (0x2f, 0x10000),
+    (0x56, 0x10000),
+    (0x30, 0x400),
+    (0x44, 0x400),
+    (0x7e, 0x400),
+    (0xa6, 0x400),
     (0x45, 0x2000_0000),
-    (0x4f, 0x800_0000), (0xa4, 0x800_0000),
-    (0x50, 0x1000_0000), (0xa5, 0x1000_0000),
+    (0x4f, 0x800_0000),
+    (0xa4, 0x800_0000),
+    (0x50, 0x1000_0000),
+    (0xa5, 0x1000_0000),
     (0x55, 0x4000_0000),
     // The second word (+0x224, slots 32 / 33 / 35 / 36): pad only (MODLOG "Gamepad").
-    (0xb7, 1 << 32), (0xb8, 1 << 33), (0xb9, 1 << 35), (0xba, 1 << 36),
+    (0xb7, 1 << 32),
+    (0xb8, 1 << 33),
+    (0xb9, 1 << 35),
+    (0xba, 1 << 36),
 ];
 
 /// A compact keyboard record (0x103623c8, 0x10 bytes): key, modifier rule, state mask, pad bits.
@@ -181,7 +233,9 @@ impl Input {
             self.k1.push(r.iter().copied().take_while(|&i| i != 0xff).collect());
             at += 4;
         }
-        self.k2 = va(t.k2, K2_ROWS * 10).map_or(Vec::new(), |b| u16s(b).chunks(5).map(|r| r.iter().copied().take_while(|&i| i != 0xffff).collect()).collect());
+        self.k2 = va(t.k2, K2_ROWS * 10).map_or(Vec::new(), |b| {
+            u16s(b).chunks(5).map(|r| r.iter().copied().take_while(|&i| i != 0xffff).collect()).collect()
+        });
         self.bindings = self.base_bindings.clone();
         self.compact = self.base_compact.clone();
         self.assigned = None;
@@ -338,7 +392,8 @@ impl Input {
 
     fn pad_frame(&mut self, f: &Frame, frames: u32) {
         let prev = self.pad.held;
-        let keys = if matches!(f.keyboard, 1 | 2) && !f.typing && !f.assigning { self.compact_bits(f.window) } else { 0 };
+        let keys =
+            if matches!(f.keyboard, 1 | 2) && !f.typing && !f.assigning { self.compact_bits(f.window) } else { 0 };
         // FUN_10005a40: the device's bits and the compact keys' share the word, its edges and its repeat.
         let held = keys | self.device;
         let mut edge = held & !prev;
@@ -378,14 +433,22 @@ impl Input {
             .filter(|c| c.key != 0 && c.states & states == c.states && self.held(c.key))
             .filter(|c| match (ctrl, alt) {
                 (false, false) => matches!(c.rule, 0 | 7) || (c.rule == 4 && shift) || (c.rule == 8 && !shift),
-                _ => (ctrl && !alt && c.rule == 1) || (alt && !ctrl && c.rule == 2) || c.rule == 7 || (c.rule == 0 && !self.k2_key(c.key)),
+                _ => {
+                    (ctrl && !alt && c.rule == 1)
+                        || (alt && !ctrl && c.rule == 2)
+                        || c.rule == 7
+                        || (c.rule == 0 && !self.k2_key(c.key))
+                }
             })
             .fold(0, |b, c| b | c.bits)
     }
 
     /// FUN_101953b0: the key is some k2 row's (slot 0 of its first id).
     fn k2_key(&self, key: u8) -> bool {
-        self.k2.iter().filter_map(|r| r.first()).any(|&id| self.bindings.get(id as usize).is_some_and(|b| b[0] as u8 == key))
+        self.k2
+            .iter()
+            .filter_map(|r| r.first())
+            .any(|&id| self.bindings.get(id as usize).is_some_and(|b| b[0] as u8 == key))
     }
 
     /// The compact pad's held bits (the stick directions W / A / S / D and I / J / K / L, among others).
@@ -403,7 +466,15 @@ impl Input {
             return 0.0;
         }
         let key = |p: u8, n: u8| self.held(p) as i32 as f32 - self.held(n) as i32 as f32;
-        let stick = |p: u64, n: u64| -> f32 { if self.pad.held & p != 0 { 127.0 / 128.0 } else if self.pad.held & n != 0 { -1.0 } else { 0.0 } };
+        let stick = |p: u64, n: u64| -> f32 {
+            if self.pad.held & p != 0 {
+                127.0 / 128.0
+            } else if self.pad.held & n != 0 {
+                -1.0
+            } else {
+                0.0
+            }
+        };
         // A controller's stick bytes (FUN_10005a40 +0x250..+0x253, client/gamepad.rs) count as the compact stick of
         // the same axis, the larger one winning; not while typing. A window does not stop them: the sticks never drive
         // windows (the d-pad does). The camera's 6 / 7 leave them out: the camera reads them with its own sense
@@ -707,7 +778,9 @@ fn egui_dik(key: egui::Key) -> Option<u8> {
         _ => {
             let n = key.name();
             let letters = b"QWERTYUIOP\0\0\0\0ASDFGHJKL\0\0\0\0\0ZXCVBNM";
-            if n.len() == 1 && let Some(i) = letters.iter().position(|&c| c == n.as_bytes()[0]) {
+            if n.len() == 1
+                && let Some(i) = letters.iter().position(|&c| c == n.as_bytes()[0])
+            {
                 return Some(0x10 + i as u8);
             }
             if n.len() == 1 && n.as_bytes()[0].is_ascii_digit() {
@@ -790,7 +863,10 @@ mod tests {
                 repeats.push(t);
             }
         }
-        assert!((17..=18).contains(&repeats[0]) && repeats.windows(2).all(|w| w[1] - w[0] == 4) && repeats.len() == 4, "{repeats:?}");
+        assert!(
+            (17..=18).contains(&repeats[0]) && repeats.windows(2).all(|w| w[1] - w[0] == 4) && repeats.len() == 4,
+            "{repeats:?}"
+        );
         i.key(KeyCode::NumpadAdd, false, &nl);
         i.begin_frame(frame());
         assert!(!i.test(0x78, mode::HELD));

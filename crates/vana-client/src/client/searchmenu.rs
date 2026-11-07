@@ -54,7 +54,11 @@ pub struct SearchMenu {
 
 /// An equipped linkshell's id (FUN_100e9730 / FUN_10107f40): extdata u32 @0 of the shell at its slot.
 fn ls_id(w: &World, n: usize) -> u32 {
-    w.linkshells.get(n).filter(|l| l.0 != 0).and_then(|&(index, bag)| w.inv.ext.get(&(bag, index))).map_or(0, |e| u32::from_le_bytes([e[0], e[1], e[2], e[3]]))
+    w.linkshells
+        .get(n)
+        .filter(|l| l.0 != 0)
+        .and_then(|&(index, bag)| w.inv.ext.get(&(bag, index)))
+        .map_or(0, |e| u32::from_le_bytes([e[0], e[1], e[2], e[3]]))
 }
 
 /// FUN_10140400 case 8: searchma (SE 0002) in the main menu's place. Disabled: Friend (no POL friend list), Linkshell /
@@ -159,7 +163,11 @@ fn push_mode(w: &mut World, name: &'static str, mode: u8, base: u8) {
     if matches!(name, LEVELS | MLEVELS) {
         let _ = w.net.commands.send(super::net::NetCommand::StatusRequest(0));
         let st = w.stats.as_ref();
-        let v = if name == LEVELS { st.map_or(1, |s| s.main.1) } else { st.filter(|s| s.ml.1 & 1 != 0).map_or(0, |s| s.ml.0) };
+        let v = if name == LEVELS {
+            st.map_or(1, |s| s.main.1)
+        } else {
+            st.filter(|s| s.ml.1 & 1 != 0).map_or(0, |s| s.ml.0)
+        };
         win.vals = (v, v);
     }
     if let Some(m) = w.searchmenu.as_mut() {
@@ -317,7 +325,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
                 _ => 5,
             };
             let to = gu.menu_links(top.name, top.sel).map_or(top.sel, |l| l[k] as u16);
-            if to != top.sel && to != 0 && to != 0xff
+            if to != top.sel
+                && to != 0
+                && to != 0xff
                 && let Some(t) = w.searchmenu.as_mut().and_then(|m| m.stack.last_mut())
             {
                 t.sel = to;
@@ -374,7 +384,11 @@ pub fn text_events(w: &mut World, events: &[egui::Event]) {
 /// The top window takes the keys unless the results window is up over it (scsibori is over the results), arealist is
 /// up, or a prompt.
 pub fn focused(w: &World) -> bool {
-    w.searchmenu.is_some() && (w.search.is_none() || refining(w)) && w.arealist.is_none() && w.seacom_edit.is_none() && w.confirm.is_none()
+    w.searchmenu.is_some()
+        && (w.search.is_none() || refining(w))
+        && w.arealist.is_none()
+        && w.seacom_edit.is_none()
+        && w.confirm.is_none()
 }
 
 /// Mouse: hover moves the cursor, a click on the cursor row is Enter *(inf: the generic child hit test)*.
@@ -384,7 +398,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let Some(e) = lay.elements.iter().skip(1).filter(|e| e.links[2] != 0xff).find(|e| {
         let (ex, ey) = (x + e.x as f32, y + e.y as f32);
         p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-    }) else { return };
+    }) else {
+        return;
+    };
     gu.hover.set(true);
     if e.id != top.sel && (moved || clicked) {
         if let Some(t) = w.searchmenu.as_mut().and_then(|m| m.stack.last_mut()) {
@@ -421,7 +437,14 @@ pub(super) fn views(w: &World) -> Vec<super::modern::MenuWin> {
                 NAMES => vec![(1, w.search_name.clone())],
                 _ => Vec::new(),
             };
-            super::modern::MenuWin { name: win.name, sel: win.sel, off: win.off.clone(), labels: Vec::new(), marked: win.edit.into_iter().collect(), values }
+            super::modern::MenuWin {
+                name: win.name,
+                sel: win.sel,
+                off: win.off.clone(),
+                labels: Vec::new(),
+                marked: win.edit.into_iter().collect(),
+                values,
+            }
         })
         .collect()
 }
@@ -452,7 +475,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 NAMES => {
                     if let Some([cx, cy, ..]) = child(1) {
                         if win.edit.is_some() {
-                            let caret = if (w.started.elapsed().as_secs_f32() * 60.0) as u32 % 30 < 20 { "|" } else { "" };
+                            let caret =
+                                if (w.started.elapsed().as_secs_f32() * 60.0) as u32 % 30 < 20 { "|" } else { "" };
                             gu.text(&format!("{}{caret}", w.search_name), cx + 2.0, cy + 2.0, 0, [0x80; 4]);
                         } else {
                             gu.shape_text(&w.search_name, cx + 2.0, cy + 2.0, 0x8080_8080, false);

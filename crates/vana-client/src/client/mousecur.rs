@@ -27,8 +27,24 @@ const SPRITES: [(&str, u32, f32); 7] = [
 
 /// The Windows cursors at 0x1034fbb0: 0 normal, 1 hit, 2..9 oarw (loaded, never used), 10..17 arw_n..arw_nw.
 const FILES: [&str; 18] = [
-    "mousenor.ani", "mousehit.ani", "oarw_n.ani", "oarw_ne.ani", "oarw_e.ani", "oarw_se.ani", "oarw_s.ani", "oarw_sw.ani", "oarw_w.ani", "oarw_nw.ani",
-    "arw_n.ani", "arw_ne.ani", "arw_e.ani", "arw_se.ani", "arw_s.ani", "arw_sw.ani", "arw_w.ani", "arw_nw.ani",
+    "mousenor.ani",
+    "mousehit.ani",
+    "oarw_n.ani",
+    "oarw_ne.ani",
+    "oarw_e.ani",
+    "oarw_se.ani",
+    "oarw_s.ani",
+    "oarw_sw.ani",
+    "oarw_w.ani",
+    "oarw_nw.ani",
+    "arw_n.ani",
+    "arw_ne.ani",
+    "arw_e.ani",
+    "arw_se.ani",
+    "arw_s.ani",
+    "arw_sw.ani",
+    "arw_w.ani",
+    "arw_nw.ani",
 ];
 
 /// A cursor file as loaded, and whether a mod supplied it.
@@ -83,7 +99,16 @@ impl MouseCursor {
     /// sprite resets the counter).
     /// `size` scales the sprite and `file_size` the pack's images (UI pixels per screen pixel times the setting).
     #[allow(clippy::too_many_arguments)]
-    pub fn draw(&mut self, gu: &mut GameUi, index: Option<&Arc<crate::dat::DatIndex>>, x: f32, y: f32, dt: f32, size: f32, file_size: f32) {
+    pub fn draw(
+        &mut self,
+        gu: &mut GameUi,
+        index: Option<&Arc<crate::dat::DatIndex>>,
+        x: f32,
+        y: f32,
+        dt: f32,
+        size: f32,
+        file_size: f32,
+    ) {
         if !self.visible {
             return;
         }
@@ -144,7 +169,9 @@ impl MouseCursor {
                 .iter()
                 .map(|name| {
                     let path = index?.root_file(name);
-                    let mut cursor = crate::dat::cursor::parse(&std::fs::read(&path).ok()?).map_err(|e| log::warn!("cursor {}: {e:#}", path.display())).ok()?;
+                    let mut cursor = crate::dat::cursor::parse(&std::fs::read(&path).ok()?)
+                        .map_err(|e| log::warn!("cursor {}: {e:#}", path.display()))
+                        .ok()?;
                     cursor.frames.iter_mut().for_each(fix_hotspot);
                     Some(Loaded { cursor, from_mod: path.starts_with(&mods) })
                 })
@@ -154,7 +181,12 @@ impl MouseCursor {
 
     /// The Windows cursor for this frame (FUN_100097f0), the .ani stepping by its jiffies; a missing file is the
     /// system arrow.
-    pub fn apply_hardware(&mut self, window: &Window, event_loop: &winit::event_loop::ActiveEventLoop, index: Option<&Arc<crate::dat::DatIndex>>) {
+    pub fn apply_hardware(
+        &mut self,
+        window: &Window,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        index: Option<&Arc<crate::dat::DatIndex>>,
+    ) {
         if self.hw.is_none() {
             let hw = self
                 .files(index)
@@ -165,7 +197,16 @@ impl MouseCursor {
                         .cursor
                         .frames
                         .iter()
-                        .filter_map(|f| CustomCursor::from_rgba(f.rgba.clone(), f.width as u16, f.height as u16, f.hotspot.0.min(f.width as u16 - 1), f.hotspot.1.min(f.height as u16 - 1)).ok())
+                        .filter_map(|f| {
+                            CustomCursor::from_rgba(
+                                f.rgba.clone(),
+                                f.width as u16,
+                                f.height as u16,
+                                f.hotspot.0.min(f.width as u16 - 1),
+                                f.hotspot.1.min(f.height as u16 - 1),
+                            )
+                            .ok()
+                        })
                         .map(|src| event_loop.create_custom_cursor(src))
                         .collect();
                     (frames.len() == f.cursor.frames.len()).then(|| Hw { frames, steps: f.cursor.steps.clone() })
@@ -239,7 +280,9 @@ mod tests {
     #[test]
     fn drag_arrows() {
         let mut c = super::MouseCursor::default();
-        for (to, idx) in [((0.0, 10.0), 14), ((10.0, 0.0), 12), ((0.0, -10.0), 10), ((-10.0, 0.0), 16), ((0.0, 0.0), 12)] {
+        for (to, idx) in
+            [((0.0, 10.0), 14), ((10.0, 0.0), 12), ((0.0, -10.0), 10), ((-10.0, 0.0), 16), ((0.0, 0.0), 12)]
+        {
             c.camera_drag((0.0, 0.0), to);
             assert_eq!(c.hw_index, idx, "{to:?}");
         }

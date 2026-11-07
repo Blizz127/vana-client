@@ -86,9 +86,18 @@ impl Dictionary {
         if let Some(g) = filter {
             let Some(&i) = self.by_id.get(&g) else { return (Vec::new(), false) };
             let gr = &self.groups[i];
-            return (sorted(gr.phrases.iter().map(|p| (p.1.clone(), p.2.clone(), [GROUP_KIND, LANG_EN, gr.id, p.0])).collect()).into_iter().map(|w| (w.0, w.2)).collect(), false);
+            return (
+                sorted(
+                    gr.phrases.iter().map(|p| (p.1.clone(), p.2.clone(), [GROUP_KIND, LANG_EN, gr.id, p.0])).collect(),
+                )
+                .into_iter()
+                .map(|w| (w.0, w.2))
+                .collect(),
+                false,
+            );
         }
-        let titles = || self.groups.iter().map(|g| (g.title.clone(), [GROUP_KIND, LANG_EN, g.id, 0])).collect::<Vec<_>>();
+        let titles =
+            || self.groups.iter().map(|g| (g.title.clone(), [GROUP_KIND, LANG_EN, g.id, 0])).collect::<Vec<_>>();
         let w = word.to_lowercase();
         if w.is_empty() {
             return (titles(), false);

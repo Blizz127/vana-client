@@ -113,7 +113,20 @@ impl Tracker {
     }
 
     pub fn new(out: bool) -> Self {
-        Self { state: None, book: None, defeat: None, who: String::new(), r: None, out, slide: out as u8 as f32, dirty: false, last: None, frame: None, rect: None, drawer: None }
+        Self {
+            state: None,
+            book: None,
+            defeat: None,
+            who: String::new(),
+            r: None,
+            out,
+            slide: out as u8 as f32,
+            dirty: false,
+            last: None,
+            frame: None,
+            rect: None,
+            drawer: None,
+        }
     }
 
     pub fn toggle(&mut self) {
@@ -245,7 +258,9 @@ fn save(w: &World) {
         return;
     }
     let path = path(w, &w.regime.who);
-    let r = std::fs::create_dir_all(path.parent().unwrap_or(&path)).map_err(anyhow::Error::from).and_then(|_| Ok(std::fs::write(&path, serde_json::to_vec_pretty(&w.regime.state)?)?));
+    let r = std::fs::create_dir_all(path.parent().unwrap_or(&path))
+        .map_err(anyhow::Error::from)
+        .and_then(|_| Ok(std::fs::write(&path, serde_json::to_vec_pretty(&w.regime.state)?)?));
     if let Err(e) = r {
         log::warn!("regime: {}: {e:#}", path.display());
     }
@@ -266,13 +281,17 @@ pub fn on_zone(w: &mut World) {
     w.regime.who = w.name.clone();
     // The server's file; with none yet, the data dir's one when FFXI_CONFIG moved the folder, then the newest by-name
     // file of an earlier build that reads (a kept `null` is a cancel, not a failure). The next save writes the own one.
-    let read = |p: &std::path::PathBuf| std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<Option<Regime>>(&b).ok());
+    let read =
+        |p: &std::path::PathBuf| std::fs::read(p).ok().and_then(|b| serde_json::from_slice::<Option<Regime>>(&b).ok());
     let own = path(w, &w.name);
     let moved = || crate::config::regime_moved_path(&server(w), &w.name).and_then(|p| Some((read(&p)?, p)));
     let kept = match read(&own) {
         Some(r) => Some((r, own)),
         None => moved().or_else(|| {
-            let mut old: Vec<_> = crate::config::regime_legacy_paths(&w.name).into_iter().filter_map(|p| Some((std::fs::metadata(&p).and_then(|m| m.modified()).ok()?, p))).collect();
+            let mut old: Vec<_> = crate::config::regime_legacy_paths(&w.name)
+                .into_iter()
+                .filter_map(|p| Some((std::fs::metadata(&p).and_then(|m| m.modified()).ok()?, p)))
+                .collect();
             old.sort_by(|a, b| b.0.cmp(&a.0));
             old.into_iter().find_map(|(_, p)| Some((read(&p)?, p)))
         }),
@@ -344,7 +363,11 @@ pub fn on_params(w: &mut World, num: [u32; 8]) {
             let id = b.start as u16;
             let Some((d, r)) = zone_block(w) else { return };
             let Some((labels, area)) = page(&d, r, id) else { return };
-            let slots = labels.into_iter().enumerate().map(|(k, label)| Slot { label, needed: num[k] as u8, killed: num[k + 4] as u8, known: true }).collect();
+            let slots = labels
+                .into_iter()
+                .enumerate()
+                .map(|(k, label)| Slot { label, needed: num[k] as u8, killed: num[k + 4] as u8, known: true })
+                .collect();
             let repeat = w.regime.state.as_ref().is_some_and(|s| s.id == id && s.repeat);
             set(w, Some(Regime { id, area, slots, repeat, complete: false }), "Review");
         }
@@ -380,7 +403,11 @@ pub fn on_zone_text(w: &mut World, id: u32, plain: bool, actor: u32) {
                     if let Some(z) = w.zone {
                         w.regime.r = Some((z, id));
                     }
-                    let slots = labels.into_iter().zip(needed).map(|(label, needed)| Slot { label, needed, killed: 0, known: true }).collect();
+                    let slots = labels
+                        .into_iter()
+                        .zip(needed)
+                        .map(|(label, needed)| Slot { label, needed, killed: 0, known: true })
+                        .collect();
                     set(w, Some(Regime { id: rid as u16, area, slots, repeat, complete: false }), "accepted");
                 }
                 None => log::info!("regime: text {id} after an accept is not the block's (a refusal?)"),
@@ -396,7 +423,9 @@ pub fn matches(label: &str, name: &str) -> bool {
         return true;
     }
     let word = label.strip_suffix(" family").or_else(|| label.strip_suffix("-type"));
-    word.is_some_and(|f| name.split(|c: char| !c.is_alphanumeric()).any(|w| w.to_lowercase().starts_with(&f.to_lowercase())))
+    word.is_some_and(|f| {
+        name.split(|c: char| !c.is_alphanumeric()).any(|w| w.to_lowercase().starts_with(&f.to_lowercase()))
+    })
 }
 
 fn kind_slot(label: &str) -> bool {
@@ -428,7 +457,9 @@ pub fn attribute(slots: &[Slot], k: u8, n: u8, name: Option<&str>) -> Option<usi
         // Counts that fit exactly before guesses.
         return c.iter().copied().find(|&i| slots[i].needed == n && slots[i].known).or(Some(c[0]));
     }
-    (0..slots.len()).filter(|&i| slots[i].needed == n && slots[i].killed < n).min_by_key(|&i| (k as i32 - 1 - slots[i].killed as i32).abs())
+    (0..slots.len())
+        .filter(|&i| slots[i].needed == n && slots[i].killed < n)
+        .min_by_key(|&i| (k as i32 - 1 - slots[i].killed as i32).abs())
 }
 
 /// s2c 0x029 / 0x02D.
@@ -454,7 +485,10 @@ pub fn on_battle(w: &mut World, m: &BattleMessage) {
                 Some(i) => i,
                 // Kills alone: a row per monster, up to the page's four.
                 None if st.id == 0 && st.slots.len() < 4 => {
-                    st.slots.push(Slot { label: name.clone().unwrap_or_else(|| format!("Target {}", st.slots.len() + 1)), ..Default::default() });
+                    st.slots.push(Slot {
+                        label: name.clone().unwrap_or_else(|| format!("Target {}", st.slots.len() + 1)),
+                        ..Default::default()
+                    });
                     st.slots.len() - 1
                 }
                 None => {
@@ -543,7 +577,11 @@ pub fn draw_panel(gu: &mut GameUi, r: &Regime, p: &Place, slide: f32, sw: f32) -
         Dock::Left => gu.sprite("menu    frames", if inward { 26 } else { 25 }, x + WIDTH - 20.0, y + 6.0, N),
         Dock::Right => gu.sprite("menu    frames", if inward { 25 } else { 26 }, x + 4.0, y + 6.0, N),
         Dock::Top => {
-            let (m, dx, dy, ay) = if inward { ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0, y + h - 18.0) } else { ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0, y + 4.0) };
+            let (m, dx, dy, ay) = if inward {
+                ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0, y + h - 18.0)
+            } else {
+                ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0, y + 4.0)
+            };
             gu.sprite_affine("menu    frames", 25, x + WIDTH - 18.0 + dx, ay + dy, m, N);
             true
         }
@@ -554,7 +592,11 @@ pub fn draw_panel(gu: &mut GameUi, r: &Regime, p: &Place, slide: f32, sw: f32) -
         Dock::Top if inward => [x, y + h - SLIVER, WIDTH, SLIVER],
         Dock::Top => [x + WIDTH - 24.0, y, 24.0, 24.0],
     };
-    let rect = if p.dock == Dock::Top && y < TOP_EDGE { [x, TOP_EDGE, WIDTH, (y + h - TOP_EDGE).max(0.0)] } else { [x, y, WIDTH, h] };
+    let rect = if p.dock == Dock::Top && y < TOP_EDGE {
+        [x, TOP_EDGE, WIDTH, (y + h - TOP_EDGE).max(0.0)]
+    } else {
+        [x, y, WIDTH, h]
+    };
     if slide <= 0.0 {
         gu.clip(None);
         return Some((rect, drawer));
@@ -572,7 +614,16 @@ pub fn draw_panel(gu: &mut GameUi, r: &Regime, p: &Place, slide: f32, sw: f32) -
         gu.shape_text(&format!("{k}/{n}"), right, ly + 13.0, tint, true);
         let gy = ly + 14.0;
         if let Some(f) = f.filter(|f| *f > 0.0) {
-            gu.sprite_coloured("menu    windowps", 97, rx + 4.0, gy + 1.0, f.min(1.0), 1.0, if done { [0x40, 0x40, 0x40, 0xa9] } else { [0x20, 0x70, 0x80, 0xa9] }, 8);
+            gu.sprite_coloured(
+                "menu    windowps",
+                97,
+                rx + 4.0,
+                gy + 1.0,
+                f.min(1.0),
+                1.0,
+                if done { [0x40, 0x40, 0x40, 0xa9] } else { [0x20, 0x70, 0x80, 0xa9] },
+                8,
+            );
         }
         gu.sprite("menu    windowps", 38, rx, gy, if f.is_some_and(|f| f > 0.0) { N } else { 0x3050_5050 });
         ly += ROW_H;
@@ -608,7 +659,13 @@ pub fn draw(gu: &mut GameUi, t: &mut Tracker, sw: f32) {
 
 /// After every window: a click on the drawer's arrow, unless a window over ours has the spot. The window's rect for
 /// the world-click blockers.
-pub fn pointer(w: &mut World, gu: &GameUi, p: Option<(f32, f32)>, clicked: bool, over: &[[f32; 4]]) -> Option<[f32; 4]> {
+pub fn pointer(
+    w: &mut World,
+    gu: &GameUi,
+    p: Option<(f32, f32)>,
+    clicked: bool,
+    over: &[[f32; 4]],
+) -> Option<[f32; 4]> {
     let r = w.regime.rect?;
     let Some(p) = p else { return Some(r) };
     let inside = |r: &[f32; 4]| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];
@@ -631,7 +688,10 @@ pub fn shot(gu: &mut GameUi, spec: &str, sw: f32, sh: f32, mini: Option<[f32; 4]
     let r = Regime {
         id: 704,
         area: "Garlaige Citadel".into(),
-        slots: vec![Slot { label: "Siege Bat".into(), needed: 4, killed: 3, known: true }, Slot { label: "Borer Beetle".into(), needed: 2, killed: 2, known: true }],
+        slots: vec![
+            Slot { label: "Siege Bat".into(), needed: 4, killed: 3, known: true },
+            Slot { label: "Borer Beetle".into(), needed: 2, killed: 2, known: true },
+        ],
         repeat: false,
         complete: false,
     };
@@ -684,7 +744,11 @@ mod tests {
         // Counts unknown (a book's page, no kills yet): the name decides.
         let s = [slot("Siege Bat", 0, 0, false), slot("Borer Beetle", 0, 0, false)];
         assert_eq!(attribute(&s, 3, 4, Some("Borer Beetle")), Some(1));
-        assert!(matches("Bat family", "Seeker Bats") && matches("Siege Bat", "siege bat") && !matches("Siege Bat", "Siege Bats"));
+        assert!(
+            matches("Bat family", "Seeker Bats")
+                && matches("Siege Bat", "siege bat")
+                && !matches("Siege Bat", "Siege Bats")
+        );
     }
 
     #[test]

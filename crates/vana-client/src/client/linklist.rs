@@ -46,7 +46,18 @@ pub fn open(w: &mut World, n: u8, group: u32, rank: u8) {
     log::info!("link list: linkshell {n} group {group:#x}");
     let rx = crate::net::search::spawn(w.search_addr, Cond::group(ids));
     w.searches.push((rx, super::search::Then::LinkList));
-    w.linklist = Some(LinkList { n, group, rank, busy: true, failed: false, rows: Vec::new(), top: 0, cursor: 0, alt: false, acts: None });
+    w.linklist = Some(LinkList {
+        n,
+        group,
+        rank,
+        busy: true,
+        failed: false,
+        rows: Vec::new(),
+        top: 0,
+        cursor: 0,
+        alt: false,
+        acts: None,
+    });
 }
 
 /// LAB_1020ac30's rows: only records carrying our group id among their three linkshells (FUN_101e4e50).
@@ -89,7 +100,9 @@ fn off(w: &World, l: &LinkList, name: &str, r: &Record, theirs: u8) -> Vec<u16> 
     if matches!(name, PEARL_ACTS | SACK_ACTS) && (l.n != 1 || r.ls_ids[0] != l.group) {
         off.push(2);
     }
-    if matches!(name, PEARL_ACTS | SACK_ACTS | SACK_SELF) && (l.n != 1 || theirs == 1 || theirs == l.rank || r.id == w.my_id) {
+    if matches!(name, PEARL_ACTS | SACK_ACTS | SACK_SELF)
+        && (l.n != 1 || theirs == 1 || theirs == l.rank || r.id == w.my_id)
+    {
         off.push(kick);
     }
     off
@@ -139,7 +152,10 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
                     // To Sack (ChangeKind 2) / To Pearl (3): c2s 0x077 {name, kind 1, change}.
                     _ => {
                         let change = if name == PEARL_ACTS { 2 } else { 3 };
-                        let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x077, body: super::party::change_body(&r.name, 1, change) });
+                        let _ = w.net.commands.send(super::net::NetCommand::Packet {
+                            id: 0x077,
+                            body: super::party::change_body(&r.name, 1, change),
+                        });
                     }
                 }
                 // Every action closes link12 (FUN_1015e910), back to link5.
@@ -153,8 +169,14 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
     match key {
         K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight if n > 0 => {
             let step = if matches!(key, K::ArrowUp | K::ArrowDown) { 1 } else { ROWS };
-            let to = if matches!(key, K::ArrowDown | K::ArrowRight) { (cursor + step).min(n - 1) } else { cursor.saturating_sub(step) };
-            if to != cursor && let Some(l) = w.linklist.as_mut() {
+            let to = if matches!(key, K::ArrowDown | K::ArrowRight) {
+                (cursor + step).min(n - 1)
+            } else {
+                cursor.saturating_sub(step)
+            };
+            if to != cursor
+                && let Some(l) = w.linklist.as_mut()
+            {
                 l.cursor = to;
                 l.top = l.top.min(to).max((to + 1).saturating_sub(ROWS));
                 w.sounds.push(Ui::Cursor as u32);
@@ -192,19 +214,43 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
     let Some(l) = w.linklist.as_ref().filter(|_| !w.modern) else { return };
     let keys = |w: &mut World, gu: &GameUi, k: egui::Key| key(w, gu, k);
     if let Some((name, sel)) = l.acts {
-        generic(w, gu, name, sel, 1..=4, p, moved, clicked, right, |w, id| {
-            if let Some(l) = w.linklist.as_mut() {
-                l.acts = Some((name, id));
-            }
-        }, keys);
+        generic(
+            w,
+            gu,
+            name,
+            sel,
+            1..=4,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(l) = w.linklist.as_mut() {
+                    l.acts = Some((name, id));
+                }
+            },
+            keys,
+        );
         return;
     }
     let (top, cursor) = (l.top, l.cursor);
-    generic(w, gu, LIST, (cursor.saturating_sub(top) + 1) as u16, 1..=ROWS as u16, p, moved, clicked, right, |w, id| {
-        if let Some(l) = w.linklist.as_mut() {
-            l.cursor = top + id as usize - 1;
-        }
-    }, keys);
+    generic(
+        w,
+        gu,
+        LIST,
+        (cursor.saturating_sub(top) + 1) as u16,
+        1..=ROWS as u16,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(l) = w.linklist.as_mut() {
+                l.cursor = top + id as usize - 1;
+            }
+        },
+        keys,
+    );
 }
 
 /// The modern layer's view: the members with their shell item (0x201 holder, 0x202 pearlsack, 0x203 pearl), the
@@ -229,21 +275,50 @@ pub fn view(w: &World, gu: &GameUi) -> Option<View> {
     } else {
         None
     };
-    let rows = l.rows.iter().map(|(r, rank)| (r.clone(), match rank {
-        2 => 0x202,
-        3 => 0x203,
-        _ => 0x201,
-    })).collect();
+    let rows = l
+        .rows
+        .iter()
+        .map(|(r, rank)| {
+            (
+                r.clone(),
+                match rank {
+                    2 => 0x202,
+                    3 => 0x203,
+                    _ => 0x201,
+                },
+            )
+        })
+        .collect();
     let (acts, act_sel) = match (l.acts, l.rows.get(l.cursor)) {
         (Some((name, sel)), Some((r, theirs))) => {
             let off = off(w, l, name, r, *theirs);
-            let kids: Vec<u16> = gu.layout(name).map(|lay| lay.elements.iter().skip(1).filter(|e| e.links[2] != 0xff).map(|e| e.id).collect()).unwrap_or_default();
-            let acts = kids.into_iter().map(|c| (c, gu.child_caption(name, c).or_else(|| gu.focus_text(name, c)[1].clone()).unwrap_or_default(), !off.contains(&c))).collect();
+            let kids: Vec<u16> = gu
+                .layout(name)
+                .map(|lay| lay.elements.iter().skip(1).filter(|e| e.links[2] != 0xff).map(|e| e.id).collect())
+                .unwrap_or_default();
+            let acts = kids
+                .into_iter()
+                .map(|c| {
+                    (
+                        c,
+                        gu.child_caption(name, c).or_else(|| gu.focus_text(name, c)[1].clone()).unwrap_or_default(),
+                        !off.contains(&c),
+                    )
+                })
+                .collect();
             (acts, Some(sel))
         }
         _ => (Vec::new(), None),
     };
-    Some(View { rows, cursor: l.cursor, focused: l.acts.is_none() && w.confirm.is_none(), alt: l.alt, empty, acts, act_sel })
+    Some(View {
+        rows,
+        cursor: l.cursor,
+        focused: l.acts.is_none() && w.confirm.is_none(),
+        alt: l.alt,
+        empty,
+        acts,
+        act_sel,
+    })
 }
 
 /// The modern layer's mouse: the list's cursor to row `k`; true when it moved.
@@ -308,7 +383,8 @@ pub fn kick_text(w: &World, k: &Kick) -> String {
 
 /// LAB_101e66a0: c2s 0x071 {0, 0, kind 1, name}; link12 closes.
 pub fn kick(w: &mut World, k: &Kick) {
-    let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x071, body: super::party::kick_body(1, &k.name()) });
+    let _ =
+        w.net.commands.send(super::net::NetCommand::Packet { id: 0x071, body: super::party::kick_body(1, &k.name()) });
     close(w);
 }
 
@@ -342,7 +418,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     // The rows are drawn by code: 18 apart from (3, 3).
     if let Some(frame) = gu.window_rect(LIST, sw, sh) {
-        let rows = (0..n.saturating_sub(l.top).min(ROWS)).map(|k| (k as u16 + 1, [wx + 3.0, wy + 3.0 + PITCH * k as f32, frame[2] - 14.0, PITCH])).collect();
+        let rows = (0..n.saturating_sub(l.top).min(ROWS))
+            .map(|k| (k as u16 + 1, [wx + 3.0, wy + 3.0 + PITCH * k as f32, frame[2] - 14.0, PITCH]))
+            .collect();
         super::winhits::record_rects(w, LIST, frame, rows);
     }
     for (i, (r, rank)) in l.rows.iter().enumerate().skip(l.top).take(ROWS) {
@@ -390,7 +468,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         && let Some((r, theirs)) = l.rows.get(l.cursor)
     {
         let off = off(w, l, name, r, *theirs);
-        if let Some(win) = gu.lobby_window_off(name, sw, sh, (0.0, 0.0), Some(sel), w.confirm.is_none() && !off.contains(&sel), &off) {
+        if let Some(win) =
+            gu.lobby_window_off(name, sw, sh, (0.0, 0.0), Some(sel), w.confirm.is_none() && !off.contains(&sel), &off)
+        {
             super::winhits::record(w, name, &win);
             gu.disabled_children(name, win.frame[0], win.frame[1], &off, Some(sel));
             rects.push(win.frame);

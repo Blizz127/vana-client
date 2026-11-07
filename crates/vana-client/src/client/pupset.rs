@@ -146,12 +146,23 @@ fn rows(w: &World, s: &Screen) -> Vec<Row> {
     let mut out = Vec::new();
     for kind in [0u16, 1] {
         if matches!((s.mode, kind), (Mode::All, _) | (Mode::Heads, 0) | (Mode::Frames, 1)) {
-            out.extend((1..0x100).filter(|&n| owned(w, s.side, 1, n) && rec(w, 0x2000 + n).is_some_and(|r| r.0 == kind)).map(|n| Row::Item(0x2000 + n)));
+            out.extend(
+                (1..0x100)
+                    .filter(|&n| owned(w, s.side, 1, n) && rec(w, 0x2000 + n).is_some_and(|r| r.0 == kind))
+                    .map(|n| Row::Item(0x2000 + n)),
+            );
         }
     }
     if matches!(s.mode, Mode::All | Mode::Attachments) {
         out.extend([Row::Element, Row::RemoveAll]);
-        out.extend((1..0x100).filter(|&n| owned(w, s.side, 2, n) && rec(w, 0x2100 + n).is_some_and(|r| r.0 >= 2 && (s.filter == 0 || r.0 == s.filter))).map(|n| Row::Item(0x2100 + n)));
+        out.extend(
+            (1..0x100)
+                .filter(|&n| {
+                    owned(w, s.side, 2, n)
+                        && rec(w, 0x2100 + n).is_some_and(|r| r.0 >= 2 && (s.filter == 0 || r.0 == s.filter))
+                })
+                .map(|n| Row::Item(0x2100 + n)),
+        );
     }
     out
 }
@@ -185,19 +196,38 @@ fn tint(w: &World, s: &Screen, id: u16) -> u32 {
 /// FUN_101cc400: our pet is the automaton (its shown name is the block's).
 fn activated(w: &World, side: usize) -> bool {
     let name = auto_name(&w.ext_job[side]);
-    w.my_pet != 0 && w.entities.values().any(|e| e.index == w.my_pet && !name.is_empty() && super::monstrosity::name(e) == name)
+    w.my_pet != 0
+        && w.entities.values().any(|e| e.index == w.my_pet && !name.is_empty() && super::monstrosity::name(e) == name)
 }
 
 /// pupequip row 2 (FUN_10207670): 0x119 seen and PUP main or sub, else group 7 0x57. automato opens last with the
 /// cursor it last had.
 pub fn open(w: &mut World) {
-    let side = w.stats.as_ref().and_then(|st| if st.main.0 == 0x12 { Some(0) } else if st.sub.0 == 0x12 { Some(1) } else { None });
+    let side = w.stats.as_ref().and_then(|st| {
+        if st.main.0 == 0x12 {
+            Some(0)
+        } else if st.sub.0 == 0x12 {
+            Some(1)
+        } else {
+            None
+        }
+    });
     let Some(side) = side.filter(|_| w.recasts_seen) else {
         super::textcmd::refuse(w, 0x57);
         return;
     };
     let grid = Some(w.cursor_recall(AUTO)).filter(|c| (1..=14).contains(c)).unwrap_or(1);
-    w.pupset = Some(Screen { side, focus: Focus::Grid, grid, list: (0, 0), slot_pick: None, pick: None, mode: Mode::All, filter: 0, sibo: None });
+    w.pupset = Some(Screen {
+        side,
+        focus: Focus::Grid,
+        grid,
+        list: (0, 0),
+        slot_pick: None,
+        pick: None,
+        mode: Mode::All,
+        filter: 0,
+        sibo: None,
+    });
 }
 
 /// The cursors kept by the windows (FUN_10118830): automato's, pupsibor's while open.
@@ -210,12 +240,28 @@ pub(super) fn kept(s: &Screen) -> Vec<(&'static str, u16)> {
 /// A slot set or emptied without the window (a Lua mod's): 0 head, 1 frame, 2..13 attachments; `item` the head /
 /// frame / attachment item id, 0 to empty.
 pub(super) fn set_slot(w: &mut World, i: usize, item: u16) -> Result<(), &'static str> {
-    let side = w.stats.as_ref().and_then(|st| if st.main.0 == 0x12 { Some(0) } else if st.sub.0 == 0x12 { Some(1) } else { None }).ok_or("not a puppetmaster")?;
+    let side = w
+        .stats
+        .as_ref()
+        .and_then(|st| {
+            if st.main.0 == 0x12 {
+                Some(0)
+            } else if st.sub.0 == 0x12 {
+                Some(1)
+            } else {
+                None
+            }
+        })
+        .ok_or("not a puppetmaster")?;
     if i > 13 {
         return Err("slot 0..13");
     }
     let base = if i < 2 { 0x2000 } else { 0x2100 };
-    let v = if item == 0 { 0 } else { item.checked_sub(base).filter(|&x| x > 0 && x < 0x100).ok_or("not an item for that slot")? as u8 };
+    let v = if item == 0 {
+        0
+    } else {
+        item.checked_sub(base).filter(|&x| x > 0 && x < 0x100).ok_or("not an item for that slot")? as u8
+    };
     send(w, side, i, v);
     Ok(())
 }
@@ -318,7 +364,13 @@ fn keys(w: &mut World, gu: &GameUi, s: &mut Screen, key: egui::Key) -> bool {
     if let Some(r) = s.sibo {
         match key {
             K::ArrowDown | K::ArrowUp => {
-                s.sibo = Some(if key == K::ArrowDown { r % 8 + 1 } else if r <= 1 { 8 } else { r - 1 });
+                s.sibo = Some(if key == K::ArrowDown {
+                    r % 8 + 1
+                } else if r <= 1 {
+                    8
+                } else {
+                    r - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             K::Enter => {
@@ -517,7 +569,8 @@ fn hit(gu: &GameUi, sw: f32, sh: f32, p: (f32, f32)) -> Option<Hit> {
     let inside = |r: [f32; 4]| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];
     if let Some((x, y)) = gu.window_xy(AUTO, sw, sh)
         && let Some(m) = gu.layout(AUTO)
-        && let Some(e) = m.elements.iter().skip(1).find(|e| inside([x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32]))
+        && let Some(e) =
+            m.elements.iter().skip(1).find(|e| inside([x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32]))
     {
         return Some(Hit::Grid(e.id));
     }
@@ -563,7 +616,9 @@ fn set_cursor(w: &mut World, h: Hit, moved: bool, clicked: bool, gu: &GameUi) {
     let Some(s) = w.pupset.as_mut() else { return };
     match h {
         // Not off a held head / frame, nor onto them with an attachment picked.
-        Hit::Grid(c) if !matches!(s.pick.map(|p| p.1), Some(0 | 1)) && !(s.pick.is_some() && matches!(c, 1 | 5)) => s.grid = c,
+        Hit::Grid(c) if !matches!(s.pick.map(|p| p.1), Some(0 | 1)) && !(s.pick.is_some() && matches!(c, 1 | 5)) => {
+            s.grid = c
+        }
         Hit::List(k) if s.list.1 + k < n => s.list.0 = s.list.1 + k,
         _ => return,
     }
@@ -609,7 +664,11 @@ fn help_text(w: &World, id: u16) -> Option<(String, Vec<usize>, String)> {
     if let Some(c) = name.first_mut() {
         *c = c.to_ascii_uppercase();
     }
-    let costs = if it.resource >= 2 { (0..8).flat_map(|e| std::iter::repeat_n(e, nibble(it.jobs, e) as usize)).collect() } else { Vec::new() };
+    let costs = if it.resource >= 2 {
+        (0..8).flat_map(|e| std::iter::repeat_n(e, nibble(it.jobs, e) as usize)).collect()
+    } else {
+        Vec::new()
+    };
     Some((name.into_iter().collect(), costs, it.description.clone()))
 }
 
@@ -692,7 +751,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     rects.extend(draw_status(gu, w, sw, sh));
     let items: Vec<(usize, u16)> = (0..14).filter_map(|i| slot_item(i, slot(w, s.side, i)).map(|id| (i, id))).collect();
     let list = rows(w, s);
-    super::items::upload_icons(gu, &info, items.iter().map(|v| v.1).chain(list.iter().skip(s.list.1).take(VISIBLE).filter_map(|r| if let Row::Item(id) = r { Some(*id) } else { None })));
+    super::items::upload_icons(
+        gu,
+        &info,
+        items.iter().map(|v| v.1).chain(
+            list.iter()
+                .skip(s.list.1)
+                .take(VISIBLE)
+                .filter_map(|r| if let Row::Item(id) = r { Some(*id) } else { None }),
+        ),
+    );
     // automato: the cells, the items' icons (the cursor's (-1, -1) while focused), the element counts beside the
     // frame's orbs (red over capacity).
     // The cursor box (anc_equi, as the Equipment grid's) while focused, and on the picked slot *(inf: the unfocused
@@ -716,9 +784,7 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             gu.shape_text(&format!("{}/", used[e]), ex, ey, c, true);
             gu.shape_text(&cap[e].to_string(), ex, ey, c, false);
         }
-        if lit
-            && let Some((wx, wy)) = gu.window_xy(AUTO, sw, sh)
-        {
+        if lit && let Some((wx, wy)) = gu.window_xy(AUTO, sw, sh) {
             let frame = gu.cursor_frame();
             let (b, ui, _, _) = gu.parts();
             if let Some(m) = ui.menu(AUTO) {
@@ -736,7 +802,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                     gu.sprite("menu    framesus", 129, ox, y + 2.0, WHITE);
                 }
                 Row::RemoveAll => {
-                    gu.text(&w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(), ox + 18.0, y + 2.0, 0, REMOVE_ALL.to_le_bytes());
+                    gu.text(
+                        &w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(),
+                        ox + 18.0,
+                        y + 2.0,
+                        0,
+                        REMOVE_ALL.to_le_bytes(),
+                    );
                 }
                 Row::Item(id) => {
                     let icon = crate::render::invwin::icon_texture(id);
@@ -749,7 +821,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
         gu.scroll_bar(frame[0] + frame[2] - 8.0, frame[1], frame[3], list.len(), VISIBLE, s.list.1);
         if s.focus == Focus::List {
-            gu.bar_site(super::scrollbar::Owner::PupSet, frame[0] + frame[2] - 8.0, frame[1], frame[3], list.len(), VISIBLE, s.list.1);
+            gu.bar_site(
+                super::scrollbar::Owner::PupSet,
+                frame[0] + frame[2] - 8.0,
+                frame[1],
+                frame[3],
+                list.len(),
+                VISIBLE,
+                s.list.1,
+            );
         }
         rects.push(frame);
     }
@@ -805,7 +885,9 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
     let list = rows(w, s)
         .iter()
         .map(|r| match *r {
-            Row::Element => (gu.sprite_caption("menu    framesus", 129).unwrap_or_else(|| "Element".into()), None, WHITE),
+            Row::Element => {
+                (gu.sprite_caption("menu    framesus", 129).unwrap_or_else(|| "Element".into()), None, WHITE)
+            }
             Row::RemoveAll => (w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(), None, REMOVE_ALL),
             Row::Item(id) => (item_name(w, id), Some(id), tint(w, s, id)),
         })
@@ -850,13 +932,23 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
 /// focus first (as Num+). True when the cursor moved.
 /// Type-to-search (modern/search.rs) in the owned parts: while either list has the keys and no slot waits for a part.
 pub(super) fn search_open(w: &World) -> bool {
-    w.confirm.is_none() && w.pupset.as_ref().is_some_and(|s| s.sibo.is_none() && (s.focus != Focus::Grid || s.slot_pick.is_none()))
+    w.confirm.is_none()
+        && w.pupset.as_ref().is_some_and(|s| s.sibo.is_none() && (s.focus != Focus::Grid || s.slot_pick.is_none()))
 }
 
 /// The parts ("Element" and "(Remove All)" have none, so they never match).
 pub(super) fn search_rows(w: &World) -> Vec<super::listsearch::Entry> {
     let Some(s) = w.pupset.as_ref() else { return Vec::new() };
-    rows(w, s).into_iter().map(|r| if let Row::Item(id) = r { super::listsearch::Entry::item(w, id) } else { super::listsearch::Entry::default() }).collect()
+    rows(w, s)
+        .into_iter()
+        .map(|r| {
+            if let Row::Item(id) = r {
+                super::listsearch::Entry::item(w, id)
+            } else {
+                super::listsearch::Entry::default()
+            }
+        })
+        .collect()
 }
 
 /// A pick: the parts list's cursor onto row `k`, then Enter.
@@ -892,7 +984,9 @@ pub(super) fn set_row(w: &mut World, grid: bool, k: usize) -> bool {
 }
 
 pub(super) fn set_sibo(w: &mut World, r: u16) -> bool {
-    let Some(cur) = w.pupset.as_mut().and_then(|s| s.sibo.as_mut()).filter(|c| **c != r && (1..=8).contains(&r)) else { return false };
+    let Some(cur) = w.pupset.as_mut().and_then(|s| s.sibo.as_mut()).filter(|c| **c != r && (1..=8).contains(&r)) else {
+        return false;
+    };
     *cur = r;
     true
 }

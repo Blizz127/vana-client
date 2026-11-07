@@ -265,7 +265,13 @@ struct Row {
 
 impl From<&SRow> for Row {
     fn from(r: &SRow) -> Self {
-        Row { label: r.label.into(), help: r.help.into(), val: r.val, choices: r.choices.iter().map(|c| (c.0, c.1.to_string())).collect(), when: r.when }
+        Row {
+            label: r.label.into(),
+            help: r.help.into(),
+            val: r.val,
+            choices: r.choices.iter().map(|c| (c.0, c.1.to_string())).collect(),
+            when: r.when,
+        }
     }
 }
 
@@ -288,13 +294,42 @@ pub struct ModRow {
 }
 
 const OFF_ON: &[(u32, &str)] = &[(1, "ON"), (0, "OFF")];
-const MODERN_SCALES: &[(u32, &str)] = &[(50, "50%"), (55, "55%"), (60, "60%"), (65, "65%"), (70, "70%"), (75, "75%"), (80, "80%"), (85, "85%"), (90, "90%"), (95, "95%"), (100, "100%"), (105, "105%"), (110, "110%"), (115, "115%"), (120, "120%"), (125, "125%"), (130, "130%"), (135, "135%"), (140, "140%"), (145, "145%"), (150, "150%")];
+const MODERN_SCALES: &[(u32, &str)] = &[
+    (50, "50%"),
+    (55, "55%"),
+    (60, "60%"),
+    (65, "65%"),
+    (70, "70%"),
+    (75, "75%"),
+    (80, "80%"),
+    (85, "85%"),
+    (90, "90%"),
+    (95, "95%"),
+    (100, "100%"),
+    (105, "105%"),
+    (110, "110%"),
+    (115, "115%"),
+    (120, "120%"),
+    (125, "125%"),
+    (130, "130%"),
+    (135, "135%"),
+    (140, "140%"),
+    (145, "145%"),
+    (150, "150%"),
+];
 
-const fn row(label: &'static str, help: &'static str, val: Val, choices: &'static [(u32, &'static str)], when: When) -> SRow {
+const fn row(
+    label: &'static str,
+    help: &'static str,
+    val: Val,
+    choices: &'static [(u32, &'static str)],
+    when: When,
+) -> SRow {
     SRow { label, help, val, choices, when }
 }
 
-const TABS: [&str; 10] = ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Controls", "Graphics", "Mods"];
+const TABS: [&str; 10] =
+    ["General", "Screen", "Textures", "Effects", "Sound", "Misc.", "Client", "Controls", "Graphics", "Mods"];
 /// The Mods page (client/modsui.rs): its rows come from the mods folder, not a table.
 const MODS: usize = 9;
 const EXTRA_TABS: [&str; 4] = ["Maps", "Timers", "Battle", "Misc."];
@@ -305,84 +340,370 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     use Val::*;
     use When::*;
     const GENERAL: &[SRow] = &[
-        row("Window Mode", "Full screen, a window, or a borderless window at your chosen size or the size of your desktop.", Tool("0034"), &[(0, "Full Screen"), (1, "Windowed"), (2, "Borderless"), (3, "Desktop")], Now),
-        row("MIP Mapping", "Uses smaller copies of textures on things far away, which stops distant ground and walls from shimmering.", Tool("0000"), OFF_ON, NextZone),
-        row("Gamma Base", "Overall brightness. The Gameplay page's red, green and blue brightness sliders are added on top.", Gamma, &[], Now),
+        row(
+            "Window Mode",
+            "Full screen, a window, or a borderless window at your chosen size or the size of your desktop.",
+            Tool("0034"),
+            &[(0, "Full Screen"), (1, "Windowed"), (2, "Borderless"), (3, "Desktop")],
+            Now,
+        ),
+        row(
+            "MIP Mapping",
+            "Uses smaller copies of textures on things far away, which stops distant ground and walls from shimmering.",
+            Tool("0000"),
+            OFF_ON,
+            NextZone,
+        ),
+        row(
+            "Gamma Base",
+            "Overall brightness. The Gameplay page's red, green and blue brightness sliders are added on top.",
+            Gamma,
+            &[],
+            Now,
+        ),
     ];
     const SCREEN: &[SRow] = &[
         row("Resolution", "The size of the game window.", Size("0001", "0002", Sizes::Window), &[], Now),
         row("Monitor", "Which monitor the game opens on (not retail).", Monitor, &[], Now),
-        row("GPU", "Which graphics card draws the game. Default picks the faster one in laptops with two (not retail).", Gpu, &[], Restart),
-        row("Background", "How sharp the 3D world is drawn. Set it higher than the window for a sharper picture at a cost in speed, or lower for speed.", Size("0003", "0004", Sizes::Background), &[], Now),
-        row("Menu Size", "The size menus and text are drawn at before they are stretched to the window. Smaller numbers make menus bigger.", Size("0037", "0038", Sizes::Ui), &[], Now),
-        row("3D Aspect", "Window keeps the 3D world in proportion to the window. Config uses the shape set in the game's config tool, as retail does.", RetailAspect, &[(0, "Window"), (1, "Config")], Now),
-        row("Draw Distance", "How far away scenery, characters and effects still appear. Retail is the game's distance, the others reach farther (not retail).", DrawDistance, &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")], Now),
+        row(
+            "GPU",
+            "Which graphics card draws the game. Default picks the faster one in laptops with two (not retail).",
+            Gpu,
+            &[],
+            Restart,
+        ),
+        row(
+            "Background",
+            "How sharp the 3D world is drawn. Set it higher than the window for a sharper picture at a cost in speed, or lower for speed.",
+            Size("0003", "0004", Sizes::Background),
+            &[],
+            Now,
+        ),
+        row(
+            "Menu Size",
+            "The size menus and text are drawn at before they are stretched to the window. Smaller numbers make menus bigger.",
+            Size("0037", "0038", Sizes::Ui),
+            &[],
+            Now,
+        ),
+        row(
+            "3D Aspect",
+            "Window keeps the 3D world in proportion to the window. Config uses the shape set in the game's config tool, as retail does.",
+            RetailAspect,
+            &[(0, "Window"), (1, "Config")],
+            Now,
+        ),
+        row(
+            "Draw Distance",
+            "How far away scenery, characters and effects still appear. Retail is the game's distance, the others reach farther (not retail).",
+            DrawDistance,
+            &[(100, "Retail"), (150, "1.5x"), (200, "2x"), (300, "3x"), (0, "Unlimited")],
+            Now,
+        ),
     ];
     const TEXTURES: &[SRow] = &[
-        row("Textures", "Texture quality. High and Low save video memory, Full is the sharpest.", Tool("0018"), &[(0, "High"), (1, "Low"), (2, "Full")], NextZone),
-        row("2-D Mapping", "Map quality. Compressed saves memory, Full is the sharpest.", Tool("0019"), &[(0, "Compressed"), (1, "Full")], NextZone),
-        row("Fonts", "Text quality. Higher is sharper.", Tool("0036"), &[(0, "Compressed"), (1, "Full"), (2, "High")], Restart),
+        row(
+            "Textures",
+            "Texture quality. High and Low save video memory, Full is the sharpest.",
+            Tool("0018"),
+            &[(0, "High"), (1, "Low"), (2, "Full")],
+            NextZone,
+        ),
+        row(
+            "2-D Mapping",
+            "Map quality. Compressed saves memory, Full is the sharpest.",
+            Tool("0019"),
+            &[(0, "Compressed"), (1, "Full")],
+            NextZone,
+        ),
+        row(
+            "Fonts",
+            "Text quality. Higher is sharper.",
+            Tool("0036"),
+            &[(0, "Compressed"), (1, "Full"), (2, "High")],
+            Restart,
+        ),
     ];
     const EFFECTS: &[SRow] = &[
-        row("Lamp Lights", "Baked keeps the lamplight painted onto the walls, as retail. Real makes the lamps give off light of their own (not retail).", LampLights, &[(0, "Baked"), (1, "Real")], Now),
-        row("Environment Animation", "Makes grass, trees and other plants sway. Smooth sways them more smoothly than Normal.", Tool("0011"), &[(0, "Off"), (1, "Normal"), (2, "Smooth")], Now),
-        row("Bump Mapping", "Gives some walls and floors a raised, textured look. Off also lights them a little differently.", Tool("0017"), OFF_ON, NextZone),
-        row("Graphics Stabilization", "Retail's fix for glitches on some old graphics cards. It only changes the moving shine some spells and effects put on characters. Leave it Off unless that shine looks broken.", Tool("0040"), OFF_ON, Now),
-        row("3D LCD Mode", "Draws the game for 3D screens that need two side-by-side pictures. Leave it Off on a normal screen.", Tool("0030"), OFF_ON, Now),
+        row(
+            "Lamp Lights",
+            "Baked keeps the lamplight painted onto the walls, as retail. Real makes the lamps give off light of their own (not retail).",
+            LampLights,
+            &[(0, "Baked"), (1, "Real")],
+            Now,
+        ),
+        row(
+            "Environment Animation",
+            "Makes grass, trees and other plants sway. Smooth sways them more smoothly than Normal.",
+            Tool("0011"),
+            &[(0, "Off"), (1, "Normal"), (2, "Smooth")],
+            Now,
+        ),
+        row(
+            "Bump Mapping",
+            "Gives some walls and floors a raised, textured look. Off also lights them a little differently.",
+            Tool("0017"),
+            OFF_ON,
+            NextZone,
+        ),
+        row(
+            "Graphics Stabilization",
+            "Retail's fix for glitches on some old graphics cards. It only changes the moving shine some spells and effects put on characters. Leave it Off unless that shine looks broken.",
+            Tool("0040"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "3D LCD Mode",
+            "Draws the game for 3D screens that need two side-by-side pictures. Leave it Off on a normal screen.",
+            Tool("0030"),
+            OFF_ON,
+            Now,
+        ),
     ];
     const SOUND: &[SRow] = &[
         row("Sound", "Turns all sound on or off.", Tool("0007"), OFF_ON, Now),
-        row("Sound Effect Channels", "How many sound effects can play at the same time. More means fewer sounds are cut off.", Tool("0029"), &[(12, "12"), (13, "13"), (14, "14"), (15, "15"), (16, "16"), (17, "17"), (18, "18"), (19, "19"), (20, "20")], Now),
+        row(
+            "Sound Effect Channels",
+            "How many sound effects can play at the same time. More means fewer sounds are cut off.",
+            Tool("0029"),
+            &[
+                (12, "12"),
+                (13, "13"),
+                (14, "14"),
+                (15, "15"),
+                (16, "16"),
+                (17, "17"),
+                (18, "18"),
+                (19, "19"),
+                (20, "20"),
+            ],
+            Now,
+        ),
         row("Sound in Background", "Keeps playing sound while you are in another window.", Tool("0035"), OFF_ON, Now),
         // The title's one volume (lobby config 0xa8); in game the Gameplay page has them (rows left out there).
-        row("Music Volume", "Music volume at the title screen. In game, use the sliders on the Gameplay page.", Music, &[], Now),
-        row("Sound Effects Volume", "Sound effects volume at the title screen. In game, use the sliders on the Gameplay page.", Effects, &[], Now),
+        row(
+            "Music Volume",
+            "Music volume at the title screen. In game, use the sliders on the Gameplay page.",
+            Music,
+            &[],
+            Now,
+        ),
+        row(
+            "Sound Effects Volume",
+            "Sound effects volume at the title screen. In game, use the sliders on the Gameplay page.",
+            Effects,
+            &[],
+            Now,
+        ),
     ];
     const MISC: &[SRow] = &[
-        row("Hardware Mouse", "Uses your system's mouse pointer with the game's cursor images, instead of a cursor the game draws.", Tool("0021"), OFF_ON, Now),
-        row("Cursor Size", "How big the game's cursor is, when Hardware Mouse is Off. Auto makes it bigger in bigger windows (not retail).", CursorSize, &[(0, "Auto"), (100, "1x"), (150, "1.5x"), (200, "2x"), (300, "3x"), (400, "4x")], Now),
-        row("Keys Hide the Cursor", "On, as the game does, a key press hides the mouse cursor until the mouse moves. Off keeps it shown while you walk with the keys (not retail).", KeysHideCursor, OFF_ON, Now),
-        row("Opening Movie", "Plays the opening movie before the title screen. Any key skips it.", Tool("0022"), OFF_ON, Restart),
-        row("Simple Character Creation", "Shows flat pictures instead of 3D models during character creation.", Tool("0023"), OFF_ON, Now),
-        row("Screenshot Size", "Also saves each screenshot at your screen's size, in ffxiuser/screenshots.", Tool("0043"), OFF_ON, Now),
-        row("Send Rate", "How often the client sends to a private server, which answers each time: faster brings what happens around you sooner. A PlayOnline sign-in keeps the game's rate (not retail).", SendRate, &[(400, "Retail"), (200, "2x"), (100, "4x"), (50, "8x")], Now),
+        row(
+            "Hardware Mouse",
+            "Uses your system's mouse pointer with the game's cursor images, instead of a cursor the game draws.",
+            Tool("0021"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Cursor Size",
+            "How big the game's cursor is, when Hardware Mouse is Off. Auto makes it bigger in bigger windows (not retail).",
+            CursorSize,
+            &[(0, "Auto"), (100, "1x"), (150, "1.5x"), (200, "2x"), (300, "3x"), (400, "4x")],
+            Now,
+        ),
+        row(
+            "Keys Hide the Cursor",
+            "On, as the game does, a key press hides the mouse cursor until the mouse moves. Off keeps it shown while you walk with the keys (not retail).",
+            KeysHideCursor,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Opening Movie",
+            "Plays the opening movie before the title screen. Any key skips it.",
+            Tool("0022"),
+            OFF_ON,
+            Restart,
+        ),
+        row(
+            "Simple Character Creation",
+            "Shows flat pictures instead of 3D models during character creation.",
+            Tool("0023"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Screenshot Size",
+            "Also saves each screenshot at your screen's size, in ffxiuser/screenshots.",
+            Tool("0043"),
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Send Rate",
+            "How often the client sends to a private server, which answers each time: faster brings what happens around you sooner. A PlayOnline sign-in keeps the game's rate (not retail).",
+            SendRate,
+            &[(400, "Retail"), (200, "2x"), (100, "4x"), (50, "8x")],
+            Now,
+        ),
     ];
     const CLIENT: &[SRow] = &[
-        row("Frame Limit", "The most frames drawn each second. The game itself always runs at the same speed.", FrameLimit, &[], Now),
-        row("Anisotropic Filtering", "Keeps ground and walls sharp when you look at them at a slant. Higher is sharper.", Aniso, &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")], NextZone),
+        row(
+            "Frame Limit",
+            "The most frames drawn each second. The game itself always runs at the same speed.",
+            FrameLimit,
+            &[],
+            Now,
+        ),
+        row(
+            "Anisotropic Filtering",
+            "Keeps ground and walls sharp when you look at them at a slant. Higher is sharper.",
+            Aniso,
+            &[(1, "Off"), (2, "2x"), (4, "4x"), (8, "8x"), (16, "16x")],
+            NextZone,
+        ),
         row("Party TP", "Shows each member's TP in the party window.", PartyTp, OFF_ON, Now),
-        row("Interface", "Classic uses the game's windows. Modern uses the new windows where there is one (not retail).", ModernUi, &[(0, "Classic"), (1, "Modern")], Now),
+        row(
+            "Interface",
+            "Classic uses the game's windows. Modern uses the new windows where there is one (not retail).",
+            ModernUi,
+            &[(0, "Classic"), (1, "Modern")],
+            Now,
+        ),
         row("Interface Size", "How big the modern windows are (not retail).", ModernScale, MODERN_SCALES, Now),
-        row("Panel Opacity", "How see-through the modern windows' backgrounds are (not retail).", ModernOpacity, &[], Now),
-        row("Panel Places", "Reset puts this character's modern windows back where they started (not retail).", ResetPlaces, &[(0, "As Moved"), (1, "Reset")], Now),
+        row(
+            "Panel Opacity",
+            "How see-through the modern windows' backgrounds are (not retail).",
+            ModernOpacity,
+            &[],
+            Now,
+        ),
+        row(
+            "Panel Places",
+            "Reset puts this character's modern windows back where they started (not retail).",
+            ResetPlaces,
+            &[(0, "As Moved"), (1, "Reset")],
+            Now,
+        ),
     ];
     // Ours: the graphics options retail has no page for (a page holds 7 rows).
     const GRAPHICS: &[SRow] = &[
-        row("Character Shadows", "Retail gives characters the game's simple shadows. Real makes characters cast proper shadows from the sun and moon, and from lamps when Lamp Lights is Real (not retail).", ActorShadows, &[(0, "Retail"), (1, "Real")], Now),
-        row("Shadow Quality", "How sharp Real shadows are. Higher is sharper and uses more video memory (not retail).", ShadowMap, &[(1024, "Low"), (2048, "Medium"), (4096, "High")], Now),
-        row("Ambient Occlusion", "Adds soft shade in corners and creases of the world, so buildings look more solid (not retail).", Ssao, OFF_ON, Now),
-        row("Colour Grading", "Gives the 3D world a colour tint. Menus and text keep their colours (not retail).", Grading, &[(0, "Off"), (1, "Vivid"), (2, "Warm"), (3, "Cool"), (4, "Film")], Now),
-        row("Anti-aliasing", "Smooths jagged edges in the 3D world. Menus and text are left alone (not retail). For even smoother edges, set Background higher than the window.", Antialias, &[(0, "Off"), (1, "SMAA")], Now),
+        row(
+            "Character Shadows",
+            "Retail gives characters the game's simple shadows. Real makes characters cast proper shadows from the sun and moon, and from lamps when Lamp Lights is Real (not retail).",
+            ActorShadows,
+            &[(0, "Retail"), (1, "Real")],
+            Now,
+        ),
+        row(
+            "Shadow Quality",
+            "How sharp Real shadows are. Higher is sharper and uses more video memory (not retail).",
+            ShadowMap,
+            &[(1024, "Low"), (2048, "Medium"), (4096, "High")],
+            Now,
+        ),
+        row(
+            "Ambient Occlusion",
+            "Adds soft shade in corners and creases of the world, so buildings look more solid (not retail).",
+            Ssao,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Colour Grading",
+            "Gives the 3D world a colour tint. Menus and text keep their colours (not retail).",
+            Grading,
+            &[(0, "Off"), (1, "Vivid"), (2, "Warm"), (3, "Cool"), (4, "Film")],
+            Now,
+        ),
+        row(
+            "Anti-aliasing",
+            "Smooths jagged edges in the 3D world. Menus and text are left alone (not retail). For even smoother edges, set Background higher than the window.",
+            Antialias,
+            &[(0, "Off"), (1, "SMAA")],
+            Now,
+        ),
     ];
     // A page holds 7 rows; the controls' (the gamepad, mouse look) have their own.
     const GAMEPAD: &[SRow] = &[
-        row("Gamepad", "Lets you play with a game controller. The button layout follows the game's pad config tool.", Gamepad, OFF_ON, Now),
-        row("Stick Dead Zone", "How far you must push a stick before it moves you. Raise it if you drift with the stick let go. 33% matches retail (not retail).", PadDeadZone, &[(15, "15%"), (20, "20%"), (25, "25%"), (33, "33%"), (40, "40%"), (50, "50%")], Now),
-        row("Mouse Camera Speed", "How fast the camera turns when you hold a mouse button and move the mouse. Lower it if the camera spins too fast. Controllers are not affected (not retail).", MouseCamSpeed, &[(25, "25%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")], Now),
+        row(
+            "Gamepad",
+            "Lets you play with a game controller. The button layout follows the game's pad config tool.",
+            Gamepad,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Stick Dead Zone",
+            "How far you must push a stick before it moves you. Raise it if you drift with the stick let go. 33% matches retail (not retail).",
+            PadDeadZone,
+            &[(15, "15%"), (20, "20%"), (25, "25%"), (33, "33%"), (40, "40%"), (50, "50%")],
+            Now,
+        ),
+        row(
+            "Mouse Camera Speed",
+            "How fast the camera turns when you hold a mouse button and move the mouse. Lower it if the camera spins too fast. Controllers are not affected (not retail).",
+            MouseCamSpeed,
+            &[(25, "25%"), (50, "50%"), (75, "75%"), (100, "100%"), (150, "150%"), (200, "200%")],
+            Now,
+        ),
     ];
     const MAPS: &[SRow] = &[
-        row("Map Overlay", "Ctrl or Alt + O shows the zone map over the game, like the map add-ons do.", MapOverlay, OFF_ON, Now),
+        row(
+            "Map Overlay",
+            "Ctrl or Alt + O shows the zone map over the game, like the map add-ons do.",
+            MapOverlay,
+            OFF_ON,
+            Now,
+        ),
         row("Map Overlay Opacity", "How see-through the map overlay is.", MapOpacity, &[], Now),
-        row("Minimap", "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom.", Minimap, OFF_ON, Now),
-        row("Minimap Position", "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.", MinimapDock, &[(0, "Top Right"), (1, "Top Left")], Now),
+        row(
+            "Minimap",
+            "A small map in a corner that follows you and shows what is nearby. Scroll over it to zoom.",
+            Minimap,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Minimap Position",
+            "Puts the minimap in the top right, moving aside for open menus, or in the top left below the cast bar.",
+            MinimapDock,
+            &[(0, "Top Right"), (1, "Top Left")],
+            Now,
+        ),
         row("Minimap Size", "How big the minimap is.", MinimapSize, &[(0, "Small"), (1, "Medium"), (2, "Large")], Now),
     ];
-    const TIMERS_ROW: SRow = row("Timers", "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers).", Timers, OFF_ON, Now);
-    const REGIME_ROW: SRow = row("Training Regime", "While a Fields or Grounds of Valor regime is active, shows its targets and your kills in a window beside the timers.", Regime, OFF_ON, Now);
-    const SKILLCHAIN_ROW: SRow = row("Skillchain Helper", "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.", Skillchains, OFF_ON, Now);
+    const TIMERS_ROW: SRow = row(
+        "Timers",
+        "Shows spell and ability recasts, your effects and the ones you put on others and on monsters, in a window that slides in and out (/timers).",
+        Timers,
+        OFF_ON,
+        Now,
+    );
+    const REGIME_ROW: SRow = row(
+        "Training Regime",
+        "While a Fields or Grounds of Valor regime is active, shows its targets and your kills in a window beside the timers.",
+        Regime,
+        OFF_ON,
+        Now,
+    );
+    const SKILLCHAIN_ROW: SRow = row(
+        "Skillchain Helper",
+        "In a party, shows which skillchains your party can make together. On your target, it shows an open skillchain, what closes it, and when to magic burst.",
+        Skillchains,
+        OFF_ON,
+        Now,
+    );
     const TIMERS: &[SRow] = &[
         TIMERS_ROW,
-        row("Timers Position", "Docks the timers window on the left, on the right above the party list, or at the top.", TimersDock, &[(0, "Left"), (1, "Right"), (2, "Top")], Now),
+        row(
+            "Timers Position",
+            "Docks the timers window on the left, on the right above the party list, or at the top.",
+            TimersDock,
+            &[(0, "Left"), (1, "Right"), (2, "Top")],
+            Now,
+        ),
         REGIME_ROW,
         SKILLCHAIN_ROW,
     ];
@@ -390,20 +711,70 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[
         row("Target Distance", "Shows how far away your target is in the target window.", TargetDistance, OFF_ON, Now),
-        row("Target HP %", "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it.", TargetHpp, OFF_ON, Now),
-        row("Trust Speech", "Shows or hides what your trusts say in the chat log.", TrustSpeech, &[(0, "Shown"), (1, "Hidden")], Now),
-        row("Ready Lines", "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.", ReadyLines, &[(0, "All"), (1, "Mine, Monsters'")], Now),
-        row("Battle Text", "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".", ShortBattle, &[(0, "Retail"), (1, "Short")], Now),
-        row("Battle Names", "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.", NameColours, &[(0, "Plain"), (1, "Coloured")], Now),
+        row(
+            "Target HP %",
+            "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it.",
+            TargetHpp,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Trust Speech",
+            "Shows or hides what your trusts say in the chat log.",
+            TrustSpeech,
+            &[(0, "Shown"), (1, "Hidden")],
+            Now,
+        ),
+        row(
+            "Ready Lines",
+            "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.",
+            ReadyLines,
+            &[(0, "All"), (1, "Mine, Monsters'")],
+            Now,
+        ),
+        row(
+            "Battle Text",
+            "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".",
+            ShortBattle,
+            &[(0, "Retail"), (1, "Short")],
+            Now,
+        ),
+        row(
+            "Battle Names",
+            "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.",
+            NameColours,
+            &[(0, "Plain"), (1, "Coloured")],
+            Now,
+        ),
     ];
     const EXTRA_MISC: &[SRow] = &[
-        row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
+        row(
+            "Synthesis Amount",
+            "After you press Synthesize, asks how many to make and crafts them one after another.",
+            SynthAmount,
+            OFF_ON,
+            Now,
+        ),
         row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
-        row("Clock", "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.", EarthClock, OFF_ON, Now),
-        row("Text Auto-Advance", "Event messages that wait for a key move on by themselves after this many seconds.", AutoAdvance, &[(0, "OFF"), (3, "3 s"), (5, "5 s"), (8, "8 s")], Now),
+        row(
+            "Clock",
+            "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.",
+            EarthClock,
+            OFF_ON,
+            Now,
+        ),
+        row(
+            "Text Auto-Advance",
+            "Event messages that wait for a key move on by themselves after this many seconds.",
+            AutoAdvance,
+            &[(0, "OFF"), (3, "3 s"), (5, "5 s"), (8, "8 s")],
+            Now,
+        ),
     ];
     match kind {
-        Kind::Extras if modern => [&MAPS[..3], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
+        Kind::Extras if modern => {
+            [&MAPS[..3], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[])
+        }
         Kind::Extras => [MAPS, TIMERS, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
         Kind::Settings if in_game && tab == 4 => &SOUND[..3],
         Kind::Settings if tab == MODS => &[],
@@ -414,8 +785,23 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
 }
 
 const RESOLUTIONS: [[u32; 2]; 17] = [
-    [640, 480], [800, 600], [1024, 768], [1280, 720], [1280, 800], [1280, 1024], [1366, 768], [1440, 900], [1600, 900], [1680, 1050],
-    [1920, 1080], [1920, 1200], [2560, 1080], [2560, 1440], [2560, 1600], [3440, 1440], [3840, 2160],
+    [640, 480],
+    [800, 600],
+    [1024, 768],
+    [1280, 720],
+    [1280, 800],
+    [1280, 1024],
+    [1366, 768],
+    [1440, 900],
+    [1600, 900],
+    [1680, 1050],
+    [1920, 1080],
+    [1920, 1200],
+    [2560, 1080],
+    [2560, 1440],
+    [2560, 1600],
+    [3440, 1440],
+    [3840, 2160],
 ];
 
 /// The Config pages' size (conf2win and its siblings, 366 x 296 at (16, 48)).
@@ -481,7 +867,26 @@ impl SettingsUi {
     }
 
     pub fn open_kind(c: &Config, window: [u32; 2], kind: Kind) -> Self {
-        let mut s = Self { kind, s: Settings::of(c), monitors: Vec::new(), gpus: Vec::new(), window, in_game: false, tab: 0, row: 0, col: 0, edit: false, sounds: Vec::new(), dirty: false, hover: false, mods_ui: None, m_mods: (0, 0), m_remove: None, mod_pages: Vec::new(), mod_changes: Vec::new() };
+        let mut s = Self {
+            kind,
+            s: Settings::of(c),
+            monitors: Vec::new(),
+            gpus: Vec::new(),
+            window,
+            in_game: false,
+            tab: 0,
+            row: 0,
+            col: 0,
+            edit: false,
+            sounds: Vec::new(),
+            dirty: false,
+            hover: false,
+            mods_ui: None,
+            m_mods: (0, 0),
+            m_remove: None,
+            mod_pages: Vec::new(),
+            mod_changes: Vec::new(),
+        };
         s.col = s.marked_col();
         s
     }
@@ -508,7 +913,13 @@ impl SettingsUi {
                 .rows
                 .iter()
                 .enumerate()
-                .map(|(i, r)| Row { label: r.label.clone(), help: r.help.clone(), val: Val::Mod(i), choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(), when: When::Now })
+                .map(|(i, r)| Row {
+                    label: r.label.clone(),
+                    help: r.help.clone(),
+                    val: Val::Mod(i),
+                    choices: r.choices.iter().enumerate().map(|(k, c)| (k as u32, c.0.clone())).collect(),
+                    when: When::Now,
+                })
                 .collect();
         }
         rows(self.kind, self.tab, self.in_game, self.s.modern_ui).iter().map(Row::from).collect()
@@ -516,7 +927,15 @@ impl SettingsUi {
 
     fn ctl(r: &Row) -> Ctl {
         match r.val {
-            Val::Size(..) | Val::Gamma | Val::FrameLimit | Val::Monitor | Val::Gpu | Val::Music | Val::Effects | Val::MapOpacity | Val::ModernOpacity => Ctl::Slider,
+            Val::Size(..)
+            | Val::Gamma
+            | Val::FrameLimit
+            | Val::Monitor
+            | Val::Gpu
+            | Val::Music
+            | Val::Effects
+            | Val::MapOpacity
+            | Val::ModernOpacity => Ctl::Slider,
             _ if r.choices.len() <= 3 => Ctl::Buttons(r.choices.len()),
             _ => Ctl::Slider,
         }
@@ -653,7 +1072,12 @@ impl SettingsUi {
     }
 
     fn tool_get(&self, n: &str) -> u32 {
-        self.s.tool.get(n).copied().or_else(|| crate::config::TOOL_DEFAULTS.iter().find(|d| d.0 == n).map(|d| d.1)).unwrap_or(0)
+        self.s
+            .tool
+            .get(n)
+            .copied()
+            .or_else(|| crate::config::TOOL_DEFAULTS.iter().find(|d| d.0 == n).map(|d| d.1))
+            .unwrap_or(0)
     }
 
     fn tool_set(&mut self, n: &str, x: u32) {
@@ -673,9 +1097,13 @@ impl SettingsUi {
                 let cur = [self.tool_get(a), self.tool_get(b)];
                 (list.len(), list.iter().position(|&x| x == cur).unwrap_or(0))
             }
-            Val::Gamma => (21, ((f32::from_bits(self.tool_get("0028")) + 1.0) * 10.0).round().clamp(0.0, 20.0) as usize),
+            Val::Gamma => {
+                (21, ((f32::from_bits(self.tool_get("0028")) + 1.0) * 10.0).round().clamp(0.0, 20.0) as usize)
+            }
             Val::FrameLimit => (FRAME_LIMITS.len(), pos(&FRAME_LIMITS, self.s.frame_limit)),
-            Val::Monitor => (self.monitors.len().max(1), self.monitors.iter().position(|m| m.0 == self.s.monitor).unwrap_or(0)),
+            Val::Monitor => {
+                (self.monitors.len().max(1), self.monitors.iter().position(|m| m.0 == self.s.monitor).unwrap_or(0))
+            }
             Val::Gpu => (self.gpus.len() + 1, self.gpus.iter().position(|g| *g == self.s.gpu).map_or(0, |i| i + 1)),
             Val::Music => (21, (self.s.music / 5) as usize),
             Val::Effects => (21, (self.s.effects / 5) as usize),
@@ -708,7 +1136,9 @@ impl SettingsUi {
                     self.s.monitor = m.0.clone();
                 }
             }
-            Val::Gpu => self.s.gpu = if i == 0 { String::new() } else { self.gpus.get(i - 1).cloned().unwrap_or_default() },
+            Val::Gpu => {
+                self.s.gpu = if i == 0 { String::new() } else { self.gpus.get(i - 1).cloned().unwrap_or_default() }
+            }
             Val::Music => self.s.music = (i as u32 * 5).min(100),
             Val::Effects => self.s.effects = (i as u32 * 5).min(100),
             Val::MapOpacity => self.s.map_opacity = ((i as u32 + 2) * 5).clamp(10, 100),
@@ -738,7 +1168,12 @@ impl SettingsUi {
             Val::Effects => format!("{}%", self.s.effects),
             Val::MapOpacity => format!("{}%", self.s.map_opacity),
             Val::ModernOpacity => format!("{}%", self.s.modern_opacity),
-            Val::Monitor => self.monitors.iter().find(|m| m.0 == self.s.monitor).or(self.monitors.first()).map_or_else(|| "Default".into(), |m| m.0.clone()),
+            Val::Monitor => self
+                .monitors
+                .iter()
+                .find(|m| m.0 == self.s.monitor)
+                .or(self.monitors.first())
+                .map_or_else(|| "Default".into(), |m| m.0.clone()),
             Val::Gpu if self.s.gpu.is_empty() => "Default".into(),
             // The name without the driver's part ("AMD Radeon RX 6800 XT (RADV NAVI21)").
             Val::Gpu => self.s.gpu.split(" (").next().unwrap_or_default().to_string(),
@@ -893,7 +1328,8 @@ impl SettingsUi {
             let y = Self::TOP + PITCH * i as f32 + 14.0;
             // conf2win's two 88-px and conf3win's three 64-px columns; a caption that does not fit (12 px of the
             // button are its ends) widens every button of the row, from the bullets' column.
-            let need = r.choices.iter().map(|c| super::super::render::screens::label_width(&c.1) + 12.0).fold(0.0, f32::max);
+            let need =
+                r.choices.iter().map(|c| super::super::render::screens::label_width(&c.1) + 12.0).fold(0.0, f32::max);
             match Self::ctl(r) {
                 Ctl::Buttons(n) if n <= 2 && need <= 88.0 => {
                     for (c, x) in WIDE.iter().enumerate().take(n) {
@@ -922,7 +1358,10 @@ impl SettingsUi {
         self.sounds.clear();
         self.hover = false;
         let (x, y) = self.origin(gu, sw, sh);
-        if let Some(k) = self.arrow_rects().iter().position(|r| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
+        if let Some(k) = self
+            .arrow_rects()
+            .iter()
+            .position(|r| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
         {
             self.hover = true;
             if clicked {
@@ -934,7 +1373,10 @@ impl SettingsUi {
         if self.on_mods() && self.mods_ui.as_ref().is_some_and(|m| m.held.is_some()) {
             return;
         }
-        let hit = self.controls().into_iter().find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3]);
+        let hit = self
+            .controls()
+            .into_iter()
+            .find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3]);
         let Some((row, col, r)) = hit else { return };
         self.hover = true;
         if (moved || clicked) && (row, col) != (self.row, self.col) && !self.edit {
@@ -985,7 +1427,8 @@ impl SettingsUi {
                 gu.sprite_cells("menu    windowps", 465, 2..3, x + 20.0 - b[0], hy + 2.0 - b[1], N);
             }
             gu.label(&r.label, x + 32.0, hy, N, false);
-            let icon = if self.warns(r) { gu.warning_icon(x + 32.0 + gu.label_width(&r.label) + 4.0, hy) + 4.0 } else { 0.0 };
+            let icon =
+                if self.warns(r) { gu.warning_icon(x + 32.0 + gu.label_width(&r.label) + 4.0, hy) + 4.0 } else { 0.0 };
             // A slider's value at the heading's end, right-aligned to the slider's (cut to the room left).
             if matches!(Self::ctl(r), Ctl::Slider) {
                 let room = SLIDER_X + SLIDER_W - 32.0 - gu.label_width(&r.label) - icon - 16.0;
@@ -1000,7 +1443,13 @@ impl SettingsUi {
                     Ctl::Buttons(_) => {
                         let d = if on { -1.0 } else { 0.0 };
                         button(gu, [x + b[0] + d, y + b[1] + d, b[2], b[3]], if on { ON } else { N });
-                        gu.label(&r.choices[*c].1, x + b[0] + 5.0 + d, y + b[1] + 1.0 + d, if on { ON } else { N }, true);
+                        gu.label(
+                            &r.choices[*c].1,
+                            x + b[0] + 5.0 + d,
+                            y + b[1] + 1.0 + d,
+                            if on { ON } else { N },
+                            true,
+                        );
                         if r.choices[*c].0 == self.get(r.val) {
                             marker(gu, x + b[0], y + b[1], b[2]);
                         }
@@ -1013,7 +1462,15 @@ impl SettingsUi {
                         // The track is baked into each page's backing (465 cells 8..10 under conf2win child 3 at (88, 80)).
                         gu.sprite_cells("menu    windowps", 465, 8..11, x + b[0] - 88.0, y + b[1] - 80.0, N);
                         if f > 0.0 {
-                            gu.sprite_scaled("menu    windowps", 384, x + b[0], y + b[1], f, 1.0, if editing { 0xa0a0_a0a0 } else { N });
+                            gu.sprite_scaled(
+                                "menu    windowps",
+                                384,
+                                x + b[0],
+                                y + b[1],
+                                f,
+                                1.0,
+                                if editing { 0xa0a0_a0a0 } else { N },
+                            );
                         }
                     }
                 }
@@ -1086,13 +1543,21 @@ impl SettingsUi {
 /// page this state is on. A row left out here (in game, or with the modern interface) is None.
 impl SettingsUi {
     fn find(&self, label: &str) -> Option<Row> {
-        let pages = (0..TABS.len()).filter(|&t| t != MODS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        pages.flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter()).find(|r| r.label == label).map(Row::from)
+        let pages = (0..TABS.len())
+            .filter(|&t| t != MODS)
+            .map(|t| (Kind::Settings, t))
+            .chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
+        pages
+            .flat_map(|(k, t)| rows(k, t, self.in_game, self.s.modern_ui).iter())
+            .find(|r| r.label == label)
+            .map(Row::from)
     }
 
     fn vrow(&self, r: &Row) -> VRow {
         let ctl = match Self::ctl(r) {
-            Ctl::Buttons(_) => VCtl::Buttons(r.choices.iter().map(|c| (c.1.to_string(), c.0 == self.get(r.val))).collect()),
+            Ctl::Buttons(_) => {
+                VCtl::Buttons(r.choices.iter().map(|c| (c.1.to_string(), c.0 == self.get(r.val))).collect())
+            }
             Ctl::Slider => {
                 let (n, at) = self.stops(r);
                 VCtl::Slider { n, at, shown: self.shown(r) }
@@ -1150,7 +1615,10 @@ impl SettingsUi {
     /// Every label of ours, for the Settings window's test that each row has a place.
     #[cfg(test)]
     pub fn all_labels(in_game: bool, modern: bool) -> Vec<&'static str> {
-        let pages = (0..TABS.len()).filter(|&t| t != MODS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
+        let pages = (0..TABS.len())
+            .filter(|&t| t != MODS)
+            .map(|t| (Kind::Settings, t))
+            .chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
         pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).collect()
     }
 }
@@ -1186,7 +1654,12 @@ fn plain(help: &str) -> String {
         return format!("{WARNING} {}", plain(rest));
     }
     let body = match help.split_once(": ") {
-        Some((head, rest)) if head.starts_with(|c: char| c.is_ascii_digit()) && head.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == '/') => rest,
+        Some((head, rest))
+            if head.starts_with(|c: char| c.is_ascii_digit())
+                && head.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == '/') =>
+        {
+            rest
+        }
         _ => help,
     };
     let body = body.replace(" (not retail)", "");
@@ -1208,18 +1681,26 @@ impl SettingsUi {
                     } else {
                         let p = m?.packs.get(i - n)?;
                         let name = p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
-                        let label = m.and_then(|m| m.progress(&p.slug)).map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
+                        let label = m
+                            .and_then(|m| m.progress(&p.slug))
+                            .map_or(name.clone(), |pm| format!("{}%  {name}", pm / 10));
                         Some(VRow { label, ctl: VCtl::Buttons(vec![("Install".into(), false)]) })
                     }
                 })
                 .collect()
         } else {
-            self.rows()
-                .iter()
-                .map(|r| self.vrow(r))
-                .collect()
+            self.rows().iter().map(|r| self.vrow(r)).collect()
         };
-        View { title: self.title(), tabs: self.tabs(), tab: self.tab, rows, row: self.row, col: self.col, edit: self.edit, help: plain(&self.help()) }
+        View {
+            title: self.title(),
+            tabs: self.tabs(),
+            tab: self.tab,
+            rows,
+            row: self.row,
+            col: self.col,
+            edit: self.edit,
+            help: plain(&self.help()),
+        }
     }
 
     /// The modern layer's mouse: page `t`.
@@ -1422,7 +1903,9 @@ impl SettingsUi {
                 gu.sprite_cells("menu    windowps", 465, 2..3, x + 20.0 - b[0], hy + 2.0 - b[1], N);
             }
             let (mut label, tint) = match (i < n, m) {
-                (true, _) => (format!("{}. {}", i + 1, self.s.mods[i].name), if held && self.row == i + 1 { ON } else { N }),
+                (true, _) => {
+                    (format!("{}. {}", i + 1, self.s.mods[i].name), if held && self.row == i + 1 { ON } else { N })
+                }
                 (false, Some(m)) => {
                     let p = &m.packs[i - n];
                     let name = p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
@@ -1456,7 +1939,14 @@ impl SettingsUi {
             gu.cursor(hx, hy);
         }
         if total > super::modsui::VISIBLE {
-            gu.scroll_bar(x + W - 12.0, y + Self::TOP, PITCH * super::modsui::VISIBLE as f32, total, super::modsui::VISIBLE, top);
+            gu.scroll_bar(
+                x + W - 12.0,
+                y + Self::TOP,
+                PITCH * super::modsui::VISIBLE as f32,
+                total,
+                super::modsui::VISIBLE,
+                top,
+            );
         }
     }
 
@@ -1471,7 +1961,17 @@ impl SettingsUi {
         let archives = self
             .mods_ui
             .as_ref()
-            .map(|m| m.packs.iter().map(|p| (p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(), m.progress(&p.slug))).collect())
+            .map(|m| {
+                m.packs
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(),
+                            m.progress(&p.slug),
+                        )
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
         (packs, archives)
     }
@@ -1548,8 +2048,13 @@ impl SettingsUi {
         let m = self.mods_ui.as_ref();
         match self.row.checked_sub(1) {
             None => "Left / Right: another page of settings.".into(),
-            Some(_) if m.is_some_and(|m| m.held.is_some()) => "Up / Down: move the pack. Enter: place it here. Escape: put it back.".into(),
-            Some(i) if i < n => format!("Mod pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.", i + 1),
+            Some(_) if m.is_some_and(|m| m.held.is_some()) => {
+                "Up / Down: move the pack. Enter: place it here. Escape: put it back.".into()
+            }
+            Some(i) if i < n => format!(
+                "Mod pack {} of {n}: a higher one's textures win. ON / OFF, or Move it. Takes effect on restart.",
+                i + 1
+            ),
             Some(i) => match (m.and_then(|m| m.packs.get(i - n)), m.and_then(|m| m.error.clone())) {
                 (_, Some(e)) => format!("The last install failed: {e}"),
                 (Some(p), None) => format!(
@@ -1622,7 +2127,10 @@ mod tests {
         }
         let (title, game) = (rows(Kind::Settings, 6, false, false), rows(Kind::Settings, 6, true, false));
         assert_eq!(title.len() + 1, game.len());
-        assert!(!title.iter().any(|r| matches!(r.val, Val::ResetPlaces)) && matches!(game.last().unwrap().val, Val::ResetPlaces));
+        assert!(
+            !title.iter().any(|r| matches!(r.val, Val::ResetPlaces))
+                && matches!(game.last().unwrap().val, Val::ResetPlaces)
+        );
     }
 
     #[test]

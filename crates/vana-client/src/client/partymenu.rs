@@ -129,7 +129,12 @@ pub fn open(w: &mut World) {
     } else {
         PRTY1
     };
-    w.partymenu = Some(PartyMenu { stack: vec![Win { name, sel: w.cursor_recall(name) }], return_menu: w.menu, langs: 0, hidden: false });
+    w.partymenu = Some(PartyMenu {
+        stack: vec![Win { name, sel: w.cursor_recall(name) }],
+        return_menu: w.menu,
+        langs: 0,
+        hidden: false,
+    });
     w.menu = None;
 }
 
@@ -284,11 +289,19 @@ fn find_member(w: &mut World) {
         return;
     }
     use crate::net::search::{AREA, Cond, STATUS};
-    let region = w.search_words.as_ref().filter(|sw| sw.zone_flags(w.pos_zone) & 2 != 0).and_then(|sw| sw.region_of(w.pos_zone)).filter(|r| !r.is_empty());
+    let region = w
+        .search_words
+        .as_ref()
+        .filter(|sw| sw.zone_flags(w.pos_zone) & 2 != 0)
+        .and_then(|sw| sw.region_of(w.pos_zone))
+        .filter(|r| !r.is_empty());
     let (mut cond, scope) = match region {
         Some(r) => {
             let last = *r.last().unwrap() as i16;
-            (Cond { flags: AREA, areas: r, last_area: last, area_given: true, ..Default::default() }, super::search::Scope::Region)
+            (
+                Cond { flags: AREA, areas: r, last_area: last, area_given: true, ..Default::default() },
+                super::search::Scope::Region,
+            )
         }
         None => (Cond::zone(w.pos_zone), super::search::Scope::Area),
     };
@@ -503,7 +516,8 @@ pub(super) fn pronoun(race: u16) -> i32 {
 /// nothing opens by itself. Not done: the 0x7F 0xFC / 0xFB codes around the name in the party line (the log draws no
 /// 0x7F codes yet).
 pub fn invited(w: &mut World, anon: u8, kind: u8, name: String, race: u16) {
-    if matches!(kind, 0 | 5) && anon & 2 == 0
+    if matches!(kind, 0 | 5)
+        && anon & 2 == 0
         && let Some(bt) = w.battle.clone()
         && let Some(raw) = bt.group10_raw(if kind == 0 { 4 } else { 3 })
     {
@@ -527,7 +541,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
         egui::Key::ArrowUp | egui::Key::ArrowDown => {
             let k = if key == egui::Key::ArrowUp { 2 } else { 3 };
             let to = gu.menu_links(top.name, top.sel).map_or(top.sel, |l| l[k] as u16);
-            if to != top.sel && to != 0 && to != 0xff
+            if to != top.sel
+                && to != 0
+                && to != 0xff
                 && let Some(t) = w.partymenu.as_mut().and_then(|m| m.stack.last_mut())
             {
                 t.sel = to;
@@ -551,7 +567,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
 
 /// The top window takes the keys unless the results window, a prompt or a party-list pick is up over it.
 pub fn focused(w: &World) -> bool {
-    w.partymenu.is_some() && w.search.is_none() && w.confirm.is_none() && w.party_cursor.is_none() && w.levelsync.is_none()
+    w.partymenu.is_some()
+        && w.search.is_none()
+        && w.confirm.is_none()
+        && w.party_cursor.is_none()
+        && w.levelsync.is_none()
 }
 
 /// Mouse: hover over a row moves the cursor, a click on the cursor row is Enter *(inf: the generic child hit test)*.
@@ -565,7 +585,8 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     });
     let Some(e) = hit else { return };
     gu.hover.set(true);
-    if (moved || clicked) && e.id != top.sel
+    if (moved || clicked)
+        && e.id != top.sel
         && let Some(t) = w.partymenu.as_mut().and_then(|m| m.stack.last_mut())
     {
         t.sel = e.id;
@@ -596,16 +617,28 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         let find = find_child(win.name);
         let mut hide = off.clone();
         hide.extend(find);
-        let Some(lw) = gu.lobby_window_swaps(win.name, sw, sh, (0.0, 0.0), Some(win.sel), focused, &hide, &swaps(w, win.name)) else { continue };
+        let Some(lw) =
+            gu.lobby_window_swaps(win.name, sw, sh, (0.0, 0.0), Some(win.sel), focused, &hide, &swaps(w, win.name))
+        else {
+            continue;
+        };
         let Some((wx, wy)) = gu.window_xy(win.name, sw, sh) else { continue };
         gu.disabled_children(win.name, wx, wy, &off, Some(win.sel).filter(|_| focused));
-        let at: Vec<(u16, f32, f32)> = gu.layout(win.name).map_or(Vec::new(), |l| l.elements.iter().skip(1).map(|e| (e.id, wx + e.x as f32, wy + e.y as f32)).collect());
+        let at: Vec<(u16, f32, f32)> = gu.layout(win.name).map_or(Vec::new(), |l| {
+            l.elements.iter().skip(1).map(|e| (e.id, wx + e.x as f32, wy + e.y as f32)).collect()
+        });
         let child = |id: u16| at.iter().find(|c| c.0 == id).map(|c| (c.1, c.2));
         if let Some(c) = find
             && let Some((cx, cy)) = child(c)
         {
             let on = win.sel == c;
-            gu.sprite("menu    windowps", if seeker(w).is_some() { 79 } else { 82 }, cx, cy, if on { 0x8080_5020 } else { 0x8080_8080 });
+            gu.sprite(
+                "menu    windowps",
+                if seeker(w).is_some() { 79 } else { 82 },
+                cx,
+                cy,
+                if on { 0x8080_5020 } else { 0x8080_8080 },
+            );
             if on && focused {
                 gu.cursor(cx, cy);
             }
@@ -642,11 +675,23 @@ pub(super) fn views(w: &World) -> Vec<super::modern::MenuWin> {
             let mut labels = swaps(w, win.name);
             labels.extend(find_child(win.name).map(|c| (c, if seeker(w).is_some() { 79 } else { 82 })));
             let marked = match win.name {
-                LANGS => LANG_BITS.iter().enumerate().filter(|(_, b)| m.langs & 1 << **b != 0).map(|(r, _)| r as u16 + 1).collect(),
+                LANGS => LANG_BITS
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, b)| m.langs & 1 << **b != 0)
+                    .map(|(r, _)| r as u16 + 1)
+                    .collect(),
                 ALARM => vec![w.game.get(0xc7) as u16 + 1],
                 _ => Vec::new(),
             };
-            super::modern::MenuWin { name: win.name, sel: win.sel, off: disabled(w, win.name), labels, marked, values: Vec::new() }
+            super::modern::MenuWin {
+                name: win.name,
+                sel: win.sel,
+                off: disabled(w, win.name),
+                labels,
+                marked,
+                values: Vec::new(),
+            }
         })
         .collect()
 }
@@ -658,7 +703,13 @@ pub fn draw_invite_icon(gu: &mut GameUi, w: &World, sw: f32, sh: f32) {
     }
     let name = gu.party_window_name().to_string();
     if let (Some([x, y, ..]), Some(b)) = (gu.window_rect(&name, sw, sh), gu.cell_bounds("menu    keytops3", 69, 0)) {
-        gu.sprite("menu    keytops3", 69, x - ((b[2] - b[0]) / 2.0).trunc(), y - ((b[3] - b[1]) / 2.0).trunc(), 0x8080_8080);
+        gu.sprite(
+            "menu    keytops3",
+            69,
+            x - ((b[2] - b[0]) / 2.0).trunc(),
+            y - ((b[3] - b[1]) / 2.0).trunc(),
+            0x8080_8080,
+        );
     }
 }
 

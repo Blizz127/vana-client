@@ -208,7 +208,8 @@ const CONF12WI: &[(u16, Ctl)] = &[
 
 /// Misc. 4 (FUN_1019bdd0): software keyboard 0xc9 (Compact only in Japanese); 0xce = 1 / 2 / 0, kept only while
 /// FUN_101bced0() > 0 *(inferred: a gamepad count)*, so 1 and 2 are off here.
-const CONF13WI: &[(u16, Ctl)] = &[p3(1, 0xc9, 0), p3(2, 0xc9, 1), p3(3, 0xc9, 2), p3(4, 0xce, 1), p3(5, 0xce, 2), p3(6, 0xce, 0)];
+const CONF13WI: &[(u16, Ctl)] =
+    &[p3(1, 0xc9, 0), p3(2, 0xc9, 1), p3(3, 0xc9, 2), p3(4, 0xce, 1), p3(5, 0xce, 2), p3(6, 0xce, 0)];
 
 /// confyn: Yes / No, the cursor starting on No (FUN_10115b70(2)).
 const CONFYN: &[(u16, Ctl)] = &[(1, Act(Act::Yes(true))), (2, Act(Act::Yes(false)))];
@@ -251,7 +252,14 @@ fn unowned(name: &str, child: u16, owned: u32) -> bool {
 }
 
 /// "(4:3)" .. "(5:4)" for 0x43 (FUN_10002cc0, 0x103443f0).
-pub const ASPECTS: [(&str, f32); 6] = [("(4:3)", 4.0 / 3.0), ("(15:9)", 15.0 / 9.0), ("(15:10)", 1.5), ("(16:9)", 16.0 / 9.0), ("(16:10)", 1.6), ("(5:4)", 1.25)];
+pub const ASPECTS: [(&str, f32); 6] = [
+    ("(4:3)", 4.0 / 3.0),
+    ("(15:9)", 15.0 / 9.0),
+    ("(15:10)", 1.5),
+    ("(16:9)", 16.0 / 9.0),
+    ("(16:10)", 1.6),
+    ("(5:4)", 1.25),
+];
 
 pub struct Win {
     /// Menu name without the prefix ("conf2win").
@@ -267,7 +275,12 @@ impl Win {
     fn new(name: &str) -> Self {
         let first = page(name).first().map_or(1, |c| c.0);
         // confyn starts on No.
-        Win { name: name.to_string(), cursor: if matches!(name, "confyn" | "comyn") { 2 } else { first }, edit: None, offset: (0.0, 0.0) }
+        Win {
+            name: name.to_string(),
+            cursor: if matches!(name, "confyn" | "comyn") { 2 } else { first },
+            edit: None,
+            offset: (0.0, 0.0),
+        }
     }
 
     pub fn full(&self) -> String {
@@ -322,7 +335,9 @@ pub fn our_help(menu: &str, child: u16) -> Option<&'static str> {
     }
     match child {
         SETTINGS => Some(SETTINGS_HELP),
-        EXTRAS => Some("Gameplay additions from the add-ons: the map overlay, the synthesis amount, timestamps on every line, timers."),
+        EXTRAS => Some(
+            "Gameplay additions from the add-ons: the map overlay, the synthesis amount, timestamps on every line, timers.",
+        ),
         _ => None,
     }
 }
@@ -593,7 +608,13 @@ impl ConfigUi {
         let Some(c) = Self::ctl(name, child) else { return };
         out.sounds.push(Se::Select);
         if name == "conf12wi" && matches!(child, 3 | 4) {
-            out.lockstyle = Some(if child == 3 { 0 } else if v.get(0xbf) == 1 { 1 } else { 4 });
+            out.lockstyle = Some(if child == 3 {
+                0
+            } else if v.get(0xbf) == 1 {
+                1
+            } else {
+                4
+            });
         }
         match c {
             Pick(id, x, _) => Self::set(v, out, id, x),
@@ -624,7 +645,11 @@ impl ConfigUi {
             Act(Act::Yes(yes)) => {
                 if yes {
                     // FUN_1018c7f0(mode + 1): FUN_1018ed00 text colours / FUN_1018ed90 log windows.
-                    let ids: Vec<u16> = if self.yn_mode == 0 { (0x1b..=0x31).chain([0x9b, 0xb0, 0xb3]).collect() } else { (0xb9..=0xbc).collect() };
+                    let ids: Vec<u16> = if self.yn_mode == 0 {
+                        (0x1b..=0x31).chain([0x9b, 0xb0, 0xb3]).collect()
+                    } else {
+                        (0xb9..=0xbc).collect()
+                    };
                     for id in ids {
                         let d = crate::gamecfg::def(id).map_or(0, |d| d.default);
                         Self::set(v, out, id, d);
@@ -637,7 +662,16 @@ impl ConfigUi {
 
     /// The pointer: hover moves the top window's cursor, a click is Enter; on a slider the click sets the value
     /// under the pointer (not retail: retail only steps with the keys).
-    pub fn pointer(&mut self, gu: &GameUi, v: &mut Values, p: (f32, f32), moved: bool, clicked: bool, sw: f32, sh: f32) -> Out {
+    pub fn pointer(
+        &mut self,
+        gu: &GameUi,
+        v: &mut Values,
+        p: (f32, f32),
+        moved: bool,
+        clicked: bool,
+        sw: f32,
+        sh: f32,
+    ) -> Out {
         let mut out = Out::default();
         if super::configui2::pointer(self, gu, v, p, moved, clicked, sw, sh, &mut out) {
             return out;
@@ -665,7 +699,8 @@ impl ConfigUi {
         let Some(m) = gu.menu_def(&w.full()) else { return out };
         let Some((x, y)) = Self::win_xy(gu, w, sw, sh) else { return out };
         if w.name == "configwi"
-            && let Some((id, _, _)) = our_rows().find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
+            && let Some((id, _, _)) = our_rows()
+                .find(|(_, _, r)| p.0 >= x + r[0] && p.1 >= y + r[1] && p.0 < x + r[0] + r[2] && p.1 < y + r[1] + r[3])
         {
             gu.hover.set(true);
             if (moved || clicked) && w.cursor != id {
@@ -773,7 +808,14 @@ impl ConfigUi {
                 gu.frame(r[0], r[1], r[2], r[3]);
                 let on = top && w.cursor == SETTINGS;
                 let (bx, by) = (r[0] + 16.0, r[1] + 4.0);
-                gu.sprite_cells("menu    windowps", 105, 0..2, bx - on as i32 as f32, by - on as i32 as f32, if on { 0x8080_5020 } else { 0x8080_8080 });
+                gu.sprite_cells(
+                    "menu    windowps",
+                    105,
+                    0..2,
+                    bx - on as i32 as f32,
+                    by - on as i32 as f32,
+                    if on { 0x8080_5020 } else { 0x8080_8080 },
+                );
                 gu.text("Settings", bx + 44.0, by, 1, [0x80; 4]);
                 if on {
                     gu.cursor(bx, by);
@@ -788,12 +830,16 @@ impl ConfigUi {
 }
 
 /// keylayou's cells (table 0x1037a3e8): the key assignment each shows (configs 0x4a.., k1assign's).
-pub const KEYLAYOU_CELLS: [u16; 20] = [0x4a, 0x4c, 0x4b, 0x4d, 0x63, 0x5f, 0x61, 0x5e, 0x5c, 0x60, 0x5d, 0x62, 0x65, 0x64, 0x4e, 0x50, 0x4f, 0x51, 0x57, 0x56];
+pub const KEYLAYOU_CELLS: [u16; 20] = [
+    0x4a, 0x4c, 0x4b, 0x4d, 0x63, 0x5f, 0x61, 0x5e, 0x5c, 0x60, 0x5d, 0x62, 0x65, 0x64, 0x4e, 0x50, 0x4f, 0x51, 0x57,
+    0x56,
+];
 
 /// Table 0x1037a418: a key's character (FUN_101afce0) to its key1topu cap, '!' (0x21) to '_' (0x5f).
 const KEY_CAPS: [u16; 63] = [
-    135, 340, 411, 373, 324, 374, 339, 408, 409, 412, 319, 92, 320, 93, 36, 32, 23, 24, 25, 26, 27, 28, 29, 30, 31, 104, 410, 402, 323, 403, 65, 37,
-    66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 308, 426, 309, 401, 106,
+    135, 340, 411, 373, 324, 374, 339, 408, 409, 412, 319, 92, 320, 93, 36, 32, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+    104, 410, 402, 323, 403, 65, 37, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
+    86, 87, 88, 89, 90, 91, 308, 426, 309, 401, 106,
 ];
 
 /// The cap of a DIK key; none for a key without a character (the cell keeps its blank cap, sprite 21).
@@ -808,7 +854,13 @@ pub fn key_cap(dik: u32) -> Option<usize> {
 fn keylayou(gu: &mut GameUi, v: &Values, page: &str, (dx, dy): (f32, f32), sw: f32, sh: f32) -> Option<[f32; 4]> {
     const KEYLAYOU: &str = "menu    keylayou";
     let (px, py) = gu.window_xy(page, sw, sh)?;
-    let c6 = gu.menu_def(page)?.elements.iter().skip(1).find(|e| e.id == 6).map(|e| (e.x as f32 + e.w as f32, e.y as f32))?;
+    let c6 = gu
+        .menu_def(page)?
+        .elements
+        .iter()
+        .skip(1)
+        .find(|e| e.id == 6)
+        .map(|e| (e.x as f32 + e.w as f32, e.y as f32))?;
     let target = (px + dx + c6.0, py + dy + c6.1 - 14.0);
     let (kx, ky) = gu.window_xy(KEYLAYOU, sw, sh)?;
     let win = gu.lobby_window_off(KEYLAYOU, sw, sh, (target.0 - kx, target.1 - ky), None, false, &[])?;
@@ -875,7 +927,15 @@ pub fn draw_page(ui: &ConfigUi, w: &Win, top: bool, gu: &mut GameUi, v: &Values,
                 let base = if matches!(cid, 0x0f | 0xb7) { 0 } else { lo };
                 let f = (val - base) as f32 / (hi - base).max(1) as f32;
                 if f > 0.0 {
-                    gu.sprite_scaled("menu    windowps", 384, *cx, *cy, f.min(1.0), 1.0, if editing.is_some() { 0xa0a0_a0a0 } else { 0x8080_8080 });
+                    gu.sprite_scaled(
+                        "menu    windowps",
+                        384,
+                        *cx,
+                        *cy,
+                        f.min(1.0),
+                        1.0,
+                        if editing.is_some() { 0xa0a0_a0a0 } else { 0x8080_8080 },
+                    );
                 }
                 // The aspect ratio's text under its slider (FUN_10002cc0) in fontshp.
                 if cid == 0x43 || cid == 0xab {

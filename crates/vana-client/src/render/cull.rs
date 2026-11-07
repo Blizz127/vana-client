@@ -73,7 +73,11 @@ pub struct CullData {
 impl CullData {
     /// `bounds`: each instance's box; `draws`: each draw's sub-draws (instance range, index count, first index, base
     /// vertex). Returns each sub-draw's argument slot.
-    pub fn build(bounds: Vec<[f32; 8]>, instances: &[Instance], draws: &[Vec<(std::ops::Range<u32>, u32, u32, i32)>]) -> (Self, Vec<Vec<u32>>) {
+    pub fn build(
+        bounds: Vec<[f32; 8]>,
+        instances: &[Instance],
+        draws: &[Vec<(std::ops::Range<u32>, u32, u32, i32)>],
+    ) -> (Self, Vec<Vec<u32>>) {
         let mut runs: Vec<(std::ops::Range<u32>, Vec<u32>)> = Vec::new();
         let mut by_range: std::collections::HashMap<(u32, u32), usize> = std::collections::HashMap::new();
         let mut args = Vec::new();
@@ -86,16 +90,29 @@ impl CullData {
                     runs.len() - 1
                 });
                 let slot = args.len() as u32;
-                args.push(ArgBase { index_count: *index_count, first_index: *first_index, base_vertex: *base_vertex, pad: 0 });
+                args.push(ArgBase {
+                    index_count: *index_count,
+                    first_index: *first_index,
+                    base_vertex: *base_vertex,
+                    pad: 0,
+                });
                 runs[run].1.push(slot);
                 s.push(slot);
             }
             slots.push(s);
         }
-        let (mut out, mut run_args, mut gpu_runs, mut boxes) = (0u32, Vec::new(), Vec::with_capacity(runs.len()), Vec::with_capacity(runs.len()));
+        let (mut out, mut run_args, mut gpu_runs, mut boxes) =
+            (0u32, Vec::new(), Vec::with_capacity(runs.len()), Vec::with_capacity(runs.len()));
         let mut arg_run = vec![0u32; args.len()];
         for (r, (range, a)) in runs.into_iter().enumerate() {
-            gpu_runs.push(Run { inst_start: range.start, inst_end: range.end, out_start: out, args_start: run_args.len() as u32, args_count: a.len() as u32, pad: [0; 3] });
+            gpu_runs.push(Run {
+                inst_start: range.start,
+                inst_end: range.end,
+                out_start: out,
+                args_start: run_args.len() as u32,
+                args_count: a.len() as u32,
+                pad: [0; 3],
+            });
             boxes.push(run_box(&bounds, instances, range.clone()));
             out += range.end - range.start;
             for &slot in &a {
@@ -109,7 +126,16 @@ impl CullData {
 
 /// A run's boxes from its instances (each mesh box through its placement matrix).
 fn run_box(bounds: &[[f32; 8]], instances: &[Instance], range: std::ops::Range<u32>) -> RunBox {
-    let mut b = RunBox { lo: Vec3::splat(f32::MAX), hi: Vec3::splat(f32::MIN), org_lo: Vec3::splat(f32::MAX), org_hi: Vec3::splat(f32::MIN), band: Some((f32::MAX, f32::MIN)), plain: false, own: 0.0, moves: false };
+    let mut b = RunBox {
+        lo: Vec3::splat(f32::MAX),
+        hi: Vec3::splat(f32::MIN),
+        org_lo: Vec3::splat(f32::MAX),
+        org_hi: Vec3::splat(f32::MIN),
+        band: Some((f32::MAX, f32::MIN)),
+        plain: false,
+        own: 0.0,
+        moves: false,
+    };
     for i in range {
         let (Some(inst), Some(bd)) = (instances.get(i as usize), bounds.get(i as usize)) else { continue };
         b.moves |= inst.band[2] != 0.0 || inst.band[3] != 0.0;
@@ -120,7 +146,8 @@ fn run_box(bounds: &[[f32; 8]], instances: &[Instance], range: std::ops::Range<u
         }
         let m = Mat4::from_cols_array_2d(&inst.model);
         let centre = m.transform_point3(Vec3::new(bd[0], bd[1], bd[2]));
-        let reach = m.x_axis.truncate().abs() * bd[4] + m.y_axis.truncate().abs() * bd[5] + m.z_axis.truncate().abs() * bd[6];
+        let reach =
+            m.x_axis.truncate().abs() * bd[4] + m.y_axis.truncate().abs() * bd[5] + m.z_axis.truncate().abs() * bd[6];
         (b.lo, b.hi) = (b.lo.min(centre - reach), b.hi.max(centre + reach));
         let origin = m.w_axis.truncate();
         (b.org_lo, b.org_hi) = (b.org_lo.min(origin), b.org_hi.max(origin));
@@ -185,23 +212,43 @@ impl Cull {
     /// None without indirect draws that start past instance 0, with nothing to draw, or with FFXI_NO_CULL set (a
     /// check against the unculled scene).
     pub fn new(gpu: &Gpu, layout: &wgpu::BindGroupLayout, data: &CullData, instances: &wgpu::Buffer) -> Option<Self> {
-        if !gpu.device.features().contains(wgpu::Features::INDIRECT_FIRST_INSTANCE) || data.runs.is_empty() || data.bounds.is_empty() || std::env::var_os("FFXI_NO_CULL").is_some() {
+        if !gpu.device.features().contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+            || data.runs.is_empty()
+            || data.bounds.is_empty()
+            || std::env::var_os("FFXI_NO_CULL").is_some()
+        {
             return None;
         }
         let device = &gpu.device;
         let with = |label, bytes: &[u8], usage: wgpu::BufferUsages| {
-            let b = device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size: (bytes.len() as u64).max(16), usage: usage | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let b = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: (bytes.len() as u64).max(16),
+                usage: usage | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             gpu.queue.put(&b, 0, bytes);
             b
         };
-        let empty = |label, size: u64, usage: wgpu::BufferUsages| device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size: size.max(16), usage, mapped_at_creation: false });
+        let empty = |label, size: u64, usage: wgpu::BufferUsages| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: size.max(16),
+                usage,
+                mapped_at_creation: false,
+            })
+        };
         let storage = wgpu::BufferUsages::STORAGE;
         let runs = with("cull runs", bytemuck::cast_slice(&data.runs), storage);
         let bounds = with("cull bounds", bytemuck::cast_slice(&data.bounds), storage);
         let run_args = with("cull run args", bytemuck::cast_slice(&data.run_args), storage);
         let arg_base = with("cull arg base", bytemuck::cast_slice(&data.args), storage);
         let out = empty("culled instances", data.out_len as u64 * INSTANCE_BYTES, storage | wgpu::BufferUsages::VERTEX);
-        let args = empty("cull args", data.args.len() as u64 * 20, storage | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC);
+        let args = empty(
+            "cull args",
+            data.args.len() as u64 * 20,
+            storage | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC,
+        );
         let vis = empty("cull visibility", data.bounds.len() as u64 * 4, storage);
         let mask = with("cull camera list", &vec![0u8; (3 + 2 * data.bounds.len().div_ceil(32)) * 4], storage);
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -213,9 +260,25 @@ impl Cull {
                 .map(|(k, b)| wgpu::BindGroupEntry { binding: k as u32, resource: b.as_entire_binding() })
                 .collect::<Vec<_>>(),
         });
-        log::info!("scenery culled on the GPU: {} instances in {} runs, {} draws", data.bounds.len(), data.runs.len(), data.args.len());
+        log::info!(
+            "scenery culled on the GPU: {} instances in {} runs, {} draws",
+            data.bounds.len(),
+            data.runs.len(),
+            data.args.len()
+        );
         let ranges = data.runs.iter().map(|r| (r.inst_start, r.inst_end)).collect();
-        Some(Self { group, instances: data.bounds.len() as u32, runs: data.runs.len() as u32, boxes: data.boxes.clone(), arg_run: data.arg_run.clone(), ranges, listed: None, mask, out, args })
+        Some(Self {
+            group,
+            instances: data.bounds.len() as u32,
+            runs: data.runs.len() as u32,
+            boxes: data.boxes.clone(),
+            arg_run: data.arg_run.clone(),
+            ranges,
+            listed: None,
+            mask,
+            out,
+            args,
+        })
     }
 
     /// A camera list in force (FUN_1017b510: the slot draws only its placements): per instance whether it is
@@ -231,7 +294,8 @@ impl Cull {
                     words[3 + set * n + i / 32] |= 1 << (i % 32);
                 }
             }
-            let any = |f: &[bool], s: u32, e: u32| f.get(s as usize..e as usize).is_some_and(|r| r.iter().any(|&on| on));
+            let any =
+                |f: &[bool], s: u32, e: u32| f.get(s as usize..e as usize).is_some_and(|r| r.iter().any(|&on| on));
             self.ranges.iter().map(|&(s, e)| any(allowed, s, e) || any(beyond, s, e)).collect()
         });
         gpu.queue.put(&self.mask, 0, bytemuck::cast_slice(&words));
@@ -241,7 +305,12 @@ impl Cull {
     /// offscreen benchmark).
     pub fn stats(&self, gpu: &Gpu) -> (u32, u32, u32) {
         let size = self.args.size();
-        let read = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+        let read = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
         let mut e = gpu.device.create_command_encoder(&Default::default());
         e.copy_buffer_to_buffer(&self.args, 0, &read, 0, size);
         gpu.queue.submit([e.finish()]);
@@ -256,7 +325,11 @@ impl Cull {
     /// Per run, whether its draws go in this frame (RunBox::maybe_visible); the GPU counts what they draw.
     pub fn runs_shown(&self, view_proj: Mat4, eye: Vec3, dk: [f32; 2]) -> Vec<bool> {
         let p = planes(view_proj);
-        self.boxes.iter().enumerate().map(|(k, b)| self.listed.as_ref().is_none_or(|l| l[k]) && b.maybe_visible(&p, eye, dk)).collect()
+        self.boxes
+            .iter()
+            .enumerate()
+            .map(|(k, b)| self.listed.as_ref().is_none_or(|l| l[k]) && b.maybe_visible(&p, eye, dk))
+            .collect()
     }
 
     /// The run of an argument slot.
@@ -265,8 +338,14 @@ impl Cull {
     }
 
     /// Both passes, with the scenery's globals (camera, voyage, door parts) bound at group 0.
-    pub fn run(&self, encoder: &mut wgpu::CommandEncoder, globals: &wgpu::BindGroup, pipes: &[wgpu::ComputePipeline; 2]) {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("cull"), timestamp_writes: None });
+    pub fn run(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        globals: &wgpu::BindGroup,
+        pipes: &[wgpu::ComputePipeline; 2],
+    ) {
+        let mut pass =
+            encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("cull"), timestamp_writes: None });
         pass.set_bind_group(0, globals, &[]);
         pass.set_bind_group(3, &self.group, &[]);
         pass.set_pipeline(&pipes[0]);
@@ -282,11 +361,25 @@ pub fn layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let entry = |binding: u32, read_only: bool| wgpu::BindGroupLayoutEntry {
         binding,
         visibility: wgpu::ShaderStages::COMPUTE,
-        ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only }, has_dynamic_offset: false, min_binding_size: None },
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
         count: None,
     };
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("cull"),
-        entries: &[entry(0, true), entry(1, true), entry(2, true), entry(3, false), entry(4, true), entry(5, true), entry(6, false), entry(7, false), entry(8, true)],
+        entries: &[
+            entry(0, true),
+            entry(1, true),
+            entry(2, true),
+            entry(3, false),
+            entry(4, true),
+            entry(5, true),
+            entry(6, false),
+            entry(7, false),
+            entry(8, true),
+        ],
     })
 }

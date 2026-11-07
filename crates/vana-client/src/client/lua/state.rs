@@ -1,8 +1,8 @@
 //! The rest of the game façade (docs/lua-mods.md 4.6): skills, jobs, merits and job points, stats, gil, what we have
 //! learned, job setups, session flags, the camera, targets by tag and the zone's NPC list.
 
-use super::api::world;
 use super::World;
+use super::api::world;
 use mlua::{Lua, Table};
 
 /// What the mod phase reads from the UI for the mods (shared as app data): the map grid as <pos> shows it.
@@ -80,7 +80,8 @@ pub(super) fn by_tag(w: &World, tag: &str) -> Option<(u32, u16)> {
         return Some((m.id, m.index));
     }
     let tagged = format!("<{inner}>");
-    let probe = if ["t", "me", "bt", "scan", "pet", "ht"].contains(&inner.as_str()) { tagged.as_str() } else { tag.trim() };
+    let probe =
+        if ["t", "me", "bt", "scan", "pet", "ht"].contains(&inner.as_str()) { tagged.as_str() } else { tag.trim() };
     super::super::textcmd::resolve(w, Some(probe), false, true, super::super::textcmd::Mode::Internal)
 }
 
@@ -208,7 +209,9 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         "spells",
         lua.create_function(|lua, ()| {
             let w = world(lua)?;
-            Ok((0..(w.spells_known.len() * 8) as u16).filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0)).collect::<Vec<u16>>())
+            Ok((0..(w.spells_known.len() * 8) as u16)
+                .filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0))
+                .collect::<Vec<u16>>())
         })?,
     )?;
     game.set(
@@ -216,7 +219,10 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         lua.create_function(|lua, ()| {
             let w = world(lua)?;
             let Some(acts) = w.actions.as_ref() else { return Ok(Vec::new()) };
-            Ok(super::super::magic::ability_rows(w, 0).into_iter().filter_map(|i| acts.abilities.get(i as usize).map(|a| a.id)).collect::<Vec<u16>>())
+            Ok(super::super::magic::ability_rows(w, 0)
+                .into_iter()
+                .filter_map(|i| acts.abilities.get(i as usize).map(|a| a.id))
+                .collect::<Vec<u16>>())
         })?,
     )?;
     game.set(
@@ -234,10 +240,15 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
                 t.set("raw", lua.create_string(&b[..])?)?;
                 match b[0] {
                     // BLU: 20 slots, spell id - 0x200.
-                    0x10 => t.set("blue_spells", b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>())?,
+                    0x10 => t.set(
+                        "blue_spells",
+                        b[4..24].iter().filter(|&&s| s != 0).map(|&s| 0x200 + s as u16).collect::<Vec<u16>>(),
+                    )?,
                     // PUP: head and frame items 0x2000 + n, attachments 0x2100 + n.
                     0x12 => {
-                        let item = |i: usize, v: u8| (v != 0).then(|| if i < 2 { 0x2000 + v as u16 } else { 0x2100 + v as u16 });
+                        let item = |i: usize, v: u8| {
+                            (v != 0).then(|| if i < 2 { 0x2000 + v as u16 } else { 0x2100 + v as u16 })
+                        };
                         t.set("head", item(0, b[4]))?;
                         t.set("frame", item(1, b[5]))?;
                         t.set("attachments", (2..14).filter_map(|i| item(i, b[4 + i])).collect::<Vec<u16>>())?;
@@ -352,7 +363,8 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
         "raycast",
         lua.create_function(move |lua, (a, b): (Table, Table)| {
             let w = world(lua)?;
-            let v = |t: &Table| -> mlua::Result<glam::Vec3> { Ok(glam::Vec3::new(t.get("x")?, t.get("y")?, t.get("z")?)) };
+            let v =
+                |t: &Table| -> mlua::Result<glam::Vec3> { Ok(glam::Vec3::new(t.get("x")?, t.get("y")?, t.get("z")?)) };
             let (from, to) = (v(&a)?, v(&b)?);
             let Some(d) = w.ground.as_ref().and_then(|g| g.raycast(from, to)) else { return Ok(None) };
             let hit = point(lua, from + (to - from).normalize_or_zero() * d)?;
@@ -400,7 +412,10 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
             t.set("autorun", w.autorun)?;
             t.set("follow", w.follow)?;
             t.set("pet_index", (w.my_pet != 0).then_some(w.my_pet))?;
-            let grid = lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<FrameInfo>>>().map(|f| f.borrow().grid.clone()).unwrap_or_default();
+            let grid = lua
+                .app_data_ref::<std::rc::Rc<std::cell::RefCell<FrameInfo>>>()
+                .map(|f| f.borrow().grid.clone())
+                .unwrap_or_default();
             t.set("map_grid", Some(grid).filter(|g| !g.is_empty() && !w.room_flag))?;
             t.set("modern_ui", w.modern)?;
             Ok(t)

@@ -59,7 +59,8 @@ mod tests {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok()?;
         let d = index.read(file).ok()?;
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
         let scene = crate::dat::zone::load_scene(&keys, &d).ok()?;
         let k = (name[3] - b'0') as usize;
         Path::parse(scene.paths[k].as_deref()?)
@@ -72,7 +73,8 @@ mod tests {
     fn scene(file: u32) -> Option<crate::dat::zone::ZoneScene> {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok()?;
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
         crate::dat::zone::load_scene(&keys, &index.read(file).ok()?).ok()
     }
 
@@ -131,11 +133,36 @@ mod tests {
             assert!(close(m.x_axis.truncate(), x, 1e-4) && close(m.z_axis.truncate(), z, 1e-4), "{m}");
             assert!(close(m.w_axis.truncate(), w, 0.01), "{}", m.w_axis);
         };
-        check(p.matrix(0.0, false), Vec3::new(-0.998915, 0.0, 0.04657), Vec3::new(-0.04657, 0.0, -0.998915), Vec3::new(3588.467, 0.0, 1092.05));
-        check(p.matrix(0.25, false), Vec3::new(-0.406212, 0.0, -0.913779), Vec3::new(0.913779, 0.0, -0.406212), Vec3::new(1049.094, 0.0, 1802.976));
-        check(p.matrix(0.5, false), Vec3::new(0.037217, 0.0, -0.999307), Vec3::new(0.999307, 0.0, 0.037217), Vec3::new(826.869, 0.0, -261.705));
-        check(p.matrix(1.0, false), Vec3::new(0.868821, 0.0, 0.495127), Vec3::new(-0.495127, 0.0, 0.868821), Vec3::new(4054.643, 0.0, 296.392));
-        check(p.matrix(0.5, true), Vec3::new(-0.037217, 0.0, 0.999307), Vec3::new(-0.999307, 0.0, -0.037217), Vec3::new(-826.869, 0.0, 261.705));
+        check(
+            p.matrix(0.0, false),
+            Vec3::new(-0.998915, 0.0, 0.04657),
+            Vec3::new(-0.04657, 0.0, -0.998915),
+            Vec3::new(3588.467, 0.0, 1092.05),
+        );
+        check(
+            p.matrix(0.25, false),
+            Vec3::new(-0.406212, 0.0, -0.913779),
+            Vec3::new(0.913779, 0.0, -0.406212),
+            Vec3::new(1049.094, 0.0, 1802.976),
+        );
+        check(
+            p.matrix(0.5, false),
+            Vec3::new(0.037217, 0.0, -0.999307),
+            Vec3::new(0.999307, 0.0, 0.037217),
+            Vec3::new(826.869, 0.0, -261.705),
+        );
+        check(
+            p.matrix(1.0, false),
+            Vec3::new(0.868821, 0.0, 0.495127),
+            Vec3::new(-0.495127, 0.0, 0.868821),
+            Vec3::new(4054.643, 0.0, 296.392),
+        );
+        check(
+            p.matrix(0.5, true),
+            Vec3::new(-0.037217, 0.0, 0.999307),
+            Vec3::new(-0.999307, 0.0, -0.037217),
+            Vec3::new(-826.869, 0.0, 261.705),
+        );
         // V carries the ship's place to the origin and its heading onto +Z.
         for t in [0.0, 0.13, 0.5, 0.77, 1.0] {
             for rev in [false, true] {
@@ -144,14 +171,34 @@ mod tests {
             }
         }
         if let Some(p) = path(101, b"c002") {
-            check(p.matrix(0.5, false), Vec3::new(0.87232, 0.0, -0.488935), Vec3::new(0.488935, 0.0, 0.87232), Vec3::new(-286.906, 0.0, 192.504));
+            check(
+                p.matrix(0.5, false),
+                Vec3::new(0.87232, 0.0, -0.488935),
+                Vec3::new(0.488935, 0.0, 0.87232),
+                Vec3::new(-286.906, 0.0, 192.504),
+            );
         }
         if let Some(p) = path(147, b"c000") {
-            check(p.matrix(0.5, true), Vec3::new(0.107841, 0.0, -0.994168), Vec3::new(0.994168, 0.0, 0.107841), Vec3::new(1179.334, 0.0, 475.422));
+            check(
+                p.matrix(0.5, true),
+                Vec3::new(0.107841, 0.0, -0.994168),
+                Vec3::new(0.994168, 0.0, 0.107841),
+                Vec3::new(1179.334, 0.0, 475.422),
+            );
         }
         if let Some(p) = path(326, b"c000") {
-            check(p.matrix(0.0, false), Vec3::new(-0.374498, 0.0, 0.927228), Vec3::new(-0.927228, 0.0, -0.374498), Vec3::new(1238.856, 60.0, 2637.019));
-            check(p.matrix(0.5, false), Vec3::new(-0.651872, 0.0, 0.758329), Vec3::new(-0.758329, 0.0, -0.651872), Vec3::new(790.793, 75.305, 288.221));
+            check(
+                p.matrix(0.0, false),
+                Vec3::new(-0.374498, 0.0, 0.927228),
+                Vec3::new(-0.927228, 0.0, -0.374498),
+                Vec3::new(1238.856, 60.0, 2637.019),
+            );
+            check(
+                p.matrix(0.5, false),
+                Vec3::new(-0.651872, 0.0, 0.758329),
+                Vec3::new(-0.758329, 0.0, -0.651872),
+                Vec3::new(790.793, 75.305, 288.221),
+            );
         }
     }
 }

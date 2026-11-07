@@ -37,7 +37,11 @@ pub struct List {
 
 /// FUN_1022da40: children 2..5 and 7 need Zilart, Promathia, Aht Urhgan, Altana, Adoulin (bits 1..4, 0xb).
 fn menu_off(enabled: u32) -> Vec<u16> {
-    [(2u16, 1u32), (3, 2), (4, 3), (5, 4), (7, 0xb)].into_iter().filter(|&(_, b)| enabled >> b & 1 == 0).map(|(c, _)| c).collect()
+    [(2u16, 1u32), (3, 2), (4, 3), (5, 4), (7, 0xb)]
+        .into_iter()
+        .filter(|&(_, b)| enabled >> b & 1 == 0)
+        .map(|(c, _)| c)
+        .collect()
 }
 
 /// The journal's name files, read on the first open.
@@ -67,7 +71,11 @@ pub(super) fn open_list(w: &mut World, log: usize) {
 /// The logs the modern page lists: the three nations, then those whose expansion is enabled (TVR once RoV is past
 /// 340), as the Left / Right cycle allows.
 pub(super) fn shown_logs(w: &World) -> Vec<usize> {
-    (0..15).filter(|&l| (l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0) && !(l == 11 && w.journal.rov < 0x154)).collect()
+    (0..15)
+        .filter(|&l| {
+            (l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0) && !(l == 11 && w.journal.rov < 0x154)
+        })
+        .collect()
 }
 
 /// The modern page: a log with the cursor on an entry (else the first row that is not a header).
@@ -101,7 +109,11 @@ pub fn command(w: &mut World, gu: &GameUi, arg: Option<&str>) {
     logs(w);
     let nation = w.journal.nation as usize;
     let log = arg
-        .and_then(|a| (0..15).filter(|&l| l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0).find(|&l| gu.title_msg(journal::MISSION_TITLES[l]).as_deref() == Some(a)))
+        .and_then(|a| {
+            (0..15)
+                .filter(|&l| l < 3 || w.expansions >> journal::MISSION_BITS[l] & 1 != 0)
+                .find(|&l| gu.title_msg(journal::MISSION_TITLES[l]).as_deref() == Some(a))
+        })
         .unwrap_or(nation.min(2));
     w.missions = Some(Missions { menu: None, list: None });
     open_list(w, log);
@@ -253,7 +265,11 @@ fn list_key(w: &mut World, l: &mut List, key: egui::Key, page: bool) {
         }
         // With 0xa8 (Ctrl / Alt) a page; else the next / previous log.
         (1, egui::Key::ArrowLeft | egui::Key::ArrowRight) if page => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             let (was, mut row) = (l.cursor, l.cursor.saturating_sub(l.top));
             if super::scrollbar::paged(m, &mut l.top, &mut row, l.rows.len(), VISIBLE) {
                 l.cursor = l.top + row;
@@ -381,10 +397,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let logs = w.logs.clone();
     let empty = crate::dat::journal::LogFile::default();
     let f = logs.as_ref().and_then(|g| g.missions.get(l.log)).unwrap_or(&empty);
-    let shown: Vec<u16> = if l.state == 1 { (1..=VISIBLE as u16).filter(|&c| l.top + (c as usize) - 1 < l.rows.len()).collect() } else { Vec::new() };
+    let shown: Vec<u16> = if l.state == 1 {
+        (1..=VISIBLE as u16).filter(|&c| l.top + (c as usize) - 1 < l.rows.len()).collect()
+    } else {
+        Vec::new()
+    };
     let hide: Vec<u16> = (1..=VISIBLE as u16).filter(|c| !shown.contains(c)).collect();
     let sel = (l.state == 1).then(|| (l.cursor - l.top + 1) as u16);
-    let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), sel, w.confirm.is_none(), &hide) else { return rects };
+    let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), sel, w.confirm.is_none(), &hide) else {
+        return rects;
+    };
     let [fx, fy, fw, fh] = win.frame;
     let Some((x, y)) = gu.window_xy(LIST, sw, sh) else { return rects };
     rects.push(win.frame);

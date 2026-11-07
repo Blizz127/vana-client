@@ -72,7 +72,13 @@ fn language(attrs: u32) -> u8 {
 fn rows(w: &World) -> Vec<Option<usize>> {
     let filter = w.concierge_ui.as_ref().map_or(0, |c| c.filter);
     std::iter::once(None)
-        .chain(w.concierge.iter().enumerate().filter(|(_, s)| s.item != 0 && (filter == 0 || language(s.attrs) == filter)).map(|(i, _)| Some(i)))
+        .chain(
+            w.concierge
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.item != 0 && (filter == 0 || language(s.attrs) == filter))
+                .map(|(i, _)| Some(i)),
+        )
         .collect()
 }
 
@@ -150,7 +156,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
             w.sounds.push(Ui::Cursor as u32);
         }
         egui::Key::ArrowRight | egui::Key::ArrowLeft => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             if super::scrollbar::rows_abs(m, &mut c.top, &mut c.cursor, n, ROWS) {
                 w.sounds.push(Ui::Cursor as u32);
             }
@@ -201,10 +211,14 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let hit = |name: &str| -> Option<u16> {
         let (x, y) = gu.window_xy(name, sw, sh)?;
         let lay = gu.layout(name)?;
-        lay.elements.iter().skip(1).find(|e| {
-            let (ex, ey) = (x + e.x as f32, y + e.y as f32);
-            p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-        }).map(|e| e.id)
+        lay.elements
+            .iter()
+            .skip(1)
+            .find(|e| {
+                let (ex, ey) = (x + e.x as f32, y + e.y as f32);
+                p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
+            })
+            .map(|e| e.id)
     };
     if let Some(id) = hit(FILTER) {
         gu.hover.set(true);
@@ -276,7 +290,14 @@ pub(super) fn look(w: &World) -> Option<Look> {
                     5 => "?",
                     _ => "",
                 };
-                RowLook { item: s.item, tint: super::linkshell::tint(s.ext[6], s.ext[6] >> 4, s.ext[7]), name: ls_name(&s.ext[9..24]), ours: ls1 == Some(group), lang, wanted: s.attrs >> 6 & 0xf }
+                RowLook {
+                    item: s.item,
+                    tint: super::linkshell::tint(s.ext[6], s.ext[6] >> 4, s.ext[7]),
+                    name: ls_name(&s.ext[9..24]),
+                    ours: ls1 == Some(group),
+                    lang,
+                    wanted: s.attrs >> 6 & 0xf,
+                }
             })
         })
         .collect();
@@ -335,7 +356,11 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let Some(c) = &w.concierge_ui else { return rects };
     let focused = w.confirm.is_none();
     if let Some(info) = &w.item_info {
-        super::items::upload_icons(gu, info, w.concierge.iter().map(|s| s.item).filter(|&i| i != 0).chain(std::iter::once(0x200)));
+        super::items::upload_icons(
+            gu,
+            info,
+            w.concierge.iter().map(|s| s.item).filter(|&i| i != 0).chain(std::iter::once(0x200)),
+        );
     }
     if let Some(win) = gu.lobby_window_off(HEADER, sw, sh, (0.0, 0.0), None, false, &[]) {
         let [x, y, ..] = win.frame;
@@ -359,7 +384,14 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             let s = &w.concierge[*i];
             let group = u32::from_le_bytes([s.ext[0], s.ext[1], s.ext[2], s.ext[3]]);
             gu.sprite("menu    keytops3", 0x219, rx + COLS[0], ry + 2.0, WHITE);
-            super::linkshell::icon(gu, s.item, rx + COLS[0], ry + 2.0, 16.0, super::linkshell::tint(s.ext[6], s.ext[6] >> 4, s.ext[7]));
+            super::linkshell::icon(
+                gu,
+                s.item,
+                rx + COLS[0],
+                ry + 2.0,
+                16.0,
+                super::linkshell::tint(s.ext[6], s.ext[6] >> 4, s.ext[7]),
+            );
             let tint = if ls1.is_some_and(|g| g == group) { GREEN } else { WHITE };
             gu.text_fit(&ls_name(&s.ext[9..24]), rx + COLS[1], ry + 2.0, COLS[2] - COLS[1] - 8.0, tint);
             let lang = match language(s.attrs) {

@@ -211,7 +211,16 @@ impl HudTop {
 
     /// Draws the three windows from the bars' text slots.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw(&mut self, gu: &mut GameUi, w: &World, sw: f32, sh: f32, bars: &BarText, camera_forward: Vec3, log_top: f32) {
+    pub fn draw(
+        &mut self,
+        gu: &mut GameUi,
+        w: &World,
+        sw: f32,
+        sh: f32,
+        bars: &BarText,
+        camera_forward: Vec3,
+        log_top: f32,
+    ) {
         let ticks = self.ticks();
         self.net_tick(w);
         let (title, help) = (shown(&bars.title), shown(&bars.help));
@@ -230,7 +239,11 @@ impl HudTop {
             || w.conquest.busy
             || super::search::busy(w)
             || w.bid.pending;
-        self.fade.advance(ticks, !title.is_empty() || !help.is_empty() || busy, w.zoning_since.is_none() && w.loading.is_none());
+        self.fade.advance(
+            ticks,
+            !title.is_empty() || !help.is_empty() || busy,
+            w.zoning_since.is_none() && w.loading.is_none(),
+        );
         let unread = w.friends.mail.iter().filter(|m| m.unread);
         self.mail = (unread.clone().count().min(200) as u32, unread.clone().any(|m| m.header.kind == 0x1e));
         self.gm = matches!(&w.gm_reply, Some((_, _, text, true)) if !text.is_empty());
@@ -250,12 +263,15 @@ impl HudTop {
                 pct: self.pct,
                 sent: self.sent_rate,
                 recv: self.recv_rate,
-                meter: (self.frame, match base {
-                    1 => 3,
-                    5 => 2,
-                    9 => 1,
-                    _ => 0,
-                }),
+                meter: (
+                    self.frame,
+                    match base {
+                        1 => 3,
+                        5 => 2,
+                        9 => 1,
+                        _ => 0,
+                    },
+                ),
                 mail: (self.net_page == 0).then_some(self.mail),
                 gm_reply: self.net_page == 0 && self.gm,
             };
@@ -264,7 +280,14 @@ impl HudTop {
             self.draw_bars(gu, sw, sh, title, help, ticks, busy);
         }
         // The compass alone is hidden in events, and in the modern layer (its location panel).
-        self.draw_compass(gu, w, log_top, ticks, !super::event::active(w) && !w.modern && !w.lua.hides("compass"), camera_forward);
+        self.draw_compass(
+            gu,
+            w,
+            log_top,
+            ticks,
+            !super::event::active(w) && !w.modern && !w.lua.hides("compass"),
+            camera_forward,
+        );
     }
 
     /// titlewin, helpwind and netstat at the current fade (also the offscreen topbar-shot).
@@ -293,7 +316,10 @@ impl HudTop {
         // the text; the marquee stands still.
         self.step_busy(ticks, busy);
         if busy {
-            let half = (165..170).filter_map(|f| gu.cell_bounds("menu    keytops3", f, 0)).map(|b| (b[2] - b[0]) / 2.0).fold(0.0, f32::max);
+            let half = (165..170)
+                .filter_map(|f| gu.cell_bounds("menu    keytops3", f, 0))
+                .map(|b| (b[2] - b[0]) / 2.0)
+                .fold(0.0, f32::max);
             let x0 = gu.cell_bounds("menu    keytops3", 165 + self.busy_frame, 0).map_or(0.0, |b| b[0]);
             gu.sprite("menu    keytops3", 165 + self.busy_frame, sw / 2.0 - half - x0, hy + 8.0, 0x8080_8080);
         }
@@ -452,7 +478,9 @@ impl HudTop {
         let h = (f.x as f64).atan2(-f.z as f64) + (1.0 - k as f64) * std::f64::consts::PI;
         let (sn, cs) = h.sin_cos();
         // A local (lx, ly) = (P.x - E.x, E.z - P.z) through S(scale) Rz(h') Rx(-1.0996), the offset truncated.
-        let map = |lx: f64, ly: f64, sc: f64| -> (f32, f32) { (((lx * cs - ly * sn) * sc).trunc() as f32, ((lx * sn + ly * cs) * sc * tilt).trunc() as f32) };
+        let map = |lx: f64, ly: f64, sc: f64| -> (f32, f32) {
+            (((lx * cs - ly * sn) * sc).trunc() as f32, ((lx * sn + ly * cs) * sc * tilt).trunc() as f32)
+        };
         // The disk and the letters: S(C+0x30 x k x 0.4); the dots and the arrow: S(2k).
         let s1 = rs.scale as f64 * k as f64 * 0.4;
         let s2 = 2.0 * k as f64;
@@ -480,7 +508,8 @@ impl HudTop {
                 self.grid_wait = 30.0;
                 self.grid = super::map::grid_text(w, gu.map_regions());
             }
-            let end = gu.shape_text(&format!("{}:{:02}  {}", m / 60, m % 60, self.grid), cx - 50.0, cy + 26.0, tint, false);
+            let end =
+                gu.shape_text(&format!("{}:{:02}  {}", m / 60, m % 60, self.grid), cx - 50.0, cy + 26.0, tint, false);
             // Ours (the Clock extra): Earth time and the moon over the next day, right of the compass and its time
             // (under it is the log).
             if w.earth_clock
@@ -515,7 +544,9 @@ impl HudTop {
         }
         let aim = match w.scan.tracking() {
             Some(t) => Some((t.pos[0], t.pos[2], t.index, 0x8020_80f0u32, 0x8080_8080u32)),
-            None => super::target::call_for_help(w).and_then(|id| w.entities.get(&id)).map(|e| (e.pos.x, e.pos.z, e.index, 0x8080_2020, gu.ncol(8))),
+            None => super::target::call_for_help(w)
+                .and_then(|id| w.entities.get(&id))
+                .map(|e| (e.pos.x, e.pos.z, e.index, 0x8080_2020, gu.ncol(8))),
         };
         if let Some((tx, tz, index, colour, name_colour)) = aim {
             let d = Vec3::new(tx - w.pos.x, 0.0, tz - w.pos.z).normalize_or_zero();
@@ -537,7 +568,22 @@ impl HudTop {
 /// The offscreen top bar (topbar-shot): the bars at a fade state, the main menu on child `menu`, the party
 /// row at `hpp` and a target window with ("mob") or without ("npc") the gauge.
 #[allow(clippy::too_many_arguments)]
-pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_swap: Option<&str>, target: Option<&str>, hpp: u8, map: Option<&str>, downloading: Option<usize>, window: Option<&str>, config: Option<&str>, cfgset: Option<&str>, installed: Option<u32>, width: u32, height: u32) -> anyhow::Result<()> {
+pub fn topbar_shot(
+    out: &std::path::Path,
+    fade: &str,
+    menu: Option<u16>,
+    menu_swap: Option<&str>,
+    target: Option<&str>,
+    hpp: u8,
+    map: Option<&str>,
+    downloading: Option<usize>,
+    window: Option<&str>,
+    config: Option<&str>,
+    cfgset: Option<&str>,
+    installed: Option<u32>,
+    width: u32,
+    height: u32,
+) -> anyhow::Result<()> {
     use crate::render::screens::HudState;
     let cfg = crate::config::Config::load();
     let index = crate::dat::DatIndex::open(&cfg.ffxi_dir())?;
@@ -575,16 +621,37 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         menu_selected: menu.and_then(|id| items.iter().find(|(i, _)| *i as u16 + 1 == id)).map(|(i, _)| *i),
         menu_page: 0,
         menu_off: Vec::new(),
-        menu_swap: menu_swap.map_or(Vec::new(), |s| s.split(',').filter_map(|p| { let (c, k) = p.split_once(':')?; Some((c.parse().ok()?, k.parse().ok()?)) }).collect()),
+        menu_swap: menu_swap.map_or(Vec::new(), |s| {
+            s.split(',')
+                .filter_map(|p| {
+                    let (c, k) = p.split_once(':')?;
+                    Some((c.parse().ok()?, k.parse().ok()?))
+                })
+                .collect()
+        }),
         menu_focused: true,
         chat_log: false,
     };
     gu.clear();
-    let login = config.is_some_and(|c| c == "login" || c == "loginpol" || c == "logincombo" || c.starts_with("login2fa"));
+    let login =
+        config.is_some_and(|c| c == "login" || c == "loginpol" || c == "logincombo" || c.starts_with("login2fa"));
     let lobby = login || config.is_some_and(|c| c.starts_with("lobycwin") || c.starts_with("lobby"));
     if login {
-        let input = super::UiInput { page: false, pointer: None, moved: false, clicked: false, pressed: false, down: false, released: false, right_clicked: false, middle_clicked: false, wheel: 0, events: Vec::new() };
-        let (mut a, mut b, mut c, mut d) = ("127.0.0.1".to_string(), "tuxedo".to_string(), "secret".to_string(), String::new());
+        let input = super::UiInput {
+            page: false,
+            pointer: None,
+            moved: false,
+            clicked: false,
+            pressed: false,
+            down: false,
+            released: false,
+            right_clicked: false,
+            middle_clicked: false,
+            wheel: 0,
+            events: Vec::new(),
+        };
+        let (mut a, mut b, mut c, mut d) =
+            ("127.0.0.1".to_string(), "tuxedo".to_string(), "secret".to_string(), String::new());
         let mut remember = cfgset == Some("remember");
         // login2fa[:scan|:code|:done]: the two-factor window over the form, a sample key for the QR code.
         let mut twofa = config.and_then(|c| c.strip_prefix("login2fa")).map(|step| {
@@ -612,13 +679,38 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         if pol {
             a = "PlayOnline".into();
         }
-        let f = |label, text, secret, hint| super::LoginField { label, text, secret, hint, help: "", options: Vec::new(), read_only: false };
+        let f = |label, text, secret, hint| super::LoginField {
+            label,
+            text,
+            secret,
+            hint,
+            help: "",
+            options: Vec::new(),
+            read_only: false,
+        };
         let mut kind = if pol { "PlayOnline" } else { "Private" }.to_string();
-        let kind_field = super::LoginField { options: vec!["PlayOnline".into(), "Private".into()], read_only: true, ..f("Server Type", &mut kind, false, "") };
+        let kind_field = super::LoginField {
+            options: vec!["PlayOnline".into(), "Private".into()],
+            read_only: true,
+            ..f("Server Type", &mut kind, false, "")
+        };
         let mut fields = if pol {
-            vec![kind_field, f("PlayOnline ID", &mut e, false, ""), f("POL password", &mut g, true, ""), f("Square Enix ID", &mut b, false, ""), f("Password", &mut c, true, ""), f("One-time pass.", &mut d, false, "with a token only")]
+            vec![
+                kind_field,
+                f("PlayOnline ID", &mut e, false, ""),
+                f("POL password", &mut g, true, ""),
+                f("Square Enix ID", &mut b, false, ""),
+                f("Password", &mut c, true, ""),
+                f("One-time pass.", &mut d, false, "with a token only"),
+            ]
         } else {
-            vec![kind_field, f("Server", &mut a, false, ""), f("Account", &mut b, false, ""), f("Password", &mut c, true, ""), f("One-time code", &mut d, false, "only with 2FA")]
+            vec![
+                kind_field,
+                f("Server", &mut a, false, ""),
+                f("Account", &mut b, false, ""),
+                f("Password", &mut c, true, ""),
+                f("One-time code", &mut d, false, "only with 2FA"),
+            ]
         };
         // Sample saved logins; logincombo: the server list open on its second row.
         if !pol {
@@ -626,7 +718,23 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         }
         fields[if pol { 3 } else { 2 }].options = vec!["tuxedo".into(), "lnxtest01".into()];
         let mut combo = (config == Some("logincombo")).then_some((1, 1));
-        super::login_window(&mut gu, &input, [width, height], &mut fields, pol, &mut combo, &mut remember, &mut 0, false, "", help, &cfg.client_version, &mut Vec::new(), None, 1.0);
+        super::login_window(
+            &mut gu,
+            &input,
+            [width, height],
+            &mut fields,
+            pol,
+            &mut combo,
+            &mut remember,
+            &mut 0,
+            false,
+            "",
+            help,
+            &cfg.client_version,
+            &mut Vec::new(),
+            None,
+            1.0,
+        );
         if let Some(t) = twofa.as_mut() {
             super::twofa::window(&mut gu, &input, [width, height], t, false, &mut Vec::new(), None);
         }
@@ -666,7 +774,12 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir())?;
         let mut o = super::map::Overlay::new(zone, region, Some(std::sync::Arc::new(index)));
         o.wait_image(&mut gu);
-        let dots = [(x + 5.0, z + 3.0, 0x8000_b040, false), (x - 8.0, z + 6.0, 0x8000_40f0, false), (x - 4.0, z - 12.0, 0x8030_60e0, false), (x + 10.0, z - 10.0, 0x8080_8080, true)];
+        let dots = [
+            (x + 5.0, z + 3.0, 0x8000_b040, false),
+            (x - 8.0, z + 6.0, 0x8000_40f0, false),
+            (x - 4.0, z - 12.0, 0x8030_60e0, false),
+            (x + 10.0, z - 10.0, 0x8080_8080, true),
+        ];
         o.draw_mini(&mut gu, rect, (x, z), std::f32::consts::FRAC_PI_2, num(6, 160.0), &dots, cfg.map_overlay_opacity);
         mini = Some(rect);
     }
@@ -676,12 +789,26 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         let num = |i: usize| f.get(i).and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
         let zone = num(0) as u16;
         // FUN_101c2090(zone, 1): group 0x14, the English places file.
-        let place = crate::dat::names::DMsg::load(&index, crate::dat::names::PLACES[1])?.text(zone as usize).filter(|n| !n.is_empty());
-        let region = super::map::Region::find(gu.map_regions(), zone).ok_or_else(|| anyhow::anyhow!("no map record for zone {zone}"))?;
+        let place = crate::dat::names::DMsg::load(&index, crate::dat::names::PLACES[1])?
+            .text(zone as usize)
+            .filter(|n| !n.is_empty());
+        let region = super::map::Region::find(gu.map_regions(), zone)
+            .ok_or_else(|| anyhow::anyhow!("no map record for zone {zone}"))?;
         let owned = f.get(3) == Some(&"owned");
         gu.open_ticks = 0.0;
         let zoom = f.get(4).and_then(|v| v.parse().ok()).unwrap_or(2000);
-        let mut m = super::map::MapWin::new(region, owned, Some(std::sync::Arc::new(index)), (num(1), num(2)), std::f32::consts::FRAC_PI_2, sw, sh, super::map::Mode::Menu, zoom, true);
+        let mut m = super::map::MapWin::new(
+            region,
+            owned,
+            Some(std::sync::Arc::new(index)),
+            (num(1), num(2)),
+            std::f32::consts::FRAC_PI_2,
+            sw,
+            sh,
+            super::map::Mode::Menu,
+            zoom,
+            true,
+        );
         m.wait_image(&mut gu);
         if f.get(5) == Some(&"markers") {
             m.shot_markers();
@@ -696,7 +823,8 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
     }
     // "timers:DOCK[:SLIDE[:FOLDED]]": the Timers window's sample, under the party / target windows and menus.
     for spec in window.unwrap_or_default().split(',').filter_map(|w| w.strip_prefix("timers:")) {
-        let acts = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok().and_then(|i| crate::dat::actions::Actions::load(&i).ok());
+        let acts =
+            crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok().and_then(|i| crate::dat::actions::Actions::load(&i).ok());
         super::timers::shot(&mut gu, acts.as_ref(), spec, sw, sh, mini);
     }
     // "regime:DOCK[:SLIDE]": the training regime window's sample.
@@ -711,7 +839,13 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
     for t in hud {
         match t.what {
             "target name" => {
-                gu.shape_text(if target == Some("npc") { "Home Point #2" } else { "Brutal Sheep" }, t.x, t.y, 0x8080_8080, false);
+                gu.shape_text(
+                    if target == Some("npc") { "Home Point #2" } else { "Brutal Sheep" },
+                    t.x,
+                    t.y,
+                    0x8080_8080,
+                    false,
+                );
             }
             "member name" => {
                 gu.shape_name("Pletsay", t.x, t.y, 0x8080_8080);
@@ -728,17 +862,39 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
             _ => {}
         }
     }
-    for w in window.unwrap_or_default().split(',').filter(|w| !w.is_empty() && !w.starts_with("timers:") && !w.starts_with("regime:")) {
+    for w in window
+        .unwrap_or_default()
+        .split(',')
+        .filter(|w| !w.is_empty() && !w.starts_with("timers:") && !w.starts_with("regime:"))
+    {
         // "iteminfo:ID[:PAGE[:EXTHEX]]": the item info window as an event opens it.
         if let Some(rest) = w.strip_prefix("iteminfo:") {
             let f: Vec<&str> = rest.split(':').collect();
-            let id = f[0].strip_prefix("0x").map_or_else(|| f[0].parse().ok(), |h| u32::from_str_radix(h, 16).ok()).unwrap_or(0);
+            let id = f[0]
+                .strip_prefix("0x")
+                .map_or_else(|| f[0].parse().ok(), |h| u32::from_str_radix(h, 16).ok())
+                .unwrap_or(0);
             let page = f.get(1).and_then(|p| p.parse().ok()).unwrap_or(0);
-            let ext: Option<[u8; 24]> = f.get(2).map(|h| std::array::from_fn(|k| h.get(k * 2..k * 2 + 2).and_then(|b| u8::from_str_radix(b, 16).ok()).unwrap_or(0)));
+            let ext: Option<[u8; 24]> = f.get(2).map(|h| {
+                std::array::from_fn(|k| {
+                    h.get(k * 2..k * 2 + 2).and_then(|b| u8::from_str_radix(b, 16).ok()).unwrap_or(0)
+                })
+            });
             gu.open_ticks = 0.0;
-            if let Some(it) = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok().and_then(|i| crate::dat::items::Items::load(&i, crate::dat::items::Lang::En).ok()).and_then(|t| t.item(id)) {
+            if let Some(it) = crate::dat::DatIndex::open(&cfg.ffxi_dir())
+                .ok()
+                .and_then(|i| crate::dat::items::Items::load(&i, crate::dat::items::Lang::En).ok())
+                .and_then(|t| t.item(id))
+            {
                 let aug = gu.aug_ctx();
-                let info = super::iteminfo::build(&it, ext.as_ref(), &Default::default(), &|g, k| gu.item_msg(g, k), &|s| gu.text_width(s), aug.as_ref());
+                let info = super::iteminfo::build(
+                    &it,
+                    ext.as_ref(),
+                    &Default::default(),
+                    &|g, k| gu.item_msg(g, k),
+                    &|s| gu.text_width(s),
+                    aug.as_ref(),
+                );
                 println!("pages {:?}", info.pages);
                 let layout = super::iteminfo::LAYOUTS[super::iteminfo::rows(&info, page) - 3];
                 if let Some(r) = gu.window_swapped("menu    iteminfo", layout, sw, sh, (0.0, 0.0)) {
@@ -771,7 +927,9 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         let mut v = crate::gamecfg::Values::default();
         for kv in cfgset.unwrap_or_default().split(',').filter(|s| !s.is_empty()) {
             if let Some((k, x)) = kv.split_once('=') {
-                let num = |s: &str| s.strip_prefix("0x").map_or_else(|| s.parse::<i64>().ok(), |h| i64::from_str_radix(h, 16).ok());
+                let num = |s: &str| {
+                    s.strip_prefix("0x").map_or_else(|| s.parse::<i64>().ok(), |h| i64::from_str_radix(h, 16).ok())
+                };
                 if let (Some(k), Some(x)) = (num(k), num(x)) {
                     v.set(k as u16, x as u32);
                 }
@@ -787,8 +945,22 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
             if f[0] == "update" {
                 let entry = crate::patch::Entry { path: "ROM/0/0.DAT".into(), versions: Vec::new() };
                 let todo = vec![(0usize, crate::patch::Action::Direct, 84_910u64); 5321];
-                let plan = crate::patch::Plan { server: crate::patch::ServerVersion { released: 0, label: "empty".into(), version: "30261006_0".into() }, manifest: Vec::new(), entries: vec![entry], todo, current: 44082, skipped_code: 10 };
-                let status = std::sync::Arc::new(std::sync::Mutex::new(super::updater::Status { game: super::updater::Game::Available(plan), client: super::updater::Client::Unavailable(String::new()) }));
+                let plan = crate::patch::Plan {
+                    server: crate::patch::ServerVersion {
+                        released: 0,
+                        label: "empty".into(),
+                        version: "30261006_0".into(),
+                    },
+                    manifest: Vec::new(),
+                    entries: vec![entry],
+                    todo,
+                    current: 44082,
+                    skipped_code: 10,
+                };
+                let status = std::sync::Arc::new(std::sync::Mutex::new(super::updater::Status {
+                    game: super::updater::Game::Available(plan),
+                    client: super::updater::Client::Unavailable(String::new()),
+                }));
                 let mut u = super::updater::UpdateUi::open(status, cfg.ffxi_dir());
                 for _ in 0..f.get(1).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0) {
                     u.key(egui::Key::ArrowDown);
@@ -797,12 +969,19 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
                 continue;
             }
             if f[0] == "settings" || f[0] == "extras" {
-                let kind = if f[0] == "extras" { super::settings::Kind::Extras } else { super::settings::Kind::Settings };
+                let kind =
+                    if f[0] == "extras" { super::settings::Kind::Extras } else { super::settings::Kind::Settings };
                 let mut s = super::settings::SettingsUi::open_kind(&cfg, [width, height], kind);
                 s.in_game = true;
-                s.gpus = crate::render::adapter_names(&wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle()), None);
+                s.gpus = crate::render::adapter_names(
+                    &wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle()),
+                    None,
+                );
                 s.s.gpu = s.gpus.first().cloned().unwrap_or_default();
-                s.goto(f.get(1).and_then(|x| x.parse().ok()).unwrap_or(0), f.get(2).and_then(|x| x.parse().ok()).unwrap_or(1));
+                s.goto(
+                    f.get(1).and_then(|x| x.parse().ok()).unwrap_or(0),
+                    f.get(2).and_then(|x| x.parse().ok()).unwrap_or(1),
+                );
                 settings = Some(s);
                 continue;
             }
@@ -836,7 +1015,15 @@ pub fn topbar_shot(out: &std::path::Path, fade: &str, menu: Option<u16>, menu_sw
         top.draw_bars(&mut gu, sw, sh, shown(&bars.title), shown(&bars.help), 0.0, window == Some("busy"));
     }
     gu.save_png(width, height, [0.30, 0.36, 0.28], out)?;
-    println!("wrote {} (fade {:?}, alpha {:.2}, title {:?}, help {:?}, edge column {:?})", out.display(), top.fade.fade, top.fade.alpha(), shown(&bars.title), shown(&bars.help), gu.edge_column(sw, 50.0, 50.0 + 269.0));
+    println!(
+        "wrote {} (fade {:?}, alpha {:.2}, title {:?}, help {:?}, edge column {:?})",
+        out.display(),
+        top.fade.fade,
+        top.fade.alpha(),
+        shown(&bars.title),
+        shown(&bars.help),
+        gu.edge_column(sw, 50.0, 50.0 + 269.0)
+    );
     Ok(())
 }
 

@@ -127,10 +127,20 @@ pub fn parse(packet: &[u8]) -> Action {
                 ..Default::default()
             };
             if b.take(1) != 0 {
-                r.proc = Some(Side { kind: b.take(6) as u8, info: b.take(4) as u8, value: b.take(17), message: b.take(10) as u16 });
+                r.proc = Some(Side {
+                    kind: b.take(6) as u8,
+                    info: b.take(4) as u8,
+                    value: b.take(17),
+                    message: b.take(10) as u16,
+                });
             }
             if b.take(1) != 0 {
-                r.react = Some(Side { kind: b.take(6) as u8, info: b.take(4) as u8, value: b.take(14), message: b.take(10) as u16 });
+                r.react = Some(Side {
+                    kind: b.take(6) as u8,
+                    info: b.take(4) as u8,
+                    value: b.take(14),
+                    message: b.take(10) as u16,
+                });
             }
             results.push(r);
         }
@@ -201,9 +211,24 @@ mod tests {
 
     fn melee() -> Action {
         // A mob (0x0100_1234) hits Tuxedo for 7, with a 3-point additional effect, then misses.
-        let hit = ActionResult { kind: 1, animation: 0, scale: 1, value: 7, message: 1, proc: Some(Side { kind: 1, info: 0, value: 3, message: 163 }), ..Default::default() };
+        let hit = ActionResult {
+            kind: 1,
+            animation: 0,
+            scale: 1,
+            value: 7,
+            message: 1,
+            proc: Some(Side { kind: 1, info: 0, value: 3, message: 163 }),
+            ..Default::default()
+        };
         let miss = ActionResult { miss: 1, kind: 1, message: 15, ..Default::default() };
-        Action { actor: 0x0100_1234, category: category::BASIC_ATTACK, arg: u32::from_le_bytes(*b"atk0"), info: 0, targets: vec![ActionTarget { id: 0x0001_0203, results: vec![hit, miss] }], seq: 0 }
+        Action {
+            actor: 0x0100_1234,
+            category: category::BASIC_ATTACK,
+            arg: u32::from_le_bytes(*b"atk0"),
+            info: 0,
+            targets: vec![ActionTarget { id: 0x0001_0203, results: vec![hit, miss] }],
+            seq: 0,
+        }
     }
 
     #[test]
@@ -226,7 +251,10 @@ mod tests {
             category: category::MAGIC_FINISH,
             arg: 144,
             info: 5,
-            targets: vec![ActionTarget { id: 2, results: vec![r(2), r(3)] }, ActionTarget { id: 3, results: vec![r(264)] }],
+            targets: vec![
+                ActionTarget { id: 2, results: vec![r(2), r(3)] },
+                ActionTarget { id: 3, results: vec![r(264)] },
+            ],
             seq: 0,
         };
         let b = parse(&pack(&a));

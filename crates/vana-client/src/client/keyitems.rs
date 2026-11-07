@@ -40,7 +40,8 @@ impl Seen {
     pub fn packet(&mut self, table: usize, new: &[u32; 16]) {
         let r = table * 16..table * 16 + 16;
         for (k, i) in r.clone().enumerate() {
-            self.local[i] = if self.merge >> table & 1 != 0 { self.local[i] | (!self.last[i] & new[k]) } else { new[k] };
+            self.local[i] =
+                if self.merge >> table & 1 != 0 { self.local[i] | (!self.last[i] & new[k]) } else { new[k] };
         }
         self.last[r].copy_from_slice(new);
         if !self.received {
@@ -101,8 +102,14 @@ pub fn event_show(w: &mut World, id: u16) {
         w.keyitems = None;
         return;
     }
-    let name = w.names.as_ref().and_then(|n| n.key_item_list().into_iter().find(|(k, _)| *k == id as u32)).map(|(_, n)| n).unwrap_or_default();
-    w.keyitems = Some(KeyItems { state: 3, cat: 0, top: 0, cursor: 0, items: vec![(id, name)], ask: None, event: true });
+    let name = w
+        .names
+        .as_ref()
+        .and_then(|n| n.key_item_list().into_iter().find(|(k, _)| *k == id as u32))
+        .map(|(_, n)| n)
+        .unwrap_or_default();
+    w.keyitems =
+        Some(KeyItems { state: 3, cat: 0, top: 0, cursor: 0, items: vec![(id, name)], ask: None, event: true });
 }
 
 pub fn update(w: &mut World) {
@@ -163,7 +170,8 @@ pub fn page(h: &[f32], top: usize, forward: bool) -> usize {
 
 pub(super) fn show_category(w: &mut World, cat: usize) {
     let cats = all(w);
-    let items: Vec<(u16, String)> = cats.get(cat).map_or(Vec::new(), |c| c.1.iter().filter(|(id, _)| w.has_key_item(*id)).cloned().collect());
+    let items: Vec<(u16, String)> =
+        cats.get(cat).map_or(Vec::new(), |c| c.1.iter().filter(|(id, _)| w.has_key_item(*id)).cloned().collect());
     if let Some(k) = w.keyitems.as_mut() {
         (k.state, k.cat, k.items, k.top, k.cursor) = (2, cat, items, 0, 0);
     }
@@ -236,7 +244,8 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, page_mod: bool) {
             let n = all(w).len();
             let max = n.saturating_sub(CAT_ROWS);
             let row = k.cursor - k.top;
-            k.top = if key == egui::Key::ArrowRight { (k.top + CAT_ROWS).min(max) } else { k.top.saturating_sub(CAT_ROWS) };
+            k.top =
+                if key == egui::Key::ArrowRight { (k.top + CAT_ROWS).min(max) } else { k.top.saturating_sub(CAT_ROWS) };
             k.cursor = (k.top + row).min(n.saturating_sub(1));
             w.sounds.push(Ui::Cursor as u32);
         }
@@ -287,13 +296,26 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let inside = |r: [f32; 4]| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];
     let rows: Vec<(usize, [f32; 4])> = if k.ask.is_some() {
         let Some((x, y)) = gu.window_xy(ASK, sw, sh) else { return };
-        gu.layout(ASK).map_or(Vec::new(), |l| l.elements.iter().skip(1).map(|e| (e.id as usize - 1, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32])).collect())
+        gu.layout(ASK).map_or(Vec::new(), |l| {
+            l.elements
+                .iter()
+                .skip(1)
+                .map(|e| (e.id as usize - 1, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32]))
+                .collect()
+        })
     } else {
         let Some((x, y)) = gu.window_xy(WINDOW, sw, sh) else { return };
         match k.state {
             1 => {
                 let n = all(w).len();
-                gu.layout(WINDOW).map_or(Vec::new(), |l| l.elements.iter().skip(1).map(|e| (k.top + e.id as usize - 1, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32])).filter(|(r, _)| *r < n).collect())
+                gu.layout(WINDOW).map_or(Vec::new(), |l| {
+                    l.elements
+                        .iter()
+                        .skip(1)
+                        .map(|e| (k.top + e.id as usize - 1, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32]))
+                        .filter(|(r, _)| *r < n)
+                        .collect()
+                })
             }
             2 => {
                 let h = heights(gu, &k.items);
@@ -317,7 +339,13 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     };
     gu.hover.set(true);
     let cur = match k.ask {
-        Some(yes) => if yes { 0 } else { 1 },
+        Some(yes) => {
+            if yes {
+                0
+            } else {
+                1
+            }
+        }
         None => k.cursor,
     };
     if row != cur && (moved || clicked) {
@@ -369,7 +397,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let focused = k.ask.is_none() && w.confirm.is_none();
     let rows: Vec<u16> = (1..=8).collect();
     let sel = (k.state == 1 && k.ask.is_none()).then(|| (k.cursor - k.top + 1) as u16);
-    let hide: Vec<u16> = if k.state == 1 { (1..=8u16).filter(|&c| k.top + c as usize - 1 >= cats.len()).collect() } else { rows };
+    let hide: Vec<u16> =
+        if k.state == 1 { (1..=8u16).filter(|&c| k.top + c as usize - 1 >= cats.len()).collect() } else { rows };
     let Some(win) = gu.lobby_window_off(WINDOW, sw, sh, (0.0, 0.0), sel, focused, &hide) else { return rects };
     let [fx, fy, fw, fh] = win.frame;
     let Some((x, y)) = gu.window_xy(WINDOW, sw, sh) else { return rects };
@@ -433,7 +462,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     // evitem01 (FUN_10222600): "Examine %s?" (group 9 0x5f) at (28, 30), Yes / No (0xc 0x2b / 0x2c) at its children.
     if let Some(yes) = k.ask
-        && let Some(win) = gu.lobby_window_off(ASK, sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), w.confirm.is_none(), &[])
+        && let Some(win) =
+            gu.lobby_window_off(ASK, sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), w.confirm.is_none(), &[])
     {
         rects.push(win.frame);
         if let Some((ax, ay)) = gu.window_xy(ASK, sw, sh) {
@@ -494,7 +524,13 @@ mod tests {
 
     #[test]
     fn sections() {
-        let list = vec![(1, "a".to_string()), (2, "b".to_string()), (0, "-First".to_string()), (3, "c".to_string()), (0, "-Second".to_string())];
+        let list = vec![
+            (1, "a".to_string()),
+            (2, "b".to_string()),
+            (0, "-First".to_string()),
+            (3, "c".to_string()),
+            (0, "-Second".to_string()),
+        ];
         let c = categories(&list);
         assert_eq!(c.len(), 2);
         assert_eq!((c[0].0.as_str(), c[0].1.len(), c[1].0.as_str(), c[1].1.len()), ("First", 2, "Second", 1));

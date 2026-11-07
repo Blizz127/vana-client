@@ -25,7 +25,17 @@ const GREY: u32 = 0x8040_4040;
 pub(super) const THROTTLE: Duration = Duration::from_millis(1000);
 /// DAT_1037f1dc / DAT_1037f1e8: the slot numbers' colours by the level a set needs.
 const BAND_LEVELS: [u8; 9] = [20, 30, 40, 50, 60, 70, 80, 90, 99];
-const BAND_COLOURS: [u32; 9] = [0x8080_8080, 0x8090_9050, 0x8050_8080, 0x8080_6090, 0x8050_9050, 0x8090_6050, 0x8050_6090, 0x8060_6050, 0x8060_4010];
+const BAND_COLOURS: [u32; 9] = [
+    0x8080_8080,
+    0x8090_9050,
+    0x8050_8080,
+    0x8080_6090,
+    0x8050_9050,
+    0x8090_6050,
+    0x8050_6090,
+    0x8060_6050,
+    0x8060_4010,
+];
 /// bluesibo's rows by family (rows 15..18 are families 16..19).
 const SIBO_ROWS: u16 = 18;
 
@@ -76,7 +86,8 @@ pub fn ext_job(w: &mut World, b: &[u8]) {
     if job == 0x10 {
         log::info!("blue magic: side {side} set {:?}", &b[4..0x18]);
     }
-    let stamp = w.ext_job.iter().find(|b| b[0] == 0x10).map_or(0, |b| u32::from_le_bytes([b[0x18], b[0x19], b[0x1a], b[0x1b]]));
+    let stamp =
+        w.ext_job.iter().find(|b| b[0] == 0x10).map_or(0, |b| u32::from_le_bytes([b[0x18], b[0x19], b[0x1a], b[0x1b]]));
     if stamp != 0 && stamp != w.blu_stamp {
         w.blu_reset = Some(Instant::now() + Duration::from_secs(60));
     }
@@ -148,13 +159,27 @@ pub fn open(w: &mut World) {
     let st = w.stats.as_ref().unwrap();
     let level = if side == 0 { st.main.1 } else { st.sub.1 };
     let (slots, total) = (blumagic::slots(level), total_points(w, level));
-    w.bluset = Some(Screen { side, slots, total, level, focus: Focus::Equip, equip: (0, 0), inven: (0, 0), slot_pick: None, spell_pick: None, filter: 0, sibo: None });
+    w.bluset = Some(Screen {
+        side,
+        slots,
+        total,
+        level,
+        focus: Focus::Equip,
+        equip: (0, 0),
+        inven: (0, 0),
+        slot_pick: None,
+        spell_pick: None,
+        filter: 0,
+        sibo: None,
+    });
 }
 
 /// FUN_101dfe30: Type, Remove All, then the known blue spells in the mix.dat order that have points and the family.
 fn inven_rows(w: &World, s: &Screen) -> Vec<Row> {
     let Some(d) = data(w) else { return vec![Row::Type, Row::RemoveAll] };
-    let spells = super::magic::blue_known(w).into_iter().filter(|&id| d.entry(id).is_some_and(|e| e.points != 0 && e.points != 0xff && (s.filter == 0 || e.family == s.filter)));
+    let spells = super::magic::blue_known(w).into_iter().filter(|&id| {
+        d.entry(id).is_some_and(|e| e.points != 0 && e.points != 0xff && (s.filter == 0 || e.family == s.filter))
+    });
     [Row::Type, Row::RemoveAll].into_iter().chain(spells.map(Row::Spell)).collect()
 }
 
@@ -297,7 +322,13 @@ fn keys(w: &mut World, s: &mut Screen, key: egui::Key) -> bool {
     if let Some(r) = s.sibo {
         match key {
             K::ArrowDown | K::ArrowUp => {
-                s.sibo = Some(if key == K::ArrowDown { r % SIBO_ROWS + 1 } else if r <= 1 { SIBO_ROWS } else { r - 1 });
+                s.sibo = Some(if key == K::ArrowDown {
+                    r % SIBO_ROWS + 1
+                } else if r <= 1 {
+                    SIBO_ROWS
+                } else {
+                    r - 1
+                });
                 w.sounds.push(Ui::Cursor as u32);
             }
             // FUN_101dfc40: families 1..14 by row, then 16..19.
@@ -497,7 +528,14 @@ fn spell_name(w: &World, id: u16) -> String {
 }
 
 /// A row list window: its frame and the hand on the cursor row while focused; rows' own sprites are not drawn.
-fn list_window(gu: &mut GameUi, name: &str, sw: f32, sh: f32, c: (usize, usize), focused: bool) -> Option<([f32; 4], (f32, f32))> {
+fn list_window(
+    gu: &mut GameUi,
+    name: &str,
+    sw: f32,
+    sh: f32,
+    c: (usize, usize),
+    focused: bool,
+) -> Option<([f32; 4], (f32, f32))> {
     let rows: Vec<u16> = (1..=VISIBLE as u16).collect();
     let win = gu.lobby_window_off(name, sw, sh, (0.0, 0.0), None, false, &rows)?;
     let (x, y) = gu.window_xy(name, sw, sh)?;
@@ -512,8 +550,13 @@ fn list_window(gu: &mut GameUi, name: &str, sw: f32, sh: f32, c: (usize, usize),
 fn help_text(gu: &GameUi, w: &World, id: u16) -> Option<[String; 4]> {
     let d = data(w)?;
     let e = d.entry(id)?;
-    let fmt = |id: usize, args: &[String]| super::textcmd::printf(&w.battle.as_ref().and_then(|b| b.group10(id)).unwrap_or_default(), args);
-    let head = fmt(0x54, &[gu.lobby_msg(0xc, 0x3e + e.family as usize, ""), gu.lobby_msg(0xc, 0x52 + e.physical as usize, "")]);
+    let fmt = |id: usize, args: &[String]| {
+        super::textcmd::printf(&w.battle.as_ref().and_then(|b| b.group10(id)).unwrap_or_default(), args)
+    };
+    let head = fmt(
+        0x54,
+        &[gu.lobby_msg(0xc, 0x3e + e.family as usize, ""), gu.lobby_msg(0xc, 0x52 + e.physical as usize, "")],
+    );
     let mp = w.actions.as_ref().and_then(|a| a.spell(id)).map_or(0, |r| r.mp as i32);
     let foot = fmt(0x55, &[spell_level(w, id).to_string(), mp.to_string(), e.points.to_string()]);
     Some([spell_name(w, id), head, d.description(e), foot])
@@ -574,16 +617,33 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
             let idx = slot(w, s.side, i);
             let id = (idx != 0).then_some(0x200 + idx as u16);
             let tint = if s.slot_pick == Some(i) { PICKED } else { WHITE };
-            RowLook { number: Some((i + 1, bands[i])), icon: id.and_then(|id| spell_icon(w, id)), text: id.map(|id| spell_name(w, id)).unwrap_or_default(), tint }
+            RowLook {
+                number: Some((i + 1, bands[i])),
+                icon: id.and_then(|id| spell_icon(w, id)),
+                text: id.map(|id| spell_name(w, id)).unwrap_or_default(),
+                tint,
+            }
         })
         .collect();
     let rows = inven_rows(w, s);
     let inven = rows
         .iter()
         .map(|r| match *r {
-            Row::Type => RowLook { number: None, icon: None, text: gu.sprite_caption("menu    framesus", 130).unwrap_or_else(|| "Type".into()), tint: WHITE },
-            Row::RemoveAll => RowLook { number: None, icon: None, text: w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(), tint: 0x8090_9040 },
-            Row::Spell(id) => RowLook { number: None, icon: spell_icon(w, id), text: spell_name(w, id), tint: spell_tint(w, s, id) },
+            Row::Type => RowLook {
+                number: None,
+                icon: None,
+                text: gu.sprite_caption("menu    framesus", 130).unwrap_or_else(|| "Type".into()),
+                tint: WHITE,
+            },
+            Row::RemoveAll => RowLook {
+                number: None,
+                icon: None,
+                text: w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(),
+                tint: 0x8090_9040,
+            },
+            Row::Spell(id) => {
+                RowLook { number: None, icon: spell_icon(w, id), text: spell_name(w, id), tint: spell_tint(w, s, id) }
+            }
         })
         .collect();
     let shown = match s.focus {
@@ -611,7 +671,8 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
 /// other list takes the focus first (as Num+). True when the cursor moved.
 /// Type-to-search (modern/search.rs) in the spells: while either list has the keys and no slot waits for a spell.
 pub(super) fn search_open(w: &World) -> bool {
-    w.confirm.is_none() && w.bluset.as_ref().is_some_and(|s| s.sibo.is_none() && (s.focus == Focus::Inven || s.slot_pick.is_none()))
+    w.confirm.is_none()
+        && w.bluset.as_ref().is_some_and(|s| s.sibo.is_none() && (s.focus == Focus::Inven || s.slot_pick.is_none()))
 }
 
 /// The spells by name ("Type" and "(Remove All)" have none, so they never match), greyed as their list greys them.
@@ -656,7 +717,11 @@ pub(super) fn set_row(w: &mut World, equip: bool, k: usize) -> bool {
 }
 
 pub(super) fn set_sibo(w: &mut World, r: u16) -> bool {
-    let Some(cur) = w.bluset.as_mut().and_then(|s| s.sibo.as_mut()).filter(|c| **c != r && (1..=SIBO_ROWS).contains(&r)) else { return false };
+    let Some(cur) =
+        w.bluset.as_mut().and_then(|s| s.sibo.as_mut()).filter(|c| **c != r && (1..=SIBO_ROWS).contains(&r))
+    else {
+        return false;
+    };
     *cur = r;
     true
 }
@@ -683,7 +748,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let used = used(w, s);
     if let Some(win) = gu.lobby_window_off(POINTS, sw, sh, (0.0, 0.0), None, false, &[]) {
         let [x, y, fw, _] = win.frame;
-        gu.shape_text(&format!("{used}/{}", s.total), x + fw - 8.0, y + 31.0, if used < s.total { WHITE } else { 0x8020_60a0 }, true);
+        gu.shape_text(
+            &format!("{used}/{}", s.total),
+            x + fw - 8.0,
+            y + 31.0,
+            if used < s.total { WHITE } else { 0x8020_60a0 },
+            true,
+        );
         rects.push(win.frame);
     }
     // bluequip: the slot number (keytops3 400 + i) in its band's colour, the icon, the name.
@@ -702,7 +773,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
         gu.scroll_bar(frame[0] + frame[2] - 8.0, frame[1], frame[3], s.slots, VISIBLE, s.equip.1);
         if s.focus == Focus::Equip {
-            gu.bar_site(super::scrollbar::Owner::BlueSet, frame[0] + frame[2] - 8.0, frame[1], frame[3], s.slots, VISIBLE, s.equip.1);
+            gu.bar_site(
+                super::scrollbar::Owner::BlueSet,
+                frame[0] + frame[2] - 8.0,
+                frame[1],
+                frame[3],
+                s.slots,
+                VISIBLE,
+                s.equip.1,
+            );
         }
         rects.push(frame);
     }
@@ -715,7 +794,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 Row::Type => {
                     gu.sprite("menu    framesus", 130, ox, y, WHITE);
                 }
-                Row::RemoveAll => text(gu, &w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(), ox + 18.0, y + 2.0, 0x8090_9040),
+                Row::RemoveAll => text(
+                    gu,
+                    &w.battle.as_ref().and_then(|b| b.group9(0xe3)).unwrap_or_default(),
+                    ox + 18.0,
+                    y + 2.0,
+                    0x8090_9040,
+                ),
                 Row::Spell(id) => {
                     icon(gu, w, id, ox, y);
                     text(gu, &spell_name(w, id), ox + 18.0, y + 2.0, spell_tint(w, s, id));
@@ -724,7 +809,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
         gu.scroll_bar(frame[0] + frame[2] - 8.0, frame[1], frame[3], rows.len(), VISIBLE, s.inven.1);
         if s.focus == Focus::Inven {
-            gu.bar_site(super::scrollbar::Owner::BlueSet, frame[0] + frame[2] - 8.0, frame[1], frame[3], rows.len(), VISIBLE, s.inven.1);
+            gu.bar_site(
+                super::scrollbar::Owner::BlueSet,
+                frame[0] + frame[2] - 8.0,
+                frame[1],
+                frame[3],
+                rows.len(),
+                VISIBLE,
+                s.inven.1,
+            );
         }
         rects.push(frame);
     }

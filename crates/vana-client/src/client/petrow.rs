@@ -22,7 +22,8 @@ fn row(w: &World, index: u16, pet: bool) -> Option<Row> {
     let (id, e) = w.entities.iter().find(|(_, e)| e.index == index)?;
     let model = w.actors.get(id).is_some_and(|a| a.character.is_some());
     // FUN_10098320: no TP for the luopans (models 0xb22..0xb31); FUN_10087610: 0x068's TP only for this pet.
-    let tp = (pet && w.party_tp && !(0xb22..=0xb31).contains(&e.model)).then(|| w.pet_sync.as_ref().filter(|p| p.index == index).map_or(0, |p| p.tp));
+    let tp = (pet && w.party_tp && !(0xb22..=0xb31).contains(&e.model))
+        .then(|| w.pet_sync.as_ref().filter(|p| p.index == index).map_or(0, |p| p.tp));
     Some(Row { name: super::monstrosity::name(e).to_string(), hpp: e.hpp, model, tp })
 }
 
@@ -31,7 +32,10 @@ pub(super) fn fellow(w: &World) -> Option<(u32, String)> {
     if w.my_fellow == 0 {
         return None;
     }
-    w.entities.iter().find(|(_, e)| e.index == w.my_fellow).map(|(id, e)| (*id, super::monstrosity::name(e).to_string()))
+    w.entities
+        .iter()
+        .find(|(_, e)| e.index == w.my_fellow)
+        .map(|(id, e)| (*id, super::monstrosity::name(e).to_string()))
 }
 
 /// FUN_102041d0 (0x10204462..0x10204552): the rows' x and the first row's y from the party window (x, y, w, h), log

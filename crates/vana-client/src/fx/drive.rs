@@ -63,7 +63,15 @@ pub struct Drive {
 impl Drive {
     /// The op's fields: i16 @6 duration (x speed), u32 @0x10 flags, u32 @0x14 curve, f32 @0x18 yaw0; `over` is the
     /// fast-forward's overshoot (DAT_1047bf14), taken off the time left.
-    pub fn new(actor: u32, owner: u64, segs: Vec<Seg>, raw: &[u8], speed: f32, over: f32, key: Option<KeyFrame>) -> Self {
+    pub fn new(
+        actor: u32,
+        owner: u64,
+        segs: Vec<Seg>,
+        raw: &[u8],
+        speed: f32,
+        over: f32,
+        key: Option<KeyFrame>,
+    ) -> Self {
         let u32_at = |o: usize| raw.get(o..o + 4).map_or(0, |b| u32::from_le_bytes(b.try_into().unwrap()));
         let dur = raw.get(6..8).map_or(0, |b| i16::from_le_bytes([b[0], b[1]]));
         let flags = u32_at(0x10);
@@ -169,7 +177,15 @@ impl RotDrive {
         let f = |o: usize| raw.get(o..o + 4).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
         let dur = raw.get(6..8).map_or(0, |b| i16::from_le_bytes([b[0], b[1]]));
         let total = dur as f32 * speed;
-        Self { actor, owner, start, target: Vec3::new(f(8), f(0xc), f(0x10)) * (PI / 180.0), mode: raw.get(0x14).copied().unwrap_or(0), total, left: total }
+        Self {
+            actor,
+            owner,
+            start,
+            target: Vec3::new(f(8), f(0xc), f(0x10)) * (PI / 180.0),
+            mode: raw.get(0x14).copied().unwrap_or(0),
+            total,
+            left: total,
+        }
     }
 
     /// Mode 0 holds the target every frame until its scheduler ends; the others turn linearly (no wrap) and end

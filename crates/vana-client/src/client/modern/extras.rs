@@ -25,7 +25,11 @@ fn hidden(w: &World) -> bool {
 /// The time left as retail's clock ("1:05", "1:00:00").
 fn clock(left: f32) -> String {
     let s = left.max(0.0).ceil() as u32;
-    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60)
+    } else {
+        format!("{}:{:02}", s / 60, s % 60)
+    }
 }
 
 /// The Ashita Timers colours by time left: green from 30 s, yellow from 20, orange from 10, else red.
@@ -62,7 +66,11 @@ fn timers_panel(p: &mut Panels, w: &mut World) {
         Icon::List(lib, k) => m.sprite_icon(ctx, gu, lib, k).map(|t| (t, super::FULL_UV, None)),
         Icon::None => None,
     };
-    let icons: Vec<Vec<Vec<Option<(egui::TextureId, Rect, Option<u16>)>>>> = if out { secs.iter().map(|s| s.iter().map(|g| g.rows.iter().map(|r| icon(&r.icon)).collect()).collect()).collect() } else { Vec::new() };
+    let icons: Vec<Vec<Vec<Option<(egui::TextureId, Rect, Option<u16>)>>>> = if out {
+        secs.iter().map(|s| s.iter().map(|g| g.rows.iter().map(|r| icon(&r.icon)).collect()).collect()).collect()
+    } else {
+        Vec::new()
+    };
     let paint = |painter: &egui::Painter, (k, gi, ri): (usize, usize, usize), r: Rect, tint: Color32| {
         if let Some(Some((t, uv, status))) = icons.get(k).and_then(|s| s.get(gi)).and_then(|g| g.get(ri)) {
             painter.image(*t, r, *uv, tint);
@@ -116,8 +124,20 @@ fn regime_rows(ui: &mut Ui, m: &super::Modern, r: &super::super::regime::Regime)
         let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
         let colour = if done { m.theme.color("muted") } else { m.theme.color("text") };
         let (label, count) = text.rsplit_once(": ").unwrap_or((text.as_str(), ""));
-        ui.painter().text(pos2(rect.min.x, rect.min.y + 2.0), Align2::LEFT_TOP, label, FontId::proportional(m.theme.small), colour);
-        ui.painter().text(pos2(rect.max.x, rect.min.y + 2.0), Align2::RIGHT_TOP, count, FontId::monospace(m.theme.small), colour);
+        ui.painter().text(
+            pos2(rect.min.x, rect.min.y + 2.0),
+            Align2::LEFT_TOP,
+            label,
+            FontId::proportional(m.theme.small),
+            colour,
+        );
+        ui.painter().text(
+            pos2(rect.max.x, rect.min.y + 2.0),
+            Align2::RIGHT_TOP,
+            count,
+            FontId::monospace(m.theme.small),
+            colour,
+        );
         let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 6.0), pos2(rect.max.x, rect.max.y - 2.0));
         ui.painter().rect_filled(bar, 2.0, m.theme.color("charcoal"));
         if let Some(f) = f.filter(|f| *f > 0.0) {
@@ -192,12 +212,28 @@ pub(super) fn skillchain_body(ui: &mut Ui, m: &super::Modern, v: &super::super::
         let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 16.0), Sense::hover());
         ui.painter().text(pos2(row.min.x, row.center().y), Align2::LEFT_CENTER, &n.mob, small.clone(), muted);
         let waiting = n.age < super::super::skillchain::WAIT;
-        let clock = if waiting { format!("wait {:.1} s", super::super::skillchain::WAIT - n.age) } else { format!("{:.1} s left", n.left) };
-        ui.painter().text(pos2(row.max.x, row.center().y), Align2::RIGHT_CENTER, clock, small.clone(), if waiting { muted } else { gold });
+        let clock = if waiting {
+            format!("wait {:.1} s", super::super::skillchain::WAIT - n.age)
+        } else {
+            format!("{:.1} s left", n.left)
+        };
+        ui.painter().text(
+            pos2(row.max.x, row.center().y),
+            Align2::RIGHT_CENTER,
+            clock,
+            small.clone(),
+            if waiting { muted } else { gold },
+        );
         match n.chain {
             Some(c) => {
                 let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), 20.0), Sense::hover());
-                let r = ui.painter().text(pos2(row.min.x, row.center().y), Align2::LEFT_CENTER, "Skillchain:", strong.clone(), gold);
+                let r = ui.painter().text(
+                    pos2(row.min.x, row.center().y),
+                    Align2::LEFT_CENTER,
+                    "Skillchain:",
+                    strong.clone(),
+                    gold,
+                );
                 chain_at(ui, c, r.max.x + 6.0, row.center().y, strong.clone());
                 let els: Vec<&str> = sc::elements(c).iter().map(|e| e.name()).collect();
                 wrapped(ui, &format!("Magic burst: {}", els.join(", ")), small.clone(), text, 0.0);
@@ -209,8 +245,16 @@ pub(super) fn skillchain_body(ui: &mut Ui, m: &super::Modern, v: &super::super::
         }
         let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), 5.0), Sense::hover());
         ui.painter().rect_filled(bar, 2.0, m.theme.color("charcoal"));
-        let f = if waiting { n.age / super::super::skillchain::WAIT } else { n.left / (n.life - super::super::skillchain::WAIT).max(0.1) };
-        ui.painter().rect_filled(Rect::from_min_max(bar.min, pos2(bar.min.x + bar.width() * f.clamp(0.0, 1.0), bar.max.y)), 2.0, if waiting { muted } else { gold });
+        let f = if waiting {
+            n.age / super::super::skillchain::WAIT
+        } else {
+            n.left / (n.life - super::super::skillchain::WAIT).max(0.1)
+        };
+        ui.painter().rect_filled(
+            Rect::from_min_max(bar.min, pos2(bar.min.x + bar.width() * f.clamp(0.0, 1.0), bar.max.y)),
+            2.0,
+            if waiting { muted } else { gold },
+        );
         wrapped(ui, &format!("by {}", n.by), small.clone(), muted, 0.0);
         ui.add_space(4.0);
         if n.closers.is_empty() {
@@ -282,13 +326,20 @@ pub(super) fn skillchain_width(ctx: &egui::Context, m: &super::Modern, v: &super
     let small = FontId::proportional(m.theme.small);
     let strong = FontId::new(m.theme.small + 1.0, FontFamily::Name(super::STRONG.into()));
     let w = |s: String, f: &FontId| ctx.fonts_mut(|x| x.layout_no_wrap(s, f.clone(), Color32::WHITE).size().x);
-    let chain_w = |c: Prop, f: &FontId| w(sc::NAMES[c as usize].to_string(), f) + 5.0 + 15.0 * sc::elements(c).len() as f32;
+    let chain_w =
+        |c: Prop, f: &FontId| w(sc::NAMES[c as usize].to_string(), f) + 5.0 + 15.0 * sc::elements(c).len() as f32;
     let mut most = w("Party chains".into(), &small);
     if let Some(n) = &v.now {
         most = most.max(w(n.mob.clone(), &small) + 16.0 + w("88.8 s left".into(), &small));
         most = most.max(match n.chain {
             Some(c) => w("Skillchain:".into(), &strong) + 6.0 + chain_w(c, &strong),
-            None => w(format!("Open: {}", n.props.iter().map(|&p| sc::NAMES[p as usize]).collect::<Vec<_>>().join(" \u{b7} ")), &strong),
+            None => w(
+                format!(
+                    "Open: {}",
+                    n.props.iter().map(|&p| sc::NAMES[p as usize]).collect::<Vec<_>>().join(" \u{b7} ")
+                ),
+                &strong,
+            ),
         });
         most = most.max(w(format!("by {}", n.by), &small));
         for c in &n.closers {
@@ -357,7 +408,15 @@ fn top_edge(m: &super::Modern, screen: Rect, x0: f32, x1: f32) -> f32 {
 /// set: its body then scrolls in it, edge_body) and says whether its fold button was clicked; the tab's click counts
 /// too. Returns that.
 #[allow(clippy::too_many_arguments)]
-fn edge_window(p: &mut Panels, key: &str, width: f32, resize: bool, folded: bool, label: &str, add: impl FnOnce(&mut Ui, Side, bool) -> bool) -> bool {
+fn edge_window(
+    p: &mut Panels,
+    key: &str,
+    width: f32,
+    resize: bool,
+    folded: bool,
+    label: &str,
+    add: impl FnOnce(&mut Ui, Side, bool) -> bool,
+) -> bool {
     // Hidden by the mode (modes.rs, faded as the other panels) or by a Lua mod (ui.native.hide).
     let vis = p.vis(key);
     if vis <= 0.01 || p.hidden.contains(&key) {
@@ -408,7 +467,9 @@ fn edge_window(p: &mut Panels, key: &str, width: f32, resize: bool, folded: bool
             let (rr, resp) = ui.allocate_exact_size(r.size(), Sense::click_and_drag());
             drag = EdgeDrag::of(&resp);
             rect = rr;
-            ui.painter().with_clip_rect(Rect::from_min_max(pos2(screen.min.x, rr.min.y), screen.max)).add(edge_frame_shape(rr, side, !float, m, false, 7));
+            ui.painter()
+                .with_clip_rect(Rect::from_min_max(pos2(screen.min.x, rr.min.y), screen.max))
+                .add(edge_frame_shape(rr, side, !float, m, false, 7));
             feedback(ui, m, rr, &resp, 7);
             let c = if resp.hovered() { m.theme.color("text") } else { m.theme.color("gold") };
             if across {
@@ -420,7 +481,11 @@ fn edge_window(p: &mut Panels, key: &str, width: f32, resize: bool, folded: bool
             } else {
                 // The word turned toward the screen: a quarter counter-clockwise on the left (read bottom up),
                 // clockwise on the right (read top down).
-                let (at, angle) = if left { (pos2(rr.min.x + 4.0, rr.center().y + gw / 2.0), -std::f32::consts::FRAC_PI_2) } else { (pos2(rr.max.x - 4.0, rr.center().y - gw / 2.0), std::f32::consts::FRAC_PI_2) };
+                let (at, angle) = if left {
+                    (pos2(rr.min.x + 4.0, rr.center().y + gw / 2.0), -std::f32::consts::FRAC_PI_2)
+                } else {
+                    (pos2(rr.max.x - 4.0, rr.center().y - gw / 2.0), std::f32::consts::FRAC_PI_2)
+                };
                 ui.painter().add(egui::epaint::TextShape::new(at, galley, c).with_angle(angle));
                 let cx = if left { rr.max.x - 10.0 } else { rr.min.x + 10.0 };
                 for d in [-3.0, 3.0] {
@@ -486,7 +551,12 @@ fn edge_window(p: &mut Panels, key: &str, width: f32, resize: bool, folded: bool
             sized = size_grip(ui, m, r, if float { Side::Left } else { side }, id);
         }
         if moved.is_some_and(|d| !d.stopped) {
-            ui.painter().rect_stroke(r.expand(1.0), 16, Stroke::new(2.5, m.theme.color("gold")), egui::StrokeKind::Outside);
+            ui.painter().rect_stroke(
+                r.expand(1.0),
+                16,
+                Stroke::new(2.5, m.theme.color("gold")),
+                egui::StrokeKind::Outside,
+            );
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
         } else if drag.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
@@ -496,7 +566,11 @@ fn edge_window(p: &mut Panels, key: &str, width: f32, resize: bool, folded: bool
     p.this.insert(key.to_string(), shown.inner);
     if let Some(s) = sized {
         let mut place = p.place(key);
-        (place.w, place.h) = if s == Vec2::ZERO { (0.0, 0.0) } else { (s.x.clamp(MIN_W, screen.width() * 0.95), s.y.clamp(MIN_H, (screen.height() - 8.0).max(MIN_H))) };
+        (place.w, place.h) = if s == Vec2::ZERO {
+            (0.0, 0.0)
+        } else {
+            (s.x.clamp(MIN_W, screen.width() * 0.95), s.y.clamp(MIN_H, (screen.height() - 8.0).max(MIN_H)))
+        };
         p.layout.insert(key.to_string(), place);
         m.arranging.set(true);
         *p.changed = true;
@@ -521,10 +595,15 @@ fn size_grip(ui: &mut Ui, m: &super::Modern, r: Rect, side: Side, id: egui::Id) 
     let g = ui.interact(Rect::from_center_size(corner, vec2(22.0, 22.0)), id.with("size"), Sense::click_and_drag());
     let c = if g.hovered() || g.dragged() { m.theme.color("gold") } else { m.theme.color("bronze") };
     for k in [4.0, 8.0, 12.0] {
-        ui.painter().line_segment([corner + vec2(sx * k, -2.0 * sy), corner + vec2(sx * 2.0, -k * sy)], Stroke::new(1.5, c));
+        ui.painter()
+            .line_segment([corner + vec2(sx * k, -2.0 * sy), corner + vec2(sx * 2.0, -k * sy)], Stroke::new(1.5, c));
     }
     if g.hovered() || g.dragged() {
-        ui.ctx().set_cursor_icon(if sx * sy < 0.0 { egui::CursorIcon::ResizeNwSe } else { egui::CursorIcon::ResizeNeSw });
+        ui.ctx().set_cursor_icon(if sx * sy < 0.0 {
+            egui::CursorIcon::ResizeNwSe
+        } else {
+            egui::CursorIcon::ResizeNeSw
+        });
     }
     if g.double_clicked() {
         return Some(Vec2::ZERO);
@@ -539,7 +618,12 @@ fn size_grip(ui: &mut Ui, m: &super::Modern, r: Rect, side: Side, id: egui::Id) 
 /// tall as it is up to `cap`.
 fn edge_body(ui: &mut Ui, salt: &str, fixed: bool, cap: f32, add: impl FnOnce(&mut Ui)) {
     let room = if fixed { ui.available_height() } else { cap.min(ui.available_height()) };
-    egui::ScrollArea::vertical().id_salt(salt).max_height(room).min_scrolled_height(if fixed { room } else { 64.0 }).auto_shrink([false, !fixed]).show(ui, add);
+    egui::ScrollArea::vertical()
+        .id_salt(salt)
+        .max_height(room)
+        .min_scrolled_height(if fixed { room } else { 64.0 })
+        .auto_shrink([false, !fixed])
+        .show(ui, add);
 }
 
 /// An edge window's drag this frame: where the pointer is, and whether it was let go.
@@ -611,7 +695,10 @@ fn edge_drag(p: &mut Panels, key: &str, rect: Rect, radius: u8, d: EdgeDrag) {
         return;
     }
     // The screen edge it would be held by: the nearest within EDGE_SNAP, pushed past it too.
-    let near = [Side::Left, Side::Right, Side::Top, Side::Bottom].into_iter().filter(|&s| gap(s) < EDGE_SNAP).min_by(|&a, &b| gap(a).total_cmp(&gap(b)));
+    let near = [Side::Left, Side::Right, Side::Top, Side::Bottom]
+        .into_iter()
+        .filter(|&s| gap(s) < EDGE_SNAP)
+        .min_by(|&a, &b| gap(a).total_cmp(&gap(b)));
     let free = Rect::from_min_size(pos2(x, y), rect.size());
     if !d.stopped {
         let at_edge = near.map(|s| {
@@ -629,8 +716,15 @@ fn edge_drag(p: &mut Panels, key: &str, rect: Rect, radius: u8, d: EdgeDrag) {
             p.layout.insert(key.to_string(), place);
         }
         if let Some(g) = at_edge.or((!float).then_some(free)) {
-            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique(("edge ghost", key))));
-            painter.rect(g, radius, m.theme.color("surface").gamma_multiply(0.45), Stroke::new(2.0, m.theme.color("gold")), egui::StrokeKind::Inside);
+            let painter =
+                ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique(("edge ghost", key))));
+            painter.rect(
+                g,
+                radius,
+                m.theme.color("surface").gamma_multiply(0.45),
+                Stroke::new(2.0, m.theme.color("gold")),
+                egui::StrokeKind::Inside,
+            );
         }
         return;
     }
@@ -657,7 +751,12 @@ fn grip(m: &super::Modern, resp: &egui::Response) {
 /// While a tab is dragged: a gold outline and the grabbing hand; hovered, the open hand.
 fn feedback(ui: &Ui, m: &super::Modern, r: Rect, resp: &egui::Response, radius: u8) {
     if resp.dragged() {
-        ui.painter().rect_stroke(r.expand(1.0), radius, Stroke::new(2.5, m.theme.color("gold")), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(
+            r.expand(1.0),
+            radius,
+            Stroke::new(2.5, m.theme.color("gold")),
+            egui::StrokeKind::Outside,
+        );
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
     } else if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
@@ -676,19 +775,34 @@ const TAB_H: f32 = 56.0;
 
 /// A chevron at `c` pointing left or right.
 fn chevron(p: &egui::Painter, c: Pos2, left: bool, col: Color32) {
-    let pts = if left { vec![pos2(c.x + 3.5, c.y - 6.0), pos2(c.x + 3.5, c.y + 6.0), pos2(c.x - 3.5, c.y)] } else { vec![pos2(c.x - 3.5, c.y - 6.0), pos2(c.x - 3.5, c.y + 6.0), pos2(c.x + 3.5, c.y)] };
+    let pts = if left {
+        vec![pos2(c.x + 3.5, c.y - 6.0), pos2(c.x + 3.5, c.y + 6.0), pos2(c.x - 3.5, c.y)]
+    } else {
+        vec![pos2(c.x - 3.5, c.y - 6.0), pos2(c.x - 3.5, c.y + 6.0), pos2(c.x + 3.5, c.y)]
+    };
     p.add(Shape::convex_polygon(pts, col, Stroke::NONE));
 }
 
 /// A chevron at `c` pointing up or down.
 fn chevron_v(p: &egui::Painter, c: Pos2, up: bool, col: Color32) {
-    let pts = if up { vec![pos2(c.x - 6.0, c.y + 3.5), pos2(c.x + 6.0, c.y + 3.5), pos2(c.x, c.y - 3.5)] } else { vec![pos2(c.x - 6.0, c.y - 3.5), pos2(c.x + 6.0, c.y - 3.5), pos2(c.x, c.y + 3.5)] };
+    let pts = if up {
+        vec![pos2(c.x - 6.0, c.y + 3.5), pos2(c.x + 6.0, c.y + 3.5), pos2(c.x, c.y - 3.5)]
+    } else {
+        vec![pos2(c.x - 6.0, c.y - 3.5), pos2(c.x + 6.0, c.y - 3.5), pos2(c.x, c.y + 3.5)]
+    };
     p.add(Shape::convex_polygon(pts, col, Stroke::NONE));
 }
 
 /// The edge window's frame over `r`: no border on the held side (it runs past the screen's edge), the other corners
 /// rounded, a bronze line with a thin gold one inside it, and on the inner side a small diamond when `jewel`.
-pub(super) fn edge_frame_shape(r: Rect, side: Side, attached: bool, m: &super::Modern, jewel: bool, radius: u8) -> Shape {
+pub(super) fn edge_frame_shape(
+    r: Rect,
+    side: Side,
+    attached: bool,
+    m: &super::Modern,
+    jewel: bool,
+    radius: u8,
+) -> Shape {
     let ext = match (attached, side) {
         (false, _) => r,
         (true, Side::Left) => Rect::from_min_max(pos2(r.min.x - 10.0, r.min.y), r.max),
@@ -709,8 +823,18 @@ pub(super) fn edge_frame_shape(r: Rect, side: Side, attached: bool, m: &super::M
     }
     let mut v = vec![
         Shape::Rect(egui::epaint::RectShape::filled(ext, round(radius), m.bg(m.theme.color("surface")))),
-        Shape::Rect(egui::epaint::RectShape::stroke(ext, round(radius), Stroke::new(2.0, m.theme.color("bronze")), egui::StrokeKind::Inside)),
-        Shape::Rect(egui::epaint::RectShape::stroke(ext.shrink(4.0), round(radius.saturating_sub(4)), Stroke::new(1.0, m.theme.color("gold").gamma_multiply(0.45)), egui::StrokeKind::Inside)),
+        Shape::Rect(egui::epaint::RectShape::stroke(
+            ext,
+            round(radius),
+            Stroke::new(2.0, m.theme.color("bronze")),
+            egui::StrokeKind::Inside,
+        )),
+        Shape::Rect(egui::epaint::RectShape::stroke(
+            ext.shrink(4.0),
+            round(radius.saturating_sub(4)),
+            Stroke::new(1.0, m.theme.color("gold").gamma_multiply(0.45)),
+            egui::StrokeKind::Inside,
+        )),
     ];
     if jewel {
         let c = match side {
@@ -720,7 +844,11 @@ pub(super) fn edge_frame_shape(r: Rect, side: Side, attached: bool, m: &super::M
             Side::Bottom => pos2(ext.center().x, ext.min.y + 1.0),
         };
         let d = 5.0;
-        v.push(Shape::convex_polygon(vec![pos2(c.x, c.y - d), pos2(c.x + d, c.y), pos2(c.x, c.y + d), pos2(c.x - d, c.y)], m.theme.color("gold"), Stroke::new(1.0, Color32::from_black_alpha(200))));
+        v.push(Shape::convex_polygon(
+            vec![pos2(c.x, c.y - d), pos2(c.x + d, c.y), pos2(c.x, c.y + d), pos2(c.x - d, c.y)],
+            m.theme.color("gold"),
+            Stroke::new(1.0, Color32::from_black_alpha(200)),
+        ));
     }
     Shape::Vec(v)
 }
@@ -753,21 +881,44 @@ fn flyout_heading(ui: &mut Ui, m: &super::Modern, text: &str, font: FontId, side
 fn header(ui: &mut Ui, m: &super::Modern, text: &str, open: bool) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 20.0), Sense::click());
     let c = if resp.hovered() { m.theme.color("text") } else { m.theme.color("gold") };
-    ui.painter().text(pos2(r.min.x, r.center().y), Align2::LEFT_CENTER, text, FontId::new(m.theme.small + 1.0, FontFamily::Name(super::STRONG.into())), c);
+    ui.painter().text(
+        pos2(r.min.x, r.center().y),
+        Align2::LEFT_CENTER,
+        text,
+        FontId::new(m.theme.small + 1.0, FontFamily::Name(super::STRONG.into())),
+        c,
+    );
     // A chevron: down while open, right while folded.
     let (cx, cy) = (r.max.x - 8.0, r.center().y);
-    let pts = if open { vec![pos2(cx - 5.0, cy - 2.5), pos2(cx + 5.0, cy - 2.5), pos2(cx, cy + 3.5)] } else { vec![pos2(cx - 2.5, cy - 5.0), pos2(cx - 2.5, cy + 5.0), pos2(cx + 3.5, cy)] };
+    let pts = if open {
+        vec![pos2(cx - 5.0, cy - 2.5), pos2(cx + 5.0, cy - 2.5), pos2(cx, cy + 3.5)]
+    } else {
+        vec![pos2(cx - 2.5, cy - 5.0), pos2(cx - 2.5, cy + 5.0), pos2(cx + 3.5, cy)]
+    };
     ui.painter().add(Shape::convex_polygon(pts, c, Stroke::NONE));
     resp
 }
 
 /// The sections under their headings (a click folds one; returns which): recasts as rows, the buffs and debuffs a
 /// line per bearer (icon_group). Also offscreen in modern-shot.
-pub(super) fn timers_body(ui: &mut Ui, m: &super::Modern, secs: &[Vec<Group>; 3], folded: u8, pulse: f32, icon: &IconPainter) -> Option<usize> {
+pub(super) fn timers_body(
+    ui: &mut Ui,
+    m: &super::Modern,
+    secs: &[Vec<Group>; 3],
+    folded: u8,
+    pulse: f32,
+    icon: &IconPainter,
+) -> Option<usize> {
     let mut fold = None;
     // One name column for every bearer: the widest name, up to 38% of the window.
     let font = FontId::proportional(m.theme.small);
-    let widest = secs[1..].iter().flatten().filter(|g| !g.rows.is_empty()).filter_map(|g| g.name.as_ref()).map(|n| ui.ctx().fonts_mut(|f| f.layout_no_wrap(n.clone(), font.clone(), Color32::WHITE).size().x)).fold(0.0, f32::max);
+    let widest = secs[1..]
+        .iter()
+        .flatten()
+        .filter(|g| !g.rows.is_empty())
+        .filter_map(|g| g.name.as_ref())
+        .map(|n| ui.ctx().fonts_mut(|f| f.layout_no_wrap(n.clone(), font.clone(), Color32::WHITE).size().x))
+        .fold(0.0, f32::max);
     let name_w = (widest + 2.0).min(ui.available_width() * 0.38);
     for (k, groups) in secs.iter().enumerate() {
         let n: usize = groups.iter().map(|g| g.rows.len()).sum();
@@ -814,9 +965,17 @@ fn cell_time(left: f32, total: f32) -> String {
 /// A bearer's effects: the name in the column, then a cell per effect (its icon, the time under it) wrapping to more
 /// lines. The time turns yellow / orange / red under 30 / 20 / 10 s; the last 15 s pulse as the status icons do;
 /// past the predicted end the cell greys. A cell's tooltip names the effect.
-fn icon_group(ui: &mut Ui, m: &super::Modern, g: &Group, name_w: f32, icon: &dyn Fn(&egui::Painter, usize, Rect, Color32), pulse: f32) {
+fn icon_group(
+    ui: &mut Ui,
+    m: &super::Modern,
+    g: &Group,
+    name_w: f32,
+    icon: &dyn Fn(&egui::Painter, usize, Rect, Color32),
+    pulse: f32,
+) {
     let font = FontId::proportional(m.theme.small - 1.0);
-    let step = ui.ctx().fonts_mut(|f| f.layout_no_wrap("9:59".into(), font.clone(), Color32::WHITE).size().x).max(CELL) + CELL_GAP;
+    let step = ui.ctx().fonts_mut(|f| f.layout_no_wrap("9:59".into(), font.clone(), Color32::WHITE).size().x).max(CELL)
+        + CELL_GAP;
     let x0 = if g.name.is_some() { name_w + NAME_GAP } else { 0.0 };
     let per = ((ui.available_width() - x0 + CELL_GAP) / step).floor().max(1.0) as usize;
     let line_h = CELL + font.size + 5.0;
@@ -825,7 +984,13 @@ fn icon_group(ui: &mut Ui, m: &super::Modern, g: &Group, name_w: f32, icon: &dyn
         if line == 0
             && let Some(name) = &g.name
         {
-            let gl = super::one_line(ui.painter(), name, FontId::proportional(m.theme.small), m.theme.color("muted"), name_w);
+            let gl = super::one_line(
+                ui.painter(),
+                name,
+                FontId::proportional(m.theme.small),
+                m.theme.color("muted"),
+                name_w,
+            );
             let full = gl.size().x;
             ui.painter().galley(pos2(r.min.x, r.min.y + (CELL - gl.size().y) / 2.0), gl, m.theme.color("muted"));
             if full >= name_w - 1.0 {
@@ -834,18 +999,30 @@ fn icon_group(ui: &mut Ui, m: &super::Modern, g: &Group, name_w: f32, icon: &dyn
         }
         for (k, row) in chunk.iter().enumerate() {
             let ri = line * per + k;
-            let cell = Rect::from_min_size(pos2(r.min.x + x0 + k as f32 * step, r.min.y), vec2(step - CELL_GAP, line_h));
+            let cell =
+                Rect::from_min_size(pos2(r.min.x + x0 + k as f32 * step, r.min.y), vec2(step - CELL_GAP, line_h));
             let at = Rect::from_center_size(pos2(cell.center().x, r.min.y + CELL / 2.0), vec2(CELL, CELL));
             let waiting = row.left <= 0.0;
             let pulse_k = if row.left > 0.0 && row.left <= 15.0 { 0.5 + 0.5 * pulse } else { 1.0 };
-            let tint = if waiting { Color32::from_white_alpha(110) } else { Color32::from_white_alpha((255.0 * pulse_k) as u8) };
+            let tint = if waiting {
+                Color32::from_white_alpha(110)
+            } else {
+                Color32::from_white_alpha((255.0 * pulse_k) as u8)
+            };
             icon(ui.painter(), ri, at, tint);
             let colour = match row.left {
                 _ if waiting || row.total <= 0.0 => m.theme.color("muted"),
                 l if l < 30.0 => bar_colour(l),
                 _ => m.theme.color("text"),
             };
-            super::paint::outlined(ui.painter(), pos2(cell.center().x, at.max.y + 1.0), Align2::CENTER_TOP, &cell_time(row.left, row.total), font.clone(), colour);
+            super::paint::outlined(
+                ui.painter(),
+                pos2(cell.center().x, at.max.y + 1.0),
+                Align2::CENTER_TOP,
+                &cell_time(row.left, row.total),
+                font.clone(),
+                colour,
+            );
             m.tip_with(ui, cell, || {
                 let body = match () {
                     _ if row.total <= 0.0 => "Its length is not known.".to_string(),
@@ -872,9 +1049,21 @@ fn group(ui: &mut Ui, m: &super::Modern, g: &Group, icon: &dyn Fn(&egui::Painter
         icon(ui.painter(), ri, Rect::from_min_size(pos2(rect.min.x, rect.min.y + 3.0), vec2(22.0, 22.0)), tint);
         let text = if waiting { m.theme.color("muted") } else { m.theme.color("text") };
         let x = rect.min.x + 30.0;
-        ui.painter().text(pos2(x, rect.min.y + 2.0), Align2::LEFT_TOP, &r.name, FontId::proportional(m.theme.small), text);
+        ui.painter().text(
+            pos2(x, rect.min.y + 2.0),
+            Align2::LEFT_TOP,
+            &r.name,
+            FontId::proportional(m.theme.small),
+            text,
+        );
         let time = if r.total <= 0.0 { "--:--".to_string() } else { clock(r.left) };
-        ui.painter().text(pos2(rect.max.x, rect.min.y + 2.0), Align2::RIGHT_TOP, time, FontId::monospace(m.theme.small), text);
+        ui.painter().text(
+            pos2(rect.max.x, rect.min.y + 2.0),
+            Align2::RIGHT_TOP,
+            time,
+            FontId::monospace(m.theme.small),
+            text,
+        );
         if r.total > 0.0 {
             let f = (r.left / r.total).clamp(0.0, 1.0);
             let f = if r.fills { 1.0 - f } else { f };
@@ -891,7 +1080,13 @@ fn group(ui: &mut Ui, m: &super::Modern, g: &Group, icon: &dyn Fn(&egui::Painter
 /// The map image as an egui texture, made once per image.
 fn map_texture(m: &super::Modern, ctx: &egui::Context, img: &MapImage) -> egui::TextureId {
     let mut images = m.images.borrow_mut();
-    let t = images.entry(img.name.clone()).or_insert_with(|| Some(ctx.load_texture(img.name.clone(), egui::ColorImage::from_rgba_unmultiplied(img.size, &img.rgba), egui::TextureOptions::LINEAR)));
+    let t = images.entry(img.name.clone()).or_insert_with(|| {
+        Some(ctx.load_texture(
+            img.name.clone(),
+            egui::ColorImage::from_rgba_unmultiplied(img.size, &img.rgba),
+            egui::TextureOptions::LINEAR,
+        ))
+    });
     t.as_ref().map_or(egui::TextureId::default(), |t| t.id())
 }
 
@@ -906,7 +1101,12 @@ const ME: Color32 = Color32::from_rgb(0xf2, 0x55, 0x22);
 fn arrow_in(painter: &egui::Painter, c: Pos2, facing: f32, size: f32, colour: Color32) {
     let d = vec2(facing.cos(), facing.sin());
     let n = vec2(-d.y, d.x);
-    let pts = vec![c + d * size, c - d * size * 0.55 + n * size * 0.65, c - d * size * 0.25, c - d * size * 0.55 - n * size * 0.65];
+    let pts = vec![
+        c + d * size,
+        c - d * size * 0.55 + n * size * 0.65,
+        c - d * size * 0.25,
+        c - d * size * 0.55 - n * size * 0.65,
+    ];
     painter.add(Shape::convex_polygon(pts, colour, Stroke::new(1.5, Color32::from_black_alpha(220))));
 }
 
@@ -925,7 +1125,11 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
     // Its own size once resized (the place's w), else Small / Medium / Large as big on screen as the retail-drawn one:
     // its layout pixels through the UI's scale.
     let mp = p.place("minimap");
-    let d = if mp.w > 0.0 { mp.w } else { minimap::SIZES[w.minimap_size.min(2) as usize] * ctx.content_rect().width() / w.ui_wh.0.max(1.0) };
+    let d = if mp.w > 0.0 {
+        mp.w
+    } else {
+        minimap::SIZES[w.minimap_size.min(2) as usize] * ctx.content_rect().width() / w.ui_wh.0.max(1.0)
+    };
     let max_d = ctx.content_rect().height() * 0.7;
     let mut resize: Option<f32> = None;
     let (pos, facing, span) = (f.pos, f.facing, f.span);
@@ -933,23 +1137,42 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
     let ids = f.ids.clone();
     // The Wide Scan row picked and the area narrowed to, in world x / z.
     let origin = m.scan_origin.get();
-    let picked = m.scan_pick.get().and_then(|i| m.scan_rows.borrow().iter().find(|r| r.0.index == i).map(|r| (origin.0 + r.0.dx as f32, origin.1 + r.0.dz as f32)));
+    let picked = m.scan_pick.get().and_then(|i| {
+        m.scan_rows
+            .borrow()
+            .iter()
+            .find(|r| r.0.index == i)
+            .map(|r| (origin.0 + r.0.dx as f32, origin.1 + r.0.dz as f32))
+    });
     let (picking, narrowed) = (m.scan_picking.get(), m.scan_area.get());
     let mut chosen: Option<(f32, f32, f32)> = None;
-    let label = p.gu.map(|gu| format!("{}  {}", crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(w.pos_zone))), m.grid(w, gu))).unwrap_or_default();
+    let label =
+        p.gu.map(|gu| {
+            format!(
+                "{}  {}",
+                crate::dat::font::plain(&crate::dat::font::decode_sjis(&gu.area_name(w.pos_zone))),
+                m.grid(w, gu)
+            )
+        })
+        .unwrap_or_default();
     let folded = p.folded.get("minimap").copied().unwrap_or(false);
     let mut wheel = 0.0f32;
     let toggle = edge_window(p, "minimap", d + 30.0, false, folded, "Map", |ui, side, _| {
         // The heading: the zone and grid, the fold chevron; dragged it moves the window.
-        let hresp = flyout_heading(ui, m, &label, FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())), side);
+        let hresp =
+            flyout_heading(ui, m, &label, FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())), side);
         ui.add_space(4.0);
-        let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ui.available_width()), if picking { Sense::click() } else { Sense::hover() });
+        let (area, resp) = ui.allocate_exact_size(
+            vec2(ui.available_width(), ui.available_width()),
+            if picking { Sense::click() } else { Sense::hover() },
+        );
         let painter = ui.painter().with_clip_rect(area);
         painter.rect_filled(area, 0.0, m.theme.color("charcoal"));
         let s = minimap::px_per_unit(&img.region);
         let z = area.width() / span;
         let (px, py) = (pos.0 * s, -pos.1 * s);
-        let u0 = pos2((px - span / 2.0 - img.region.ox as f32) / 512.0, (py - span / 2.0 - img.region.oy as f32) / 512.0);
+        let u0 =
+            pos2((px - span / 2.0 - img.region.ox as f32) / 512.0, (py - span / 2.0 - img.region.oy as f32) / 512.0);
         painter.image(tex, area, Rect::from_min_size(u0, vec2(span / 512.0, span / 512.0)), Color32::WHITE);
         let c = area.center();
         // The dot nearest the pointer (within 7 points) names itself in a tooltip.
@@ -972,14 +1195,20 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
         }
         arrow_in(&painter, c, facing, 9.0, ME);
         if let (Some((_, k)), Some(h)) = (near.filter(|_| !picking), hover)
-            && let Some(name) = ids.get(k).and_then(|id| w.entities.get(id)).map(|e| e.name.clone()).filter(|n| !n.is_empty())
+            && let Some(name) =
+                ids.get(k).and_then(|id| w.entities.get(id)).map(|e| e.name.clone()).filter(|n| !n.is_empty())
         {
             m.tip_at(ui.ctx(), h, &name, "");
         }
         // World x / z on the map and back.
         let at = |x: f32, wz: f32| c + vec2((x * s - px) * z, (-wz * s - py) * z);
         if let Some((x, wz, r)) = narrowed {
-            painter.circle(at(x, wz), r * s * z, m.theme.color("focus").gamma_multiply(0.12), Stroke::new(1.5, m.theme.color("focus")));
+            painter.circle(
+                at(x, wz),
+                r * s * z,
+                m.theme.color("focus").gamma_multiply(0.12),
+                Stroke::new(1.5, m.theme.color("focus")),
+            );
         }
         if let Some((x, wz)) = picked {
             painter.circle_stroke(at(x, wz), 7.0, Stroke::new(2.0, m.theme.color("gold")));
@@ -987,7 +1216,11 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
         // Narrow down range (retail's mapscan): the click is the centre, the radius 0.65 of the half map shown.
         if picking {
             if let Some(q) = resp.hover_pos() {
-                painter.circle_stroke(q, 0.65 * area.width() / 2.0, Stroke::new(1.0, m.theme.color("focus").gamma_multiply(0.7)));
+                painter.circle_stroke(
+                    q,
+                    0.65 * area.width() / 2.0,
+                    Stroke::new(1.0, m.theme.color("focus").gamma_multiply(0.7)),
+                );
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
             }
             if resp.clicked()
@@ -1010,10 +1243,17 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
         let g = ui.interact(gr, egui::Id::unique("minimap grip"), Sense::drag());
         let gc = if g.hovered() || g.dragged() { m.theme.color("gold") } else { m.theme.color("bronze") };
         for k in [4.0, 8.0, 12.0] {
-            ui.painter().line_segment([corner + vec2(sx * k, -2.0 * sy), corner + vec2(sx * 2.0, -k * sy)], Stroke::new(1.5, gc));
+            ui.painter().line_segment(
+                [corner + vec2(sx * k, -2.0 * sy), corner + vec2(sx * 2.0, -k * sy)],
+                Stroke::new(1.5, gc),
+            );
         }
         if g.hovered() || g.dragged() {
-            ui.ctx().set_cursor_icon(if sx * sy < 0.0 { egui::CursorIcon::ResizeNwSe } else { egui::CursorIcon::ResizeNeSw });
+            ui.ctx().set_cursor_icon(if sx * sy < 0.0 {
+                egui::CursorIcon::ResizeNwSe
+            } else {
+                egui::CursorIcon::ResizeNeSw
+            });
         }
         if g.dragged() {
             let dx = g.drag_delta().x * -sx;
@@ -1023,8 +1263,19 @@ fn minimap_panel(p: &mut Panels, w: &mut World) {
         }
         // N at the top.
         let n = pos2(area.center().x, area.min.y + 10.0);
-        painter.circle(n, 8.0, m.theme.color("charcoal").gamma_multiply(0.85), Stroke::new(1.0, m.theme.color("bronze")));
-        painter.text(n, Align2::CENTER_CENTER, "N", FontId::new(m.theme.small - 1.0, FontFamily::Name(super::STRONG.into())), m.theme.color("gold"));
+        painter.circle(
+            n,
+            8.0,
+            m.theme.color("charcoal").gamma_multiply(0.85),
+            Stroke::new(1.0, m.theme.color("bronze")),
+        );
+        painter.text(
+            n,
+            Align2::CENTER_CENTER,
+            "N",
+            FontId::new(m.theme.small - 1.0, FontFamily::Name(super::STRONG.into())),
+            m.theme.color("gold"),
+        );
         if resp.contains_pointer() {
             wheel = ui.input(|i| {
                 i.events
@@ -1086,7 +1337,12 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         let place = if mp.edge != 0 && !mp.float {
             super::Place { x: (r.max.x + 6.0) / screen.width().max(1.0), edge: mp.edge, ..Default::default() }
         } else {
-            super::Place { x: mp.x, y: (r.max.y + 6.0) / screen.height().max(1.0), float: mp.float, ..Default::default() }
+            super::Place {
+                x: mp.x,
+                y: (r.max.y + 6.0) / screen.height().max(1.0),
+                float: mp.float,
+                ..Default::default()
+            }
         };
         p.retail.insert("widescan".into(), place);
     }
@@ -1097,24 +1353,36 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
     let now = std::time::Instant::now();
     // A track the server never confirmed (it refuses silently: out of range, gone) is dropped after five position
     // packets, so the row is not shown tracked and the list refreshes again (ours).
-    if w.scan.tracking().is_none() && w.scan.track.index != 0 && w.scan.asked.is_some_and(|t| now.duration_since(t).as_secs_f32() >= 2.0) {
+    if w.scan.tracking().is_none()
+        && w.scan.track.index != 0
+        && w.scan.asked.is_some_and(|t| now.duration_since(t).as_secs_f32() >= 2.0)
+    {
         (w.scan.track, w.scan.asked) = (Default::default(), None);
         w.sounds.push(crate::audio::Ui::Error as u32);
     }
-    if !folded && w.scan.track.index == 0 && w.scan.list_state != 1 && m.scan_at.get().is_none_or(|t| now.duration_since(t).as_secs_f32() >= 10.0) {
+    if !folded
+        && w.scan.track.index == 0
+        && w.scan.list_state != 1
+        && m.scan_at.get().is_none_or(|t| now.duration_since(t).as_secs_f32() >= 10.0)
+    {
         m.scan_at.set(Some(now));
         super::super::scan_request(w);
     }
     // Named as retail's list (FUN_101fb4b0): players by their own name, NPCs and monsters from the zone's NPC list by
     // index & 0x3ff; nameless ones and ourselves left out.
-    let names: std::collections::HashMap<u16, &String> = w.npc_names.iter().map(|(id, n)| ((id & 0x3ff) as u16, n)).collect();
+    let names: std::collections::HashMap<u16, &String> =
+        w.npc_names.iter().map(|(id, n)| ((id & 0x3ff) as u16, n)).collect();
     let mut rows: Vec<(super::super::widescan::Entry, String)> = w
         .scan
         .entries
         .values()
         .filter(|e| !(e.kind == 0 && e.index == w.my_index))
         .filter_map(|e| {
-            let name = if e.kind == 0 { e.name.clone() } else { names.get(&(e.index & 0x3ff)).map(|n| n.to_string()).unwrap_or_default() };
+            let name = if e.kind == 0 {
+                e.name.clone()
+            } else {
+                names.get(&(e.index & 0x3ff)).map(|n| n.to_string()).unwrap_or_default()
+            };
             (!name.is_empty()).then(|| (e.clone(), name))
         })
         .collect();
@@ -1133,7 +1401,9 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         .scan_rows
         .borrow()
         .iter()
-        .filter(|(e, _)| area.is_none_or(|(x, z, r)| (origin.0 + e.dx as f32 - x).hypot(origin.1 + e.dz as f32 - z) <= r))
+        .filter(|(e, _)| {
+            area.is_none_or(|(x, z, r)| (origin.0 + e.dx as f32 - x).hypot(origin.1 + e.dz as f32 - z) <= r)
+        })
         .cloned()
         .collect();
     // The filter (ours): the kinds shown, and every word typed somewhere in the name.
@@ -1158,7 +1428,11 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
     let mut cancel = false;
     let mut scan = false;
     let toggle = edge_window(p, "widescan", 290.0, true, folded, "Wide Scan", |ui, side, fixed| {
-        let count = if filtered { format!("Wide Scan ({} of {all})", rows.len()) } else { format!("Wide Scan ({})", rows.len()) };
+        let count = if filtered {
+            format!("Wide Scan ({} of {all})", rows.len())
+        } else {
+            format!("Wide Scan ({})", rows.len())
+        };
         let hresp = flyout_header(ui, m, &count, side);
         ui.add_space(4.0);
         // Scan now (between the 10-s refreshes: camping a notorious monster); greyed while a list comes in.
@@ -1178,7 +1452,8 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
             // No players chip: LSB's Wide Scan lists only NPCs and monsters (CZoneEntities::WideScan).
             for (bit, label) in [(2u8, "NPCs"), (4, "Monsters")] {
                 let on = kinds & bit != 0;
-                if kit::chip(ui, m, label, kit::Btn { lit: on, ..Default::default() }, Some(kind_colour(bit))).clicked() {
+                if kit::chip(ui, m, label, kit::Btn { lit: on, ..Default::default() }, Some(kind_colour(bit))).clicked()
+                {
                     flip ^= bit;
                 }
             }
@@ -1187,25 +1462,54 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         // The name field: a click takes the keys (Enter keeps the filter, Escape clears it); the cross clears it.
         let (fr, fresp) = ui.allocate_exact_size(vec2(ui.available_width(), 24.0), Sense::click());
         ui.painter().rect_filled(fr, 5.0, m.theme.color("charcoal"));
-        ui.painter().rect_stroke(fr, 5.0, Stroke::new(1.0, if typing { m.theme.color("focus") } else { m.theme.color("bronze").gamma_multiply(0.6) }), egui::StrokeKind::Inside);
+        ui.painter().rect_stroke(
+            fr,
+            5.0,
+            Stroke::new(1.0, if typing { m.theme.color("focus") } else { m.theme.color("bronze").gamma_multiply(0.6) }),
+            egui::StrokeKind::Inside,
+        );
         let font = FontId::proportional(m.theme.small);
-        let (text, col) = if find.is_empty() && !typing { ("Filter by name".to_string(), m.theme.color("muted")) } else { (find.clone(), m.theme.color("text")) };
-        let tr = ui.painter().with_clip_rect(fr.shrink(3.0)).text(pos2(fr.min.x + 8.0, fr.center().y), Align2::LEFT_CENTER, text, font, col);
+        let (text, col) = if find.is_empty() && !typing {
+            ("Filter by name".to_string(), m.theme.color("muted"))
+        } else {
+            (find.clone(), m.theme.color("text"))
+        };
+        let tr = ui.painter().with_clip_rect(fr.shrink(3.0)).text(
+            pos2(fr.min.x + 8.0, fr.center().y),
+            Align2::LEFT_CENTER,
+            text,
+            font,
+            col,
+        );
         if typing && (ui.input(|i| i.time) * 2.0) as i64 % 2 == 0 {
             let x = if find.is_empty() { fr.min.x + 8.0 } else { tr.max.x + 1.0 };
-            ui.painter().vline(x, (fr.center().y - 7.0)..=(fr.center().y + 7.0), Stroke::new(1.5, m.theme.color("text")));
+            ui.painter().vline(
+                x,
+                (fr.center().y - 7.0)..=(fr.center().y + 7.0),
+                Stroke::new(1.5, m.theme.color("text")),
+            );
         }
         if !find.is_empty() {
             let xr = Rect::from_center_size(pos2(fr.max.x - 12.0, fr.center().y), vec2(16.0, 16.0));
             let x = ui.interact(xr, egui::Id::unique("scan filter clear"), Sense::click());
             let xc = if x.hovered() { m.theme.color("text") } else { m.theme.color("muted") };
-            ui.painter().text(xr.center(), Align2::CENTER_CENTER, "\u{00d7}", FontId::proportional(m.theme.small + 2.0), xc);
+            ui.painter().text(
+                xr.center(),
+                Align2::CENTER_CENTER,
+                "\u{00d7}",
+                FontId::proportional(m.theme.small + 2.0),
+                xc,
+            );
             clear |= x.clicked();
         }
         field_click = fresp.clicked();
         if picking {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Click the map where to look.").size(m.theme.small).color(m.theme.color("focus")));
+                ui.label(
+                    egui::RichText::new("Click the map where to look.")
+                        .size(m.theme.small)
+                        .color(m.theme.color("focus")),
+                );
                 if ui.button(egui::RichText::new("Cancel").size(m.theme.small)).clicked() {
                     cancel = true;
                 }
@@ -1213,46 +1517,78 @@ fn widescan_panel(p: &mut Panels, w: &mut World) {
         }
         ui.add_space(4.0);
         if rows.is_empty() && filtered && all > 0 {
-            ui.label(egui::RichText::new("Nothing matches the filter.").size(m.theme.small).color(m.theme.color("muted")));
+            ui.label(
+                egui::RichText::new("Nothing matches the filter.").size(m.theme.small).color(m.theme.color("muted")),
+            );
         }
         let room = if fixed { ui.available_height() } else { 320.0 };
-        egui::ScrollArea::vertical().max_height(room).min_scrolled_height(room).auto_shrink([false, !fixed]).show(ui, |ui| {
-            for (e, name) in &rows {
-                let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::click());
-                let on = e.index == tracked;
-                if on || resp.hovered() {
-                    ui.painter().rect_filled(r, 4.0, m.theme.color("focus").gamma_multiply(if on { 0.35 } else { 0.15 }));
+        egui::ScrollArea::vertical().max_height(room).min_scrolled_height(room).auto_shrink([false, !fixed]).show(
+            ui,
+            |ui| {
+                for (e, name) in &rows {
+                    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::click());
+                    let on = e.index == tracked;
+                    if on || resp.hovered() {
+                        ui.painter().rect_filled(
+                            r,
+                            4.0,
+                            m.theme.color("focus").gamma_multiply(if on { 0.35 } else { 0.15 }),
+                        );
+                    }
+                    let col = kind_colour(kind_bit(e.kind));
+                    ui.painter().text(
+                        pos2(r.min.x + 4.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        name,
+                        FontId::proportional(m.theme.small),
+                        col,
+                    );
+                    let d = (e.dx as f32).hypot(e.dz as f32);
+                    let info = if e.level > 0 { format!("Lv{} {d:.0}", e.level) } else { format!("{d:.0}") };
+                    ui.painter().text(
+                        pos2(r.max.x - 26.0, r.center().y),
+                        Align2::RIGHT_CENTER,
+                        info,
+                        FontId::monospace(m.theme.small - 1.0),
+                        m.theme.color("muted"),
+                    );
+                    arrow(
+                        ui.painter(),
+                        pos2(r.max.x - 12.0, r.center().y),
+                        (-(e.dz as f32)).atan2(e.dx as f32),
+                        6.0,
+                        m,
+                    );
+                    if picked == Some(e.index) {
+                        ui.painter().rect_stroke(
+                            r,
+                            4.0,
+                            Stroke::new(1.5, m.theme.color("gold")),
+                            egui::StrokeKind::Inside,
+                        );
+                    }
+                    // A click (or right click) opens the row's options, retail's mapscan: Track target (not a player's),
+                    // Narrow down range.
+                    if resp.clicked() || resp.secondary_clicked() {
+                        chose = Some(e.index);
+                    }
+                    if picked == Some(e.index) {
+                        ui.horizontal(|ui| {
+                            ui.add_space(12.0);
+                            let track = if e.index == tracked { "Stop tracking" } else { "Track target" };
+                            let s = kit::Btn { off: e.kind == 0, ..Default::default() };
+                            if kit::clicked(&kit::chip(ui, m, track, s, None), s) {
+                                pick = Some(e.index);
+                            }
+                            if kit::chip(ui, m, "Narrow down range", kit::Btn::default(), None).clicked() {
+                                narrow = true;
+                            }
+                        });
+                        ui.add_space(4.0);
+                    }
                 }
-                let col = kind_colour(kind_bit(e.kind));
-                ui.painter().text(pos2(r.min.x + 4.0, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), col);
-                let d = (e.dx as f32).hypot(e.dz as f32);
-                let info = if e.level > 0 { format!("Lv{} {d:.0}", e.level) } else { format!("{d:.0}") };
-                ui.painter().text(pos2(r.max.x - 26.0, r.center().y), Align2::RIGHT_CENTER, info, FontId::monospace(m.theme.small - 1.0), m.theme.color("muted"));
-                arrow(ui.painter(), pos2(r.max.x - 12.0, r.center().y), (-(e.dz as f32)).atan2(e.dx as f32), 6.0, m);
-                if picked == Some(e.index) {
-                    ui.painter().rect_stroke(r, 4.0, Stroke::new(1.5, m.theme.color("gold")), egui::StrokeKind::Inside);
-                }
-                // A click (or right click) opens the row's options, retail's mapscan: Track target (not a player's),
-                // Narrow down range.
-                if resp.clicked() || resp.secondary_clicked() {
-                    chose = Some(e.index);
-                }
-                if picked == Some(e.index) {
-                    ui.horizontal(|ui| {
-                        ui.add_space(12.0);
-                        let track = if e.index == tracked { "Stop tracking" } else { "Track target" };
-                        let s = kit::Btn { off: e.kind == 0, ..Default::default() };
-                        if kit::clicked(&kit::chip(ui, m, track, s, None), s) {
-                            pick = Some(e.index);
-                        }
-                        if kit::chip(ui, m, "Narrow down range", kit::Btn::default(), None).clicked() {
-                            narrow = true;
-                        }
-                    });
-                    ui.add_space(4.0);
-                }
-            }
-        });
+            },
+        );
         hresp.clicked()
     });
     if flip != 0 {
@@ -1344,11 +1680,24 @@ fn overlay(p: &mut Panels, w: &mut World) {
     let boxr = Rect::from_min_size(pos2(rect[0] * k.x, rect[1] * k.y), vec2(rect[2] * k.x, rect[3] * k.y));
     let z = vec2(zoom * k.x, zoom * k.y);
     let painter = ctx.layer_painter(egui::LayerId::background()).with_clip_rect(boxr);
-    let img_r = Rect::from_min_size(boxr.min + vec2((img.region.ox as f32 - view.0) * z.x, (img.region.oy as f32 - view.1) * z.y), vec2(512.0 * z.x, 512.0 * z.y));
-    painter.image(tex, img_r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::from_white_alpha((255.0 * opacity.clamp(0.0, 1.0)) as u8));
+    let img_r = Rect::from_min_size(
+        boxr.min + vec2((img.region.ox as f32 - view.0) * z.x, (img.region.oy as f32 - view.1) * z.y),
+        vec2(512.0 * z.x, 512.0 * z.y),
+    );
+    painter.image(
+        tex,
+        img_r,
+        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+        Color32::from_white_alpha((255.0 * opacity.clamp(0.0, 1.0)) as u8),
+    );
     let (px, py) = img.region.px(pos.0, pos.1);
     let me = boxr.min + vec2((px as f32 - view.0) * z.x, (py as f32 - view.1) * z.y);
     arrow_in(&painter, me, facing, 11.0, ME);
     let edge = ctx.layer_painter(egui::LayerId::background());
-    edge.rect_stroke(boxr, 6.0, Stroke::new(2.0, m.theme.color("bronze").gamma_multiply(0.8)), egui::StrokeKind::Outside);
+    edge.rect_stroke(
+        boxr,
+        6.0,
+        Stroke::new(2.0, m.theme.color("bronze").gamma_multiply(0.8)),
+        egui::StrokeKind::Outside,
+    );
 }

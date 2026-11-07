@@ -27,7 +27,12 @@ enum Tab {
     KeyItems,
 }
 
-const TABS: [(Tab, &str); 4] = [(Tab::Missions, "Missions"), (Tab::Quests, "Quests"), (Tab::Roe, "Records of Eminence"), (Tab::KeyItems, "Key Items")];
+const TABS: [(Tab, &str); 4] = [
+    (Tab::Missions, "Missions"),
+    (Tab::Quests, "Quests"),
+    (Tab::Roe, "Records of Eminence"),
+    (Tab::KeyItems, "Key Items"),
+];
 
 /// The tab open (none while a Records of Eminence list shows retail's).
 fn tab(w: &World) -> Option<Tab> {
@@ -97,7 +102,8 @@ fn settle(w: &mut World) {
     if w.missions.as_ref().is_some_and(|m| m.list.is_none()) {
         missions::show_log(w, (w.journal.nation as usize).min(2), None);
     }
-    if w.journal_roe.is_none() && w.quests.as_ref().is_some_and(|q| q.state == 1 && q.list.is_none() && q.roe.is_none()) {
+    if w.journal_roe.is_none() && w.quests.as_ref().is_some_and(|q| q.state == 1 && q.list.is_none() && q.roe.is_none())
+    {
         quests::show_area(w, (w.journal.nation as usize).min(2), None);
     }
     if let Some(k) = w.keyitems.as_mut()
@@ -108,7 +114,10 @@ fn settle(w: &mut World) {
     if let Some(k) = w.keyitems.as_ref().filter(|k| k.state == 1) {
         // Opening on its first category with something held (retail's cursor starts on the first).
         let cats = keyitems::all(w);
-        let cat = (k.cursor..cats.len()).chain(0..k.cursor).find(|&c| cats[c].1.iter().any(|(id, _)| w.has_key_item(*id))).unwrap_or(k.cursor);
+        let cat = (k.cursor..cats.len())
+            .chain(0..k.cursor)
+            .find(|&c| cats[c].1.iter().any(|(id, _)| w.has_key_item(*id)))
+            .unwrap_or(k.cursor);
         keyitems::show_category(w, cat);
     }
 }
@@ -177,7 +186,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, page: bool) -> bool {
         (Tab::KeyItems, K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight) => keyitems::key(w, gu, key, page),
         (Tab::KeyItems, K::Enter) => examine(w),
         // A list open: retail's keys (a category's Escape goes up, the root's back to the summary).
-        (Tab::Roe, K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight | K::Enter) if w.quests.as_ref().is_some_and(|q| q.roe.is_some()) => {
+        (Tab::Roe, K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight | K::Enter)
+            if w.quests.as_ref().is_some_and(|q| q.roe.is_some()) =>
+        {
             roe::modern_key(w, key, page);
         }
         (Tab::Roe, K::ArrowUp | K::ArrowDown) => {
@@ -226,8 +237,20 @@ fn nav_row(ui: &mut Ui, m: &super::Modern, text: &str, count: &str, on: bool, ke
     super::rows::face(ui.painter(), m, r, face, if on && !keys { UNFOCUSED } else { Color32::WHITE });
     let c = if off { m.theme.color("muted") } else { m.theme.color("text") };
     let clip = Rect::from_min_max(r.min, pos2(r.max.x - if count.is_empty() { 8.0 } else { 44.0 }, r.max.y));
-    ui.painter().with_clip_rect(clip).text(pos2(r.min.x + 24.0, r.center().y), Align2::LEFT_CENTER, text, FontId::proportional(m.theme.small), c);
-    ui.painter().text(pos2(r.max.x - 10.0, r.center().y), Align2::RIGHT_CENTER, count, FontId::monospace(m.theme.small - 1.0), m.theme.color("muted"));
+    ui.painter().with_clip_rect(clip).text(
+        pos2(r.min.x + 24.0, r.center().y),
+        Align2::LEFT_CENTER,
+        text,
+        FontId::proportional(m.theme.small),
+        c,
+    );
+    ui.painter().text(
+        pos2(r.max.x - 10.0, r.center().y),
+        Align2::RIGHT_CENTER,
+        count,
+        FontId::monospace(m.theme.small - 1.0),
+        m.theme.color("muted"),
+    );
     ui.add_space(2.0);
     resp
 }
@@ -235,60 +258,96 @@ fn nav_row(ui: &mut Ui, m: &super::Modern, text: &str, count: &str, on: bool, ke
 /// The rows, the cursor's kept in view as it moves (lit while the rows have the keys); a click takes the row.
 #[allow(clippy::too_many_arguments)]
 fn list(ui: &mut Ui, m: &super::Modern, lines: &[Line], cursor: usize, keys: bool, follow: bool, mouse: &mut Mouse) {
-    egui::ScrollArea::vertical().id_salt("journal list").max_height(ROWS as f32 * ROW).min_scrolled_height(ROWS as f32 * ROW).auto_shrink([false, false]).show(ui, |ui| {
-        ui.set_width(LIST_W);
-        for (k, l) in lines.iter().enumerate() {
-            let (r, resp) = ui.allocate_exact_size(vec2(LIST_W, ROW), if l.head { Sense::hover() } else { Sense::click() });
-            if l.head {
-                ui.painter().text(pos2(r.min.x + 4.0, r.center().y + 2.0), Align2::LEFT_CENTER, &l.text, FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())), m.theme.color("gold"));
-                continue;
+    egui::ScrollArea::vertical()
+        .id_salt("journal list")
+        .max_height(ROWS as f32 * ROW)
+        .min_scrolled_height(ROWS as f32 * ROW)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.set_width(LIST_W);
+            for (k, l) in lines.iter().enumerate() {
+                let (r, resp) =
+                    ui.allocate_exact_size(vec2(LIST_W, ROW), if l.head { Sense::hover() } else { Sense::click() });
+                if l.head {
+                    ui.painter().text(
+                        pos2(r.min.x + 4.0, r.center().y + 2.0),
+                        Align2::LEFT_CENTER,
+                        &l.text,
+                        FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())),
+                        m.theme.color("gold"),
+                    );
+                    continue;
+                }
+                let face = match () {
+                    _ if k == cursor => "controls/list_row_selected",
+                    _ if resp.hovered() => "controls/list_row_hover",
+                    _ => "controls/list_row_normal",
+                };
+                let tint = if k == cursor && !keys { UNFOCUSED } else { Color32::WHITE };
+                super::rows::face(ui.painter(), m, r.shrink2(vec2(0.0, 1.0)), face, tint);
+                let mut x = r.min.x + 24.0 + l.indent;
+                if l.new {
+                    ui.painter().circle_filled(pos2(x + 3.0, r.center().y), 4.0, m.theme.color("gold"));
+                    x += 12.0;
+                }
+                let right = if l.count.is_some() { r.max.x - 120.0 } else { r.max.x - 8.0 };
+                let clip = Rect::from_min_max(r.min, pos2(right, r.max.y));
+                ui.painter().with_clip_rect(clip).text(
+                    pos2(x, r.center().y),
+                    Align2::LEFT_CENTER,
+                    &l.text,
+                    FontId::proportional(m.theme.small),
+                    l.colour,
+                );
+                if let Some((have, goal)) = l.count {
+                    let bar = Rect::from_min_size(pos2(r.max.x - 112.0, r.center().y - 3.0), vec2(48.0, 6.0));
+                    let f = if goal == 0 { 1.0 } else { (have as f32 / goal as f32).min(1.0) };
+                    ui.painter().rect_filled(bar, 3.0, m.theme.color("charcoal"));
+                    ui.painter().rect_filled(
+                        Rect::from_min_size(bar.min, vec2(bar.width() * f, bar.height())),
+                        3.0,
+                        m.theme.color("gold"),
+                    );
+                    ui.painter().text(
+                        pos2(r.max.x - 10.0, r.center().y),
+                        Align2::RIGHT_CENTER,
+                        format!("{have}/{goal}"),
+                        FontId::monospace(m.theme.small - 1.0),
+                        m.theme.color("text"),
+                    );
+                }
+                if k == cursor && follow {
+                    ui.scroll_to_rect(r, None);
+                }
+                if resp.clicked() {
+                    mouse.click = Some(k);
+                }
             }
-            let face = match () {
-                _ if k == cursor => "controls/list_row_selected",
-                _ if resp.hovered() => "controls/list_row_hover",
-                _ => "controls/list_row_normal",
-            };
-            let tint = if k == cursor && !keys { UNFOCUSED } else { Color32::WHITE };
-            super::rows::face(ui.painter(), m, r.shrink2(vec2(0.0, 1.0)), face, tint);
-            let mut x = r.min.x + 24.0 + l.indent;
-            if l.new {
-                ui.painter().circle_filled(pos2(x + 3.0, r.center().y), 4.0, m.theme.color("gold"));
-                x += 12.0;
+            if lines.is_empty() {
+                ui.label(egui::RichText::new("None.").size(m.theme.small).color(m.theme.color("muted")));
             }
-            let right = if l.count.is_some() { r.max.x - 120.0 } else { r.max.x - 8.0 };
-            let clip = Rect::from_min_max(r.min, pos2(right, r.max.y));
-            ui.painter().with_clip_rect(clip).text(pos2(x, r.center().y), Align2::LEFT_CENTER, &l.text, FontId::proportional(m.theme.small), l.colour);
-            if let Some((have, goal)) = l.count {
-                let bar = Rect::from_min_size(pos2(r.max.x - 112.0, r.center().y - 3.0), vec2(48.0, 6.0));
-                let f = if goal == 0 { 1.0 } else { (have as f32 / goal as f32).min(1.0) };
-                ui.painter().rect_filled(bar, 3.0, m.theme.color("charcoal"));
-                ui.painter().rect_filled(Rect::from_min_size(bar.min, vec2(bar.width() * f, bar.height())), 3.0, m.theme.color("gold"));
-                ui.painter().text(pos2(r.max.x - 10.0, r.center().y), Align2::RIGHT_CENTER, format!("{have}/{goal}"), FontId::monospace(m.theme.small - 1.0), m.theme.color("text"));
-            }
-            if k == cursor && follow {
-                ui.scroll_to_rect(r, None);
-            }
-            if resp.clicked() {
-                mouse.click = Some(k);
-            }
-        }
-        if lines.is_empty() {
-            ui.label(egui::RichText::new("None.").size(m.theme.small).color(m.theme.color("muted")));
-        }
-    });
+        });
 }
 
 /// The cursor row's name and description, wrapped.
 fn description(ui: &mut Ui, m: &super::Modern, name: &str, text: &str) {
     ui.add_space(8.0);
     // As tall as its text needs (DESC_H at least), so nothing is cut.
-    egui::Frame::NONE.fill(m.theme.color("charcoal").gamma_multiply(0.7)).corner_radius(6).inner_margin(10).show(ui, |ui| {
-        ui.set_width(LIST_W - 20.0);
-        ui.set_min_height(DESC_H - 20.0);
-        ui.label(egui::RichText::new(name).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
-        ui.add_space(2.0);
-        super::gametext::label(ui, m, text, m.theme.small, m.theme.color("text"));
-    });
+    egui::Frame::NONE.fill(m.theme.color("charcoal").gamma_multiply(0.7)).corner_radius(6).inner_margin(10).show(
+        ui,
+        |ui| {
+            ui.set_width(LIST_W - 20.0);
+            ui.set_min_height(DESC_H - 20.0);
+            ui.label(
+                egui::RichText::new(name)
+                    .size(m.theme.small)
+                    .family(FontFamily::Name(super::STRONG.into()))
+                    .color(m.theme.color("gold")),
+            );
+            ui.add_space(2.0);
+            super::gametext::label(ui, m, text, m.theme.small, m.theme.color("text"));
+        },
+    );
 }
 
 /// The tab strip.
@@ -343,13 +402,41 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 cursor = l.cursor;
                 for r in &l.rows {
                     let line = match *r {
-                        Row::CurHead => Line { text: gu.lobby_msg(0xc, 0x36, "Current:"), indent: 0.0, colour: gold, head: true, new: false, count: None },
-                        Row::DoneHead => Line { text: gu.lobby_msg(0xc, 0x37, "Completed:"), indent: 0.0, colour: gold, head: true, new: false, count: None },
-                        Row::Msg(id) => Line { text: gu.lobby_msg(0xc, id, ""), indent: 0.0, colour: muted, head: false, new: false, count: None },
+                        Row::CurHead => Line {
+                            text: gu.lobby_msg(0xc, 0x36, "Current:"),
+                            indent: 0.0,
+                            colour: gold,
+                            head: true,
+                            new: false,
+                            count: None,
+                        },
+                        Row::DoneHead => Line {
+                            text: gu.lobby_msg(0xc, 0x37, "Completed:"),
+                            indent: 0.0,
+                            colour: gold,
+                            head: true,
+                            new: false,
+                            count: None,
+                        },
+                        Row::Msg(id) => Line {
+                            text: gu.lobby_msg(0xc, id, ""),
+                            indent: 0.0,
+                            colour: muted,
+                            head: false,
+                            new: false,
+                            count: None,
+                        },
                         Row::Current(i) | Row::Done(i) => {
                             let (name, n) = f.entries.get(i).map_or(("", 0), |e| journal::indent(&e.name));
                             let n = if matches!(r, Row::Current(_)) { 0.0 } else { 8.0 * n as f32 };
-                            Line { text: name.to_string(), indent: n, colour: if matches!(r, Row::Current(_)) { gold } else { white }, head: false, new: false, count: None }
+                            Line {
+                                text: name.to_string(),
+                                indent: n,
+                                colour: if matches!(r, Row::Current(_)) { gold } else { white },
+                                head: false,
+                                new: false,
+                                count: None,
+                            }
                         }
                     };
                     lines.push(line);
@@ -378,14 +465,37 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 let mut k_of = Vec::new();
                 for (k, &i) in l.rows.iter().enumerate() {
                     if k == 0 && split > 0 {
-                        lines.push(Line { text: gu.lobby_msg(0xc, 0x36, "Current:"), indent: 0.0, colour: gold, head: true, new: false, count: None });
+                        lines.push(Line {
+                            text: gu.lobby_msg(0xc, 0x36, "Current:"),
+                            indent: 0.0,
+                            colour: gold,
+                            head: true,
+                            new: false,
+                            count: None,
+                        });
                     }
                     if k == split {
-                        lines.push(Line { text: gu.lobby_msg(0xc, 0x37, "Completed:"), indent: 0.0, colour: gold, head: true, new: false, count: None });
+                        lines.push(Line {
+                            text: gu.lobby_msg(0xc, 0x37, "Completed:"),
+                            indent: 0.0,
+                            colour: gold,
+                            head: true,
+                            new: false,
+                            count: None,
+                        });
                     }
-                    let name = f.and_then(|f| f.entries.get(i)).map_or(String::new(), |e| e.name.trim_start_matches('+').to_string());
+                    let name = f
+                        .and_then(|f| f.entries.get(i))
+                        .map_or(String::new(), |e| e.name.trim_start_matches('+').to_string());
                     k_of.push(lines.len());
-                    lines.push(Line { text: name, indent: 0.0, colour: if k < split { gold } else { white }, head: false, new: false, count: None });
+                    lines.push(Line {
+                        text: name,
+                        indent: 0.0,
+                        colour: if k < split { gold } else { white },
+                        head: false,
+                        new: false,
+                        count: None,
+                    });
                 }
                 cursor = k_of.get(l.cursor).copied().unwrap_or(usize::MAX);
                 if let Some(e) = l.rows.get(l.cursor).and_then(|&i| f.and_then(|f| f.entries.get(i))) {
@@ -405,7 +515,14 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             heading = if v.deep { format!("‹ {}", v.title) } else { v.title.clone() };
             for row in &v.rows {
                 let text = if row.category { format!("{}  ›", row.name) } else { row.name.clone() };
-                lines.push(Line { text, indent: 0.0, colour: super::chat::colour(row.tint.to_le_bytes()), head: false, new: row.new, count: row.count });
+                lines.push(Line {
+                    text,
+                    indent: 0.0,
+                    colour: super::chat::colour(row.tint.to_le_bytes()),
+                    head: false,
+                    new: row.new,
+                    count: row.count,
+                });
             }
             if let Some(e) = &v.empty {
                 lines.push(Line { text: e.clone(), indent: 0.0, colour: muted, head: true, new: false, count: None });
@@ -413,7 +530,13 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             cursor = v.cursor;
             desc = v.desc.as_ref().map(|d| {
                 let once = d.once.as_ref().map_or(String::new(), |o| format!("   ({o})"));
-                (d.name.clone(), format!("{}\n\n{}: {}{once}\n{}: {}", d.text, d.progress_label, d.progress, d.rewards_label, d.rewards))
+                (
+                    d.name.clone(),
+                    format!(
+                        "{}\n\n{}: {}{once}\n{}: {}",
+                        d.text, d.progress_label, d.progress, d.rewards_label, d.rewards
+                    ),
+                )
             });
         }
         Tab::Roe => {
@@ -433,7 +556,14 @@ pub fn draw(p: &mut Panels, w: &mut World) {
                 (0x82, r.completed()),
                 (0x209, r.plaudits as u32),
             ] {
-                lines.push(Line { text: format!("{}   {v}", gu.lobby_msg(0xc, label, "")), indent: 0.0, colour: if v >= 99999 { m.theme.color("focus") } else { white }, head: false, new: false, count: None });
+                lines.push(Line {
+                    text: format!("{}   {v}", gu.lobby_msg(0xc, label, "")),
+                    indent: 0.0,
+                    colour: if v >= 99999 { m.theme.color("focus") } else { white },
+                    head: false,
+                    new: false,
+                    count: None,
+                });
             }
             cursor = usize::MAX;
             desc = Some((nav[sel].0.clone(), "Enter or a click on an entry at the left opens it.".into()));
@@ -450,7 +580,14 @@ pub fn draw(p: &mut Panels, w: &mut World) {
             heading = cats.get(k.cat).map_or(String::new(), |c| c.0.clone());
             cursor = k.cursor;
             for (id, name) in &k.items {
-                lines.push(Line { text: name.clone(), indent: 0.0, colour: white, head: false, new: !w.ki_seen.seen(*id), count: None });
+                lines.push(Line {
+                    text: name.clone(),
+                    indent: 0.0,
+                    colour: white,
+                    head: false,
+                    new: !w.ki_seen.seen(*id),
+                    count: None,
+                });
             }
             if let Some((id, name)) = k.items.get(k.cursor) {
                 let d = w.names.as_ref().and_then(|n| n.key_item_description(*id as u32)).unwrap_or_default();
@@ -462,48 +599,63 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let follow = m.journal_seen.get() != (t as u8, cursor);
     m.journal_seen.set((t as u8, cursor));
 
-    p.panel("window", Some(Title { icon: Some("icons/quest_log"), text: "Journal", note: None, name: false }), NAV_W + 18.0 + LIST_W, |ui| {
-        tabs(ui, m, t, &mut mouse);
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(NAV_W);
-                egui::ScrollArea::vertical().id_salt("journal nav").max_height(ROWS as f32 * ROW + DESC_H + 40.0).min_scrolled_height(ROWS as f32 * ROW + DESC_H + 40.0).auto_shrink([false, true]).show(ui, |ui| {
-                    let follow = m.moved("journal nav", chosen);
-                    for (k, (text, count, off)) in nav.iter().enumerate() {
-                        let resp = nav_row(ui, m, text, count, k == chosen, !on_list, *off);
-                        if k == chosen && follow {
-                            ui.scroll_to_rect(resp.rect, None);
-                        }
-                        if resp.clicked() {
-                            mouse.nav = Some(k);
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/quest_log"), text: "Journal", note: None, name: false }),
+        NAV_W + 18.0 + LIST_W,
+        |ui| {
+            tabs(ui, m, t, &mut mouse);
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(NAV_W);
+                    egui::ScrollArea::vertical()
+                        .id_salt("journal nav")
+                        .max_height(ROWS as f32 * ROW + DESC_H + 40.0)
+                        .min_scrolled_height(ROWS as f32 * ROW + DESC_H + 40.0)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| {
+                            let follow = m.moved("journal nav", chosen);
+                            for (k, (text, count, off)) in nav.iter().enumerate() {
+                                let resp = nav_row(ui, m, text, count, k == chosen, !on_list, *off);
+                                if k == chosen && follow {
+                                    ui.scroll_to_rect(resp.rect, None);
+                                }
+                                if resp.clicked() {
+                                    mouse.nav = Some(k);
+                                }
+                            }
+                        });
+                });
+                ui.add_space(18.0);
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    if let Some((text, sel, hits, icons)) = &search {
+                        found = Some(lists::search_rows(ui, m, w, icons, text, *sel, hits));
+                        return;
+                    }
+                    ui.label(
+                        egui::RichText::new(&heading)
+                            .size(m.theme.title)
+                            .family(FontFamily::Name(super::STRONG.into()))
+                            .color(gold),
+                    );
+                    ui.add_space(4.0);
+                    if waiting {
+                        ui.label(egui::RichText::new("Preparing data...").size(m.theme.small).color(muted));
+                        return;
+                    }
+                    list(ui, m, &lines, cursor, on_list, follow, &mut mouse);
+                    match &desc {
+                        Some((name, text)) => description(ui, m, name, text),
+                        None => {
+                            ui.add_space(8.0 + DESC_H);
                         }
                     }
+                    ui.label(egui::RichText::new("Type to search every list.").size(m.theme.small - 2.0).color(muted));
                 });
             });
-            ui.add_space(18.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                if let Some((text, sel, hits, icons)) = &search {
-                    found = Some(lists::search_rows(ui, m, w, icons, text, *sel, hits));
-                    return;
-                }
-                ui.label(egui::RichText::new(&heading).size(m.theme.title).family(FontFamily::Name(super::STRONG.into())).color(gold));
-                ui.add_space(4.0);
-                if waiting {
-                    ui.label(egui::RichText::new("Preparing data...").size(m.theme.small).color(muted));
-                    return;
-                }
-                list(ui, m, &lines, cursor, on_list, follow, &mut mouse);
-                match &desc {
-                    Some((name, text)) => description(ui, m, name, text),
-                    None => {
-                        ui.add_space(8.0 + DESC_H);
-                    }
-                }
-                ui.label(egui::RichText::new("Type to search every list.").size(m.theme.small - 2.0).color(muted));
-            });
-        });
-    });
+        },
+    );
 
     if let (Some(f), Some((_, _, hits, _))) = (found, &search) {
         lists::search_mouse(w, p.gu, &f, hits);
@@ -549,8 +701,15 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         return;
     }
     let changed = match t {
-        Tab::Missions => w.missions.as_mut().and_then(|x| x.list.as_mut()).filter(|l| !matches!(l.rows.get(at), Some(Row::CurHead | Row::DoneHead) | None)).map(|l| std::mem::replace(&mut l.cursor, at) != at),
-        Tab::Quests => w.quests.as_mut().and_then(|x| x.list.as_mut()).map(|l| std::mem::replace(&mut l.cursor, at) != at),
+        Tab::Missions => w
+            .missions
+            .as_mut()
+            .and_then(|x| x.list.as_mut())
+            .filter(|l| !matches!(l.rows.get(at), Some(Row::CurHead | Row::DoneHead) | None))
+            .map(|l| std::mem::replace(&mut l.cursor, at) != at),
+        Tab::Quests => {
+            w.quests.as_mut().and_then(|x| x.list.as_mut()).map(|l| std::mem::replace(&mut l.cursor, at) != at)
+        }
         Tab::KeyItems => w.keyitems.as_mut().map(|x| std::mem::replace(&mut x.cursor, at) != at),
         Tab::Roe => None,
     };

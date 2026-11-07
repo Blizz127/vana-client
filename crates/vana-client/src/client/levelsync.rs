@@ -120,7 +120,10 @@ fn name_of(w: &World, id: u32) -> String {
 /// Yes (DAT_10204a50 / DAT_10204aa0, LAB_10204e00): c2s 0x077 {name, 0, 6 on / 7 off}; levelsyn closes.
 pub fn answer(w: &mut World, id: u32, off: bool) {
     let name = name_of(w, id);
-    let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x077, body: super::party::change_body(&name, 0, if off { 7 } else { 6 }) });
+    let _ = w.net.commands.send(super::net::NetCommand::Packet {
+        id: 0x077,
+        body: super::party::change_body(&name, 0, if off { 7 } else { 6 }),
+    });
     w.levelsync = None;
 }
 

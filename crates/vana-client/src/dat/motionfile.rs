@@ -132,18 +132,32 @@ pub fn battle_files(pc: &PcMotion) -> Vec<u32> {
         return vec![BATTLE_UPPER[r] + pc.weapon as u32, BATTLE_SKIRT[r][skirt] + pc.weapon as u32];
     };
     let set = |base: u32, v: i8| (v >= 0).then(|| base + v as u32);
-    [set(DUAL_MAIN[r], pc.weapon), set(DUAL_SUB[r], sub), set(DUAL_MAIN_SKIRT[r][skirt], pc.weapon), set(DUAL_SUB_SKIRT[r][skirt], sub)].into_iter().flatten().collect()
+    [
+        set(DUAL_MAIN[r], pc.weapon),
+        set(DUAL_SUB[r], sub),
+        set(DUAL_MAIN_SKIRT[r][skirt], pc.weapon),
+        set(DUAL_SUB_SKIRT[r][skirt], sub),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// Emote files of PC looks (FUN_100cfc10, model kinds 0 / 1 / 6): 0x103523dc[race] + group and the skirt
 /// file 0x103523ee[race * 2 + skirt] + group.
 const EMOTE_UPPER: [u32; 9] = [10056, 10056, 13232, 16408, 19584, 22760, 22984, 26160, 29336];
-const EMOTE_SKIRT: [u32; 19] = [0, 10120, 10184, 10120, 10184, 13296, 13360, 16472, 16536, 19648, 19712, 22824, 22888, 23048, 23112, 26224, 26288, 29400, 29464];
+const EMOTE_SKIRT: [u32; 19] = [
+    0, 10120, 10184, 10120, 10184, 13296, 13360, 16472, 16536, 19648, 19712, 22824, 22888, 23048, 23112, 26224, 26288,
+    29400, 29464,
+];
 
 /// A mannequin's pose bank (FUN_100d1f70 on status 0x31): DAT_1035d83c[race] + bank and the skirt file
 /// DAT_1035d84e[skirt + race * 2] + bank, as the emote tables just before them.
 const MANNEQUIN_UPPER: [u32; 9] = [10088, 10088, 13264, 16440, 19616, 22792, 23016, 26192, 29368];
-const MANNEQUIN_SKIRT: [u32; 19] = [0, 10152, 10216, 10152, 10216, 13328, 13392, 16504, 16568, 19680, 19744, 22856, 22920, 23080, 23144, 26256, 26320, 29432, 29496];
+const MANNEQUIN_SKIRT: [u32; 19] = [
+    0, 10152, 10216, 10152, 10216, 13328, 13392, 16504, 16568, 19680, 19744, 22856, 22920, 23080, 23144, 26256, 26320,
+    29432, 29496,
+];
 /// DAT_1037e028: the pose motions "mq0?".."mq7?".
 const MANNEQUIN_MOTION: [&str; 8] = ["mq0", "mq1", "mq2", "mq3", "mq4", "mq5", "mq6", "mq7"];
 
@@ -169,10 +183,10 @@ pub fn mannequin_pose(pose: u8, class: Option<u8>) -> (u32, &'static str) {
 
 /// FUN_1009f420: emote number -> motion index (table 0x103504a8); -2 none, 0x7a.. computed forms (not handled).
 const EMOTE_MOTION: [i16; 97] = [
-    1, 0, 127, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, -2, 18, -2, 20, 21, 22, 23, 24, -2, 26, 27, 28, -2, -2, 31, -2, 33, 34, 35, 19, 21, 38,
-    24, 23, 39, 40, 48, 56, 126, 88, 80, 81, 82, 256, 257, 258, 259, 260, 261, 262, 263, 125, 272, 273, 274, 275, 276, 277, 278, 289, 96, 97,
-    98, 99, -2, -2, -2, -2, 124, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123,
-    122,
+    1, 0, 127, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, -2, 18, -2, 20, 21, 22, 23, 24, -2, 26, 27, 28, -2, -2, 31,
+    -2, 33, 34, 35, 19, 21, 38, 24, 23, 39, 40, 48, 56, 126, 88, 80, 81, 82, 256, 257, 258, 259, 260, 261, 262, 263,
+    125, 272, 273, 274, 275, 276, 277, 278, 289, 96, 97, 98, 99, -2, -2, -2, -2, 124, 123, 123, 123, 123, 123, 123,
+    123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 123, 122,
 ];
 
 /// An emote's motion index (FUN_1009f230 refuses numbers above 0x60).
@@ -225,7 +239,12 @@ pub fn draw_scheduler(pc: &PcMotion, out: bool) -> String {
 /// Scheduler op 0x84 (case at 0x10059ae3, dual wield "in 0" / "out0"): one hand's draw or sheathe, "in1" / "ot1"
 /// (main) or "in2" / "ot2" (sub) and that hand's digit (+0x87c / +0x87f, below 0 taken as 0).
 pub fn hand_name(out: bool, sub: bool, digit: i8) -> [u8; 4] {
-    [if out { b'o' } else { b'i' }, if out { b't' } else { b'n' }, if sub { b'2' } else { b'1' }, b'0' + digit.max(0) as u8]
+    [
+        if out { b'o' } else { b'i' },
+        if out { b't' } else { b'n' },
+        if sub { b'2' } else { b'1' },
+        b'0' + digit.max(0) as u8,
+    ]
 }
 
 pub fn hand_scheduler(pc: &PcMotion, out: bool, sub: bool) -> String {
@@ -262,7 +281,10 @@ mod tests {
         assert_eq!(emote_index(43, 0, 0, 6), Ok(Some(0x4e)));
         assert_eq!(emote_index(74, 0, 0, 6), Ok(Some(0x88)));
         assert_eq!(emote_index(96, 0xffff, 0, 6), Err(()));
-        assert_eq!((emote_index(4, 0, 0x2f, 6), emote_index(37, 0, 0x40, 6), emote_index(10, 0, 0x2f, 6)), (Ok(Some(64)), Ok(Some(239)), Ok(None)));
+        assert_eq!(
+            (emote_index(4, 0, 0x2f, 6), emote_index(37, 0, 0x40, 6), emote_index(10, 0, 0x2f, 6)),
+            (Ok(Some(64)), Ok(Some(239)), Ok(None))
+        );
     }
 
     fn index() -> Option<DatIndex> {
@@ -295,7 +317,8 @@ mod tests {
         let Some(index) = index() else { return };
         assert_eq!(emote_motion(13), Some(15));
         assert_eq!(emote_motion(15), None);
-        let (files, name) = emote_files(&PcMotion { race: 3, weapon: -1, draw: 0, skirt: 1, dual: None, sub_draw: 0 }, 15);
+        let (files, name) =
+            emote_files(&PcMotion { race: 3, weapon: -1, draw: 0, skirt: 1, dual: None, sub_draw: 0 }, 15);
         assert_eq!((files.as_slice(), name.as_str()), ([16409, 16473].as_slice(), "em07"));
         assert!(has_sched(&MotionFile::load(&index, 16409).unwrap(), "em07"));
     }
@@ -325,7 +348,14 @@ mod tests {
     /// the draw: "in 0" calls the main hand's "in10" (i0c) at tick 6 and the sub's "in20" (i1c) at 40.
     #[test]
     fn dual_wield_files() {
-        assert!(dual_wield(310) && dual_wield(0x7136) && !dual_wield(0) && !dual_wield(0x80) && !dual_wield(0x1e0) && !dual_wield(0x2a0));
+        assert!(
+            dual_wield(310)
+                && dual_wield(0x7136)
+                && !dual_wield(0)
+                && !dual_wield(0x80)
+                && !dual_wield(0x1e0)
+                && !dual_wield(0x2a0)
+        );
         let pc = PcMotion { race: 7, weapon: 3, draw: 0, skirt: 2, dual: Some(3), sub_draw: 0 };
         assert_eq!(battle_files(&pc), [47218, 46834, 47474, 47090]);
         assert_eq!(battle_files(&PcMotion { dual: Some(-1), ..pc }), [47218, 47474]);
@@ -336,7 +366,10 @@ mod tests {
         let sched = |f: &MotionFile, n: &str| f.schedulers.iter().find(|(m, _)| m == n).unwrap().1.clone();
         assert_eq!(crate::dat::sched::hand_calls(&sched(&main, "in 0")), [(6, false, false), (40, false, true)]);
         assert_eq!(crate::dat::sched::hand_calls(&sched(&main, "out0")), [(6, true, true), (40, true, false)]);
-        assert_eq!([hand_scheduler(&pc, false, false), hand_scheduler(&pc, false, true), hand_scheduler(&pc, true, true)], ["in10", "in20", "ot20"]);
+        assert_eq!(
+            [hand_scheduler(&pc, false, false), hand_scheduler(&pc, false, true), hand_scheduler(&pc, true, true)],
+            ["in10", "in20", "ot20"]
+        );
         assert_eq!(crate::dat::sched::plan(&sched(&main, "in10"), &[]).motions[0].name, "i0c");
         assert_eq!(crate::dat::sched::plan(&sched(&sub, "in20"), &[]).motions[0].name, "i1c");
     }

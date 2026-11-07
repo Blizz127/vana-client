@@ -12,7 +12,10 @@ const WIN: &str = "menu    faqsub";
 const WHITE: u32 = 0x8080_8080;
 const GREY: u32 = 0x8040_4040;
 /// FUN_10216a50(i): group 9 ids.
-const TEXT: [usize; 26] = [0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd1, 0x12b, 0xd5, 0xd6, 0xd8, 0xd7, 0xd9, 0xda, 0xdb, 0xdc, 0x12c, 0xdd];
+const TEXT: [usize; 26] = [
+    0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd1, 0x12b, 0xd5, 0xd6, 0xd8,
+    0xd7, 0xd9, 0xda, 0xdb, 0xdc, 0x12c, 0xdd,
+];
 /// The menu page's rows: Q&A, Adventuring Primer, Mentor Search, Help Desk, Config, Back.
 const MENU: [usize; 6] = [0, 15, 12, 2, 3, 4];
 /// Their help (FUN_10216970), none on Back.
@@ -214,11 +217,23 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
         }
         return;
     }
-    super::winhits::generic(w, gu, WIN, h.cursor as u16 + 1, 1..=6, p, moved, clicked, right, |w, id| {
-        if let Some(h) = w.helpdesk.as_mut() {
-            h.cursor = id as usize - 1;
-        }
-    }, |w, _, k| key(w, k));
+    super::winhits::generic(
+        w,
+        gu,
+        WIN,
+        h.cursor as u16 + 1,
+        1..=6,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(h) = w.helpdesk.as_mut() {
+                h.cursor = id as usize - 1;
+            }
+        },
+        |w, _, k| key(w, k),
+    );
 }
 
 /// Escape: the Config page goes back to the menu page (state 1), the menu page closes faqsub.
@@ -281,12 +296,22 @@ fn layout(gu: &GameUi, w: &World, h: &HelpDesk, width: f32) -> Vec<Entry> {
         out.push(Entry { x: 0.0, y: 0.0, lines, tint: WHITE, row: None });
     }
     let row_w = width - INDENT - GAP;
-    let list: Vec<(usize, usize)> = if h.config { CONFIG.iter().copied().enumerate().collect() } else { MENU.iter().copied().enumerate().collect() };
+    let list: Vec<(usize, usize)> = if h.config {
+        CONFIG.iter().copied().enumerate().collect()
+    } else {
+        MENU.iter().copied().enumerate().collect()
+    };
     for (row, i) in list {
         y += GAP;
         let t = text(w, i);
         let lines = wrap(&t, row_w);
-        let tint = if h.config { if config_on(w, row) { WHITE } else { GREY } } else if row == 0 { GREY } else { WHITE };
+        let tint = if h.config {
+            if config_on(w, row) { WHITE } else { GREY }
+        } else if row == 0 {
+            GREY
+        } else {
+            WHITE
+        };
         let selectable = !(h.config && row == 3);
         out.push(Entry { x: INDENT, y, lines: lines.clone(), tint, row: selectable.then_some(row) });
         y += 16.0 * lines.len() as f32;

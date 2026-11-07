@@ -43,7 +43,14 @@ fn parse_emotes(d: &[u8]) -> Vec<EmoteEntry> {
         .filter_map(|i| {
             let e = d.get(4 + i * 0x20..4 + i * 0x20 + 0x20)?;
             let u = |o: usize| u16::from_le_bytes([e[o], e[o + 1]]);
-            Some(EmoteEntry { id: u(0), name: u(2), help: u(4), parent: u(6), cmd: s(&e[8..0x18]), arg: s(&e[0x18..0x20]) })
+            Some(EmoteEntry {
+                id: u(0),
+                name: u(2),
+                help: u(4),
+                parent: u(6),
+                cmd: s(&e[8..0x18]),
+                arg: s(&e[0x18..0x20]),
+            })
         })
         .collect()
 }
@@ -110,10 +117,36 @@ pub struct Cats {
 /// Trust), abimenu FUN_1013fa70, abiselec FUN_1013f7f0 (Mount sits above Pet in both).
 pub(super) fn cat_rows(menu: &str) -> &'static [(u16, Cat)] {
     match menu {
-        "menu    mgcmenu" => &[(1, Cat::Magic(1, true)), (2, Cat::Magic(2, true)), (3, Cat::Magic(5, true)), (4, Cat::Magic(4, true)), (5, Cat::Magic(3, true)), (6, Cat::Magic(6, true)), (7, Cat::Magic(7, true)), (8, Cat::Magic(8, true))],
-        "menu    magselec" => &[(1, Cat::Magic(1, false)), (2, Cat::Magic(2, false)), (3, Cat::Magic(5, false)), (4, Cat::Magic(4, false)), (5, Cat::Magic(3, false)), (6, Cat::Magic(6, false)), (7, Cat::Magic(7, false))],
-        "menu    abimenu" => &[(1, Cat::Ability(4)), (2, Cat::Ability(1)), (3, Cat::Ability(3)), (4, Cat::Ranged), (6, Cat::Mount), (5, Cat::Ability(2))],
-        "menu    abiselec" => &[(1, Cat::Ability(1)), (2, Cat::Ability(3)), (3, Cat::Ranged), (5, Cat::Mount), (4, Cat::Ability(2))],
+        "menu    mgcmenu" => &[
+            (1, Cat::Magic(1, true)),
+            (2, Cat::Magic(2, true)),
+            (3, Cat::Magic(5, true)),
+            (4, Cat::Magic(4, true)),
+            (5, Cat::Magic(3, true)),
+            (6, Cat::Magic(6, true)),
+            (7, Cat::Magic(7, true)),
+            (8, Cat::Magic(8, true)),
+        ],
+        "menu    magselec" => &[
+            (1, Cat::Magic(1, false)),
+            (2, Cat::Magic(2, false)),
+            (3, Cat::Magic(5, false)),
+            (4, Cat::Magic(4, false)),
+            (5, Cat::Magic(3, false)),
+            (6, Cat::Magic(6, false)),
+            (7, Cat::Magic(7, false)),
+        ],
+        "menu    abimenu" => &[
+            (1, Cat::Ability(4)),
+            (2, Cat::Ability(1)),
+            (3, Cat::Ability(3)),
+            (4, Cat::Ranged),
+            (6, Cat::Mount),
+            (5, Cat::Ability(2)),
+        ],
+        "menu    abiselec" => {
+            &[(1, Cat::Ability(1)), (2, Cat::Ability(3)), (3, Cat::Ranged), (5, Cat::Mount), (4, Cat::Ability(2))]
+        }
         // FUN_101ebdc0: 1 the Friend List (flistmai, not done), 2 the emote list.
         "menu    commenu" => &[(1, Cat::Friends), (2, Cat::Emote)],
         // Monstrosity: mp_abisc from mp_pmode (Monster Skills, Monster Abilities), mp_mnabi from the main menu (Traits
@@ -178,7 +211,32 @@ pub(super) fn focus_row(win: &mut ListWin, id: u16) -> bool {
 }
 
 /// Table 0x10386159 by ability type: (the type Esc goes back to, the kind: subwindo mode and cost check).
-const ABILITY_TYPES: [(u8, u8); 24] = [(0, 2), (0, 2), (0, 5), (0, 4), (0, 0), (0, 0), (2, 6), (0, 0), (1, 2), (1, 8), (2, 6), (1, 3), (1, 3), (1, 3), (1, 2), (1, 8), (1, 3), (1, 2), (2, 8), (1, 2), (0x14, 9), (1, 2), (1, 2), (1, 2)];
+const ABILITY_TYPES: [(u8, u8); 24] = [
+    (0, 2),
+    (0, 2),
+    (0, 5),
+    (0, 4),
+    (0, 0),
+    (0, 0),
+    (2, 6),
+    (0, 0),
+    (1, 2),
+    (1, 8),
+    (2, 6),
+    (1, 3),
+    (1, 3),
+    (1, 3),
+    (1, 2),
+    (1, 8),
+    (1, 3),
+    (1, 2),
+    (2, 8),
+    (1, 2),
+    (0x14, 9),
+    (1, 2),
+    (1, 2),
+    (1, 2),
+];
 
 pub(super) fn ability_kind(ty: u8) -> u8 {
     ABILITY_TYPES.get(ty as usize).map_or(0, |t| t.1)
@@ -210,7 +268,11 @@ pub fn set_recast(w: &mut World, spell: u16, info: u32) {
 /// with the known bits (FUN_1021e550; with no file: id order).
 fn order(w: &World, aix: bool, known: &[u8]) -> Vec<u16> {
     let n = if aix { 0xb00 } else { 0x400 };
-    let mut o = w.macros.as_ref().map(|m| if aix { m.aix.clone() } else { m.mix.clone() }).unwrap_or_else(|| super::macros::Order { bits: vec![0; n / 8], list: vec![0; n], count: 0 });
+    let mut o = w
+        .macros
+        .as_ref()
+        .map(|m| if aix { m.aix.clone() } else { m.mix.clone() })
+        .unwrap_or_else(|| super::macros::Order { bits: vec![0; n / 8], list: vec![0; n], count: 0 });
     o.merge(known);
     o.ids().to_vec()
 }
@@ -263,7 +325,9 @@ pub(super) fn ability_rows(w: &World, ty: u16) -> Vec<u16> {
         .into_iter()
         .filter(|&i| {
             acts.abilities.get(i as usize).is_some_and(|a| {
-                a.id != 0 && (ty == 0 || a.kind as u16 == ty) && (ty != 0x14 || (w.mon_in && super::monstrosity::is_move(w, i) && a.level <= level))
+                a.id != 0
+                    && (ty == 0 || a.kind as u16 == ty)
+                    && (ty != 0x14 || (w.mon_in && super::monstrosity::is_move(w, i) && a.level <= level))
             })
         })
         .collect()
@@ -293,7 +357,21 @@ pub fn open_magic(w: &mut World, ty: u16, list_mode: bool, exclude: u32) {
     let rows = magic_rows(w, ty, list_mode, exclude);
     // Ours: the modern UI gives every magic list its sort window (retail: mgcmenu's list mode only, attached below).
     let sort = w.modern.then_some(if ty == 6 { "menu    blusortw" } else { "menu    mgcsortw" });
-    let mut win = ListWin { kind: Kind::Magic, ty, exclude, list_mode, rows, scroll: 0, cursor: 0, hidden: false, sort, sort_focus: None, ask: None, manual: 0, picked: 0 };
+    let mut win = ListWin {
+        kind: Kind::Magic,
+        ty,
+        exclude,
+        list_mode,
+        rows,
+        scroll: 0,
+        cursor: 0,
+        hidden: false,
+        sort,
+        sort_focus: None,
+        ask: None,
+        manual: 0,
+        picked: 0,
+    };
     recall(w, &mut win);
     w.magic = Some(win);
     w.menu = None;
@@ -318,8 +396,23 @@ pub fn open_ability(w: &mut World, ty: u16, sortable: bool) {
     }
     // Ours: the modern UI sorts Job Abilities, Weapon Skills and their sub-lists however they were opened.
     let parent = ABILITY_TYPES.get(ty as usize).map_or(0, |t| t.0);
-    let sort = (sortable || (w.modern && (matches!(ty, 1 | 3) || matches!(parent, 1 | 3)))).then_some("menu    abisortw");
-    let mut win = ListWin { kind: Kind::Ability, ty, exclude: 0, list_mode: false, rows, scroll: 0, cursor: 0, hidden: false, sort, sort_focus: None, ask: None, manual: 0, picked: 0 };
+    let sort =
+        (sortable || (w.modern && (matches!(ty, 1 | 3) || matches!(parent, 1 | 3)))).then_some("menu    abisortw");
+    let mut win = ListWin {
+        kind: Kind::Ability,
+        ty,
+        exclude: 0,
+        list_mode: false,
+        rows,
+        scroll: 0,
+        cursor: 0,
+        hidden: false,
+        sort,
+        sort_focus: None,
+        ask: None,
+        manual: 0,
+        picked: 0,
+    };
     recall(w, &mut win);
     w.ability = Some(win);
     w.menu = None;
@@ -342,7 +435,21 @@ pub(super) fn mount_rows(w: &World) -> Vec<u16> {
 pub fn open_mount(w: &mut World, sortable: bool) {
     let rows = mount_rows(w);
     let sort = (sortable || w.modern).then_some("menu    abisortw");
-    let mut win = ListWin { kind: Kind::Mount, ty: 0xfffe, exclude: 0, list_mode: false, rows, scroll: 0, cursor: 0, hidden: false, sort, sort_focus: None, ask: None, manual: 0, picked: 0 };
+    let mut win = ListWin {
+        kind: Kind::Mount,
+        ty: 0xfffe,
+        exclude: 0,
+        list_mode: false,
+        rows,
+        scroll: 0,
+        cursor: 0,
+        hidden: false,
+        sort,
+        sort_focus: None,
+        ask: None,
+        manual: 0,
+        picked: 0,
+    };
     recall(w, &mut win);
     w.ability = Some(win);
     w.menu = None;
@@ -368,7 +475,9 @@ fn emote_rows(w: &World, folder: u16) -> Vec<u16> {
     let order: Vec<u16> = w.macros.as_ref().map_or_else(|| (0..0x80).collect(), |m| m.eix.clone());
     order
         .into_iter()
-        .filter(|&id| id != 0 && tree.iter().find(|e| e.id == id).is_some_and(|e| e.parent != 0xffff && e.parent == folder))
+        .filter(|&id| {
+            id != 0 && tree.iter().find(|e| e.id == id).is_some_and(|e| e.parent != 0xffff && e.parent == folder)
+        })
         .collect()
 }
 
@@ -379,7 +488,21 @@ pub fn open_emote(w: &mut World) {
     }
     let folder = w.emote_path.last().copied().unwrap_or(0);
     let rows = emote_rows(w, folder);
-    let mut win = ListWin { kind: Kind::Emote, ty: 0x8000 | folder, exclude: 0, list_mode: false, rows, scroll: 0, cursor: 0, hidden: false, sort: Some("menu    abisortw"), sort_focus: None, ask: None, manual: 0, picked: 0 };
+    let mut win = ListWin {
+        kind: Kind::Emote,
+        ty: 0x8000 | folder,
+        exclude: 0,
+        list_mode: false,
+        rows,
+        scroll: 0,
+        cursor: 0,
+        hidden: false,
+        sort: Some("menu    abisortw"),
+        sort_focus: None,
+        ask: None,
+        manual: 0,
+        picked: 0,
+    };
     recall(w, &mut win);
     w.ability = Some(win);
     w.menu = None;
@@ -676,7 +799,13 @@ pub(super) fn enter(w: &mut World, kind: Kind) {
                 return;
             }
             let name = ability_name(w, id);
-            let cmd = if a.kind == 3 { "/weaponskill" } else if a.kind == 0x14 { "/monsterskill" } else { "/jobability" };
+            let cmd = if a.kind == 3 {
+                "/weaponskill"
+            } else if a.kind == 0x14 {
+                "/monsterskill"
+            } else {
+                "/jobability"
+            };
             if !target::open_sub(w, a.targets as u32, SubThen::Ability(cmd, name.clone()), None, name, 0x51) {
                 refuse(w, 0x5d);
                 return;
@@ -708,7 +837,11 @@ pub(super) fn step(win: &mut ListWin, key: egui::Key) -> bool {
         egui::Key::ArrowDown => at = (at + 1) % n,
         egui::Key::ArrowUp => at = (at + n - 1) % n,
         egui::Key::ArrowRight | egui::Key::ArrowLeft => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             return super::scrollbar::paged(m, &mut win.scroll, &mut win.cursor, n, VISIBLE);
         }
         _ => return false,
@@ -753,7 +886,14 @@ pub fn key(w: &mut World, key: egui::Key) -> bool {
                     // FUN_1013f880: Ranged Attack through the prompt for enemies, as `/ra`.
                     Some(Cat::Ranged) => {
                         w.cats = None;
-                        if !target::open_sub(w, 0x20, SubThen::Line { stash: "/range ".into(), quoted: false, from_macro: false }, None, String::new(), 0) {
+                        if !target::open_sub(
+                            w,
+                            0x20,
+                            SubThen::Line { stash: "/range ".into(), quoted: false, from_macro: false },
+                            None,
+                            String::new(),
+                            0,
+                        ) {
                             refuse(w, 0x5d);
                         }
                     }
@@ -795,7 +935,12 @@ pub fn key(w: &mut World, key: egui::Key) -> bool {
         }
         egui::Key::Escape => {
             // Esc on an ability sub-list goes back to its parent type (not Monstrosity's).
-            let parent = w.ability.as_ref().filter(|_| kind == Kind::Ability).map(|a| ABILITY_TYPES.get(a.ty as usize).map_or(0, |t| t.0)).filter(|&p| p != 0 && p != 0x14);
+            let parent = w
+                .ability
+                .as_ref()
+                .filter(|_| kind == Kind::Ability)
+                .map(|a| ABILITY_TYPES.get(a.ty as usize).map_or(0, |t| t.0))
+                .filter(|&p| p != 0 && p != 0x14);
             let sortable = w.ability.as_ref().is_some_and(|a| a.sort.is_some());
             match kind {
                 Kind::Magic => w.magic = None,
@@ -834,7 +979,10 @@ pub fn num_plus(w: &mut World) {
         return;
     }
     let kind = w.ability.as_ref().map_or(Kind::Magic, |a| a.kind);
-    let Some(win) = list_mut(w, kind).filter(|x| !x.hidden && x.sort.is_some() && x.ask.is_none() && x.manual == 0) else { return };
+    let Some(win) = list_mut(w, kind).filter(|x| !x.hidden && x.sort.is_some() && x.ask.is_none() && x.manual == 0)
+    else {
+        return;
+    };
     if win.sort_focus.is_some() {
         win.sort_focus = None;
     } else if !win.rows.is_empty() {
@@ -848,7 +996,12 @@ pub fn num_plus(w: &mut World) {
 
 /// FUN_1022c070: the current list (record valid, type, exclusion) sorted by record +0x3e; the other spells keep
 /// their relative order and fill the holes after it; the count is kept.
-fn auto_sort(o: &mut super::macros::Order, known: &[u8], in_list: impl Fn(u16) -> bool, key: impl Fn(u16) -> Option<u16>) {
+fn auto_sort(
+    o: &mut super::macros::Order,
+    known: &[u8],
+    in_list: impl Fn(u16) -> bool,
+    key: impl Fn(u16) -> Option<u16>,
+) {
     let n = o.list.len();
     let mut local = o.list.clone();
     for x in local.iter_mut().filter(|x| **x != 0 && in_list(**x)) {
@@ -862,7 +1015,8 @@ fn auto_sort(o: &mut super::macros::Order, known: &[u8], in_list: impl Fn(u16) -
             by_key[k as usize] = id;
         }
     }
-    let mut out: Vec<u16> = by_key[1..].iter().copied().filter(|&x| x != 0).map(|x| if in_list(x) { x } else { 0 }).collect();
+    let mut out: Vec<u16> =
+        by_key[1..].iter().copied().filter(|&x| x != 0).map(|x| if in_list(x) { x } else { 0 }).collect();
     out.resize(n, 0);
     let mut at = 0;
     for &x in local.iter().filter(|&&x| x != 0) {
@@ -904,7 +1058,10 @@ fn sort_key(w: &mut World, kind: Kind, key: egui::Key) -> bool {
                     let known = w.spells_known.clone();
                     let acts = w.actions.clone();
                     if let (Some(o), Some(acts)) = (order_mut(w, false), acts) {
-                        let in_list = |id: u16| acts.spell(id).is_some_and(|r| exclude & (1 << (r.kind & 0x1f)) == 0 && (ty == 0 || r.kind == ty));
+                        let in_list = |id: u16| {
+                            acts.spell(id)
+                                .is_some_and(|r| exclude & (1 << (r.kind & 0x1f)) == 0 && (ty == 0 || r.kind == ty))
+                        };
                         auto_sort(o, &known, in_list, |id| acts.spell(id).map(|r| r.sort));
                     }
                     rebuild(w, kind);
@@ -1055,7 +1212,14 @@ pub fn draw_cast_bar(gu: &mut GameUi, w: &World, sw: f32, sh: f32) {
     let (x, y) = crate::render::screens::push_window_at(b, ui, style, m, sw, sh, top - m.elements[0].y as f32);
     // Mode 4 (an event's, FUN_1012bfe0): the time left right-aligned at +0x69, y + 9, no gauge.
     if w.cast_event {
-        crate::render::screens::push_shape_text_right(b, ui, bar_clock(left).as_bytes(), x + 105.0, y + 9.0, 0x8080_8080);
+        crate::render::screens::push_shape_text_right(
+            b,
+            ui,
+            bar_clock(left).as_bytes(),
+            x + 105.0,
+            y + 9.0,
+            0x8080_8080,
+        );
         return;
     }
     crate::render::screens::push_gauge(b, ui, wps, x + 8.0, y + 9.0, 38, 97, f);
@@ -1080,7 +1244,14 @@ pub fn draw_event_timer(gu: &mut GameUi, w: &World, sw: f32, sh: f32) {
     let text = bar_clock(left);
     let tw = crate::render::screens::shape_text_width(ui, text.as_bytes());
     let ww = m.elements[0].w as f32;
-    crate::render::screens::push_shape_text(b, ui, text.as_bytes(), x + ((ww - tw) / 2.0).trunc(), y + 9.0, 0x8080_8080);
+    crate::render::screens::push_shape_text(
+        b,
+        ui,
+        text.as_bytes(),
+        x + ((ww - tw) / 2.0).trunc(),
+        y + 9.0,
+        0x8080_8080,
+    );
 }
 
 /// Mouse (window messages 9 hover / 5 confirm): hovering a row or category moves the cursor there (SE 0001), a click
@@ -1127,7 +1298,11 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
 /// "%d:%02d" (">= 1 h: %d:%02d:%02d", FUN_101c93c0) of the seconds left, rounded up.
 pub(super) fn clock(secs: f32) -> String {
     let s = secs.ceil() as u32;
-    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
+    } else {
+        format!("{}:{:02}", s / 60, s % 60)
+    }
 }
 
 /// The open category window, list and cost box. Returns the window rects that take clicks.
@@ -1154,13 +1329,28 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         .map(|(k, &id)| {
             let (name, refused) = match win.kind {
                 Kind::Mount => (mount_name(w, id), mount_check(w).is_some()),
-                Kind::Emote => (emote_entry(w, id).and_then(|e| w.names.as_ref()?.emote_text(e.name as u32)).unwrap_or_default(), emote_locked(w, id)),
+                Kind::Emote => (
+                    emote_entry(w, id).and_then(|e| w.names.as_ref()?.emote_text(e.name as u32)).unwrap_or_default(),
+                    emote_locked(w, id),
+                ),
                 Kind::Magic => (spell_name(w, id), magic_check(w, id).is_some()),
-                Kind::Ability => (ability_name(w, id), w.actions.as_ref().and_then(|a| a.abilities.get(id as usize)).is_some_and(|a| a.kind != 4) && ability_check(w, id).is_some()),
+                Kind::Ability => (
+                    ability_name(w, id),
+                    w.actions.as_ref().and_then(|a| a.abilities.get(id as usize)).is_some_and(|a| a.kind != 4)
+                        && ability_check(w, id).is_some(),
+                ),
             };
             // Manual's picked row (colour 3) when not under the cursor.
             let picked = win.manual == 2 && win.scroll + k == win.picked;
-            let tint = if k == win.cursor { 0x8080_3040 } else if picked { 0x8080_4020 } else if refused { 0x8040_4040 } else { 0x8080_8080 };
+            let tint = if k == win.cursor {
+                0x8080_3040
+            } else if picked {
+                0x8080_4020
+            } else if refused {
+                0x8040_4040
+            } else {
+                0x8080_8080
+            };
             ActionRow { icon: row_icon(w, win.kind, id), name, tint }
         })
         .collect();
@@ -1175,7 +1365,23 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     gu.replay_on_change(menu, (win.kind as u64) << 32 | (win.ty as u64) << 16 | w.emote_path.len() as u64);
     let m = gu.stacked_menu(menu, sw, sh).filter(|_| gu.gate_layout(menu, sw, sh, None));
     let (b, ui, style, font) = gu.parts();
-    let bar = m.as_ref().map(|m| push_action_list(b, ui, style, font, GameUi::ATLAS, m, &rows, win.cursor, &empty, sw, sh, frame, (win.rows.len(), win.scroll)));
+    let bar = m.as_ref().map(|m| {
+        push_action_list(
+            b,
+            ui,
+            style,
+            font,
+            GameUi::ATLAS,
+            m,
+            &rows,
+            win.cursor,
+            &empty,
+            sw,
+            sh,
+            frame,
+            (win.rows.len(), win.scroll),
+        )
+    });
     // The list has the focus unless its sort window or a prompt over it does.
     if let Some([x, y, h]) = bar.filter(|_| win.sort_focus.is_none() && win.ask.is_none()) {
         gu.bar_site(super::scrollbar::Owner::Actions, x, y, h, win.rows.len(), VISIBLE, win.scroll);
@@ -1184,27 +1390,41 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     // The sort window at its layout (384, 48), highlighted while focused; blusortw's row 3 disabled (no disabled
     // sprite: keytops3 89 at 0x30808080, under the cursor 0x40402810 at (+1, +1)) without 0x119 and BLU.
     if let Some(sort) = win.sort {
-        let off = sort == "menu    blusortw" && !(w.recasts_seen && w.stats.as_ref().is_some_and(|s| s.main.0 == 16 || s.sub.0 == 16));
+        let off = sort == "menu    blusortw"
+            && !(w.recasts_seen && w.stats.as_ref().is_some_and(|s| s.main.0 == 16 || s.sub.0 == 16));
         let hide: &[u16] = if off { &[3] } else { &[] };
-        if let Some(sw_) = gu.lobby_window_off(sort, sw, sh, (0.0, 0.0), win.sort_focus, win.sort_focus.is_some(), hide) {
+        if let Some(sw_) = gu.lobby_window_off(sort, sw, sh, (0.0, 0.0), win.sort_focus, win.sort_focus.is_some(), hide)
+        {
             rects.push(sw_.frame);
             if off && let Some(&(_, r)) = sw_.children.iter().find(|ch| ch.0 == 2) {
                 let on = win.sort_focus == Some(3);
                 let d = if on { 1.0 } else { 0.0 };
-                gu.sprite("menu    keytops3", 89, r[0] + d, r[1] + 16.0 + d, if on { 0x4040_2810 } else { 0x3080_8080 });
+                gu.sprite(
+                    "menu    keytops3",
+                    89,
+                    r[0] + d,
+                    r[1] + 16.0 + d,
+                    if on { 0x4040_2810 } else { 0x3080_8080 },
+                );
             }
         }
         // sortyn 16 px lower under blusortw (FUN_102227d0, inferred from its child count).
         if let Some(yes) = win.ask {
             let dy = if sort == "menu    blusortw" { 16.0 } else { 0.0 };
-            rects.extend(gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, dy), Some(if yes { 1 } else { 2 }), true, &[]).map(|x| x.frame));
+            rects.extend(
+                gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, dy), Some(if yes { 1 } else { 2 }), true, &[])
+                    .map(|x| x.frame),
+            );
         }
     }
     // subwindo for the cursor row: magic "MP Cost" (9 0xe6) and "Next" (9 0xe7); abilities by their kind.
     let lines: Vec<(String, String)> = match (win.kind, win.at()) {
         (Kind::Magic, Some(s)) => {
             let mp = w.actions.as_ref().and_then(|a| a.spell(s)).map_or(0, |r| r.mp);
-            vec![(gu.lobby_msg(9, 0xe6, "MP Cost"), mp.to_string()), (gu.lobby_msg(9, 0xe7, "Next"), clock(spell_recast(w, s)))]
+            vec![
+                (gu.lobby_msg(9, 0xe6, "MP Cost"), mp.to_string()),
+                (gu.lobby_msg(9, 0xe7, "Next"), clock(spell_recast(w, s))),
+            ]
         }
         // subwindo mode 10: the shared mount recast, "Next" on the second line.
         (Kind::Mount, _) => {
@@ -1213,7 +1433,10 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
         (Kind::Ability, Some(i)) => match w.actions.as_ref().and_then(|a| a.abilities.get(i as usize)) {
             Some(a) => {
-                let next = (gu.lobby_msg(9, 0xe7, "Next"), clock(if a.timer == 900 { 0.0 } else { ability_recast(w, a.timer) }));
+                let next = (
+                    gu.lobby_msg(9, 0xe7, "Next"),
+                    clock(if a.timer == 900 { 0.0 } else { ability_recast(w, a.timer) }),
+                );
                 match ability_kind(a.kind) {
                     // subwindo modes 2 / 10 (FUN_1014fc20): Next on the second line (+0x1a).
                     2 | 10 => vec![(String::new(), String::new()), next],
@@ -1225,7 +1448,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                             && let Some(m) = gu.stacked_menu("menu    subwindo", sw, sh)
                         {
                             let (b, ui, style, _) = gu.parts();
-                            crate::render::invwin::push_tp_cost_box(b, ui, style, &m, w.vitals.map_or(0, |v| v.2), a.tp16, sw, sh);
+                            crate::render::invwin::push_tp_cost_box(
+                                b,
+                                ui,
+                                style,
+                                &m,
+                                w.vitals.map_or(0, |v| v.2),
+                                a.tp16,
+                                sw,
+                                sh,
+                            );
                         }
                         Vec::new()
                     }
@@ -1278,7 +1510,8 @@ fn description(w: &World, kind: Kind, id: u16) -> String {
 fn cursor_bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
     if let Some(p) = w.prompt.as_ref().filter(|p| p.help != 0) {
         bars.help[2] = gu.menu_msg(p.help as usize, "");
-        bars.title[2] = if matches!(p.then, SubThen::Item { .. }) { gu.title_msg(2).unwrap_or_default() } else { p.title.clone() };
+        bars.title[2] =
+            if matches!(p.then, SubThen::Item { .. }) { gu.title_msg(2).unwrap_or_default() } else { p.title.clone() };
         return;
     }
     if let Some(c) = w.cats {
@@ -1303,12 +1536,13 @@ fn cursor_bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
         }
         return;
     }
-    bars.title[1] = gu.title_msg(match win.kind {
-        Kind::Magic => 76,
-        Kind::Emote => 0xb4,
-        _ => 68,
-    })
-    .unwrap_or_default();
+    bars.title[1] = gu
+        .title_msg(match win.kind {
+            Kind::Magic => 76,
+            Kind::Emote => 0xb4,
+            _ => 68,
+        })
+        .unwrap_or_default();
     // Manual Sort: magic 0xe 8 / 9, abilities 0xa / 0xb (FUN_1022cb90 / FUN_10224640), mounts 0x3e6 / 0x3e7.
     if win.manual != 0 {
         let base = match win.kind {
@@ -1364,7 +1598,21 @@ mod tests {
 
     #[test]
     fn list_paging() {
-        let mut win = ListWin { kind: Kind::Magic, ty: 0, exclude: 0, list_mode: true, rows: (1..=30).collect(), scroll: 0, cursor: 0, hidden: false, sort: None, sort_focus: None, ask: None, manual: 0, picked: 0 };
+        let mut win = ListWin {
+            kind: Kind::Magic,
+            ty: 0,
+            exclude: 0,
+            list_mode: true,
+            rows: (1..=30).collect(),
+            scroll: 0,
+            cursor: 0,
+            hidden: false,
+            sort: None,
+            sort_focus: None,
+            ask: None,
+            manual: 0,
+            picked: 0,
+        };
         step(&mut win, egui::Key::ArrowUp);
         assert_eq!((win.scroll, win.cursor, win.at()), (18, 11, Some(30)));
         step(&mut win, egui::Key::ArrowDown);

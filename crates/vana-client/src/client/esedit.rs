@@ -65,7 +65,21 @@ fn slot_of(child: u16) -> usize {
 /// mcresmn's Edit (FUN_10134d90 / FUN_10135de0): the list on the inventory, the grid focused in mode 2.
 pub fn open(w: &mut World, row: usize) -> Option<Editor> {
     let work = w.equipsets.as_ref()?.sets.get(row)?.slots;
-    Some(Editor { row, work, mode: 2, grid: 1, on_list: false, container: 0, filter: None, scroll: 0, cursor: 0, picked: None, mask: 0, last: None, mogc: None })
+    Some(Editor {
+        row,
+        work,
+        mode: 2,
+        grid: 1,
+        on_list: false,
+        container: 0,
+        filter: None,
+        scroll: 0,
+        cursor: 0,
+        picked: None,
+        mask: 0,
+        last: None,
+        mogc: None,
+    })
 }
 
 /// FUN_10134e70 and the close hook (FUN_101358e0): the list and the grid close, the working copy goes into the set.
@@ -85,7 +99,10 @@ fn items(w: &World, e: &Editor) -> Vec<crate::inventory::Slot> {
         .slots_of(e.container)
         .into_iter()
         .filter(|s| s.index != 0 && s.id != 0)
-        .filter(|s| info.item(s.id).is_some_and(|it| it.level != 0 && it.races != 0 && e.filter.is_none_or(|m| it.slots & m != 0)))
+        .filter(|s| {
+            info.item(s.id)
+                .is_some_and(|it| it.level != 0 && it.races != 0 && e.filter.is_none_or(|m| it.slots & m != 0))
+        })
         .collect();
     out.sort_by_key(|s| (info.item(s.id).map_or(0, |it| it.resource), s.id));
     out
@@ -208,7 +225,9 @@ fn grid_key(w: &mut World, key: egui::Key) {
         // A picked item: Left / Right walk the allowed slots in ORDER (wrapping, not onto itself); Up / Down nothing.
         K::ArrowLeft | K::ArrowRight => {
             let at = ORDER.iter().position(|&c| c == grid).unwrap_or(0);
-            let next = (1..16).map(|k| if key == K::ArrowRight { ORDER[(at + k) % 16] } else { ORDER[(at + 16 - k) % 16] }).find(|&c| mask & 1 << slot_of(c) != 0);
+            let next = (1..16)
+                .map(|k| if key == K::ArrowRight { ORDER[(at + k) % 16] } else { ORDER[(at + 16 - k) % 16] })
+                .find(|&c| mask & 1 << slot_of(c) != 0);
             if let (Some(c), Some(e)) = (next, ed_mut(w)) {
                 e.grid = c;
                 w.sounds.push(Ui::Cursor as u32);
@@ -218,7 +237,8 @@ fn grid_key(w: &mut World, key: egui::Key) {
         K::Enter if mode == 2 => {
             let slot = slot_of(grid);
             if let Some(e) = ed_mut(w) {
-                (e.container, e.filter, e.scroll, e.cursor, e.on_list) = (e.work[slot][0] >> 2, Some(1 << slot), 0, 0, true);
+                (e.container, e.filter, e.scroll, e.cursor, e.on_list) =
+                    (e.work[slot][0] >> 2, Some(1 << slot), 0, 0, true);
             }
             w.sounds.push(Ui::Select as u32);
         }
@@ -299,7 +319,11 @@ fn list_key(w: &mut World, key: egui::Key) {
             if mode == 1 {
                 let bits = w.item_info.as_ref().and_then(|i| i.item(s.id)).map_or(0, |it| it.slots);
                 let Some(e) = ed_mut(w) else { return };
-                let held = (0..16).find(|&k| e.work[k][0] >> 2 == c && e.work[k][1] == s.index && u16::from_le_bytes([e.work[k][2], e.work[k][3]]) == s.id);
+                let held = (0..16).find(|&k| {
+                    e.work[k][0] >> 2 == c
+                        && e.work[k][1] == s.index
+                        && u16::from_le_bytes([e.work[k][2], e.work[k][3]]) == s.id
+                });
                 e.mask = held.map_or(bits, |k| 1 << k);
                 e.picked = Some(Picked::Item(s.index));
                 if let Some(&first) = ORDER.iter().find(|&&ch| e.mask & 1 << slot_of(ch) != 0) {
@@ -387,7 +411,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let n = EXTRA + items(w, e).len();
     let row = super::post::picker_row(gu, sw, sh, p);
     let (_, in_grid) = child_under(w, GRID, p, 1..=16);
-    if (moved || clicked) && ((!on_list && row.is_some() && mode == 2) || (on_list && in_grid && mode == 1 && picked.is_none())) {
+    if (moved || clicked)
+        && ((!on_list && row.is_some() && mode == 2) || (on_list && in_grid && mode == 1 && picked.is_none()))
+    {
         num_plus(w);
         return;
     }
@@ -435,7 +461,10 @@ pub(super) fn view(w: &World) -> Option<View> {
     let e = ed(w)?;
     let info = w.item_info.as_ref()?;
     let group9 = |id: usize| w.battle.as_ref().and_then(|b| b.group9(id)).unwrap_or_default();
-    let mut rows: Vec<(u16, String, u32, u32)> = [(0x113, Picked::Remove), (0x114, Picked::Keep)].into_iter().map(|(k, p)| (0, group9(k), 0, if e.picked == Some(p) { 0x8080_4020 } else { 0x8090_9040 })).collect();
+    let mut rows: Vec<(u16, String, u32, u32)> = [(0x113, Picked::Remove), (0x114, Picked::Keep)]
+        .into_iter()
+        .map(|(k, p)| (0, group9(k), 0, if e.picked == Some(p) { 0x8080_4020 } else { 0x8090_9040 }))
+        .collect();
     let shown = items(w, e);
     for s in &shown {
         let tint = if e.picked == Some(Picked::Item(s.index)) {
@@ -538,8 +567,14 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32, free: bool) -> Vec<[f3
     let mut rects = Vec::new();
     let (Some(e), Some(info)) = (ed(w), w.item_info.clone()) else { return rects };
     // The grid (FUN_101359c0): "remove" keytops3 429 at (+1, 0), an item its icon, "keep" the slot's label.
-    super::items::upload_icons(gu, &info, e.work.iter().filter(|s| s[0] & 3 == 1).map(|s| u16::from_le_bytes([s[2], s[3]])));
-    if let Some(win) = gu.lobby_window_off(GRID, sw, sh, (0.0, 0.0), Some(e.grid), free && !e.on_list && e.mogc.is_none(), &[]) {
+    super::items::upload_icons(
+        gu,
+        &info,
+        e.work.iter().filter(|s| s[0] & 3 == 1).map(|s| u16::from_le_bytes([s[2], s[3]])),
+    );
+    if let Some(win) =
+        gu.lobby_window_off(GRID, sw, sh, (0.0, 0.0), Some(e.grid), free && !e.on_list && e.mogc.is_none(), &[])
+    {
         super::macroedit::hit(w, GRID, &win);
         for &(child, r) in win.children.iter().filter(|(c, _)| (1..=16).contains(c)) {
             let s = e.work[slot_of(child)];
@@ -561,7 +596,12 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32, free: bool) -> Vec<[f3
     let mut rows = vec![Row { id: 0, name: String::new(), count: None, tint: WHITE }];
     let group9 = |id: usize| w.battle.as_ref().and_then(|b| b.group9(id)).unwrap_or_default();
     for (k, p) in [(0x113, Picked::Remove), (0x114, Picked::Keep)] {
-        rows.push(Row { id: 0, name: group9(k), count: None, tint: if e.picked == Some(p) { 0x8080_4020 } else { 0x8090_9040 } });
+        rows.push(Row {
+            id: 0,
+            name: group9(k),
+            count: None,
+            tint: if e.picked == Some(p) { 0x8080_4020 } else { 0x8090_9040 },
+        });
     }
     for (mut r, s) in crate::inventory::build_rows(&shown, info.as_ref(), false).into_iter().zip(&shown) {
         r.tint = if e.picked == Some(Picked::Item(s.index)) {
@@ -583,7 +623,21 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32, free: bool) -> Vec<[f3
         if let Some(el) = m.elements.first_mut() {
             el.x = LIST_X;
         }
-        crate::render::invwin::push_item_list(b, ui, style, font, GameUi::ATLAS, &m, &list, sw, sh, frame, 3.0, free && e.on_list && e.mogc.is_none(), crate::render::invwin::INVENTOR_BAR);
+        crate::render::invwin::push_item_list(
+            b,
+            ui,
+            style,
+            font,
+            GameUi::ATLAS,
+            &m,
+            &list,
+            sw,
+            sh,
+            frame,
+            3.0,
+            free && e.on_list && e.mogc.is_none(),
+            crate::render::invwin::INVENTOR_BAR,
+        );
         // The storage strip (cell 1 kind 0x41: framesus 185, its text baked in) at the row origin + (0, 2); cell 0 kind
         // 0x40 the wardrobe number right-aligned at (row x + 13, y + 4) (its badge sprites have alpha 0).
         if e.scroll == 0 {
@@ -597,7 +651,14 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32, free: bool) -> Vec<[f3
                 _ => 0,
             };
             if n > 0 {
-                crate::render::screens::push_shape_text_right(b, ui, n.to_string().as_bytes(), wx + 3.0 + 13.0, wy + 4.0 + 4.0, WHITE);
+                crate::render::screens::push_shape_text_right(
+                    b,
+                    ui,
+                    n.to_string().as_bytes(),
+                    wx + 3.0 + 13.0,
+                    wy + 4.0 + 4.0,
+                    WHITE,
+                );
             }
         }
     }

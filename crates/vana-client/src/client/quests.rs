@@ -14,7 +14,10 @@ const GREY: u32 = 0x8040_4040;
 /// FUN_1022f670: the chooser's rows moved to these y (window-relative; child 1 35 high).
 const ROW_Y: [f32; 5] = [14.0, 46.0, 110.0, 142.0, 174.0];
 /// Titles (group 0xd) by area: current, completed (FUN_10231c60).
-pub(super) const TITLES: [[usize; 11]; 2] = [[0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x88, 0x91, 0x9c, 0xa0, 0xa3], [0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x89, 0x92, 0x9d, 0xa1, 0xa4]];
+pub(super) const TITLES: [[usize; 11]; 2] = [
+    [0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x88, 0x91, 0x9c, 0xa0, 0xa3],
+    [0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x89, 0x92, 0x9d, 0xa1, 0xa4],
+];
 
 /// Records of Eminence (s2c 0x110 / 0x111 / 0x112; DAT_104804d0.., flags DAT_104807ec).
 #[derive(Clone, Debug)]
@@ -267,7 +270,11 @@ fn list_key(w: &mut World, l: &mut List, key: egui::Key, page: bool) {
             w.sounds.push(Ui::Cursor as u32);
         }
         (0, egui::Key::ArrowLeft | egui::Key::ArrowRight) if page => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             let mut row = l.cursor.saturating_sub(l.top);
             if super::scrollbar::paged(m, &mut l.top, &mut row, n, VISIBLE) {
                 l.cursor = l.top + row;
@@ -282,7 +289,8 @@ fn list_key(w: &mut World, l: &mut List, key: egui::Key, page: bool) {
                     break;
                 }
             }
-            (l.area, l.rows, l.top, l.cursor) = (a, if l.mode == 2 { merged(w, a).0 } else { rows(w, a, l.mode) }, 0, 0);
+            (l.area, l.rows, l.top, l.cursor) =
+                (a, if l.mode == 2 { merged(w, a).0 } else { rows(w, a, l.mode) }, 0, 0);
             w.sounds.push(Ui::Cursor as u32);
         }
         (0, egui::Key::Enter) => {
@@ -305,10 +313,14 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let hit = |name: &str| -> Option<u16> {
         let (x, y) = gu.window_xy(name, sw, sh)?;
         let lay = gu.layout(name)?;
-        lay.elements.iter().skip(1).find(|e| {
-            let (ex, ey) = (x + e.x as f32, y + e.y as f32);
-            p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-        }).map(|e| e.id)
+        lay.elements
+            .iter()
+            .skip(1)
+            .find(|e| {
+                let (ex, ey) = (x + e.x as f32, y + e.y as f32);
+                p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
+            })
+            .map(|e| e.id)
     };
     if let Some(l) = &q.roe {
         let c = hit(LIST);
@@ -361,7 +373,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let Some(r) = (0..total).find(|&k| {
         let (ex, ey) = (x + 39.0, y + ROW_Y[k]);
         p.0 >= ex && p.0 < ex + 320.0 && p.1 >= ey && p.1 < ey + if k == 0 { 35.0 } else { 18.0 }
-    }) else { return };
+    }) else {
+        return;
+    };
     gu.hover.set(true);
     if r != q.sel && (moved || clicked) {
         w.quests.as_mut().unwrap().sel = r;
@@ -426,9 +440,21 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             for (k, label) in labels.iter().enumerate() {
                 let (cx, cy) = (x + 39.0, y + ROW_Y[k]);
                 let on = k == q.sel;
-                gu.sprite("menu    quest", 0, cx - on as u8 as f32, cy - on as u8 as f32, if on { 0x8080_5020 } else { WHITE });
+                gu.sprite(
+                    "menu    quest",
+                    0,
+                    cx - on as u8 as f32,
+                    cy - on as u8 as f32,
+                    if on { 0x8080_5020 } else { WHITE },
+                );
                 gu.sprite("menu    framesus", 35, cx + 4.0, cy + 5.0, WHITE);
-                let tint = if k == 4 && !van { GREY } else if on { CURSOR } else { WHITE };
+                let tint = if k == 4 && !van {
+                    GREY
+                } else if on {
+                    CURSOR
+                } else {
+                    WHITE
+                };
                 text(gu, label, cx + 16.0, cy, tint);
                 if on && focused {
                     gu.cursor(cx, cy);
@@ -455,10 +481,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let Some(l) = &q.list else { return rects };
     let Some(f) = w.logs.as_ref().and_then(|g| g.quests.get(l.area)) else { return rects };
-    let shown: Vec<u16> = if l.state == 0 { (1..=VISIBLE as u16).filter(|&c| l.top + (c as usize) - 1 < l.rows.len()).collect() } else { Vec::new() };
+    let shown: Vec<u16> = if l.state == 0 {
+        (1..=VISIBLE as u16).filter(|&c| l.top + (c as usize) - 1 < l.rows.len()).collect()
+    } else {
+        Vec::new()
+    };
     let hide: Vec<u16> = (1..=VISIBLE as u16).filter(|c| !shown.contains(c)).collect();
     let sel = (l.state == 0 && !l.rows.is_empty()).then(|| (l.cursor - l.top + 1) as u16);
-    let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), sel, w.confirm.is_none(), &hide) else { return rects };
+    let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), sel, w.confirm.is_none(), &hide) else {
+        return rects;
+    };
     let [fx, fy, fw, fh] = win.frame;
     let Some((x, y)) = gu.window_xy(LIST, sw, sh) else { return rects };
     rects.push(win.frame);
@@ -468,14 +500,27 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         }
         if l.rows.is_empty() {
             if let Some(bt) = &w.battle {
-                text(gu, &bt.group9(if l.mode == 0 { 0x63 } else { 0x64 }).unwrap_or_default(), x + 20.0, y + 40.0, WHITE);
+                text(
+                    gu,
+                    &bt.group9(if l.mode == 0 { 0x63 } else { 0x64 }).unwrap_or_default(),
+                    x + 20.0,
+                    y + 40.0,
+                    WHITE,
+                );
             }
         }
         for &(id, [cx, cy, ..]) in win.children.iter().filter(|(id, _)| (1..=VISIBLE as u16).contains(id)) {
             let row = l.top + id as usize - 1;
             let Some(e) = l.rows.get(row).and_then(|&i| f.entries.get(i)) else { continue };
             gu.sprite("menu    framesus", 35, cx + 4.0, cy + 5.0, WHITE);
-            super::missions::lines(gu, e.name.trim_start_matches('+'), cx + 18.0, cy, 301.0, if row == l.cursor { CURSOR } else { WHITE });
+            super::missions::lines(
+                gu,
+                e.name.trim_start_matches('+'),
+                cx + 18.0,
+                cy,
+                301.0,
+                if row == l.cursor { CURSOR } else { WHITE },
+            );
         }
         let bx = fx + fw - 8.0;
         gu.scroll_bar(bx, fy, fh, l.rows.len(), VISIBLE, l.top);

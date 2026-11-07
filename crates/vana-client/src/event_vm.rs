@@ -50,63 +50,159 @@ pub enum Effect {
     /// `place`: the text's 02 / 03 window position codes.
     /// `mode`: a 1f code's (msg+4); `sounds`: the 0d / 0e SeSep ids played as the text was built.
     /// `motions`: the `17 n` names the moogle plays.
-    Message { op: u8, speaker: Option<u32>, id: u32, text: String, prompt: bool, wait: Option<u32>, place: [Option<i16>; 2], mode: Option<u8>, sounds: Vec<u32>, motions: Vec<&'static str> },
+    Message {
+        op: u8,
+        speaker: Option<u32>,
+        id: u32,
+        text: String,
+        prompt: bool,
+        wait: Option<u32>,
+        place: [Option<i16>; 2],
+        mode: Option<u8>,
+        sounds: Vec<u32>,
+        motions: Vec<&'static str>,
+    },
     /// A message's `13 n`: the K.O. offer state (2 raise, 3 tractor) as s2c 0x0F9 sets it.
     Offer(u8),
     /// Choice menu (op 0x24); answer with [`Runtime::choose`].
-    Choice { id: u32, question: String, options: Vec<(u32, String)>, cursor: usize },
+    Choice {
+        id: u32,
+        question: String,
+        options: Vec<(u32, String)>,
+        cursor: usize,
+    },
     /// Scheduler start (0x45 and family): file id (base + n), tag, actor, target, param.
-    Scheduler { file: u32, tag: String, actor: u32, target: u32, param: i32 },
-    SchedulerStop { file: u32, tag: String, actor: u32, target: u32 },
+    Scheduler {
+        file: u32,
+        tag: String,
+        actor: u32,
+        target: u32,
+        param: i32,
+    },
+    SchedulerStop {
+        file: u32,
+        tag: String,
+        actor: u32,
+        target: u32,
+    },
     /// 0x46 sub 0 / 1: FUN_10082b20 (flag = DAT_10346088 = 1, camera seeded from the player) /
     /// FUN_10082be0 (flag = 0). Cutscenes run with 0 and set 1 before they end. Sub 3 seeds it at `offset` in the
     /// player's frame (x forward, y down) instead of FUN_10021680's (-4, -2, 0).
-    Camera { flag: bool, offset: Option<[f32; 3]> },
+    Camera {
+        flag: bool,
+        offset: Option<[f32; 3]>,
+    },
     /// 0x46 sub 1 also hides "menu    buff" (FUN_10221c30: not drawn, items disabled, no cursor); only the event end
     /// (FUN_100ae960) shows it again, not sub 0.
     HideBuffs,
     /// Op 0x71: open "menu    passinpu" (kind: title and allowed characters; max bytes, at most 16); answer with
     /// [`Runtime::input_done`].
-    Input { kind: i32, max: usize },
+    Input {
+        kind: i32,
+        max: usize,
+    },
     /// Sound volume, 0x69 set / 0x6a fade (FUN_10035200.. / FUN_10034be0): mask 1 world sound effects
     /// (DAT_1034656c), 2 interface sounds (DAT_10346568), 4 music (DAT_10346570), 8 all of them and
     /// the stream at DAT_10450fe8; 0x10 (0x69) sets DAT_10346578. Reaches `level` over `ticks`.
-    Volume { mask: i32, level: f32, ticks: f32 },
+    Volume {
+        mask: i32,
+        level: f32,
+        ticks: f32,
+    },
     /// Actor alpha fade (0x6c).
-    ActorFade { actor: u32, alpha: i32, frames: i32 },
+    ActorFade {
+        actor: u32,
+        alpha: i32,
+        frames: i32,
+    },
     /// FUN_1008af20: the actor's turning steps ('@tl0' / '@tr0') stop.
-    StopTurn { actor: u32 },
+    StopTurn {
+        actor: u32,
+    },
     /// Motion start: 0x5b / 0x66 load motion file `file` then play 4cc `name` (model vtable +0x298),
     /// 0x2c plays one the actor has (file 0). 0x53 waits for it ([`Busy::Playing`]).
-    Motion { op: u8, actor: u32, target: u32, file: i32, name: String },
-    IdleMotion { actor: u32, name: String },
+    Motion {
+        op: u8,
+        actor: u32,
+        target: u32,
+        file: i32,
+        name: String,
+    },
+    IdleMotion {
+        actor: u32,
+        name: String,
+    },
     /// Discrete position / direction set by the script (walking is in [`Runtime::actors`]); 0x36 / 0x37 snap
     /// the drawn transform (FUN_100917e0), 0x39 / 0x4b only turn.
-    Position { op: u8, actor: u32, pos: [f32; 3], dir: f32 },
-    Face { actor: u32, target: u32 },
+    Position {
+        op: u8,
+        actor: u32,
+        pos: [f32; 3],
+        dir: f32,
+    },
+    Face {
+        actor: u32,
+        target: u32,
+    },
     /// A wait started (0x1c, 0x6f): ticks at 60 Hz.
-    Wait { actor: u32, ticks: f32 },
+    Wait {
+        actor: u32,
+        ticks: f32,
+    },
     Send(Packet),
     /// Any other opcode, with its operands decoded.
-    Op { op: u8, sub: Option<u8>, actor: u32, args: Vec<Arg> },
+    Op {
+        op: u8,
+        sub: Option<u8>,
+        actor: u32,
+        args: Vec<Arg>,
+    },
     /// A form the client cannot run (no length, or b1 sub >= 3): the thread is ended here.
-    Fault { actor: u32, pc: u16, op: u8 },
-    End { option: u32, cancelled: bool },
+    Fault {
+        actor: u32,
+        pc: u16,
+        op: u8,
+    },
+    End {
+        option: u32,
+        cancelled: bool,
+    },
 }
 
 /// What a waiting op asks the host each frame; true = still busy (the op yields).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Busy {
-    Scheduler { file: u32, tag: String, actor: u32, target: u32 },
+    Scheduler {
+        file: u32,
+        tag: String,
+        actor: u32,
+        target: u32,
+    },
     /// Actor turning (0x70, 0x76; actor +0x12c bit 1).
-    Turning { actor: u32 },
+    Turning {
+        actor: u32,
+    },
     /// 0x5b / 0x66: the motion file is still loading (FUN_100cf260); the op then plays and yields once.
-    MotionLoad { actor: u32, file: i32 },
+    MotionLoad {
+        actor: u32,
+        file: i32,
+    },
     /// 0x54: the zone action (a scheduler of the zone's effects) `name` on (a, b) still running (FUN_100b50f0).
-    ZoneAction { name: String, a: u32, b: u32 },
+    ZoneAction {
+        name: String,
+        a: u32,
+        b: u32,
+    },
     /// 0x53: motion or scheduler `name` of the actor still playing (model vtable +0x2a0).
-    Playing { actor: u32, name: String },
-    Op { op: u8, sub: Option<u8>, actor: u32 },
+    Playing {
+        actor: u32,
+        name: String,
+    },
+    Op {
+        op: u8,
+        sub: Option<u8>,
+        actor: u32,
+    },
 }
 
 /// The client side of the VM. Defaults suit a headless run: actors exist, nothing stays busy.
@@ -403,7 +499,13 @@ fn four_cc(v: u32) -> String {
 
 impl Runtime {
     /// Binds every block that has the event id (or the 0xfffe wildcard) and runs FUN_100baf30 on each.
-    pub fn start(blocks: Vec<Block>, dialog: Option<Dialog>, start: Start, mem: Memory, host: &mut dyn Host) -> Runtime {
+    pub fn start(
+        blocks: Vec<Block>,
+        dialog: Option<Dialog>,
+        start: Start,
+        mem: Memory,
+        host: &mut dyn Host,
+    ) -> Runtime {
         let mut z = [0u32; 0x60];
         z[2..10].copy_from_slice(&start.params);
         let mut rt = Runtime {
@@ -445,15 +547,25 @@ impl Runtime {
             frame: 0,
         };
         let ev = rt.start.event;
-        let mut bound: Vec<usize> =
-            (0..rt.blocks.len()).filter(|&i| rt.blocks[i].events.iter().any(|(id, _)| *id == ev || *id == 0xfffe)).collect();
+        let mut bound: Vec<usize> = (0..rt.blocks.len())
+            .filter(|&i| rt.blocks[i].events.iter().any(|(id, _)| *id == ev || *id == 0xfffe))
+            .collect();
         // The client walks actor slots in index order; the player's slot is above the NPCs'.
         bound.sort_by_key(|&i| Self::index_of(rt.blocks[i].actor));
         for b in bound {
             let actor = rt.blocks[b].actor;
             let (pos, dir) = host.place(actor);
             let n = rt.vms.len();
-            rt.bodies.push(Body { locals: [0; 0x50], pos, dir, tilt: [0.0; 2], speed: 5.0, anim_speed: 5.0, no_ground: false, msg_actor: None });
+            rt.bodies.push(Body {
+                locals: [0; 0x50],
+                pos,
+                dir,
+                tilt: [0.0; 2],
+                speed: 5.0,
+                anim_speed: 5.0,
+                no_ground: false,
+                msg_actor: None,
+            });
             rt.vms.push(Vm {
                 block: b,
                 own: actor,
@@ -641,7 +753,8 @@ impl Runtime {
                 }
                 self.z[6] = b(0x21) as i8 as u32;
                 let code = p.get(0x10..0x20).unwrap_or(&[]);
-                let code = String::from_utf8_lossy(&code[..code.iter().position(|&c| c == 0).unwrap_or(code.len())]).into_owned();
+                let code = String::from_utf8_lossy(&code[..code.iter().position(|&c| c == 0).unwrap_or(code.len())])
+                    .into_owned();
                 if self.start.strings.is_empty() {
                     self.start.strings.push(String::new());
                 }
@@ -696,7 +809,14 @@ impl Runtime {
                 let code = &self.blocks[vm.block].code;
                 let live = (0..16)
                     .filter(|&i| vm.threads[i].prio != FREE)
-                    .map(|i| (i, vm.threads[i].prio, vm.threads[i].pc, code.get(vm.threads[i].pc as usize).copied().unwrap_or(0)))
+                    .map(|i| {
+                        (
+                            i,
+                            vm.threads[i].prio,
+                            vm.threads[i].pc,
+                            code.get(vm.threads[i].pc as usize).copied().unwrap_or(0),
+                        )
+                    })
                     .collect();
                 (vm.own, live)
             })
@@ -835,7 +955,9 @@ impl Runtime {
             0..0x800 => body.locals.get(k as usize).copied().unwrap_or(0),
             0x800..0x1100 => self.z.get((k as i32 - 0x1000) as usize).copied().unwrap_or(0),
             0x1100..0x1200 => self.mem.m.get(k as usize - 0x1100).copied().unwrap_or(0),
-            0x1200..0x1800 => (k as i32 - 0x1700).try_into().ok().and_then(|i: usize| self.mem.g.get(i).copied()).unwrap_or(0),
+            0x1200..0x1800 => {
+                (k as i32 - 0x1700).try_into().ok().and_then(|i: usize| self.mem.g.get(i).copied()).unwrap_or(0)
+            }
             0x7f00 => (body.pos[0] / POS) as i32 as u32,
             0x7f01 => (body.pos[1] / POS) as i32 as u32,
             0x7f02 => (body.pos[2] / POS) as i32 as u32,
@@ -1052,7 +1174,9 @@ impl Runtime {
         if let Some(o) = e.as_ref().and_then(|e| e.offer) {
             host.effect(Effect::Offer(o));
         }
-        let (wait, place, mode, sounds, motions) = e.map_or((None, [None; 2], None, Vec::new(), Vec::new()), |e| (e.wait, e.place, e.mode, e.sounds, e.motions));
+        let (wait, place, mode, sounds, motions) = e.map_or((None, [None; 2], None, Vec::new(), Vec::new()), |e| {
+            (e.wait, e.place, e.mode, e.sounds, e.motions)
+        });
         let name = speaker.map(|s| host.name(s));
         let text = match name {
             Some(n) => format!("{n} : {text}"),
@@ -1066,7 +1190,9 @@ impl Runtime {
     /// Operands of a generic op from the opcode table.
     fn args(&self, v: usize, op: &event::Op, sub: Option<u8>) -> Vec<Arg> {
         let args = match sub {
-            Some(s) if !op.sub_args.is_empty() => op.sub_args.iter().find(|(k, _)| *k == s).map_or(op.args, |(_, a)| *a),
+            Some(s) if !op.sub_args.is_empty() => {
+                op.sub_args.iter().find(|(k, _)| *k == s).map_or(op.args, |(_, a)| *a)
+            }
             _ => op.args,
         };
         args.iter()
@@ -1165,7 +1291,13 @@ impl Runtime {
                     0x10 => a.wrapping_shl(b as u32),
                     0x11 => a.wrapping_shr(b as u32),
                     0x14 => a.wrapping_mul(b),
-                    _ => if a == 0 || b == 0 { 0 } else { a.wrapping_div(b) },
+                    _ => {
+                        if a == 0 || b == 0 {
+                            0
+                        } else {
+                            a.wrapping_div(b)
+                        }
+                    }
                 };
                 self.set_at(v, 1, 0, r as u32);
                 self.adv(v, len);
@@ -1275,7 +1407,8 @@ impl Runtime {
             0x31 => {
                 if sub == Some(0) {
                     host.effect(Effect::StopTurn { actor });
-                    let (x, z, y) = (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
+                    let (x, z, y) =
+                        (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
                     let frames = self.val(v, 8) as i16;
                     let t = self.thread(v);
                     t.target = [x, y, z, 0.0];
@@ -1296,7 +1429,8 @@ impl Runtime {
             }
             0x1f | 0x5a => match sub {
                 Some(0) => {
-                    let (x, z, y) = (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
+                    let (x, z, y) =
+                        (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
                     self.thread(v).target = [x, y, z, 0.0];
                     self.adv(v, 8);
                 }
@@ -1460,7 +1594,8 @@ impl Runtime {
                 let t = self.actor_at(v, 1);
                 if let Some(tv) = self.vm_of(t) {
                     let tb = self.vms[tv].body;
-                    let (x, z, y) = (self.val(v, 5) as f32 * POS, self.val(v, 7) as f32 * POS, self.val(v, 9) as f32 * POS);
+                    let (x, z, y) =
+                        (self.val(v, 5) as f32 * POS, self.val(v, 7) as f32 * POS, self.val(v, 9) as f32 * POS);
                     self.bodies[tb].dir = self.val(v, 11) as f32 * DIR;
                     let y = if self.bodies[tb].no_ground { y } else { host.ground(t, [x, y, z]).unwrap_or(y) };
                     self.bodies[tb].pos = [x, y, z];
@@ -1597,7 +1732,8 @@ impl Runtime {
             }
             0x47 => match sub {
                 Some(0) => {
-                    let (x, z, y) = (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
+                    let (x, z, y) =
+                        (self.val(v, 2) as f32 * POS, self.val(v, 4) as f32 * POS, self.val(v, 6) as f32 * POS);
                     let dir = self.val(v, 8) as f32 * DIR;
                     host.effect(Effect::Send(Packet::EventPos { head: self.head(), x, y, z, dir, option: self.z[1] }));
                     self.wait_update = true;
@@ -1621,7 +1757,8 @@ impl Runtime {
                 self.adv(v, 3);
             }
             0x5b | 0x66 => {
-                let (a, t, file, name) = (self.actor_at(v, 3), self.actor_at(v, 7), self.val(v, 1), four_cc(self.u32_at(v, 0xb)));
+                let (a, t, file, name) =
+                    (self.actor_at(v, 3), self.actor_at(v, 7), self.val(v, 1), four_cc(self.u32_at(v, 0xb)));
                 if self.thread(v).state == 0 {
                     host.effect(Effect::Motion { op: opc, actor: a, target: t, file, name });
                     self.thread(v).state = 1;
@@ -1840,7 +1977,8 @@ impl Runtime {
             }
             // FUN_100b75c0: set@1 = sqrt((v7 - v3)^2 + (v9 - v5)^2), integer squares, truncated.
             0x64 => {
-                let (dx, dz) = (self.val(v, 7).wrapping_sub(self.val(v, 3)), self.val(v, 9).wrapping_sub(self.val(v, 5)));
+                let (dx, dz) =
+                    (self.val(v, 7).wrapping_sub(self.val(v, 3)), self.val(v, 9).wrapping_sub(self.val(v, 5)));
                 let d = ((dz.wrapping_mul(dz) as f64) + (dx.wrapping_mul(dx) as f64)).sqrt();
                 self.set_at(v, 1, 0, d as i32 as u32);
                 self.adv(v, 0xb);
@@ -1854,7 +1992,9 @@ impl Runtime {
                 };
                 let (a, b) = (self.actor_at(v, 3), self.actor_at(v, 7));
                 let d = match (at(self, host, a), at(self, host, b)) {
-                    (Some(p), Some(q)) => ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt() as f64 * 1000.0,
+                    (Some(p), Some(q)) => {
+                        ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt() as f64 * 1000.0
+                    }
                     _ => 0.0,
                 };
                 self.set_at(v, 1, 0, d as i32 as u32);
@@ -1893,7 +2033,15 @@ impl Runtime {
             }
             0xaa => {
                 let t = self.val(v, 1) as u32;
-                let parts = [t / 0x12fc00 + 0x376, t % 0x12fc00 / 0x19500 + 1, t % 0x19500 / 0xd80 + 1, t % 0x6c00 / 0xd80, t % 0xd80 / 0x90, t % 0x90 * 60 / 0x90, t / 0x5e80 % 12];
+                let parts = [
+                    t / 0x12fc00 + 0x376,
+                    t % 0x12fc00 / 0x19500 + 1,
+                    t % 0x19500 / 0xd80 + 1,
+                    t % 0x6c00 / 0xd80,
+                    t % 0xd80 / 0x90,
+                    t % 0x90 * 60 / 0x90,
+                    t / 0x5e80 % 12,
+                ];
                 for (k, p) in parts.into_iter().enumerate() {
                     self.set_at(v, 3 + 2 * k, 0, p);
                 }
@@ -1997,7 +2145,12 @@ impl Runtime {
                             b[..15].iter_mut().filter(|c| **c == b'@').for_each(|c| *c = b' ');
                         }
                         let raw = self.u16_at(v, 2);
-                        self.set4(v, raw, 0, std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())));
+                        self.set4(
+                            v,
+                            raw,
+                            0,
+                            std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())),
+                        );
                     }
                     1 => {
                         let slot = (self.val(v, 4) as usize).min(4) % 4;
@@ -2007,12 +2160,18 @@ impl Runtime {
                             b[..n].copy_from_slice(&t.as_bytes()[..n]);
                         }
                         let raw = self.u16_at(v, 2);
-                        self.set4(v, raw, 0, std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())));
+                        self.set4(
+                            v,
+                            raw,
+                            0,
+                            std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())),
+                        );
                     }
                     4 => {
                         let slot = (self.val(v, 4) as usize).min(4) % 4;
                         let b = self.str_at(v, 2);
-                        let text = String::from_utf8_lossy(&b[..b.iter().position(|&c| c == 0).unwrap_or(15)]).into_owned();
+                        let text =
+                            String::from_utf8_lossy(&b[..b.iter().position(|&c| c == 0).unwrap_or(15)]).into_owned();
                         if self.start.strings.len() <= slot {
                             self.start.strings.resize(slot + 1, String::new());
                         }
@@ -2105,7 +2264,12 @@ impl Runtime {
                         0x31 if !self.input_open => {
                             let b = self.input_buf;
                             let raw = self.u16_at(v, 2);
-                            self.set4(v, raw, 0, std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())));
+                            self.set4(
+                                v,
+                                raw,
+                                0,
+                                std::array::from_fn(|i| u32::from_le_bytes(b[i * 4..i * 4 + 4].try_into().unwrap())),
+                            );
                             self.adv(v, 4);
                         }
                         // FUN_100b7e10 0x40 (FUN_100b8430): the concierge's list with title val@2; 0x41 waits for it,
@@ -2317,18 +2481,21 @@ impl Runtime {
     }
 
     /// C atoi over at most 16 bytes: leading whitespace, a sign, digits; wrapping.
-fn atoi(b: &[u8]) -> i32 {
-    let b = &b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())];
-    let mut i = b.iter().take_while(|c| c.is_ascii_whitespace()).count();
-    let neg = b.get(i) == Some(&b'-');
-    if matches!(b.get(i), Some(b'-' | b'+')) {
-        i += 1;
+    fn atoi(b: &[u8]) -> i32 {
+        let b = &b[..b.iter().position(|&c| c == 0).unwrap_or(b.len())];
+        let mut i = b.iter().take_while(|c| c.is_ascii_whitespace()).count();
+        let neg = b.get(i) == Some(&b'-');
+        if matches!(b.get(i), Some(b'-' | b'+')) {
+            i += 1;
+        }
+        let n = b[i.min(b.len())..]
+            .iter()
+            .take_while(|c| c.is_ascii_digit())
+            .fold(0i32, |n, c| n.wrapping_mul(10).wrapping_add((c - b'0') as i32));
+        if neg { n.wrapping_neg() } else { n }
     }
-    let n = b[i.min(b.len())..].iter().take_while(|c| c.is_ascii_digit()).fold(0i32, |n, c| n.wrapping_mul(10).wrapping_add((c - b'0') as i32));
-    if neg { n.wrapping_neg() } else { n }
-}
 
-/// FUN_100aead0: push and jump (the stack is per VM, 8 deep).
+    /// FUN_100aead0: push and jump (the stack is per VM, 8 deep).
     fn call(&mut self, v: usize, to: u16, ret: u16) {
         let vm = &mut self.vms[v];
         if vm.stack.len() == 8 {
@@ -2363,7 +2530,8 @@ fn atoi(b: &[u8]) -> i32 {
         let b = &mut self.bodies[body];
         let d = [tg[0] - b.pos[0], tg[1] - b.pos[1], tg[2] - b.pos[2]];
         b.dir = (-d[2]).atan2(d[0]);
-        let dist = if three_d { (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt() } else { (d[0] * d[0] + d[2] * d[2]).sqrt() };
+        let dist =
+            if three_d { (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt() } else { (d[0] * d[0] + d[2] * d[2]).sqrt() };
         let step = self.dt * b.speed / 60.0;
         let arrived = dist <= step;
         if arrived {
@@ -2435,7 +2603,8 @@ fn atoi(b: &[u8]) -> i32 {
                         host.effect(Effect::Offer(o));
                     }
                     let at = e.choice.unwrap_or(e.lines.len());
-                    question = e.lines[..at.min(e.lines.len())].iter().map(|l| decode_sjis(l)).collect::<Vec<_>>().join("\n");
+                    question =
+                        e.lines[..at.min(e.lines.len())].iter().map(|l| decode_sjis(l)).collect::<Vec<_>>().join("\n");
                     let (default, mut mask) = (self.val(v, 3 + off) as u32, self.val(v, 5 + off) as u32);
                     for (i, l) in e.lines.iter().skip(at).enumerate() {
                         if mask & 1 == 0 {
@@ -2835,7 +3004,8 @@ impl Host for Scripted {
             Effect::Scheduler { file, tag, actor, target, param } => {
                 let len = self.sched_ticks.as_mut().map_or(Some(self.busy_frames as f32), |f| f(*file, tag, *param));
                 let until = len.map_or(u32::MAX, |t| self.frame + t.ceil() as u32 + 1);
-                self.running.push((Busy::Scheduler { file: *file, tag: tag.clone(), actor: *actor, target: *target }, until))
+                self.running
+                    .push((Busy::Scheduler { file: *file, tag: tag.clone(), actor: *actor, target: *target }, until))
             }
             Effect::SchedulerStop { file, tag, actor, target } => {
                 let b = Busy::Scheduler { file: *file, tag: tag.clone(), actor: *actor, target: *target };
@@ -2938,7 +3108,14 @@ pub fn run_scripted(rt: &mut Runtime, host: &mut Scripted, max_frames: u32) -> O
 }
 
 /// `event-run`: runs one event headless and prints its effects.
-pub fn run_cli(zone: u16, event: u16, target: u32, params: [u32; 8], choices: &[Option<u32>], race: u8) -> anyhow::Result<()> {
+pub fn run_cli(
+    zone: u16,
+    event: u16,
+    target: u32,
+    params: [u32; 8],
+    choices: &[Option<u32>],
+    race: u8,
+) -> anyhow::Result<()> {
     let index = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir())?;
     let blocks = event::load(&index, zone)?;
     let dialog = Dialog::load(&index, zone).ok();
@@ -2989,9 +3166,16 @@ pub fn sweep(zones: &[u16]) -> anyhow::Result<()> {
         let (mut zf, mut zh, mut zi) = (Vec::new(), Vec::new(), Vec::new());
         for &(id, actor) in &ids {
             let mut host = Scripted::new(&[]);
-            host.sched_ticks = Some(sched_timer(crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir())?));
+            host.sched_ticks =
+                Some(sched_timer(crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir())?));
             let start = Start { zone: z, event: id, target: actor, ..Default::default() };
-            let mut rt = Runtime::start(event::load(&index, z)?, Dialog::load(&index, z).ok(), start, Memory::default(), &mut host);
+            let mut rt = Runtime::start(
+                event::load(&index, z)?,
+                Dialog::load(&index, z).ok(),
+                start,
+                Memory::default(),
+                &mut host,
+            );
             let done = run_scripted(&mut rt, &mut host, 60 * 60 * 5).is_some();
             for e in &host.log {
                 if let Effect::Fault { actor, pc, op } = e {
@@ -3078,7 +3262,8 @@ mod tests {
     }
 
     fn end(log: &[Effect]) -> Option<u32> {
-        log.iter().find_map(|e| if let Effect::Send(Packet::EventEnd { option, .. }) = e { Some(*option) } else { None })
+        log.iter()
+            .find_map(|e| if let Effect::Send(Packet::EventEnd { option, .. }) = e { Some(*option) } else { None })
     }
 
     /// Zone 37 event 0x040a: a 0xd4 sub 2 menu (the 0x24 menu one byte on) and the 0x7f wait after it.
@@ -3086,7 +3271,10 @@ mod tests {
     fn select_prompt_d4() {
         let Some((log, f)) = run(37, 0x040a, &[Some(1), Some(1)]) else { return };
         assert!(f.is_some());
-        assert!(log.iter().any(|e| matches!(e, Effect::Choice { id: 7284, options, cursor: 2, .. } if options.len() == 3)), "{log:?}");
+        assert!(
+            log.iter().any(|e| matches!(e, Effect::Choice { id: 7284, options, cursor: 2, .. } if options.len() == 3)),
+            "{log:?}"
+        );
         assert!(log.iter().any(|e| matches!(e, Effect::Choice { id: 7279, .. })));
     }
 
@@ -3103,7 +3291,13 @@ mod tests {
             let mut host = Scripted::new(&[Some(0), Some(2), Some(1), Some(0), None]);
             host.map_busy = busy;
             let start = Start { zone: 230, event: 0x21fc, target: 0x010e_6087, ..Default::default() };
-            let mut rt = Runtime::start(event::load(&index, 230).unwrap(), Dialog::load(&index, 230).ok(), start, Memory::default(), &mut host);
+            let mut rt = Runtime::start(
+                event::load(&index, 230).unwrap(),
+                Dialog::load(&index, 230).ok(),
+                start,
+                Memory::default(),
+                &mut host,
+            );
             rt.params([1, u32::MAX, u32::MAX, u32::MAX, u32::MAX, 100_000, 4095, 0]);
             if let Ok(n) = crate::dat::names::Names::load(&index, crate::dat::items::Lang::En) {
                 rt.set_names(std::sync::Arc::new(n));
@@ -3119,11 +3313,18 @@ mod tests {
         let open = at(&log, &|e| matches!(e, Effect::Op { op: 0xd4, sub: Some(0), .. })).unwrap();
         assert!(e2 < e4 && e4 < menu && menu < open, "{e2} {e4} {menu} {open}");
         // The title's place name is num[33]: G25 (message slots 8.. are the G registers).
-        assert!(matches!(&log[menu], Effect::Choice { question, .. } if question.contains("Southern San d'Oria")), "{:?}", log[menu]);
+        assert!(
+            matches!(&log[menu], Effect::Choice { question, .. } if question.contains("Southern San d'Oria")),
+            "{:?}",
+            log[menu]
+        );
 
         let log = run(true);
         assert!(at(&log, &entry(4, 97)).is_some());
-        assert!(at(&log, &|e| matches!(e, Effect::Choice { id: 30, .. } | Effect::Op { op: 0xd4, sub: Some(0), .. })).is_none());
+        assert!(
+            at(&log, &|e| matches!(e, Effect::Choice { id: 30, .. } | Effect::Op { op: 0xd4, sub: Some(0), .. }))
+                .is_none()
+        );
     }
 
     /// Southern San d'Oria actor 0x01b, event 0x0249: the Mog House explanation and its choice.
@@ -3153,7 +3354,10 @@ mod tests {
         let mut rt = Runtime::start(event::load(&index, 230).unwrap(), dialog, start, Memory::default(), &mut host);
         rt.params([1, 0, 0, 0, 0, 0, 0, 0]);
         run_scripted(&mut rt, &mut host, 60 * 60).expect("finished");
-        let t = host.log.iter().find_map(|e| if let Effect::Message { id: 10, text, .. } = e { Some(text.clone()) } else { None });
+        let t = host
+            .log
+            .iter()
+            .find_map(|e| if let Effect::Message { id: 10, text, .. } = e { Some(text.clone()) } else { None });
         assert!(t.expect("message 10").contains("Bastok"));
 
         let mut host = Scripted::new(&[]);
@@ -3191,7 +3395,8 @@ mod tests {
     fn fishing_ranking_b3() {
         let code = vec![
             0xb3, 0x00, 0x10, 0x00, // request 1 with L16
-            0xb3, 0x01, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05, 0x00, // L0..L5 = result..share
+            0xb3, 0x01, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05,
+            0x00, // L0..L5 = result..share
             0xb3, 0x09, 0x06, 0x00, // L6 = window open
             0x03, 0x01, 0x10, 0x01, 0x00, // Z1 (the end option) = L1
             0x21, 0x00,
@@ -3204,7 +3409,13 @@ mod tests {
         let mut rt = Runtime::start(blocks(), None, start(), Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
         assert_eq!(end(&host.log), Some(7));
-        assert!(host.log.iter().any(|e| matches!(e, Effect::Op { op: 0xb3, sub: Some(0), args, .. } if args[..] == [Arg::Int(0)])), "{:?}", host.log);
+        assert!(
+            host.log
+                .iter()
+                .any(|e| matches!(e, Effect::Op { op: 0xb3, sub: Some(0), args, .. } if args[..] == [Arg::Int(0)])),
+            "{:?}",
+            host.log
+        );
 
         // No result yet: sub 1 stays.
         let mut host = Scripted::new(&[]);
@@ -3234,11 +3445,16 @@ mod tests {
             .log
             .iter()
             .filter_map(|e| match e {
-                Effect::Op { op: op @ (0xa8 | 0xb9), sub, args, .. } => Some((*op, *sub, args.iter().map(|a| if let Arg::Int(i) = a { *i } else { -1 }).collect())),
+                Effect::Op { op: op @ (0xa8 | 0xb9), sub, args, .. } => {
+                    Some((*op, *sub, args.iter().map(|a| if let Arg::Int(i) = a { *i } else { -1 }).collect()))
+                }
                 _ => None,
             })
             .collect();
-        assert_eq!(ops[..3], [(0xa8, Some(0), vec![230, 5]), (0xb9, Some(1), vec![230, 3, 5]), (0xa8, Some(2), vec![])]);
+        assert_eq!(
+            ops[..3],
+            [(0xa8, Some(0), vec![230, 5]), (0xb9, Some(1), vec![230, 3, 5]), (0xa8, Some(2), vec![])]
+        );
     }
 
     /// Op 0xb4 sub 2 hands the host the 16-byte string var@2 and val@4 (the target window's event mode); sub 3 closes.
@@ -3253,9 +3469,16 @@ mod tests {
         let start = Start { zone: 230, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let seen: Vec<String> = host.log.iter().filter(|e| matches!(e, Effect::Op { op: 0xb4, .. })).map(|e| format!("{e:?}")).collect();
+        let seen: Vec<String> =
+            host.log.iter().filter(|e| matches!(e, Effect::Op { op: 0xb4, .. })).map(|e| format!("{e:?}")).collect();
         assert_eq!(seen.len(), 2, "{seen:?}");
-        assert!(seen[0].contains("sub: Some(2)") && seen[0].contains("Name(\"Goblin Fort\")") && seen[0].contains("Int(42)"), "{}", seen[0]);
+        assert!(
+            seen[0].contains("sub: Some(2)")
+                && seen[0].contains("Name(\"Goblin Fort\")")
+                && seen[0].contains("Int(42)"),
+            "{}",
+            seen[0]
+        );
         assert!(seen[1].contains("sub: Some(3)"), "{}", seen[1]);
     }
 
@@ -3269,8 +3492,16 @@ mod tests {
         let start = Start { zone: 230, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let seen: Vec<String> = host.log.iter().filter(|e| matches!(e, Effect::Camera { .. } | Effect::HideBuffs)).map(|e| format!("{e:?}")).collect();
-        assert_eq!(seen[..3], ["Camera { flag: false, offset: None }", "HideBuffs", "Camera { flag: true, offset: None }"]);
+        let seen: Vec<String> = host
+            .log
+            .iter()
+            .filter(|e| matches!(e, Effect::Camera { .. } | Effect::HideBuffs))
+            .map(|e| format!("{e:?}"))
+            .collect();
+        assert_eq!(
+            seen[..3],
+            ["Camera { flag: false, offset: None }", "HideBuffs", "Camera { flag: true, offset: None }"]
+        );
     }
 
     /// The cutscene clock ops reach the host in order with their operands: 0xa9 day val@1, 0x98 (no wait headless),
@@ -3320,11 +3551,20 @@ mod tests {
         let start = Start { zone: 230, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let ops: Vec<(u8, Vec<Arg>)> =
-            host.log.iter().filter_map(|e| if let Effect::Op { op, args, .. } = e { Some((*op, args.clone())) } else { None }).collect();
+        let ops: Vec<(u8, Vec<Arg>)> = host
+            .log
+            .iter()
+            .filter_map(|e| if let Effect::Op { op, args, .. } = e { Some((*op, args.clone())) } else { None })
+            .collect();
         assert_eq!(
             ops[..5],
-            [(0x95, vec![Arg::Int(0)]), (0xa4, vec![Arg::Int(1)]), (0x86, vec![Arg::Int(1), Arg::Actor(PLAYER)]), (0x84, vec![]), (0x96, vec![])],
+            [
+                (0x95, vec![Arg::Int(0)]),
+                (0xa4, vec![Arg::Int(1)]),
+                (0x86, vec![Arg::Int(1), Arg::Actor(PLAYER)]),
+                (0x84, vec![]),
+                (0x96, vec![])
+            ],
             "{ops:?}"
         );
     }
@@ -3368,8 +3608,11 @@ mod tests {
         let start = Start { zone: 230, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let subs: Vec<(Option<u8>, u32)> =
-            host.log.iter().filter_map(|e| if let Effect::Op { op: 0x5f, sub, actor, .. } = e { Some((*sub, *actor)) } else { None }).collect();
+        let subs: Vec<(Option<u8>, u32)> = host
+            .log
+            .iter()
+            .filter_map(|e| if let Effect::Op { op: 0x5f, sub, actor, .. } = e { Some((*sub, *actor)) } else { None })
+            .collect();
         assert_eq!(subs[..2], [(Some(1), actor), (Some(0), actor)]);
     }
 
@@ -3387,7 +3630,9 @@ mod tests {
             .log
             .iter()
             .filter_map(|e| match e {
-                Effect::Op { op: 0xae, sub: Some(0), args, .. } => Some(args.iter().map(|a| if let Arg::Int(i) = a { *i } else { -1 }).collect()),
+                Effect::Op { op: 0xae, sub: Some(0), args, .. } => {
+                    Some(args.iter().map(|a| if let Arg::Int(i) = a { *i } else { -1 }).collect())
+                }
                 _ => None,
             })
             .collect();
@@ -3413,7 +3658,9 @@ mod tests {
             .log
             .iter()
             .filter_map(|e| match e {
-                Effect::Op { op: op @ (0x5f | 0xc1), args, .. } => Some((*op, args.iter().find_map(|a| if let Arg::Actor(x) = a { Some(*x) } else { None }))),
+                Effect::Op { op: op @ (0x5f | 0xc1), args, .. } => {
+                    Some((*op, args.iter().find_map(|a| if let Arg::Actor(x) = a { Some(*x) } else { None })))
+                }
                 _ => None,
             })
             .collect();
@@ -3430,7 +3677,11 @@ mod tests {
         let start = Start { zone: 243, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let subs: Vec<Option<u8>> = host.log.iter().filter_map(|e| if let Effect::Op { op: 0xab, sub, .. } = e { Some(*sub) } else { None }).collect();
+        let subs: Vec<Option<u8>> = host
+            .log
+            .iter()
+            .filter_map(|e| if let Effect::Op { op: 0xab, sub, .. } = e { Some(*sub) } else { None })
+            .collect();
         assert_eq!(subs[..4], [Some(0x0f), Some(0x10), Some(0x12), Some(0x13)]);
     }
 
@@ -3477,8 +3728,13 @@ mod tests {
         let start = Start { zone: 257, event: 1, target: actor, ..Default::default() };
         let mut rt = Runtime::start(blocks, None, start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60).expect("finished");
-        let ids: Vec<Vec<Arg>> =
-            host.log.iter().filter_map(|e| if let Effect::Op { op: 0xcc, sub: Some(0x20), args, .. } = e { Some(args.clone()) } else { None }).collect();
+        let ids: Vec<Vec<Arg>> = host
+            .log
+            .iter()
+            .filter_map(|e| {
+                if let Effect::Op { op: 0xcc, sub: Some(0x20), args, .. } = e { Some(args.clone()) } else { None }
+            })
+            .collect();
         assert_eq!(ids[..2], [vec![Arg::Int(2842)], vec![Arg::Int(0)]]);
     }
 
@@ -3500,7 +3756,10 @@ mod tests {
         let mut rt = Runtime::start(blocks, Dialog::load(&index, 245).ok(), start, Memory::default(), &mut host);
         run_scripted(&mut rt, &mut host, 60 * 60).expect("finished");
         assert!(host.log.iter().any(|e| matches!(e, Effect::Input { kind: 0, max: 16 })));
-        let sent = host.log.iter().find_map(|e| if let Effect::Send(Packet::Passwords { text, .. }) = e { Some(*text) } else { None });
+        let sent = host
+            .log
+            .iter()
+            .find_map(|e| if let Effect::Send(Packet::Passwords { text, .. }) = e { Some(*text) } else { None });
         assert_eq!(&sent.expect("0x060")[..7], b"Tuxedo\0");
     }
 

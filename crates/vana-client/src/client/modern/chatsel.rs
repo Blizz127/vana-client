@@ -85,7 +85,13 @@ pub fn hit(drawn: &Drawn, p: Pos2) -> Option<(usize, usize)> {
 
 fn dist(line: &(usize, Pos2, Arc<Galley>), p: Pos2) -> f32 {
     let (y0, y1) = (line.1.y, line.1.y + line.2.size().y);
-    if p.y < y0 { y0 - p.y } else if p.y > y1 { p.y - y1 } else { 0.0 }
+    if p.y < y0 {
+        y0 - p.y
+    } else if p.y > y1 {
+        p.y - y1
+    } else {
+        0.0
+    }
 }
 
 /// The text of the line under `p`, if any.
@@ -105,7 +111,11 @@ pub fn wash(p: &egui::Painter, m: &Modern, g: &Galley, at: Pos2, (s, e): (usize,
         let x0 = if (r.min.y..=r.max.y).contains(&a.center().y) { a.min.x } else { r.min.x };
         let x1 = if (r.min.y..=r.max.y).contains(&b.center().y) { b.min.x } else { r.max.x };
         if x1 > x0 {
-            p.rect_filled(Rect::from_min_max(pos2(at.x + x0, at.y + r.min.y), pos2(at.x + x1, at.y + r.max.y)), 2.0, colour);
+            p.rect_filled(
+                Rect::from_min_max(pos2(at.x + x0, at.y + r.min.y), pos2(at.x + x1, at.y + r.max.y)),
+                2.0,
+                colour,
+            );
         }
     }
 }
@@ -146,7 +156,8 @@ pub fn log_mouse(m: &Modern, resp: &egui::Response, drawn: &Drawn) -> bool {
 pub fn line_stops(ui: &Ui, pieces: &[(String, bool)], font: &FontId, x0: f32) -> Vec<(usize, f32)> {
     let mut out = vec![(0, x0)];
     let (mut x, mut chars) = (x0, 0);
-    let width = |s: &str| ui.fonts_mut(|f| f.layout_no_wrap(s.to_string(), font.clone(), egui::Color32::WHITE).size().x);
+    let width =
+        |s: &str| ui.fonts_mut(|f| f.layout_no_wrap(s.to_string(), font.clone(), egui::Color32::WHITE).size().x);
     for (text, phrase) in pieces {
         if *phrase {
             x += width(text);

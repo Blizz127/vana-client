@@ -31,7 +31,8 @@ impl Costume {
     pub fn step(&mut self, status: u8, bound: bool) {
         // Table 0x10095fe0 (status - 2), then FUN_10095680 (5), FUN_100956a0 (0x55), FUN_100956c0 (fishing, digging)
         // and FUN_10095790 (chairs): only checked while the costume is on.
-        let blocked = self.on && matches!(status, 2 | 3 | 5 | 6 | 7 | 0x21 | 0x26..=0x2c | 0x2f | 0x30 | 0x32..=0x35 | 0x38..=0x53 | 0x55);
+        let blocked = self.on
+            && matches!(status, 2 | 3 | 5 | 6 | 7 | 0x21 | 0x26..=0x2c | 0x2f | 0x30 | 0x32..=0x35 | 0x38..=0x53 | 0x55);
         let allowed = !blocked && !bound;
         if self.pending {
             if self.id == 0 {
@@ -72,7 +73,8 @@ pub(super) fn step_all(w: &mut World) {
         changes.push((me, applied(&w.costume)));
     }
     w.costumes.retain(|id, _| w.entities.contains_key(id));
-    let ids: Vec<(u32, u8, bool)> = w.costumes.keys().map(|&id| (id, w.entities.get(&id).map_or(0, |e| e.motion.status), bound(w, id))).collect();
+    let ids: Vec<(u32, u8, bool)> =
+        w.costumes.keys().map(|&id| (id, w.entities.get(&id).map_or(0, |e| e.motion.status), bound(w, id))).collect();
     for (id, status, b) in ids {
         let Some(c) = w.costumes.get_mut(&id) else { continue };
         let was = applied(c);

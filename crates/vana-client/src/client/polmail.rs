@@ -89,7 +89,9 @@ pub fn text_events(w: &mut World, events: &[egui::Event]) {
             egui::Event::Key { key: egui::Key::Backspace, pressed: true, .. } => {
                 l.text.pop();
             }
-            egui::Event::Key { key: k @ (egui::Key::Enter | egui::Key::Escape), pressed: true, .. } => done = Some(*k == egui::Key::Enter),
+            egui::Event::Key { key: k @ (egui::Key::Enter | egui::Key::Escape), pressed: true, .. } => {
+                done = Some(*k == egui::Key::Enter)
+            }
             _ => {}
         }
     }
@@ -133,7 +135,9 @@ pub fn list_up(w: &World) -> bool {
 fn refresh(w: &mut World) {
     let Some((_, top, cursor, from)) = w.polmail.list.clone() else { return };
     let mut rows = vec![String::new()];
-    rows.extend(w.friends.mail.iter().filter(|m| m.unread && from.is_none_or(|f| m.header.from == f)).map(|m| m.name.clone()));
+    rows.extend(
+        w.friends.mail.iter().filter(|m| m.unread && from.is_none_or(|f| m.header.from == f)).map(|m| m.name.clone()),
+    );
     let n = rows.len();
     w.polmail.list = Some((rows, top.min(n.saturating_sub(ROWS)), cursor.min(n - 1), from));
 }
@@ -187,7 +191,11 @@ pub(super) fn type_label(kind: u8) -> &'static str {
 
 /// From: the name we list them under, else the header's sender.
 pub(super) fn from_name(w: &World, m: &friends::Mail) -> String {
-    w.friends.list.iter().find(|f| f.account == m.header.from).map_or_else(|| m.header.sender.clone(), |f| f.name.clone())
+    w.friends
+        .list
+        .iter()
+        .find(|f| f.account == m.header.from)
+        .map_or_else(|| m.header.sender.clone(), |f| f.name.clone())
 }
 
 /// Read (LAB_10200de0): [OTR] -> 7 0x60; else From / Title / Message to the log in mode 0x12 (the built-in title
@@ -433,23 +441,43 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let keys = |w: &mut World, _: &GameUi, k: egui::Key| key(w, k);
     if let Some((_, frnd, c)) = w.polmail.read.clone() {
         let name = if frnd { FRND } else { RCV };
-        super::winhits::generic(w, gu, name, c, 1..=4, p, moved, clicked, right, |w, id| {
-            if let Some(r) = w.polmail.read.as_mut() {
-                r.2 = id;
-            }
-        }, keys);
+        super::winhits::generic(
+            w,
+            gu,
+            name,
+            c,
+            1..=4,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(r) = w.polmail.read.as_mut() {
+                    r.2 = id;
+                }
+            },
+            keys,
+        );
         return;
     }
     let Some((rows, top, cursor, _)) = w.polmail.list.clone() else { return };
     let (Some((x, y)), Some(lay)) = (gu.window_xy(LIST, sw, sh), gu.layout(LIST)) else { return };
-    if gu.window_rect(LIST, sw, sh).is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh) {
+    if gu
+        .window_rect(LIST, sw, sh)
+        .is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh)
+    {
         gu.hover.set(true);
         if right {
             key(w, egui::Key::Escape);
             return;
         }
     }
-    let inside = |e: &crate::dat::ui::MenuElement| p.0 >= x + e.x as f32 && p.0 < x + e.x as f32 + e.w as f32 && p.1 >= y + e.y as f32 && p.1 < y + e.y as f32 + e.h as f32;
+    let inside = |e: &crate::dat::ui::MenuElement| {
+        p.0 >= x + e.x as f32
+            && p.0 < x + e.x as f32 + e.w as f32
+            && p.1 >= y + e.y as f32
+            && p.1 < y + e.y as f32 + e.h as f32
+    };
     let Some(e) = lay.elements.iter().skip(1).find(|e| inside(e)) else { return };
     let row = top + e.id as usize - 1;
     if row >= rows.len() {

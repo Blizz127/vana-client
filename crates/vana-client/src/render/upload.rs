@@ -4,8 +4,8 @@
 //! The rate is measured as the copies go, so faster machines get more a frame.
 
 use super::Gpu;
-use std::time::Instant;
 use super::Put;
+use std::time::Instant;
 
 /// Copy time a frame in the world, and while the zone indicator is up.
 pub const FRAME_MS: f64 = 2.0;
@@ -61,15 +61,24 @@ impl Gpu {
 
 /// Level 0 of an image as it goes up: the file's DXT blocks as BC1 / BC2 when the device samples them (both sides
 /// a multiple of 4), else RGBA. (kind, format, data, bytes per block row, block rows, texel rows per block row).
-pub fn level0<'a>(gpu: &Gpu, t: &'a crate::dat::zone::Texture, srgb: bool) -> (super::mipgen::Kind, wgpu::TextureFormat, &'a [u8], u32, u32, u32) {
+pub fn level0<'a>(
+    gpu: &Gpu,
+    t: &'a crate::dat::zone::Texture,
+    srgb: bool,
+) -> (super::mipgen::Kind, wgpu::TextureFormat, &'a [u8], u32, u32, u32) {
     use super::mipgen::Kind;
     use wgpu::TextureFormat as F;
     let (w, h) = (t.width, t.height);
     let pick = |s: F, u: F| if srgb { s } else { u };
-    let bc = gpu.device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC) && !super::UNCOMPRESSED.load(std::sync::atomic::Ordering::Relaxed);
+    let bc = gpu.device.features().contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
+        && !super::UNCOMPRESSED.load(std::sync::atomic::Ordering::Relaxed);
     match &t.dxt {
-        Some((true, b)) if bc && w % 4 == 0 && h % 4 == 0 => (Kind::Bc2, pick(F::Bc2RgbaUnormSrgb, F::Bc2RgbaUnorm), b.as_slice(), w / 4 * 16, h / 4, 4),
-        Some((false, b)) if bc && w % 4 == 0 && h % 4 == 0 => (Kind::Bc1, pick(F::Bc1RgbaUnormSrgb, F::Bc1RgbaUnorm), b.as_slice(), w / 4 * 8, h / 4, 4),
+        Some((true, b)) if bc && w % 4 == 0 && h % 4 == 0 => {
+            (Kind::Bc2, pick(F::Bc2RgbaUnormSrgb, F::Bc2RgbaUnorm), b.as_slice(), w / 4 * 16, h / 4, 4)
+        }
+        Some((false, b)) if bc && w % 4 == 0 && h % 4 == 0 => {
+            (Kind::Bc1, pick(F::Bc1RgbaUnormSrgb, F::Bc1RgbaUnorm), b.as_slice(), w / 4 * 8, h / 4, 4)
+        }
         _ => (Kind::Rgba, pick(F::Rgba8UnormSrgb, F::Rgba8Unorm), t.rgba.as_slice(), w * 4, h, 1),
     }
 }
@@ -110,12 +119,21 @@ impl TexUp {
         let (_, _, data, ..) = level0(gpu, t, self.srgb);
         while self.done < self.rows && (all || gpu.upload_room() > 0) {
             let left = self.rows - self.done;
-            let n = if all { left } else { (gpu.piece(left as u64 * self.row as u64, self.row as u64) / self.row as u64) as u32 };
+            let n = if all {
+                left
+            } else {
+                (gpu.piece(left as u64 * self.row as u64, self.row as u64) / self.row as u64) as u32
+            };
             let at = (self.done * self.row) as usize;
             let len = (n * self.row) as usize;
             gpu.upload(len as u64, || {
                 gpu.queue.write_texture(
-                    wgpu::TexelCopyTextureInfo { texture: &self.texture, mip_level: 0, origin: wgpu::Origin3d { x: 0, y: self.done * self.block_h, z: 0 }, aspect: wgpu::TextureAspect::All },
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &self.texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d { x: 0, y: self.done * self.block_h, z: 0 },
+                        aspect: wgpu::TextureAspect::All,
+                    },
                     &data[at..at + len],
                     wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(self.row), rows_per_image: Some(n) },
                     wgpu::Extent3d { width: t.width, height: n * self.block_h, depth_or_array_layers: 1 },
@@ -123,7 +141,12 @@ impl TexUp {
             });
             self.done += n;
         }
-        (self.done >= self.rows).then(|| gpu.mips.lock().map(|mut m| m.push(self.texture.clone(), t.width, t.height, self.kind, !self.srgb)).unwrap_or(0))
+        (self.done >= self.rows).then(|| {
+            gpu.mips
+                .lock()
+                .map(|mut m| m.push(self.texture.clone(), t.width, t.height, self.kind, !self.srgb))
+                .unwrap_or(0)
+        })
     }
 }
 

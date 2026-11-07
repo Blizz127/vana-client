@@ -77,7 +77,8 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     });
     let Some(e) = hit else { return };
     gu.hover.set(true);
-    if (moved || clicked) && e.id != sel
+    if (moved || clicked)
+        && e.id != sel
         && let Some(b) = w.bazaar.as_mut()
     {
         b.sel = e.id;
@@ -90,7 +91,14 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
 /// The window as the modern page draws it.
 pub(super) fn view(w: &World) -> Option<super::modern::MenuWin> {
     let b = w.bazaar.as_ref()?;
-    Some(super::modern::MenuWin { name: WIN, sel: b.sel, off: Vec::new(), labels: Vec::new(), marked: Vec::new(), values: Vec::new() })
+    Some(super::modern::MenuWin {
+        name: WIN,
+        sel: b.sel,
+        off: Vec::new(),
+        labels: Vec::new(),
+        marked: Vec::new(),
+        values: Vec::new(),
+    })
 }
 
 /// The window, unfocused while the list or the editor is up (it stays where it is: group 0x81 shares nothing with them).

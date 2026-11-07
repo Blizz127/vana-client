@@ -193,7 +193,10 @@ pub fn rows(w: &World) -> Vec<Row> {
                 continue;
             }
             let e = ext(w, bag, s.index);
-            let num = worn.iter().position(|x| x.is_some_and(|(sl, b, _)| (sl, b) == (s.index, bag))).map_or(0, |k| k as u8 + 1);
+            let num = worn
+                .iter()
+                .position(|x| x.is_some_and(|(sl, b, _)| (sl, b) == (s.index, bag)))
+                .map_or(0, |k| k as u8 + 1);
             let mut name_tint = if num != 0 { GREEN } else { WHITE };
             if worn_elsewhere(w, s.index, bag, group(&e)) {
                 name_tint = GREY;
@@ -312,7 +315,10 @@ fn mode_of(n: u8) -> u8 {
 fn push_line(w: &mut World, line: String, mode: u8) {
     let Some(bt) = w.battle.clone() else { return };
     let names = w.names.clone();
-    let line = bt.phrases.as_ref().map_or(line.clone(), |d| d.expand(&line, names.as_deref().map(|n| n as &dyn crate::dat::names::NameSource)));
+    let line = bt
+        .phrases
+        .as_ref()
+        .map_or(line.clone(), |d| d.expand(&line, names.as_deref().map(|n| n as &dyn crate::dat::names::NameSource)));
     let colour = bt.colour_in(mode, &w.game);
     w.chat.push_colour(line, colour);
 }
@@ -339,7 +345,9 @@ fn level_line(w: &mut World, n: u8, level: u8) {
     if n == 7 {
         return super::textcmd::refuse(w, 0x9c);
     }
-    let Some(line) = w.battle.as_ref().and_then(|b| b.group9(0xbc + level as usize).filter(|_| level < 3)) else { return };
+    let Some(line) = w.battle.as_ref().and_then(|b| b.group9(0xbc + level as usize).filter(|_| level < 3)) else {
+        return;
+    };
     push_line(w, line, 0xcd);
 }
 
@@ -641,7 +649,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
             w.sounds.push(Ui::Cursor as u32);
         }
         egui::Key::ArrowRight | egui::Key::ArrowLeft => {
-            let m = if key == egui::Key::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+            let m = if key == egui::Key::ArrowRight {
+                super::scrollbar::Msg::PageDown
+            } else {
+                super::scrollbar::Msg::PageUp
+            };
             if super::scrollbar::rows_abs(m, &mut l.top, &mut l.cursor, n, ROWS) {
                 w.sounds.push(Ui::Cursor as u32);
             }
@@ -821,7 +833,9 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     let Some(e) = lay.elements.iter().skip(1).filter(|e| e.links[2] != 0xff).find(|e| {
         let (ex, ey) = (x + e.x as f32, y + e.y as f32);
         p.0 >= ex && p.0 < ex + e.w as f32 && p.1 >= ey && p.1 < ey + e.h as f32
-    }) else { return };
+    }) else {
+        return;
+    };
     if name == LIST && l.top + e.id as usize > n {
         return;
     }
@@ -940,7 +954,8 @@ pub(super) fn modern_view(w: &World) -> Option<(Vec<(Row, String, u32)>, usize, 
         .into_iter()
         .map(|r| {
             let e = ext(w, r.bag, r.slot);
-            let (name, t) = if group(&e) == 0 { (String::new(), tint(7, 7, 7)) } else { (ls_name(&e[9..24]), shell_tint(&e)) };
+            let (name, t) =
+                if group(&e) == 0 { (String::new(), tint(7, 7, 7)) } else { (ls_name(&e[9..24]), shell_tint(&e)) };
             (r, name, t)
         })
         .collect();

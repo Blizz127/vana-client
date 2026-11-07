@@ -2,6 +2,7 @@
 //! as FFXiMain does, then drawn with the matching D3D8 blend states (gamma-space, Rgba8Unorm target).
 //! Generic FUN_10286450, Sampling FUN_1028e980, Aniso FUN_1028eca0; texgen dispatch FUN_102808d0.
 
+use super::Put;
 use super::{Gpu, depth_view};
 use crate::dat::dancer::{Model, Skinned};
 use crate::dat::zone::Texture;
@@ -10,7 +11,6 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Mat4, Vec3};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
-use super::Put;
 
 const BAD: u32 = 0xEFBE_DDBA;
 
@@ -116,14 +116,21 @@ pub fn build_draws(m: &Model, sk: &[Skinned], eye: Vec3, fwd: Vec3, lights: &[Li
         // "_sort" shapes: each listed-triangle run in descending (P0 + P1 + P2 - 3 eye) . fwd, i.e. back to front.
         let mut tris = s.tris.clone();
         if s.sorted {
-            let key = |t: &[u32; 3]| (k.pos[t[0] as usize] + k.pos[t[1] as usize] + k.pos[t[2] as usize] - 3.0 * eye).dot(fwd);
+            let key = |t: &[u32; 3]| {
+                (k.pos[t[0] as usize] + k.pos[t[1] as usize] + k.pos[t[2] as usize] - 3.0 * eye).dot(fwd)
+            };
             for &(a, n) in &s.list_runs {
                 tris[a..a + n].sort_by(|x, y| key(y).total_cmp(&key(x)));
             }
         }
         let indices = std::sync::Arc::new(tris.iter().flatten().copied().collect::<Vec<u32>>());
         let n = k.pos.len();
-        let vert = |i: usize, uv1: [f32; 2], col: [f32; 4]| DVertex { pos: k.pos[i].to_array(), uv0: s.uv[i], uv1, col: col8(col) };
+        let vert = |i: usize, uv1: [f32; 2], col: [f32; 4]| DVertex {
+            pos: k.pos[i].to_array(),
+            uv0: s.uv[i],
+            uv1,
+            col: col8(col),
+        };
         let push = |out: &mut Vec<DDraw>, verts, tex0, tex1, blend, zwrite, op0, op1, aref| {
             out.push(DDraw { verts, indices: indices.clone(), tex0, tex1, blend, zwrite, op0, op1, aref })
         };
@@ -138,23 +145,46 @@ pub fn build_draws(m: &Model, sk: &[Skinned], eye: Vec3, fwd: Vec3, lights: &[Li
                 let alpha = 1.0 - wf(w, 0x11);
                 let lit: Vec<[f32; 4]> = (0..k.pos.len())
                     .map(|i| {
-                        let c = if w[0x26] != 0 { d3d_light(k.normal[i], col * amb, col * kd, lights) } else { Vec3::ONE };
+                        let c =
+                            if w[0x26] != 0 { d3d_light(k.normal[i], col * amb, col * kd, lights) } else { Vec3::ONE };
                         [c.x, c.y, c.z, alpha]
                     })
                     .collect();
                 let ct = wt(w, 0x13);
                 let blend = if has_alpha(ct) && uam & 1 != 0 { Blend::Alpha } else { Blend::Opaque };
-                push(out, (0..n).map(|i| vert(i, [0.0; 2], lit[i])).collect(), tname(ct), None, blend, true, 0, 0, -1.0);
+                push(
+                    out,
+                    (0..n).map(|i| vert(i, [0.0; 2], lit[i])).collect(),
+                    tname(ct),
+                    None,
+                    blend,
+                    true,
+                    0,
+                    0,
+                    -1.0,
+                );
                 let mut op = 0;
                 if let Some(env) = wt(w, 0x14) {
                     let b = if uam & 4 != 0 { Blend::DstAlphaAdd } else { Blend::Add };
-                    let v = (0..n).map(|i| DVertex { uv0: env_uv(k.pos[i], k.normal[i], eye), ..vert(i, [0.0; 2], [1.0; 4]) }).collect();
+                    let v = (0..n)
+                        .map(|i| DVertex { uv0: env_uv(k.pos[i], k.normal[i], eye), ..vert(i, [0.0; 2], [1.0; 4]) })
+                        .collect();
                     push(out, v, tname(Some(env)), None, b, true, 1, 0, -1.0);
                     op = 1;
                 }
                 let mask = wt(w, 0x17);
                 if mask.is_some() {
-                    push(out, (0..n).map(|i| vert(i, [0.0; 2], [1.0; 4])).collect(), tname(mask), None, Blend::AlphaOnly, true, 1, 0, -1.0);
+                    push(
+                        out,
+                        (0..n).map(|i| vert(i, [0.0; 2], [1.0; 4])).collect(),
+                        tname(mask),
+                        None,
+                        Blend::AlphaOnly,
+                        true,
+                        1,
+                        0,
+                        -1.0,
+                    );
                     op = 1;
                 }
                 if let Some(ph) = wt(w, 0x16) {
@@ -192,7 +222,17 @@ pub fn build_draws(m: &Model, sk: &[Skinned], eye: Vec3, fwd: Vec3, lights: &[Li
                     .collect();
                 let ct = wt(w, 0x14);
                 let blend = if has_alpha(ct) && uam & 1 != 0 { Blend::Alpha } else { Blend::Opaque };
-                push(out, (0..n).map(|i| vert(i, [0.0; 2], lit[i])).collect(), tname(ct), None, blend, true, 0, 0, -1.0);
+                push(
+                    out,
+                    (0..n).map(|i| vert(i, [0.0; 2], lit[i])).collect(),
+                    tname(ct),
+                    None,
+                    blend,
+                    true,
+                    0,
+                    0,
+                    -1.0,
+                );
                 if let Some(ph) = wt(w, 0x15).filter(|_| wf(w, 0x58) > 0.001) {
                     let b = if uam & 2 != 0 { Blend::DstAlphaAdd } else { Blend::Add };
                     let v = (0..n)
@@ -343,27 +383,51 @@ pub struct DancerRenderer {
 impl DancerRenderer {
     pub fn new(gpu: &Gpu, format: wgpu::TextureFormat) -> Self {
         let device = &gpu.device;
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("dancer"), source: wgpu::ShaderSource::Wgsl(WGSL.into()) });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("dancer"),
+            source: wgpu::ShaderSource::Wgsl(WGSL.into()),
+        });
         let ubl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: None,
+                },
                 count: None,
             }],
         });
         let tex_entry = |b| wgpu::BindGroupLayoutEntry {
             binding: b,
             visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
             count: None,
         };
         let tbl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            entries: &[tex_entry(0), tex_entry(1), wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None }],
+            entries: &[
+                tex_entry(0),
+                tex_entry(1),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
         });
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: None, bind_group_layouts: &[Some(&ubl), Some(&tbl)], immediate_size: 0 });
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[Some(&ubl), Some(&tbl)],
+            immediate_size: 0,
+        });
         let sampler = super::mip_sampler(device);
         let white = Self::make(gpu, 1, 1, &[255; 4]);
         Self {
@@ -443,7 +507,10 @@ impl DancerRenderer {
             .get_or_insert_with(|| {
                 use wgpu::{BlendComponent as C, BlendFactor as F, BlendOperation as O};
                 let attrs = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x2, 3 => Unorm8x4];
-                let blend = wgpu::BlendState { color: C { src_factor: F::Zero, dst_factor: F::Src, operation: O::Add }, alpha: C { src_factor: F::Zero, dst_factor: F::One, operation: O::Add } };
+                let blend = wgpu::BlendState {
+                    color: C { src_factor: F::Zero, dst_factor: F::Src, operation: O::Add },
+                    alpha: C { src_factor: F::Zero, dst_factor: F::One, operation: O::Add },
+                };
                 gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("dancer shadow"),
                     layout: Some(layout),
@@ -451,7 +518,11 @@ impl DancerRenderer {
                         module: shader,
                         entry_point: Some("vs_shadow"),
                         compilation_options: Default::default(),
-                        buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<DVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &attrs })],
+                        buffers: &[Some(wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<DVertex>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &attrs,
+                        })],
                     },
                     primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
                     depth_stencil: Some(wgpu::DepthStencilState {
@@ -462,7 +533,16 @@ impl DancerRenderer {
                         bias: Default::default(),
                     }),
                     multisample: Default::default(),
-                    fragment: Some(wgpu::FragmentState { module: shader, entry_point: Some("fs_shadow"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend: Some(blend), write_mask: wgpu::ColorWrites::ALL })] }),
+                    fragment: Some(wgpu::FragmentState {
+                        module: shader,
+                        entry_point: Some("fs_shadow"),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(blend),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
                     multiview_mask: None,
                     cache: None,
                 })
@@ -484,7 +564,11 @@ impl DancerRenderer {
                         module: shader,
                         entry_point: Some("vs"),
                         compilation_options: Default::default(),
-                        buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<DVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &attrs })],
+                        buffers: &[Some(wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<DVertex>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &attrs,
+                        })],
                     },
                     // cull = 1 on every creator shader: no face culling (FUN_1027a410 CULLMODE).
                     primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
@@ -496,7 +580,12 @@ impl DancerRenderer {
                         bias: Default::default(),
                     }),
                     multisample: Default::default(),
-                    fragment: Some(wgpu::FragmentState { module: shader, entry_point: Some("fs"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format, blend, write_mask })] }),
+                    fragment: Some(wgpu::FragmentState {
+                        module: shader,
+                        entry_point: Some("fs"),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState { format, blend, write_mask })],
+                    }),
                     multiview_mask: None,
                     cache: None,
                 })
@@ -507,14 +596,30 @@ impl DancerRenderer {
     /// Draws over what is in `view`, clearing only depth as the dancer does (FUN_10245ab0).
     /// `coverage` adds the alpha-only pass that marks the model for a transparent background.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw(&mut self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, depth: &wgpu::TextureView, view_proj: Mat4, draws: &[DDraw], coverage: bool) {
+    pub fn draw(
+        &mut self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+        view_proj: Mat4,
+        draws: &[DDraw],
+        coverage: bool,
+    ) {
         self.prepare(gpu, encoder, view_proj, draws, coverage);
         self.draw_prepared(encoder, view, depth);
     }
 
     /// Uploads one pose's passes: all vertices in one buffer, uniforms in one buffer at dynamic offsets,
     /// texture bind groups cached by name. `draw_prepared` then replays them until the next prepare.
-    pub fn prepare(&mut self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder, view_proj: Mat4, draws: &[DDraw], coverage: bool) {
+    pub fn prepare(
+        &mut self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        view_proj: Mat4,
+        draws: &[DDraw],
+        coverage: bool,
+    ) {
         let mut list: Vec<(&DDraw, u32, Blend, bool)> = draws.iter().map(|d| (d, d.op0, d.blend, d.zwrite)).collect();
         if coverage {
             list.extend(draws.iter().filter(|d| d.op0 == 0 && d.zwrite).map(|d| (d, 2, Blend::AlphaOnly, false)));
@@ -529,14 +634,27 @@ impl DancerRenderer {
         let mut last_idx: Option<(&std::sync::Arc<Vec<u32>>, std::ops::Range<u32>)> = None;
         let uniform = |ubytes: &mut Vec<u8>, op: [f32; 4], light: [f32; 4]| {
             let off = ubytes.len() as u32;
-            ubytes.extend_from_slice(bytemuck::bytes_of(&DUniforms { view_proj: view_proj.to_cols_array_2d(), op, light }));
+            ubytes.extend_from_slice(bytemuck::bytes_of(&DUniforms {
+                view_proj: view_proj.to_cols_array_2d(),
+                op,
+                light,
+            }));
             ubytes.resize(ubytes.len().next_multiple_of(UNIFORM_STRIDE), 0);
             off
         };
-        let shadow_u = self.shadow.map(|sh| uniform(&mut ubytes, [sh.mult[0], sh.mult[1], sh.mult[2], 0.0], [sh.light.x, sh.light.y, sh.light.z, 0.0]));
+        let shadow_u = self.shadow.map(|sh| {
+            uniform(&mut ubytes, [sh.mult[0], sh.mult[1], sh.mult[2], 0.0], [sh.light.x, sh.light.y, sh.light.z, 0.0])
+        });
         for (d, op0, blend, zwrite) in list {
-            let key = (d.tex0.clone().filter(|n| self.views.contains_key(n)), d.tex1.clone().filter(|n| self.views.contains_key(n)));
-            let uoff = uniform(&mut ubytes, [op0 as f32, d.op1 as f32, d.aref, if key.0.is_some() { 1.0 } else { 0.0 }], [0.0; 4]);
+            let key = (
+                d.tex0.clone().filter(|n| self.views.contains_key(n)),
+                d.tex1.clone().filter(|n| self.views.contains_key(n)),
+            );
+            let uoff = uniform(
+                &mut ubytes,
+                [op0 as f32, d.op1 as f32, d.aref, if key.0.is_some() { 1.0 } else { 0.0 }],
+                [0.0; 4],
+            );
             self.tex_group(gpu, &key);
             // Passes of one shape share its index list.
             let idx = match &last_idx {
@@ -558,7 +676,13 @@ impl DancerRenderer {
             {
                 let none: TexKey = (None, None);
                 self.tex_group(gpu, &none);
-                shadow_calls.push(Call { pipe: self.shadow_pipeline(gpu), key: none, uoff: su, idx: idx.clone(), base });
+                shadow_calls.push(Call {
+                    pipe: self.shadow_pipeline(gpu),
+                    key: none,
+                    uoff: su,
+                    idx: idx.clone(),
+                    base,
+                });
             }
             calls.push(Call { pipe: self.pipeline(gpu, blend, zwrite), key, uoff, idx, base });
         }
@@ -574,11 +698,22 @@ impl DancerRenderer {
         // mapped_at_creation / queue.write_buffer cost ~16 ms per 2.5 MB pose here).
         let vbytes: &[u8] = bytemuck::cast_slice(&verts);
         let ibytes: &[u8] = bytemuck::cast_slice(&indices);
-        let old = self.prepared.take().filter(|p| p.vb.size() >= vbytes.len() as u64 && p.ib.size() >= ibytes.len() as u64 && p.ub.size() >= ubytes.len() as u64);
+        let old = self.prepared.take().filter(|p| {
+            p.vb.size() >= vbytes.len() as u64
+                && p.ib.size() >= ibytes.len() as u64
+                && p.ub.size() >= ubytes.len() as u64
+        });
         let (vb, ib, ub, ug) = match old {
             Some(p) => (p.vb, p.ib, p.ub, p.ug),
             None => {
-                let buf = |label, len: usize, usage| device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size: (len.next_power_of_two().max(256)) as u64, usage: usage | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+                let buf = |label, len: usize, usage| {
+                    device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some(label),
+                        size: (len.next_power_of_two().max(256)) as u64,
+                        usage: usage | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    })
+                };
                 let vb = buf("dancer verts", vbytes.len(), wgpu::BufferUsages::VERTEX);
                 let ib = buf("dancer indices", ibytes.len(), wgpu::BufferUsages::INDEX);
                 let ub = buf("dancer uniforms", ubytes.len(), wgpu::BufferUsages::UNIFORM);
@@ -586,7 +721,10 @@ impl DancerRenderer {
                 let ug = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: None,
                     layout: &self.ubl,
-                    entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &ub, offset: 0, size }) }],
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &ub, offset: 0, size }),
+                    }],
                 });
                 (vb, ib, ub, ug)
             }
@@ -603,10 +741,20 @@ impl DancerRenderer {
     }
 
     /// Replays the last `prepare` over `view`, clearing depth only.
-    pub fn draw_prepared(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, depth: &wgpu::TextureView) {
+    pub fn draw_prepared(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+    ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("dancer"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+            })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth,
                 depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
@@ -651,7 +799,15 @@ struct Prepared {
 }
 
 /// Renders the draws to an RGBA PNG.
-pub fn render_png(textures: &[Texture], draws: &[DDraw], view_proj: Mat4, bg: &Background, width: u32, height: u32, path: &std::path::Path) -> Result<()> {
+pub fn render_png(
+    textures: &[Texture],
+    draws: &[DDraw],
+    view_proj: Mat4,
+    bg: &Background,
+    width: u32,
+    height: u32,
+    path: &std::path::Path,
+) -> Result<()> {
     let gpu = Gpu::headless()?;
     let device = &gpu.device;
     let format = wgpu::TextureFormat::Rgba8Unorm;
@@ -670,7 +826,12 @@ pub fn render_png(textures: &[Texture], draws: &[DDraw], view_proj: Mat4, bg: &B
     if let Background::Image(rgba) = bg {
         anyhow::ensure!(rgba.len() == (width * height * 4) as usize, "backdrop size does not match the output");
         gpu.queue.write_texture(
-            wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+            wgpu::TexelCopyTextureInfo {
+                texture: &target,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
             rgba,
             wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(width * 4), rows_per_image: Some(height) },
             wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
@@ -687,7 +848,12 @@ pub fn render_png(textures: &[Texture], draws: &[DDraw], view_proj: Mat4, bg: &B
     if let Some(c) = clear {
         enc.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("dancer clear"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment { view: &view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(c), store: wgpu::StoreOp::Store } })],
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(c), store: wgpu::StoreOp::Store },
+            })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
@@ -696,10 +862,23 @@ pub fn render_png(textures: &[Texture], draws: &[DDraw], view_proj: Mat4, bg: &B
     }
     r.draw(&gpu, &mut enc, &view, &depth, view_proj, draws, matches!(bg, Background::Transparent));
     let row = (width * 4).div_ceil(256) * 256;
-    let readback = device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (row * height) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+    let readback = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: (row * height) as u64,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
     enc.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo { texture: &target, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
-        wgpu::TexelCopyBufferInfo { buffer: &readback, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(height) } },
+        wgpu::TexelCopyTextureInfo {
+            texture: &target,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &readback,
+            layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(height) },
+        },
         wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
     );
     gpu.queue.submit([enc.finish()]);
@@ -968,7 +1147,14 @@ impl DancerGpu {
                     // Unskinned shapes (no skin lists) keep the bind pose; a skinned vertex with no list sums to zero.
                     let count = if s.skin.is_empty() { 0 } else { lists[v].len() as u32 };
                     let (at, count) = if !s.skin.is_empty() && count == 0 { (at, u32::MAX) } else { (at, count) };
-                    verts.push(SVertex { pos: s.pos[v].to_array(), normal: s.normal[v].to_array(), tangent: t0[v].to_array(), binormal: b0[v].to_array(), uv: s.uv[v], inf: [at, count] });
+                    verts.push(SVertex {
+                        pos: s.pos[v].to_array(),
+                        normal: s.normal[v].to_array(),
+                        tangent: t0[v].to_array(),
+                        binormal: b0[v].to_array(),
+                        uv: s.uv[v],
+                        inf: [at, count],
+                    });
                 }
                 let first = indices.len() as u32;
                 indices.extend(s.tris.iter().flatten());
@@ -993,9 +1179,15 @@ impl DancerGpu {
             indices.push(0);
         }
         let d = &gpu.device;
-        let buf = |label, contents: &[u8], usage| d.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage });
+        let buf = |label, contents: &[u8], usage| {
+            d.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage })
+        };
         let vb = buf("dancer shapes", bytemuck::cast_slice(&verts), wgpu::BufferUsages::VERTEX);
-        let ib = buf("dancer triangles", bytemuck::cast_slice(&indices), wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST);
+        let ib = buf(
+            "dancer triangles",
+            bytemuck::cast_slice(&indices),
+            wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        );
         let inf = buf("dancer influences", bytemuck::cast_slice(&inf), wgpu::BufferUsages::STORAGE);
         let joint_base = [0, models[0].bones.len() as u32];
         DancerGpu { vb, ib, inf, joints: None, ub: None, ranges, passes, joint_base, calls: Vec::new() }
@@ -1004,7 +1196,8 @@ impl DancerGpu {
     /// Writes the frame's joints, uniforms and sorted triangle orders (all small).
     pub fn update(&mut self, gpu: &Gpu, r: &mut DancerRenderer, f: &GFrame, coverage: bool) {
         let d = &gpu.device;
-        let mut mats: Vec<[[f32; 4]; 4]> = f.joints[0].iter().chain(f.joints[1]).map(|m| m.to_cols_array_2d()).collect();
+        let mut mats: Vec<[[f32; 4]; 4]> =
+            f.joints[0].iter().chain(f.joints[1]).map(|m| m.to_cols_array_2d()).collect();
         if mats.is_empty() {
             mats.push(Mat4::IDENTITY.to_cols_array_2d());
         }
@@ -1012,11 +1205,19 @@ impl DancerGpu {
         let jbytes: &[u8] = bytemuck::cast_slice(&mats);
         if self.joints.as_ref().is_none_or(|(_, _, c)| *c < jbytes.len() as u64) {
             let cap = (jbytes.len() as u64).next_power_of_two().max(4096);
-            let jb = d.create_buffer(&wgpu::BufferDescriptor { label: Some("dancer joints"), size: cap, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let jb = d.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("dancer joints"),
+                size: cap,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             let g = d.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
                 layout: r.storage_layout(gpu),
-                entries: &[wgpu::BindGroupEntry { binding: 0, resource: jb.as_entire_binding() }, wgpu::BindGroupEntry { binding: 1, resource: self.inf.as_entire_binding() }],
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: jb.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: self.inf.as_entire_binding() },
+                ],
             });
             self.joints = Some((jb, g, cap));
         }
@@ -1039,7 +1240,8 @@ impl DancerGpu {
         let mut ubytes = Vec::new();
         let mut calls = Vec::new();
         let mut shadow_calls = Vec::new();
-        let mut list: Vec<(&GPass, u32, Blend, bool)> = self.passes.iter().map(|p| (p, p.op0, p.blend, p.zwrite)).collect();
+        let mut list: Vec<(&GPass, u32, Blend, bool)> =
+            self.passes.iter().map(|p| (p, p.op0, p.blend, p.zwrite)).collect();
         if coverage {
             list.extend(self.passes.iter().filter(|p| p.op0 == 0 && p.zwrite).map(|p| (p, 2, Blend::AlphaOnly, false)));
         }
@@ -1049,7 +1251,12 @@ impl DancerGpu {
                 view_proj: f.view_proj.to_cols_array_2d(),
                 op,
                 light,
-                kind: [p.kind as f32, self.joint_base[p.model] as f32, if p.model == 0 { f.scale } else { 1.0 }, p.alpha],
+                kind: [
+                    p.kind as f32,
+                    self.joint_base[p.model] as f32,
+                    if p.model == 0 { f.scale } else { 1.0 },
+                    p.alpha,
+                ],
                 root: [f.root.x, f.root.y, f.root.z, 0.0],
                 p0: p.p0,
                 p1: p.p1,
@@ -1064,7 +1271,10 @@ impl DancerGpu {
             off
         };
         for (p, op0, blend, zwrite) in list {
-            let key = (p.tex.0.clone().filter(|n| r.views.contains_key(n)), p.tex.1.clone().filter(|n| r.views.contains_key(n)));
+            let key = (
+                p.tex.0.clone().filter(|n| r.views.contains_key(n)),
+                p.tex.1.clone().filter(|n| r.views.contains_key(n)),
+            );
             let Some((base, idx)) = self.ranges.get(p.model).and_then(|x| x.get(p.shape)).cloned() else { continue };
             if idx.is_empty() {
                 continue;
@@ -1072,21 +1282,35 @@ impl DancerGpu {
             if let Some(sh) = shadow.filter(|_| p.shadow && op0 == 0 && blend != Blend::AlphaOnly && zwrite) {
                 let none: TexKey = (None, None);
                 r.tex_group(gpu, &none);
-                let uoff = uniform(p, [sh.mult[0], sh.mult[1], sh.mult[2], 0.0], [sh.light.x, sh.light.y, sh.light.z, 0.0]);
+                let uoff =
+                    uniform(p, [sh.mult[0], sh.mult[1], sh.mult[2], 0.0], [sh.light.x, sh.light.y, sh.light.z, 0.0]);
                 shadow_calls.push(Call { pipe: r.gpu_shadow_pipeline(gpu), key: none, uoff, idx: idx.clone(), base });
             }
-            let uoff = uniform(p, [op0 as f32, p.op1 as f32, p.aref, if key.0.is_some() { 1.0 } else { 0.0 }], [0.0; 4]);
+            let uoff =
+                uniform(p, [op0 as f32, p.op1 as f32, p.aref, if key.0.is_some() { 1.0 } else { 0.0 }], [0.0; 4]);
             r.tex_group(gpu, &key);
             calls.push(Call { pipe: r.gpu_pipeline(gpu, blend, zwrite), key, uoff, idx, base });
         }
         shadow_calls.append(&mut calls);
         if self.ub.as_ref().is_none_or(|(_, _, c)| *c < ubytes.len() as u64) {
             let cap = (ubytes.len() as u64).next_power_of_two().max(GSTRIDE as u64);
-            let ub = d.create_buffer(&wgpu::BufferDescriptor { label: Some("dancer pass uniforms"), size: cap, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let ub = d.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("dancer pass uniforms"),
+                size: cap,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             let g = d.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
                 layout: &r.ubl,
-                entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer: &ub, offset: 0, size: wgpu::BufferSize::new(std::mem::size_of::<GUniforms>() as u64) }) }],
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &ub,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<GUniforms>() as u64),
+                    }),
+                }],
             });
             self.ub = Some((ub, g, cap));
         }
@@ -1097,10 +1321,21 @@ impl DancerGpu {
     }
 
     /// Draws over `view`, clearing only depth (FUN_10245ab0).
-    pub fn draw(&self, r: &DancerRenderer, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, depth: &wgpu::TextureView) {
+    pub fn draw(
+        &self,
+        r: &DancerRenderer,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+    ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("dancer"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store } })],
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+            })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth,
                 depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
@@ -1135,7 +1370,23 @@ fn shape_passes(m: &Model, model: usize, shape: usize) -> Vec<GPass> {
     let col = [wf(w, 0xa), wf(w, 0xb), wf(w, 0xc)];
     let (amb, kd) = (wf(w, 0xd), wf(w, 0xe));
     let p0 = [col[0], col[1], col[2], amb];
-    let pass = |kind, tex: TexKey, blend, zwrite, op0, op1, aref, p1: [f32; 4], p2: [f32; 4], alpha, shadow| GPass { model, shape, kind, tex, blend, zwrite, op0, op1, aref, p0, p1, p2, alpha, ramp: [[0.0; 4]; 16], shadow };
+    let pass = |kind, tex: TexKey, blend, zwrite, op0, op1, aref, p1: [f32; 4], p2: [f32; 4], alpha, shadow| GPass {
+        model,
+        shape,
+        kind,
+        tex,
+        blend,
+        zwrite,
+        op0,
+        op1,
+        aref,
+        p0,
+        p1,
+        p2,
+        alpha,
+        ramp: [[0.0; 4]; 16],
+        shadow,
+    };
     match sh.kind {
         0xF0001 => {
             if w[0x23] == 0 || wf(w, 0x11) >= 0.999 {
@@ -1145,7 +1396,19 @@ fn shape_passes(m: &Model, model: usize, shape: usize) -> Vec<GPass> {
             let lit = if w[0x26] != 0 { 1.0 } else { 0.0 };
             let ct = wt(w, 0x13);
             let blend = if has_alpha(ct) && uam & 1 != 0 { Blend::Alpha } else { Blend::Opaque };
-            out.push(pass(0, (tname(ct), None), blend, true, 0, 0, -1.0, [kd, lit, 0.0, 0.0], [0.0; 4], 1.0 - wf(w, 0x11), true));
+            out.push(pass(
+                0,
+                (tname(ct), None),
+                blend,
+                true,
+                0,
+                0,
+                -1.0,
+                [kd, lit, 0.0, 0.0],
+                [0.0; 4],
+                1.0 - wf(w, 0x11),
+                true,
+            ));
             let mut op = 0;
             if let Some(env) = wt(w, 0x14) {
                 let b = if uam & 4 != 0 { Blend::DstAlphaAdd } else { Blend::Add };
@@ -1154,12 +1417,36 @@ fn shape_passes(m: &Model, model: usize, shape: usize) -> Vec<GPass> {
             }
             let mask = wt(w, 0x17);
             if mask.is_some() {
-                out.push(pass(2, (tname(mask), None), Blend::AlphaOnly, true, 1, 0, -1.0, [0.0; 4], [0.0; 4], 1.0, false));
+                out.push(pass(
+                    2,
+                    (tname(mask), None),
+                    Blend::AlphaOnly,
+                    true,
+                    1,
+                    0,
+                    -1.0,
+                    [0.0; 4],
+                    [0.0; 4],
+                    1.0,
+                    false,
+                ));
                 op = 1;
             }
             if let Some(ph) = wt(w, 0x16) {
                 let b = if uam & 2 == 0 && mask.is_none() { Blend::Add } else { Blend::DstAlphaAdd };
-                out.push(pass(3, (tname(Some(ph)), None), b, false, op, 0, -1.0, [0.0, 0.0, wf(w, 0x20), 0.0], [0.0; 4], 1.0, false));
+                out.push(pass(
+                    3,
+                    (tname(Some(ph)), None),
+                    b,
+                    false,
+                    op,
+                    0,
+                    -1.0,
+                    [0.0, 0.0, wf(w, 0x20), 0.0],
+                    [0.0; 4],
+                    1.0,
+                    false,
+                ));
             }
         }
         0xF0002 => {
@@ -1171,14 +1458,27 @@ fn shape_passes(m: &Model, model: usize, shape: usize) -> Vec<GPass> {
             let sc = 15.0 / (back + 1.0001);
             let ct = wt(w, 0x14);
             let blend = if has_alpha(ct) && uam & 1 != 0 { Blend::Alpha } else { Blend::Opaque };
-            let mut base = pass(4, (tname(ct), None), blend, true, 0, 0, -1.0, [0.0; 4], [back, sc, 0.0, 0.0], 1.0, true);
+            let mut base =
+                pass(4, (tname(ct), None), blend, true, 0, 0, -1.0, [0.0; 4], [back, sc, 0.0, 0.0], 1.0, true);
             for j in 0..16 {
                 base.ramp[j] = [wf(w, 0x17 + 4 * j), wf(w, 0x18 + 4 * j), wf(w, 0x19 + 4 * j), 0.0];
             }
             out.push(base);
             if let Some(ph) = wt(w, 0x15).filter(|_| wf(w, 0x58) > 0.001) {
                 let b = if uam & 2 != 0 { Blend::DstAlphaAdd } else { Blend::Add };
-                out.push(pass(3, (tname(Some(ph)), None), b, false, 0, 0, -1.0, [0.0, 0.0, wf(w, 0x57), 0.0], [0.0; 4], 1.0, false));
+                out.push(pass(
+                    3,
+                    (tname(Some(ph)), None),
+                    b,
+                    false,
+                    0,
+                    0,
+                    -1.0,
+                    [0.0, 0.0, wf(w, 0x57), 0.0],
+                    [0.0; 4],
+                    1.0,
+                    false,
+                ));
             }
         }
         0xF0005 => {
@@ -1189,7 +1489,19 @@ fn shape_passes(m: &Model, model: usize, shape: usize) -> Vec<GPass> {
             let ct = wt(w, 0x18);
             let blend = if has_alpha(ct) { Blend::Alpha } else { Blend::Opaque };
             let aref = if w[0x15] != 0 { 0x5f as f32 / 255.0 } else { -1.0 };
-            out.push(pass(5, (tname(ct), tname(wt(w, 0x19))), blend, true, 0, 1, aref, [kd, 0.0, 0.0, by_v], [0.0; 4], 1.0, true));
+            out.push(pass(
+                5,
+                (tname(ct), tname(wt(w, 0x19))),
+                blend,
+                true,
+                0,
+                1,
+                aref,
+                [kd, 0.0, 0.0, by_v],
+                [0.0; 4],
+                1.0,
+                true,
+            ));
         }
         _ => {}
     }
@@ -1202,18 +1514,32 @@ impl DancerRenderer {
             let e = |binding| wgpu::BindGroupLayoutEntry {
                 binding,
                 visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
                 count: None,
             };
-            gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("dancer skin"), entries: &[e(0), e(1)] })
+            gpu.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("dancer skin"),
+                entries: &[e(0), e(1)],
+            })
         })
     }
 
     fn gpu_layout(&mut self, gpu: &Gpu) -> (wgpu::ShaderModule, wgpu::PipelineLayout) {
         if self.gpu_mod.is_none() {
             let sbl = self.storage_layout(gpu).clone();
-            let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("dancer gpu"), source: wgpu::ShaderSource::Wgsl(GWGSL.into()) });
-            let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: None, bind_group_layouts: &[Some(&self.ubl), Some(&self.tbl), Some(&sbl)], immediate_size: 0 });
+            let module = gpu.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("dancer gpu"),
+                source: wgpu::ShaderSource::Wgsl(GWGSL.into()),
+            });
+            let layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[Some(&self.ubl), Some(&self.tbl), Some(&sbl)],
+                immediate_size: 0,
+            });
             self.gpu_mod = Some((module, layout));
         }
         self.gpu_mod.clone().unwrap()
@@ -1233,11 +1559,31 @@ impl DancerRenderer {
         let p = gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("dancer gpu"),
             layout: Some(&layout),
-            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_skin"), compilation_options: Default::default(), buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<SVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &attrs })] },
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_skin"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<SVertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &attrs,
+                })],
+            },
             primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
-            depth_stencil: Some(wgpu::DepthStencilState { format: super::DEPTH_FORMAT, depth_write_enabled: Some(zwrite), depth_compare: Some(wgpu::CompareFunction::LessEqual), stencil: Default::default(), bias: Default::default() }),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: super::DEPTH_FORMAT,
+                depth_write_enabled: Some(zwrite),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
             multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState { module: &module, entry_point: Some("fs"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format: self.format, blend, write_mask })] }),
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format: self.format, blend, write_mask })],
+            }),
             multiview_mask: None,
             cache: None,
         });
@@ -1252,15 +1598,42 @@ impl DancerRenderer {
         use wgpu::{BlendComponent as C, BlendFactor as F, BlendOperation as O};
         let (module, layout) = self.gpu_layout(gpu);
         let attrs = Self::gpu_vertex_layout();
-        let blend = wgpu::BlendState { color: C { src_factor: F::Zero, dst_factor: F::Src, operation: O::Add }, alpha: C { src_factor: F::Zero, dst_factor: F::One, operation: O::Add } };
+        let blend = wgpu::BlendState {
+            color: C { src_factor: F::Zero, dst_factor: F::Src, operation: O::Add },
+            alpha: C { src_factor: F::Zero, dst_factor: F::One, operation: O::Add },
+        };
         let p = gpu.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("dancer gpu shadow"),
             layout: Some(&layout),
-            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_skin_shadow"), compilation_options: Default::default(), buffers: &[Some(wgpu::VertexBufferLayout { array_stride: std::mem::size_of::<SVertex>() as u64, step_mode: wgpu::VertexStepMode::Vertex, attributes: &attrs })] },
+            vertex: wgpu::VertexState {
+                module: &module,
+                entry_point: Some("vs_skin_shadow"),
+                compilation_options: Default::default(),
+                buffers: &[Some(wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<SVertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &attrs,
+                })],
+            },
             primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
-            depth_stencil: Some(wgpu::DepthStencilState { format: super::DEPTH_FORMAT, depth_write_enabled: Some(true), depth_compare: Some(wgpu::CompareFunction::Less), stencil: Default::default(), bias: Default::default() }),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: super::DEPTH_FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
             multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState { module: &module, entry_point: Some("fs_shadow"), compilation_options: Default::default(), targets: &[Some(wgpu::ColorTargetState { format: self.format, blend: Some(blend), write_mask: wgpu::ColorWrites::ALL })] }),
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_shadow"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.format,
+                    blend: Some(blend),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
             multiview_mask: None,
             cache: None,
         });

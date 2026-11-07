@@ -37,7 +37,10 @@ impl MarkFile {
         if let Ok(b) = std::fs::read(Self::path(dir, zone, key)) {
             return Self::parse(&b, 0, 4, 8).unwrap_or_default();
         }
-        std::fs::read(dir.join(format!("M{zone:03}{key:02}_{char_id:08}.MRK"))).ok().and_then(|b| Self::parse(&b, 0, 8, 0x10)).unwrap_or_default()
+        std::fs::read(dir.join(format!("M{zone:03}{key:02}_{char_id:08}.MRK")))
+            .ok()
+            .and_then(|b| Self::parse(&b, 0, 8, 0x10))
+            .unwrap_or_default()
     }
 
     fn parse(b: &[u8], magic: usize, crc: usize, data: usize) -> Option<MarkFile> {
@@ -80,7 +83,9 @@ impl MarkFile {
 
     /// Writes the new layout and removes the old name (inf: the removal, FUN_101c49e0).
     pub fn save(&self, dir: &Path, zone: u16, key: u8, char_id: u32) {
-        if let Err(e) = std::fs::create_dir_all(dir).and_then(|_| std::fs::write(Self::path(dir, zone, key), self.bytes())) {
+        if let Err(e) =
+            std::fs::create_dir_all(dir).and_then(|_| std::fs::write(Self::path(dir, zone, key), self.bytes()))
+        {
             log::warn!("map markers: {e}");
         }
         let _ = std::fs::remove_file(dir.join(format!("M{zone:03}{key:02}_{char_id:08}.MRK")));

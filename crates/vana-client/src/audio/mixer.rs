@@ -8,19 +8,21 @@ use std::sync::mpsc::Receiver;
 
 /// Volume level 0..127 -> linear 0..4096 (FFXiMain 0x1037c338).
 pub const LEVEL: [i32; 128] = [
-    0, 2340, 2511, 2633, 2727, 2804, 2869, 2925, 2975, 3019, 3060, 3096, 3130, 3161, 3191, 3218, 3243, 3268, 3290, 3312, 3333, 3352, 3371, 3389,
-    3406, 3423, 3439, 3454, 3469, 3483, 3497, 3510, 3523, 3536, 3548, 3560, 3572, 3583, 3594, 3605, 3615, 3625, 3635, 3645, 3654, 3664, 3673, 3682,
-    3690, 3699, 3707, 3715, 3723, 3731, 3739, 3747, 3754, 3761, 3769, 3776, 3783, 3790, 3796, 3803, 3809, 3816, 3822, 3829, 3835, 3841, 3847, 3853,
-    3858, 3864, 3870, 3875, 3881, 3886, 3892, 3897, 3902, 3908, 3913, 3918, 3923, 3928, 3933, 3937, 3942, 3947, 3951, 3956, 3961, 3965, 3970, 3974,
-    3978, 3983, 3987, 3991, 3996, 4000, 4004, 4008, 4012, 4016, 4020, 4024, 4028, 4032, 4035, 4039, 4043, 4047, 4050, 4054, 4058, 4061, 4065, 4068,
-    4072, 4075, 4079, 4082, 4085, 4089, 4092, 4096,
+    0, 2340, 2511, 2633, 2727, 2804, 2869, 2925, 2975, 3019, 3060, 3096, 3130, 3161, 3191, 3218, 3243, 3268, 3290,
+    3312, 3333, 3352, 3371, 3389, 3406, 3423, 3439, 3454, 3469, 3483, 3497, 3510, 3523, 3536, 3548, 3560, 3572, 3583,
+    3594, 3605, 3615, 3625, 3635, 3645, 3654, 3664, 3673, 3682, 3690, 3699, 3707, 3715, 3723, 3731, 3739, 3747, 3754,
+    3761, 3769, 3776, 3783, 3790, 3796, 3803, 3809, 3816, 3822, 3829, 3835, 3841, 3847, 3853, 3858, 3864, 3870, 3875,
+    3881, 3886, 3892, 3897, 3902, 3908, 3913, 3918, 3923, 3928, 3933, 3937, 3942, 3947, 3951, 3956, 3961, 3965, 3970,
+    3974, 3978, 3983, 3987, 3991, 3996, 4000, 4004, 4008, 4012, 4016, 4020, 4024, 4028, 4032, 4035, 4039, 4043, 4047,
+    4050, 4054, 4058, 4061, 4065, 4068, 4072, 4075, 4079, 4082, 4085, 4089, 4092, 4096,
 ];
 
 /// Pan distance from centre -> volume scale (FFXiMain 0x1037c238).
 const PAN_SCALE: [i32; 64] = [
-    4096, 4094, 4092, 4090, 4088, 4086, 4084, 4082, 4081, 4079, 4077, 4075, 4073, 4071, 4069, 4067, 4065, 4063, 4061, 4059, 4057, 4055, 4053, 4051,
-    4050, 4048, 4046, 4044, 4042, 4040, 4038, 4036, 4034, 4032, 4030, 4028, 4026, 4024, 4022, 4020, 4019, 4017, 4015, 4013, 4011, 4009, 4007, 4005,
-    4003, 4001, 3999, 3997, 3995, 3993, 3991, 3989, 3988, 3986, 3984, 3982, 3980, 3978, 3976, 3974,
+    4096, 4094, 4092, 4090, 4088, 4086, 4084, 4082, 4081, 4079, 4077, 4075, 4073, 4071, 4069, 4067, 4065, 4063, 4061,
+    4059, 4057, 4055, 4053, 4051, 4050, 4048, 4046, 4044, 4042, 4040, 4038, 4036, 4034, 4032, 4030, 4028, 4026, 4024,
+    4022, 4020, 4019, 4017, 4015, 4013, 4011, 4009, 4007, 4005, 4003, 4001, 3999, 3997, 3995, 3993, 3991, 3989, 3988,
+    3986, 3984, 3982, 3980, 3978, 3976, 3974,
 ];
 
 /// Effect voices: the Config tool's 0029 allows up to 20 at once (FUN_10037510 gates on it).
@@ -92,11 +94,21 @@ impl Ramp {
 
 pub enum Cmd {
     /// Start music (cmd 7): ignored while the same id plays. `ticks` fades in from level 1.
-    PlayBgm { id: u32, bytes: Arc<[u8]>, level: u8, ticks: i32 },
+    PlayBgm {
+        id: u32,
+        bytes: Arc<[u8]>,
+        level: u8,
+        ticks: i32,
+    },
     /// Ramp the music to a level (cmd 8).
-    BgmVolume { level: u8, ticks: i32 },
+    BgmVolume {
+        level: u8,
+        ticks: i32,
+    },
     /// Ramp to level 1 and stop (cmd 9; 0 ticks = silence now).
-    BgmFadeOut { ticks: i32 },
+    BgmFadeOut {
+        ticks: i32,
+    },
     BgmStop,
     /// Remember where the music is, for when it comes back (cmd 10).
     SavePosition,
@@ -104,12 +116,28 @@ pub enum Cmd {
     ClearPositions(Option<u32>),
     /// Start an effect (cmd 2); `handle` (0 = none) names the voice for the commands below.
     /// `limit`: busy voices above which a new one steals instead of taking a free slot (0 = every slot).
-    PlaySe { bytes: Arc<[u8]>, level: u8, pan: u8, priority: i32, handle: u32, limit: u8 },
+    PlaySe {
+        bytes: Arc<[u8]>,
+        level: u8,
+        pan: u8,
+        priority: i32,
+        handle: u32,
+        limit: u8,
+    },
     /// Cmd 4 / 3: a voice's level / pan, at once.
-    SeLevel { handle: u32, level: u8 },
-    SePan { handle: u32, pan: u8 },
+    SeLevel {
+        handle: u32,
+        level: u8,
+    },
+    SePan {
+        handle: u32,
+        pan: u8,
+    },
     /// Cmd 0 (ticks 0, stop now) / cmd 5 (fade to level 1 over ticks, then stop).
-    SeStop { handle: u32, ticks: i32 },
+    SeStop {
+        handle: u32,
+        ticks: i32,
+    },
 }
 
 struct Source {
@@ -211,7 +239,18 @@ pub struct Mixer {
 impl Mixer {
     pub fn new(rx: Receiver<Cmd>, rate: u32, status: Arc<Status>) -> Self {
         let tick_len = (rate / 50).max(1);
-        Self { rx, rate, bgm: None, voices: (0..VOICES).map(|_| None).collect(), resume: vec![0; 0x400], tick_len, tick_left: tick_len, serial: 0, status, taken_now: Vec::new() }
+        Self {
+            rx,
+            rate,
+            bgm: None,
+            voices: (0..VOICES).map(|_| None).collect(),
+            resume: vec![0; 0x400],
+            tick_len,
+            tick_left: tick_len,
+            serial: 0,
+            status,
+            taken_now: Vec::new(),
+        }
     }
 
     fn command(&mut self, cmd: Cmd) {
@@ -277,7 +316,9 @@ impl Mixer {
                 }
             }
             Cmd::SeStop { handle, ticks } => {
-                for slot in self.voices.iter_mut().filter(|v| v.as_ref().is_some_and(|v| v.handle == handle && handle != 0)) {
+                for slot in
+                    self.voices.iter_mut().filter(|v| v.as_ref().is_some_and(|v| v.handle == handle && handle != 0))
+                {
                     let n = steps(ticks);
                     let v = slot.as_mut().unwrap();
                     if n == 0 {
@@ -298,7 +339,11 @@ impl Mixer {
                 let mut ramp = Ramp { cur: LEVEL[(level & 0x7f) as usize] << 12, left: 0, delta: 0 };
                 if flags & 0x20 != 0 && flags & 0x80 == 0 {
                     // Fade in over 150 steps (FUN_10240090).
-                    ramp = Ramp { cur: LEVEL[1] << 12, left: 0x96, delta: (((LEVEL[(level & 0x7f) as usize] - LEVEL[1]) * 0x1000) | 0x800) / 0x96 };
+                    ramp = Ramp {
+                        cur: LEVEL[1] << 12,
+                        left: 0x96,
+                        delta: (((LEVEL[(level & 0x7f) as usize] - LEVEL[1]) * 0x1000) | 0x800) / 0x96,
+                    };
                 }
                 // Flag 0x20 (ambient loops): priority 20000 and kept from stealing.
                 let kept = flags & 0x20 != 0;
@@ -308,14 +353,25 @@ impl Mixer {
                 let busy = self.voices.iter().flatten().count();
                 let free = limit == 0 || busy < limit as usize;
                 let slot = (0..VOICES).rev().find(|&i| free && self.voices[i].is_none()).or_else(|| {
-                    (0..VOICES).filter(|&i| self.voices[i].as_ref().is_some_and(|v| !v.kept && v.priority <= priority)).min_by_key(|&i| {
-                        let v = self.voices[i].as_ref().unwrap();
-                        (v.priority, v.started)
-                    })
+                    (0..VOICES)
+                        .filter(|&i| self.voices[i].as_ref().is_some_and(|v| !v.kept && v.priority <= priority))
+                        .min_by_key(|&i| {
+                            let v = self.voices[i].as_ref().unwrap();
+                            (v.priority, v.started)
+                        })
                 });
                 if let Some(i) = slot {
                     self.serial += 1;
-                    self.voices[i] = Some(Voice { src: Source::new(dec, self.rate), ramp, pan, priority, started: self.serial, handle, stop_after: false, kept });
+                    self.voices[i] = Some(Voice {
+                        src: Source::new(dec, self.rate),
+                        ramp,
+                        pan,
+                        priority,
+                        started: self.serial,
+                        handle,
+                        stop_after: false,
+                        kept,
+                    });
                 }
             }
         }

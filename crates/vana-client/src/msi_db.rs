@@ -86,8 +86,10 @@ impl Database {
                 size: int(&r["FileSize"]) as u32 as u64,
             })
             .collect();
-        let mut media: Vec<(i32, Media)> =
-            rows("Media")?.iter().map(|r| (int(&r["LastSequence"]), Media { cabinet: req_str(&r["Cabinet"]) })).collect();
+        let mut media: Vec<(i32, Media)> = rows("Media")?
+            .iter()
+            .map(|r| (int(&r["LastSequence"]), Media { cabinet: req_str(&r["Cabinet"]) }))
+            .collect();
         media.sort_by_key(|(last, _)| *last);
         let hashes = rows("MsiFileHash")?
             .iter()

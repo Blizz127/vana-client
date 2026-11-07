@@ -28,7 +28,8 @@ pub fn draw(m: &Modern, ctx: &Context, v: &TopView) {
     let screen = ctx.content_rect();
     // What the bar covers, for the windows on the top edge.
     let (x0, x1) = (if v.title_up { PAD } else { PAD + SIDE + GAP }, if v.net_up { PAD } else { PAD + NET + GAP });
-    let span = Rect::from_min_max(pos2(screen.min.x + x0, screen.min.y), pos2(screen.max.x - x1, screen.min.y + PAD + H));
+    let span =
+        Rect::from_min_max(pos2(screen.min.x + x0, screen.min.y), pos2(screen.max.x - x1, screen.min.y + PAD + H));
     m.top_bar.set((v.alpha > 0.0).then_some((span, v.alpha)));
     let frame = |r: Rect| {
         if v.alpha > 0.0 {
@@ -40,10 +41,19 @@ pub fn draw(m: &Modern, ctx: &Context, v: &TopView) {
         let r = Rect::from_min_size(pos2(screen.min.x + PAD, screen.min.y + PAD), vec2(SIDE, H));
         frame(r);
         let font = FontId::new(m.theme.ui, FontFamily::Name(STRONG.into()));
-        p.with_clip_rect(r.shrink2(vec2(10.0, 0.0))).text(pos2(r.min.x + 12.0, r.center().y), Align2::LEFT_CENTER, &v.title, font, m.theme.color("gold"));
+        p.with_clip_rect(r.shrink2(vec2(10.0, 0.0))).text(
+            pos2(r.min.x + 12.0, r.center().y),
+            Align2::LEFT_CENTER,
+            &v.title,
+            font,
+            m.theme.color("gold"),
+        );
     }
     // helpwind between the two, its "Help" legend only while fully shown.
-    let r = Rect::from_min_max(pos2(screen.min.x + PAD + SIDE + GAP, screen.min.y + PAD), pos2(screen.max.x - PAD - NET - GAP, screen.min.y + PAD + H));
+    let r = Rect::from_min_max(
+        pos2(screen.min.x + PAD + SIDE + GAP, screen.min.y + PAD),
+        pos2(screen.max.x - PAD - NET - GAP, screen.min.y + PAD + H),
+    );
     frame(r);
     if v.shown {
         legend(&p, m, r, "Help", true);
@@ -57,8 +67,14 @@ pub fn draw(m: &Modern, ctx: &Context, v: &TopView) {
         }
         network(&p, m, r, v);
         // Its tooltip (ours) where no window covers it.
-        if let Some(at) = ctx.input(|i| i.pointer.hover_pos()).filter(|at| r.contains(*at) && ctx.layer_id_at(*at).is_none_or(|l| l.order == Order::Background)) {
-            let body = format!("Connection {}%: it falls while the server sends nothing.\nS {} / R {}: bytes sent and received a second.", v.pct, v.sent, v.recv);
+        if let Some(at) = ctx
+            .input(|i| i.pointer.hover_pos())
+            .filter(|at| r.contains(*at) && ctx.layer_id_at(*at).is_none_or(|l| l.order == Order::Background))
+        {
+            let body = format!(
+                "Connection {}%: it falls while the server sends nothing.\nS {} / R {}: bytes sent and received a second.",
+                v.pct, v.sent, v.recv
+            );
             m.tip_at(ctx, at, "Network", &body);
         }
     }
@@ -123,7 +139,13 @@ fn network(p: &Painter, m: &Modern, r: Rect, v: &TopView) {
         if let Some(s) = m.art.sprite("icons/help") {
             p.add(super::paint::image(&s, pos2(r.min.x + 18.0, r.center().y - 10.0), 20.0, Color32::WHITE));
         }
-        p.text(pos2(r.min.x + 44.0, r.center().y + 2.0), Align2::LEFT_CENTER, "Help Desk reply", FontId::proportional(SMALL), m.theme.color("gold"));
+        p.text(
+            pos2(r.min.x + 44.0, r.center().y + 2.0),
+            Align2::LEFT_CENTER,
+            "Help Desk reply",
+            FontId::proportional(SMALL),
+            m.theme.color("gold"),
+        );
         if let Some(s) = m.art.sprite("icons/notification") {
             p.add(super::paint::image(&s, pos2(r.max.x - 32.0, r.center().y - 9.0), 18.0, Color32::WHITE));
         }
@@ -134,11 +156,29 @@ fn network(p: &Painter, m: &Modern, r: Rect, v: &TopView) {
         let c = if sys { m.theme.color("hp") } else { m.theme.color("gold") };
         let e = Rect::from_center_size(pos2(r.min.x + 30.0, r.center().y + 1.0), vec2(22.0, 15.0));
         p.rect_stroke(e, 2.0, egui::Stroke::new(1.5, c), egui::StrokeKind::Inside);
-        p.line_segment([e.left_top() + vec2(2.0, 2.0), pos2(e.center().x, e.center().y + 2.0)], egui::Stroke::new(1.5, c));
-        p.line_segment([e.right_top() + vec2(-2.0, 2.0), pos2(e.center().x, e.center().y + 2.0)], egui::Stroke::new(1.5, c));
-        p.text(pos2(r.min.x + 50.0, r.center().y + 2.0), Align2::LEFT_CENTER, "PlayOnline", FontId::proportional(SMALL), m.theme.color("muted"));
+        p.line_segment(
+            [e.left_top() + vec2(2.0, 2.0), pos2(e.center().x, e.center().y + 2.0)],
+            egui::Stroke::new(1.5, c),
+        );
+        p.line_segment(
+            [e.right_top() + vec2(-2.0, 2.0), pos2(e.center().x, e.center().y + 2.0)],
+            egui::Stroke::new(1.5, c),
+        );
+        p.text(
+            pos2(r.min.x + 50.0, r.center().y + 2.0),
+            Align2::LEFT_CENTER,
+            "PlayOnline",
+            FontId::proportional(SMALL),
+            m.theme.color("muted"),
+        );
         if n > 0 {
-            p.text(pos2(r.max.x - 14.0, r.center().y + 2.0), Align2::RIGHT_CENTER, n.to_string(), FontId::proportional(m.theme.ui + 2.0), m.theme.color("text"));
+            p.text(
+                pos2(r.max.x - 14.0, r.center().y + 2.0),
+                Align2::RIGHT_CENTER,
+                n.to_string(),
+                FontId::proportional(m.theme.ui + 2.0),
+                m.theme.color("text"),
+            );
         }
         return;
     }
@@ -165,7 +205,13 @@ fn network(p: &Painter, m: &Modern, r: Rect, v: &TopView) {
         p.rect_filled(bar, 1.0, c);
     }
     let small = FontId::proportional(SMALL);
-    p.text(pos2(x0 + 36.0, r.center().y + 2.0), Align2::LEFT_CENTER, format!("{}%", v.pct), FontId::proportional(m.theme.ui + 2.0), m.theme.color("text"));
+    p.text(
+        pos2(x0 + 36.0, r.center().y + 2.0),
+        Align2::LEFT_CENTER,
+        format!("{}%", v.pct),
+        FontId::proportional(m.theme.ui + 2.0),
+        m.theme.color("text"),
+    );
     // S and R in a column, their numbers right-aligned beside them.
     let (lx, nx) = (r.max.x - 66.0, r.max.x - 14.0);
     for (k, (label, n)) in [("S", v.sent), ("R", v.recv)].into_iter().enumerate() {

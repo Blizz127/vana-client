@@ -175,7 +175,14 @@ pub fn tables() -> &'static Tables {
             .filter_map(|f| {
                 Some((
                     num(f[0])?,
-                    Rule { flags: f[1].to_string(), overwrite: f[2].to_string(), exclusion: opt(f[3]), negative: num(f[4]), remove: num(f[6]), min: num(f[7]).unwrap_or(0.0) },
+                    Rule {
+                        flags: f[1].to_string(),
+                        overwrite: f[2].to_string(),
+                        exclusion: opt(f[3]),
+                        negative: num(f[4]),
+                        remove: num(f[6]),
+                        min: num(f[7]).unwrap_or(0.0),
+                    },
                 ))
             })
             .collect();
@@ -196,7 +203,10 @@ pub fn tables() -> &'static Tables {
                 augments.entry(a).or_default().push((k, m, v));
             }
         }
-        let merits = lines(MERITS).filter(|f| f.len() >= 4).filter_map(|f| Some((num(f[0])?, (num(f[1])?, num(f[2])?, f[3] == "1")))).collect();
+        let merits = lines(MERITS)
+            .filter(|f| f.len() >= 4)
+            .filter_map(|f| Some((num(f[0])?, (num(f[1])?, num(f[2])?, f[3] == "1"))))
+            .collect();
         let jps = lines(JOBPOINTS).filter(|f| f.len() >= 2).filter_map(|f| Some((num(f[0])?, num(f[1])?))).collect();
         Tables { rows, rules, gear, augments, merits, jps }
     })
@@ -256,7 +266,9 @@ impl Caster {
             statuses,
             merits: w.merit_list.iter().map(|(&id, &(_, n))| (id, n)).collect(),
             jps: w.jp_list.iter().map(|(&id, &(lv, _))| (id, lv)).collect(),
-            skills: w.skill_base.map_or(HashMap::new(), |s| (0..64).map(|i| (i as u8, (s[i] & 0x7fff) as f32)).collect()),
+            skills: w
+                .skill_base
+                .map_or(HashMap::new(), |s| (0..64).map(|i| (i as u8, (s[i] & 0x7fff) as f32)).collect()),
             tp: tp.unwrap_or(1000.0),
             pet_tp: w.timers.pet_tp.map(|t| t as f32),
             ..Default::default()
@@ -283,7 +295,11 @@ impl Caster {
     fn effect_mods(&mut self, w: &World) {
         let add = |c: &mut Caster, m: u16, v: f32| *c.mods.entry(m).or_default() += v;
         // REGEN_DURATION from Light Arts / Addendum: White and Tabula Rasa (SCH main).
-        let s = if self.main.0 == 20 && self.main.1 >= 20 { 3.0 * ((self.main.1 as f32 - 10.0) / 10.0).floor() } else { 0.0 };
+        let s = if self.main.0 == 20 && self.main.1 >= 20 {
+            3.0 * ((self.main.1 as f32 - 10.0) / 10.0).floor()
+        } else {
+            0.0
+        };
         let arts_w = self.has(358) || self.has(401);
         if arts_w {
             add(self, 339, 2.0 * s);
@@ -429,7 +445,9 @@ pub fn white(w: &World, spell: u16) -> bool {
 
 /// The weapon skill TP formula (MODLOG "Timers", Weapon skills) for the TP-scaled rows.
 fn ws_tp(id: u16, tp: f32) -> Option<f32> {
-    let f = |a: f32, b: f32, c: f32| if tp <= 2000.0 { a + (b - a) * (tp - 1000.0).max(0.0) / 1000.0 } else { b + (c - b) * (tp - 2000.0) / 1000.0 };
+    let f = |a: f32, b: f32, c: f32| {
+        if tp <= 2000.0 { a + (b - a) * (tp - 1000.0).max(0.0) / 1000.0 } else { b + (c - b) * (tp - 2000.0) / 1000.0 }
+    };
     Some(match id {
         83 | 181 | 80 => 120.0 + 6.0 * tp / 100.0,
         85 => 120.0 + 6.0 * tp / 100.0,
@@ -468,7 +486,9 @@ fn repair_secs(ammo: u16) -> f32 {
 pub fn predict(c: &Caster, row: &Row, t: &Target, white: bool, prior: Option<f32>) -> Option<f32> {
     let base = row.base();
     let d = match row.formula.as_str() {
-        "FIXED" | "NIN_FIXED" | "BLU_ENF" | "BLU_ENF_RAW" | "DIA_BIO" | "MOB_STATUS" | "MOB_STATUS_EX" | "MOB_GAZE" | "RANDOM" | "WS_R" | "WS_FIXED" | "QD_SLEEP" | "DESPERATE" | "HOLY2_AMNESIA" | "JA_CHARM_BIND" | "SOLACE_SS" | "ARISE_RR" => base,
+        "FIXED" | "NIN_FIXED" | "BLU_ENF" | "BLU_ENF_RAW" | "DIA_BIO" | "MOB_STATUS" | "MOB_STATUS_EX" | "MOB_GAZE"
+        | "RANDOM" | "WS_R" | "WS_FIXED" | "QD_SLEEP" | "DESPERATE" | "HOLY2_AMNESIA" | "JA_CHARM_BIND"
+        | "SOLACE_SS" | "ARISE_RR" => base,
         "ENH" | "ENH_REGEN" | "ENH_RANDOM" | "ENH_EN" => enhancing(c, row, t, white),
         "ENF" => enfeebling(c, row, t),
         "HELIX" => {
@@ -584,7 +604,16 @@ pub fn predict(c: &Caster, row: &Row, t: &Target, white: bool, prior: Option<f32
 
 /// The song family's mod (the row's first song mod: 433..450 but the all-songs and duration ones).
 fn song_mod(c: &Caster, row: &Row) -> f32 {
-    row.toks.iter().find_map(|t| if let Tok::Mod(m @ 433..=450) = t { (!matches!(m, 444 | 446 | 449 | 452..=454)).then(|| c.m(*m)) } else { None }).unwrap_or(0.0)
+    row.toks
+        .iter()
+        .find_map(|t| {
+            if let Tok::Mod(m @ 433..=450) = t {
+                (!matches!(m, 444 | 446 | 449 | 452..=454)).then(|| c.m(*m))
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0.0)
 }
 
 /// ENH (MODLOG "Timers").
@@ -615,7 +644,8 @@ fn enhancing(c: &Caster, row: &Row, t: &Target, white: bool) -> f32 {
     if c.has(469) && white {
         d *= 2.0;
     }
-    if let (Some(lv), Some(tl)) = (row.toks.iter().find_map(|t| if let Tok::Lvl(l) = t { Some(*l) } else { None }), t.level)
+    if let (Some(lv), Some(tl)) =
+        (row.toks.iter().find_map(|t| if let Tok::Lvl(l) = t { Some(*l) } else { None }), t.level)
         && tl < lv
     {
         d *= tl as f32 / lv as f32;
@@ -699,7 +729,9 @@ pub fn ends(status: u16) -> Vec<u16> {
     let Some(r) = t.rules.get(&status) else { return Vec::new() };
     let mut out: Vec<u16> = r.remove.into_iter().chain(r.negative).filter(|&s| s != status).collect();
     if let Some(g) = &r.exclusion {
-        out.extend(t.rules.iter().filter(|(id, o)| **id != status && o.exclusion.as_ref() == Some(g)).map(|(id, _)| *id));
+        out.extend(
+            t.rules.iter().filter(|(id, o)| **id != status && o.exclusion.as_ref() == Some(g)).map(|(id, _)| *id),
+        );
     }
     match status {
         134 => out.push(135),
@@ -847,7 +879,10 @@ mod tests {
         assert_eq!(predict(&c, row(Kind::Ability, 381), &Target::default(), false, None), Some(195.0));
         c.mods.insert(490, 10.0);
         c.mods.insert(498, 10.0);
-        assert_eq!(predict(&c, row(Kind::Ability, 189), &Target { me: true, ..Default::default() }, false, None), Some(143.0));
+        assert_eq!(
+            predict(&c, row(Kind::Ability, 189), &Target { me: true, ..Default::default() }, false, None),
+            Some(143.0)
+        );
     }
 
     /// Helix: 30, +60 from main level 60, + HELIX_DURATION; Indi on an Entrust target 180 + INDI_DURATION.

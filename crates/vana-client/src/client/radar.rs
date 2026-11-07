@@ -74,7 +74,13 @@ pub fn kind_bits(w: &World, id: u32, e: &Entity) -> u32 {
 /// invisible, not untargetable or radar-off, not an object model, not hidden for the s2c 0x077 list (+0xb2 bit 7).
 /// Not modelled: +0x120 bit 15.
 pub fn shown(e: &Entity) -> bool {
-    !matches!(e.sub_kind, 2..=4) && e.flags & 6 == 0 && !e.invisible && !e.untargetable && !e.radar_off && !e.object && !e.unlisted
+    !matches!(e.sub_kind, 2..=4)
+        && e.flags & 6 == 0
+        && !e.invisible
+        && !e.untargetable
+        && !e.radar_off
+        && !e.object
+        && !e.unlisted
 }
 
 /// FUN_102203b0's alpha (asm 0x10216a40..0x10216ad7, x87 with truncation) from the compass alpha `a` (0..0x80):

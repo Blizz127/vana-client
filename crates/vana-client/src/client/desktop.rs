@@ -75,7 +75,8 @@ pub fn settle() -> Result<()> {
     }
     std::fs::create_dir_all(home.parent().context("no data directory")?)?;
     put(&exe, &home)?;
-    let menu = std::fs::read_to_string(data_home()?.join("applications/vana-client.desktop")).map_or(true, |t| !t.contains("NoDisplay=true"));
+    let menu = std::fs::read_to_string(data_home()?.join("applications/vana-client.desktop"))
+        .map_or(true, |t| !t.contains("NoDisplay=true"));
     install(menu)?;
     if dirs::desktop_dir().is_some_and(|d| d.join("vana-client.desktop").exists()) {
         desktop_shortcut()?;

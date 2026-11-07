@@ -45,14 +45,32 @@ pub fn panel(p: &mut Panels, v: &View) {
         };
         let font = FontId::proportional(m.theme.ui);
         let (note, colour) = match &v.state {
-            State::Waiting => (format!("waiting{}", ".".repeat(1 + (v.secs * 3.0) as usize % 3)), m.theme.color("muted")),
+            State::Waiting => {
+                (format!("waiting{}", ".".repeat(1 + (v.secs * 3.0) as usize % 3)), m.theme.color("muted"))
+            }
             State::Refused(_) => ("refused".to_string(), m.theme.color("hp")),
             State::NoReply => ("no reply".to_string(), m.theme.color("muted")),
         };
         // A dot in the state's colour, the action, the state at the right.
-        ui.painter().circle_filled(pos2(r.min.x + 5.0, r.center().y), 4.0, if v.state == State::Waiting { m.theme.color("focus") } else { colour });
-        ui.painter().text(pos2(r.min.x + 16.0, r.center().y), Align2::LEFT_CENTER, head, font.clone(), m.theme.color("text"));
-        ui.painter().text(pos2(r.max.x, r.center().y), Align2::RIGHT_CENTER, note, FontId::proportional(m.theme.small), colour);
+        ui.painter().circle_filled(
+            pos2(r.min.x + 5.0, r.center().y),
+            4.0,
+            if v.state == State::Waiting { m.theme.color("focus") } else { colour },
+        );
+        ui.painter().text(
+            pos2(r.min.x + 16.0, r.center().y),
+            Align2::LEFT_CENTER,
+            head,
+            font.clone(),
+            m.theme.color("text"),
+        );
+        ui.painter().text(
+            pos2(r.max.x, r.center().y),
+            Align2::RIGHT_CENTER,
+            note,
+            FontId::proportional(m.theme.small),
+            colour,
+        );
         let why = match &v.state {
             State::Refused(t) if !t.is_empty() => Some(t.clone()),
             State::NoReply => Some("The server has not answered.".to_string()),

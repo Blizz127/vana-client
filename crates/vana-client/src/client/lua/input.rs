@@ -10,39 +10,110 @@ use winit::keyboard::{KeyCode as K, ModifiersState, PhysicalKey};
 
 /// Key names (lower case), the window's key, and the egui key egui-winit makes of it.
 const KEYS: &[(&str, K, Option<E>)] = &[
-    ("a", K::KeyA, Some(E::A)), ("b", K::KeyB, Some(E::B)), ("c", K::KeyC, Some(E::C)), ("d", K::KeyD, Some(E::D)),
-    ("e", K::KeyE, Some(E::E)), ("f", K::KeyF, Some(E::F)), ("g", K::KeyG, Some(E::G)), ("h", K::KeyH, Some(E::H)),
-    ("i", K::KeyI, Some(E::I)), ("j", K::KeyJ, Some(E::J)), ("k", K::KeyK, Some(E::K)), ("l", K::KeyL, Some(E::L)),
-    ("m", K::KeyM, Some(E::M)), ("n", K::KeyN, Some(E::N)), ("o", K::KeyO, Some(E::O)), ("p", K::KeyP, Some(E::P)),
-    ("q", K::KeyQ, Some(E::Q)), ("r", K::KeyR, Some(E::R)), ("s", K::KeyS, Some(E::S)), ("t", K::KeyT, Some(E::T)),
-    ("u", K::KeyU, Some(E::U)), ("v", K::KeyV, Some(E::V)), ("w", K::KeyW, Some(E::W)), ("x", K::KeyX, Some(E::X)),
-    ("y", K::KeyY, Some(E::Y)), ("z", K::KeyZ, Some(E::Z)),
-    ("0", K::Digit0, Some(E::Num0)), ("1", K::Digit1, Some(E::Num1)), ("2", K::Digit2, Some(E::Num2)), ("3", K::Digit3, Some(E::Num3)),
-    ("4", K::Digit4, Some(E::Num4)), ("5", K::Digit5, Some(E::Num5)), ("6", K::Digit6, Some(E::Num6)), ("7", K::Digit7, Some(E::Num7)),
-    ("8", K::Digit8, Some(E::Num8)), ("9", K::Digit9, Some(E::Num9)),
-    ("f1", K::F1, Some(E::F1)), ("f2", K::F2, Some(E::F2)), ("f3", K::F3, Some(E::F3)), ("f4", K::F4, Some(E::F4)),
-    ("f5", K::F5, Some(E::F5)), ("f6", K::F6, Some(E::F6)), ("f7", K::F7, Some(E::F7)), ("f8", K::F8, Some(E::F8)),
-    ("f9", K::F9, Some(E::F9)), ("f10", K::F10, Some(E::F10)), ("f11", K::F11, Some(E::F11)), ("f12", K::F12, Some(E::F12)),
-    ("escape", K::Escape, Some(E::Escape)), ("enter", K::Enter, Some(E::Enter)), ("space", K::Space, Some(E::Space)),
-    ("tab", K::Tab, Some(E::Tab)), ("backspace", K::Backspace, Some(E::Backspace)), ("insert", K::Insert, Some(E::Insert)),
-    ("delete", K::Delete, Some(E::Delete)), ("home", K::Home, Some(E::Home)), ("end", K::End, Some(E::End)),
-    ("pageup", K::PageUp, Some(E::PageUp)), ("pagedown", K::PageDown, Some(E::PageDown)),
-    ("up", K::ArrowUp, Some(E::ArrowUp)), ("down", K::ArrowDown, Some(E::ArrowDown)),
-    ("left", K::ArrowLeft, Some(E::ArrowLeft)), ("right", K::ArrowRight, Some(E::ArrowRight)),
-    ("-", K::Minus, Some(E::Minus)), ("=", K::Equal, Some(E::Equals)), ("[", K::BracketLeft, Some(E::OpenBracket)),
-    ("]", K::BracketRight, Some(E::CloseBracket)), ("\\", K::Backslash, Some(E::Backslash)), (";", K::Semicolon, Some(E::Semicolon)),
-    ("'", K::Quote, Some(E::Quote)), ("`", K::Backquote, Some(E::Backtick)), (",", K::Comma, Some(E::Comma)),
-    (".", K::Period, Some(E::Period)), ("/", K::Slash, Some(E::Slash)),
-    ("numpad0", K::Numpad0, Some(E::Num0)), ("numpad1", K::Numpad1, Some(E::Num1)), ("numpad2", K::Numpad2, Some(E::Num2)),
-    ("numpad3", K::Numpad3, Some(E::Num3)), ("numpad4", K::Numpad4, Some(E::Num4)), ("numpad5", K::Numpad5, Some(E::Num5)),
-    ("numpad6", K::Numpad6, Some(E::Num6)), ("numpad7", K::Numpad7, Some(E::Num7)), ("numpad8", K::Numpad8, Some(E::Num8)),
-    ("numpad9", K::Numpad9, Some(E::Num9)), ("numpad+", K::NumpadAdd, Some(E::Plus)), ("numpad-", K::NumpadSubtract, Some(E::Minus)),
-    ("numpad*", K::NumpadMultiply, None), ("numpad/", K::NumpadDivide, Some(E::Slash)), ("numpad.", K::NumpadDecimal, Some(E::Period)),
+    ("a", K::KeyA, Some(E::A)),
+    ("b", K::KeyB, Some(E::B)),
+    ("c", K::KeyC, Some(E::C)),
+    ("d", K::KeyD, Some(E::D)),
+    ("e", K::KeyE, Some(E::E)),
+    ("f", K::KeyF, Some(E::F)),
+    ("g", K::KeyG, Some(E::G)),
+    ("h", K::KeyH, Some(E::H)),
+    ("i", K::KeyI, Some(E::I)),
+    ("j", K::KeyJ, Some(E::J)),
+    ("k", K::KeyK, Some(E::K)),
+    ("l", K::KeyL, Some(E::L)),
+    ("m", K::KeyM, Some(E::M)),
+    ("n", K::KeyN, Some(E::N)),
+    ("o", K::KeyO, Some(E::O)),
+    ("p", K::KeyP, Some(E::P)),
+    ("q", K::KeyQ, Some(E::Q)),
+    ("r", K::KeyR, Some(E::R)),
+    ("s", K::KeyS, Some(E::S)),
+    ("t", K::KeyT, Some(E::T)),
+    ("u", K::KeyU, Some(E::U)),
+    ("v", K::KeyV, Some(E::V)),
+    ("w", K::KeyW, Some(E::W)),
+    ("x", K::KeyX, Some(E::X)),
+    ("y", K::KeyY, Some(E::Y)),
+    ("z", K::KeyZ, Some(E::Z)),
+    ("0", K::Digit0, Some(E::Num0)),
+    ("1", K::Digit1, Some(E::Num1)),
+    ("2", K::Digit2, Some(E::Num2)),
+    ("3", K::Digit3, Some(E::Num3)),
+    ("4", K::Digit4, Some(E::Num4)),
+    ("5", K::Digit5, Some(E::Num5)),
+    ("6", K::Digit6, Some(E::Num6)),
+    ("7", K::Digit7, Some(E::Num7)),
+    ("8", K::Digit8, Some(E::Num8)),
+    ("9", K::Digit9, Some(E::Num9)),
+    ("f1", K::F1, Some(E::F1)),
+    ("f2", K::F2, Some(E::F2)),
+    ("f3", K::F3, Some(E::F3)),
+    ("f4", K::F4, Some(E::F4)),
+    ("f5", K::F5, Some(E::F5)),
+    ("f6", K::F6, Some(E::F6)),
+    ("f7", K::F7, Some(E::F7)),
+    ("f8", K::F8, Some(E::F8)),
+    ("f9", K::F9, Some(E::F9)),
+    ("f10", K::F10, Some(E::F10)),
+    ("f11", K::F11, Some(E::F11)),
+    ("f12", K::F12, Some(E::F12)),
+    ("escape", K::Escape, Some(E::Escape)),
+    ("enter", K::Enter, Some(E::Enter)),
+    ("space", K::Space, Some(E::Space)),
+    ("tab", K::Tab, Some(E::Tab)),
+    ("backspace", K::Backspace, Some(E::Backspace)),
+    ("insert", K::Insert, Some(E::Insert)),
+    ("delete", K::Delete, Some(E::Delete)),
+    ("home", K::Home, Some(E::Home)),
+    ("end", K::End, Some(E::End)),
+    ("pageup", K::PageUp, Some(E::PageUp)),
+    ("pagedown", K::PageDown, Some(E::PageDown)),
+    ("up", K::ArrowUp, Some(E::ArrowUp)),
+    ("down", K::ArrowDown, Some(E::ArrowDown)),
+    ("left", K::ArrowLeft, Some(E::ArrowLeft)),
+    ("right", K::ArrowRight, Some(E::ArrowRight)),
+    ("-", K::Minus, Some(E::Minus)),
+    ("=", K::Equal, Some(E::Equals)),
+    ("[", K::BracketLeft, Some(E::OpenBracket)),
+    ("]", K::BracketRight, Some(E::CloseBracket)),
+    ("\\", K::Backslash, Some(E::Backslash)),
+    (";", K::Semicolon, Some(E::Semicolon)),
+    ("'", K::Quote, Some(E::Quote)),
+    ("`", K::Backquote, Some(E::Backtick)),
+    (",", K::Comma, Some(E::Comma)),
+    (".", K::Period, Some(E::Period)),
+    ("/", K::Slash, Some(E::Slash)),
+    ("numpad0", K::Numpad0, Some(E::Num0)),
+    ("numpad1", K::Numpad1, Some(E::Num1)),
+    ("numpad2", K::Numpad2, Some(E::Num2)),
+    ("numpad3", K::Numpad3, Some(E::Num3)),
+    ("numpad4", K::Numpad4, Some(E::Num4)),
+    ("numpad5", K::Numpad5, Some(E::Num5)),
+    ("numpad6", K::Numpad6, Some(E::Num6)),
+    ("numpad7", K::Numpad7, Some(E::Num7)),
+    ("numpad8", K::Numpad8, Some(E::Num8)),
+    ("numpad9", K::Numpad9, Some(E::Num9)),
+    ("numpad+", K::NumpadAdd, Some(E::Plus)),
+    ("numpad-", K::NumpadSubtract, Some(E::Minus)),
+    ("numpad*", K::NumpadMultiply, None),
+    ("numpad/", K::NumpadDivide, Some(E::Slash)),
+    ("numpad.", K::NumpadDecimal, Some(E::Period)),
     ("numpadenter", K::NumpadEnter, Some(E::Enter)),
-    ("capslock", K::CapsLock, None), ("scrolllock", K::ScrollLock, None), ("numlock", K::NumLock, None), ("pause", K::Pause, None),
-    ("printscreen", K::PrintScreen, None), ("apps", K::ContextMenu, None),
-    ("lshift", K::ShiftLeft, None), ("rshift", K::ShiftRight, None), ("lctrl", K::ControlLeft, None), ("rctrl", K::ControlRight, None),
-    ("lalt", K::AltLeft, None), ("ralt", K::AltRight, None), ("lwin", K::SuperLeft, None), ("rwin", K::SuperRight, None),
+    ("capslock", K::CapsLock, None),
+    ("scrolllock", K::ScrollLock, None),
+    ("numlock", K::NumLock, None),
+    ("pause", K::Pause, None),
+    ("printscreen", K::PrintScreen, None),
+    ("apps", K::ContextMenu, None),
+    ("lshift", K::ShiftLeft, None),
+    ("rshift", K::ShiftRight, None),
+    ("lctrl", K::ControlLeft, None),
+    ("rctrl", K::ControlRight, None),
+    ("lalt", K::AltLeft, None),
+    ("ralt", K::AltRight, None),
+    ("lwin", K::SuperLeft, None),
+    ("rwin", K::SuperRight, None),
 ];
 
 /// A key's name.
@@ -90,7 +161,9 @@ impl Combo {
         let mut s = s.trim().to_ascii_lowercase();
         let (mut ctrl, mut alt, mut shift, mut win) = (false, false, false, false);
         loop {
-            if s.len() > 1 && let Some(c) = s.chars().next().filter(|c| "^!~@".contains(*c)) {
+            if s.len() > 1
+                && let Some(c) = s.chars().next().filter(|c| "^!~@".contains(*c))
+            {
                 match c {
                     '^' => ctrl = true,
                     '!' => alt = true,
@@ -100,7 +173,8 @@ impl Combo {
                 s.remove(0);
                 continue;
             }
-            let prefixes: [(&str, u8); 7] = [("ctrl+", 0), ("control+", 0), ("alt+", 1), ("shift+", 2), ("win+", 3), ("super+", 3), ("cmd+", 3)];
+            let prefixes: [(&str, u8); 7] =
+                [("ctrl+", 0), ("control+", 0), ("alt+", 1), ("shift+", 2), ("win+", 3), ("super+", 3), ("cmd+", 3)];
             match prefixes.iter().find(|p| s.starts_with(p.0) && s.len() > p.0.len()) {
                 Some(&(p, m)) => {
                     match m {
@@ -119,7 +193,11 @@ impl Combo {
 
     /// The key with exactly these modifiers held.
     fn matches(&self, code: K, m: ModifiersState) -> bool {
-        self.key == code && self.ctrl == m.control_key() && self.alt == m.alt_key() && self.shift == m.shift_key() && self.win == m.super_key()
+        self.key == code
+            && self.ctrl == m.control_key()
+            && self.alt == m.alt_key()
+            && self.shift == m.shift_key()
+            && self.win == m.super_key()
     }
 }
 
@@ -154,7 +232,8 @@ impl Synth {
     /// The egui events the window would have made.
     pub(in crate::client) fn egui_events(&self) -> Vec<egui::Event> {
         let Some(key) = egui_of(self.key) else { return Vec::new() };
-        let modifiers = egui::Modifiers { alt: self.alt, ctrl: self.ctrl, shift: self.shift, mac_cmd: false, command: self.ctrl };
+        let modifiers =
+            egui::Modifiers { alt: self.alt, ctrl: self.ctrl, shift: self.shift, mac_cmd: false, command: self.ctrl };
         let ev = |pressed| egui::Event::Key { key, physical_key: Some(key), pressed, repeat: false, modifiers };
         match self.down {
             None => vec![ev(true), ev(false)],
@@ -164,7 +243,8 @@ impl Synth {
 
     /// The DIK codes of the key and its modifiers.
     pub(in crate::client) fn diks(&self) -> (Option<u8>, Vec<u8>) {
-        let mods = [(self.ctrl, 0x1d), (self.alt, 0x38), (self.shift, 0x2a)].iter().filter(|m| m.0).map(|m| m.1).collect();
+        let mods =
+            [(self.ctrl, 0x1d), (self.alt, 0x38), (self.shift, 0x2a)].iter().filter(|m| m.0).map(|m| m.1).collect();
         (super::super::input::dik(self.key), mods)
     }
 }
@@ -398,13 +478,19 @@ fn button_edge(w: &mut World, button: MouseButton, down: bool) -> bool {
     }
     let (taken, (x, y)) = {
         let mut s = st.borrow_mut();
-        if let Some(k) = [MouseButton::Left, MouseButton::Right, MouseButton::Middle].iter().position(|b| *b == button) {
+        if let Some(k) = [MouseButton::Left, MouseButton::Right, MouseButton::Middle].iter().position(|b| *b == button)
+        {
             s.buttons[k] = down;
         }
-        let taken = !down && s.taken_buttons.iter().position(|b| *b == button).map(|k| s.taken_buttons.remove(k)).is_some();
+        let taken =
+            !down && s.taken_buttons.iter().position(|b| *b == button).map(|k| s.taken_buttons.remove(k)).is_some();
         (taken, s.cursor)
     };
-    let took = filter(w, true, serde_json::json!({"kind": if down { "down" } else { "up" }, "button": button_name(button), "x": x.round() as i64, "y": y.round() as i64})) || taken;
+    let took = filter(
+        w,
+        true,
+        serde_json::json!({"kind": if down { "down" } else { "up" }, "button": button_name(button), "x": x.round() as i64, "y": y.round() as i64}),
+    ) || taken;
     if took && down {
         st.borrow_mut().taken_buttons.push(button);
     }
@@ -497,11 +583,17 @@ pub(super) fn run_binds(host: &mut super::Host, w: &World, out: &mut Vec<(String
                 let granted = |p: &str| vm.st.borrow().granted.iter().any(|g| g == p);
                 let mods = granted("mods");
                 if super::controls_mods(&line) && !mods {
-                    out.push((format!("{}: the bind {text} loads or unloads mods, which needs mods.", vm.manifest.name), super::ERROR));
+                    out.push((
+                        format!("{}: the bind {text} loads or unloads mods, which needs mods.", vm.manifest.name),
+                        super::ERROR,
+                    ));
                 } else if line.starts_with("//") || granted("actions") || granted("automation") {
                     lines.push((line, mods));
                 } else {
-                    out.push((format!("{}: the bind {text} runs a game command, which needs actions.", vm.manifest.name), super::ERROR));
+                    out.push((
+                        format!("{}: the bind {text} runs a game command, which needs actions.", vm.manifest.name),
+                        super::ERROR,
+                    ));
                 }
             }
             Some(Err(Some(f))) => lend(vm, w, |vm| vm.call_input(f, ())),
@@ -531,7 +623,8 @@ fn shared(lua: &mlua::Lua) -> std::rc::Rc<std::cell::RefCell<State>> {
 }
 
 fn combo_arg(s: &str) -> mlua::Result<Combo> {
-    Combo::parse(s).ok_or_else(|| mlua::Error::runtime(format!("no key {s:?} (e.g. \"f1\", \"ctrl+a\", \"^!1\", \"numpad+\")")))
+    Combo::parse(s)
+        .ok_or_else(|| mlua::Error::runtime(format!("no key {s:?} (e.g. \"f1\", \"ctrl+a\", \"^!1\", \"numpad+\")")))
 }
 
 /// The `input` and `binds` namespaces, and the chat line's reads and writes.
@@ -546,7 +639,11 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
                 let id = next_id(&st);
                 let key = lua.create_registry_value(func)?;
                 let mut s = st.borrow_mut();
-                if mouse { s.mouse_filters.push((id, key)) } else { s.key_filters.push((id, key)) }
+                if mouse {
+                    s.mouse_filters.push((id, key))
+                } else {
+                    s.key_filters.push((id, key))
+                }
                 Ok(id)
             })?,
         )?;
@@ -609,7 +706,10 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
             if c.win {
                 return Err(mlua::Error::runtime(format!("{key:?}: the Windows key cannot be pressed for the game")));
             }
-            super::api::push_op(lua, super::Op::Key(Synth { key: c.key, down: None, ctrl: c.ctrl, alt: c.alt, shift: c.shift }))?;
+            super::api::push_op(
+                lua,
+                super::Op::Key(Synth { key: c.key, down: None, ctrl: c.ctrl, alt: c.alt, shift: c.shift }),
+            )?;
             Ok(())
         })?,
     )?;
@@ -618,7 +718,10 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
         lua.create_function(|lua, (key, down): (String, bool)| {
             need(lua, "input.capture")?;
             let key = code_of(&key).ok_or_else(|| mlua::Error::runtime(format!("no key {key:?}")))?;
-            super::api::push_op(lua, super::Op::Key(Synth { key, down: Some(down), ctrl: false, alt: false, shift: false }))?;
+            super::api::push_op(
+                lua,
+                super::Op::Key(Synth { key, down: Some(down), ctrl: false, alt: false, shift: false }),
+            )?;
             let st = super::api::state(lua);
             let mut s = st.borrow_mut();
             s.keys_down.retain(|k| *k != key);
@@ -662,7 +765,8 @@ pub(super) fn install(lua: &mlua::Lua, g: &mlua::Table) -> mlua::Result<()> {
             let st = state(lua);
             let gone: Vec<Bind> = {
                 let mut s = st.borrow_mut();
-                let (gone, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut s.binds).into_iter().partition(|b| b.combo == combo);
+                let (gone, keep): (Vec<_>, Vec<_>) =
+                    std::mem::take(&mut s.binds).into_iter().partition(|b| b.combo == combo);
                 s.binds = keep;
                 gone
             };

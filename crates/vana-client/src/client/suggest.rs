@@ -33,7 +33,8 @@ pub struct Suggestion {
 
 impl PartialEq for Suggestion {
     fn eq(&self, o: &Self) -> bool {
-        (self.action, &self.target, &self.reason, &self.group, &self.label) == (o.action, &o.target, &o.reason, &o.group, &o.label)
+        (self.action, &self.target, &self.reason, &self.group, &self.label)
+            == (o.action, &o.target, &o.reason, &o.group, &o.label)
     }
 }
 
@@ -201,7 +202,11 @@ const RENEW: [(u16, &[u16], &str); 10] = [
 ];
 
 /// Effects worth having up between fights when missing, and their spells (strongest first).
-const BETWEEN: [(u16, &[u16], &str); 3] = [(40, &[47, 46, 45, 44, 43], "Protect"), (41, &[52, 51, 50, 49, 48], "Shell"), (113, &[848, 142, 141, 135], "Reraise")];
+const BETWEEN: [(u16, &[u16], &str); 3] = [
+    (40, &[47, 46, 45, 44, 43], "Protect"),
+    (41, &[52, 51, 50, 49, 48], "Shell"),
+    (113, &[848, 142, 141, 135], "Reraise"),
+];
 
 /// Each ninjutsu's tool and the universal tool a NIN main may use instead (LSB's spell_list and HasNinjaTool; the
 /// client has no such table): Inoshishinofuda elemental, Shikanofuda support, Chonofuda enfeebling.
@@ -297,7 +302,8 @@ fn weather_element(weather: u16) -> Option<u16> {
 
 /// Firesday .. Darksday to their element ids; each element's day by element id.
 const DAY_ELEMENTS: [u16; 8] = [0, 3, 5, 2, 1, 4, 6, 7];
-const DAY_NAMES: [&str; 8] = ["Firesday", "Iceday", "Windsday", "Earthsday", "Lightningday", "Watersday", "Lightsday", "Darksday"];
+const DAY_NAMES: [&str; 8] =
+    ["Firesday", "Iceday", "Windsday", "Earthsday", "Lightningday", "Watersday", "Lightsday", "Darksday"];
 
 /// A spell's family (a suggestion's submenu): an elemental nuke's element (its tiers, -ga / -ja and ancient magic),
 /// else the name without its tier (" II" .. " VI", ": Ichi" ..) and its area form (Protectra, Curaga, Diaga ...).
@@ -312,7 +318,15 @@ fn family(s: &SpellFact) -> String {
             break;
         }
     }
-    const AREA: [(&str, &str); 7] = [("Protectra", "Protect"), ("Shellra", "Shell"), ("Curaga", "Cure"), ("Diaga", "Dia"), ("Poisonga", "Poison"), ("Banishga", "Banish"), ("Sleepga", "Sleep")];
+    const AREA: [(&str, &str); 7] = [
+        ("Protectra", "Protect"),
+        ("Shellra", "Shell"),
+        ("Curaga", "Cure"),
+        ("Diaga", "Dia"),
+        ("Poisonga", "Poison"),
+        ("Banishga", "Banish"),
+        ("Sleepga", "Sleep"),
+    ];
     AREA.iter().find(|a| a.0 == n).map_or(n, |a| a.1).to_string()
 }
 
@@ -402,7 +416,12 @@ fn tier(table: &[(u16, u32)], missing: u32, can: impl Fn(u16) -> bool) -> Option
 /// elemental ninjutsu; not the damage-over-time spells.
 fn nuke(s: &SpellFact) -> bool {
     let dot = ["Burn", "Frost", "Choke", "Rasp", "Shock", "Drown", "Bio", "Dia"].iter().any(|p| s.name.starts_with(p));
-    s.targets & 0x20 != 0 && !dot && (matches!(s.skill, 32 | 36) || s.name.starts_with("Drain") || s.name.starts_with("Aspir") || (s.skill == 39 && s.name.contains("ton:")))
+    s.targets & 0x20 != 0
+        && !dot
+        && (matches!(s.skill, 32 | 36)
+            || s.name.starts_with("Drain")
+            || s.name.starts_with("Aspir")
+            || (s.skill == 39 && s.name.contains("ton:")))
 }
 
 /// The rules in their order: raise, shadows, ailments, heal, close the open chain, burst it, pull the monster off
@@ -440,9 +459,11 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
         }
     }
     // Healing: several low, Curaga; else the lowest; a waltz when no cure is known.
-    let low: Vec<&Member> = f.party.iter().filter(|m| m.here && m.hp_max > 0 && m.hp > 0 && m.hp * 4 <= m.hp_max * 3).collect();
+    let low: Vec<&Member> =
+        f.party.iter().filter(|m| m.here && m.hp_max > 0 && m.hp > 0 && m.hp * 4 <= m.hp_max * 3).collect();
     if low.len() >= 3
-        && let Some(id) = tier(&CURAGAS, low.iter().map(|m| m.hp_max - m.hp).sum::<u32>() / low.len() as u32, |s| f.can(s))
+        && let Some(id) =
+            tier(&CURAGAS, low.iter().map(|m| m.hp_max - m.hp).sum::<u32>() / low.len() as u32, |s| f.can(s))
     {
         push(&mut out, Suggestion::new(Action::Spell(id), None, format!("{} members are below 75% HP.", low.len())));
     } else if let Some(m) = low.iter().min_by_key(|m| m.hp * 100 / m.hp_max) {
@@ -463,18 +484,44 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
                 let els = sc::elements(c);
                 // Not ancient magic while anything else bursts it, one target over an area (Holy before Banishga
                 // II), then the strongest: the top of its family's list.
-                let best = f.spells.iter().filter(|s| nuke(s) && sc::Element::of_spell(s.element as u8).is_some_and(|e| els.contains(&e))).max_by_key(|s| (!ancient(s.id), !s.area, s.mp));
+                let best = f
+                    .spells
+                    .iter()
+                    .filter(|s| nuke(s) && sc::Element::of_spell(s.element as u8).is_some_and(|e| els.contains(&e)))
+                    .max_by_key(|s| (!ancient(s.id), !s.area, s.mp));
                 if let Some(s) = best {
-                    push(&mut out, Suggestion::new(Action::Spell(s.id), None, format!("Burst {}: {:.0} s left.", super::skillchain::chain_text(c), r.left)));
+                    push(
+                        &mut out,
+                        Suggestion::new(
+                            Action::Spell(s.id),
+                            None,
+                            format!("Burst {}: {:.0} s left.", super::skillchain::chain_text(c), r.left),
+                        ),
+                    );
                 }
             }
             _ => {}
         }
         if f.tp >= 1000 && r.left > 0.5 {
-            let close = f.weapon_skills.iter().filter_map(|a| sc::form(&r.against, &a.props).map(|c| (a, c))).max_by_key(|(a, c)| (sc::level(*c), a.power));
+            let close = f
+                .weapon_skills
+                .iter()
+                .filter_map(|a| sc::form(&r.against, &a.props).map(|c| (a, c)))
+                .max_by_key(|(a, c)| (sc::level(*c), a.power));
             if let Some((a, c)) = close {
-                let when = if r.age < super::skillchain::WAIT { format!(" in {:.1} s", super::skillchain::WAIT - r.age) } else { String::new() };
-                push(&mut out, Suggestion::new(Action::Ability(a.index), None, format!("Closes the open chain{when}: {}.", super::skillchain::chain_text(c))));
+                let when = if r.age < super::skillchain::WAIT {
+                    format!(" in {:.1} s", super::skillchain::WAIT - r.age)
+                } else {
+                    String::new()
+                };
+                push(
+                    &mut out,
+                    Suggestion::new(
+                        Action::Ability(a.index),
+                        None,
+                        format!("Closes the open chain{when}: {}.", super::skillchain::chain_text(c)),
+                    ),
+                );
             }
         }
     }
@@ -484,7 +531,8 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
         && !t.hitting_me
         && let Some(m) = f.party.iter().find(|m| &m.name == name)
         && (!matches!(m.job, 7 | 13 | 22) || m.hp * 2 < m.hp_max)
-        && let Some(a) = f.ability("Provoke").map(|a| Action::Ability(a.index)).or_else(|| f.can(112).then_some(Action::Spell(112)))
+        && let Some(a) =
+            f.ability("Provoke").map(|a| Action::Ability(a.index)).or_else(|| f.can(112).then_some(Action::Spell(112)))
     {
         push(&mut out, Suggestion::new(a, None, format!("The {} is attacking {name}.", t.name)));
     }
@@ -508,14 +556,19 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
         }
         // Yonin while the monster is on us, else Innin.
         if !f.has(420) && !f.has(421) {
-            let (name, why) = if targeted { ("Yonin", "the monster is on you") } else { ("Innin", "you are not holding the monster") };
+            let (name, why) = if targeted {
+                ("Yonin", "the monster is on you")
+            } else {
+                ("Innin", "you are not holding the monster")
+            };
             if let Some(a) = f.ability(name) {
                 push(&mut out, Suggestion::new(Action::Ability(a.index), None, sentence(why)));
             }
         }
         // A samba while none is up.
         if ![368, 369, 370].iter().any(|&s| f.has(s))
-            && let Some(a) = ["Haste Samba", "Drain Samba III", "Drain Samba II", "Drain Samba"].iter().find_map(|n| f.ability(n))
+            && let Some(a) =
+                ["Haste Samba", "Drain Samba III", "Drain Samba II", "Drain Samba"].iter().find_map(|n| f.ability(n))
         {
             push(&mut out, Suggestion::new(Action::Ability(a.index), None, "No samba up.".into()));
         }
@@ -529,7 +582,11 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
                 continue;
             }
             if let Some(&id) = spells.iter().find(|&&s| f.can(s)) {
-                let reason = if word.chars().next().is_some_and(char::is_uppercase) { format!("{word} is not on the {}.", t.name) } else { format!("The {} is not {word}.", t.name) };
+                let reason = if word.chars().next().is_some_and(char::is_uppercase) {
+                    format!("{word} is not on the {}.", t.name)
+                } else {
+                    format!("The {} is not {word}.", t.name)
+                };
                 push(&mut out, Suggestion::new(Action::Spell(id), None, reason));
                 given += 1;
             }
@@ -555,7 +612,9 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
                 Some(0) => format!("The {} does not resist {word}.", t.name),
                 Some(_) => format!("The {} resists {word} least.", t.name),
                 None if f.weather_element == Some(s.element) => format!("Today's weather strengthens {word}."),
-                None if f.day_element == Some(s.element) => format!("{} strengthens {word}.", DAY_NAMES[s.element as usize]),
+                None if f.day_element == Some(s.element) => {
+                    format!("{} strengthens {word}.", DAY_NAMES[s.element as usize])
+                }
                 None => format!("Your strongest nuke on the {}.", t.name),
             };
             push(&mut out, Suggestion::new(Action::Spell(s.id), None, reason));
@@ -576,7 +635,14 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
             }
         }
         if let Some((a, c, p, sname)) = best {
-            push(&mut out, Suggestion::new(Action::Ability(a.index), None, format!("Opens {} with {}'s {sname} (TP {}).", super::skillchain::chain_text(c), p.name, p.tp)));
+            push(
+                &mut out,
+                Suggestion::new(
+                    Action::Ability(a.index),
+                    None,
+                    format!("Opens {} with {}'s {sname} (TP {}).", super::skillchain::chain_text(c), p.name, p.tp),
+                ),
+            );
         }
     }
     // The strongest weapon skill.
@@ -584,7 +650,10 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
         && f.tp >= 1000
         && let Some(a) = f.weapon_skills.iter().max_by_key(|a| a.power)
     {
-        push(&mut out, Suggestion::new(Action::Ability(a.index), None, format!("Your strongest weapon skill (TP {}).", f.tp)));
+        push(
+            &mut out,
+            Suggestion::new(Action::Ability(a.index), None, format!("Your strongest weapon skill (TP {}).", f.tp)),
+        );
     }
     // Renew what wears off soon; between fights, put back what is missing.
     for &(effect, spells, name) in &RENEW {
@@ -592,7 +661,10 @@ pub fn suggest(f: &Facts) -> Vec<Suggestion> {
             && left < SOON
             && let Some(&id) = spells.iter().find(|&&s| f.can(s))
         {
-            push(&mut out, Suggestion::new(Action::Spell(id), None, format!("{name} wears off in {}s.", left.ceil() as u32)));
+            push(
+                &mut out,
+                Suggestion::new(Action::Spell(id), None, format!("{name} wears off in {}s.", left.ceil() as u32)),
+            );
         }
     }
     if !f.fighting() {
@@ -628,7 +700,9 @@ pub fn refresh_root(w: &mut World) {
             regroup(&f, &mut w.root_sugg);
             w.root_sugg_at = Some(std::time::Instant::now());
             if let Some(s) = w.root_sugg.get(k).filter(|_| w.suggest_sub.is_some()) {
-                w.suggest_sub = (s.group.len() > 1).then(|| on.and_then(|id| s.group.iter().position(|&g| g == id)).unwrap_or_else(|| family_start(s)));
+                w.suggest_sub = (s.group.len() > 1).then(|| {
+                    on.and_then(|id| s.group.iter().position(|&g| g == id)).unwrap_or_else(|| family_start(s))
+                });
             }
         }
         return;
@@ -659,7 +733,23 @@ pub struct Case {
 /// The rules by the names cases give them, in suggest's order.
 #[cfg(test)]
 pub const RULES: [&str; 17] = [
-    "raise", "shadows", "ailment", "curaga", "cure", "waltz", "burst", "close", "provoke", "job_ability", "ninja_stance", "samba", "debuff", "open_chain", "strongest_ws", "renew", "between",
+    "raise",
+    "shadows",
+    "ailment",
+    "curaga",
+    "cure",
+    "waltz",
+    "burst",
+    "close",
+    "provoke",
+    "job_ability",
+    "ninja_stance",
+    "samba",
+    "debuff",
+    "open_chain",
+    "strongest_ws",
+    "renew",
+    "between",
 ];
 
 /// With VANA_SUGGEST_RECORD set to a folder, each new set of suggestions is written there with its facts as a case
@@ -671,7 +761,10 @@ fn record(f: &Facts, out: &[Suggestion]) {
     let ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
     let case = Case { rule: String::new(), note: String::new(), facts: f.clone(), expect: out.to_vec() };
     let path = dir.join(format!("suggest-{ms}.json"));
-    match serde_json::to_string_pretty(&case).map_err(std::io::Error::other).and_then(|j| std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, j))) {
+    match serde_json::to_string_pretty(&case)
+        .map_err(std::io::Error::other)
+        .and_then(|j| std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, j)))
+    {
         Ok(()) => log::info!("suggest: recorded {}", path.display()),
         Err(e) => log::warn!("suggest: can't record to {}: {e}", dir.display()),
     }
@@ -725,34 +818,78 @@ pub fn facts(w: &World) -> Facts {
     let own_ids: Vec<u16> = super::buffs::icons(w).iter().map(|e| e.0).collect();
     let mut party = Vec::new();
     if let (Some((hp, ..)), Some(st)) = (w.vitals, w.stats.as_ref()) {
-        party.push(Member { name: w.name.clone(), me: true, here: true, hp, hp_max: st.hp_max, job: st.main.0, effects: own_ids.clone() });
+        party.push(Member {
+            name: w.name.clone(),
+            me: true,
+            here: true,
+            hp,
+            hp_max: st.hp_max,
+            job: st.main.0,
+            effects: own_ids.clone(),
+        });
     }
     for m in slots.slots[1..6].iter().flatten() {
-        let max = w.party_hp_max.get(&m.id).copied().filter(|&x| m.hp <= x).unwrap_or_else(|| if m.hpp > 0 { m.hp * 100 / m.hpp as u32 } else { 0 });
-        let effects = w.party_buffs.get(&m.id).map_or(Vec::new(), |row| row.iter().copied().filter(|&b| b != 0 && b != 0xffff).collect());
-        party.push(Member { name: m.name.clone(), me: false, here: m.away == 0 && m.zone == w.pos_zone, hp: m.hp, hp_max: max, job: m.jobs[0], effects });
+        let max = w
+            .party_hp_max
+            .get(&m.id)
+            .copied()
+            .filter(|&x| m.hp <= x)
+            .unwrap_or_else(|| if m.hpp > 0 { m.hp * 100 / m.hpp as u32 } else { 0 });
+        let effects = w
+            .party_buffs
+            .get(&m.id)
+            .map_or(Vec::new(), |row| row.iter().copied().filter(|&b| b != 0 && b != 0xffff).collect());
+        party.push(Member {
+            name: m.name.clone(),
+            me: false,
+            here: m.away == 0 && m.zone == w.pos_zone,
+            hp: m.hp,
+            hp_max: max,
+            job: m.jobs[0],
+            effects,
+        });
     }
-    let own = super::buffs::icons(w).into_iter().map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0))).collect();
-    let known: Vec<u16> = (0..1024u16).filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0)).collect();
+    let own = super::buffs::icons(w)
+        .into_iter()
+        .map(|(id, end)| (id, (end != 0x7fff_ffff).then(|| (end.wrapping_sub(now) as i32) as f32 / 60.0)))
+        .collect();
+    let known: Vec<u16> =
+        (0..1024u16).filter(|&s| w.spells_known.get(s as usize / 8).is_some_and(|b| b & (1 << (s % 8)) != 0)).collect();
     // Ninjutsu only with its tool in the inventory (the server's check; retail's client has none).
-    let held = |item: u16| w.inv.slots.iter().any(|(&(bag, _), &(id, n))| bag == super::items::INVENTORY && id == item && n > 0);
+    let held = |item: u16| {
+        w.inv.slots.iter().any(|(&(bag, _), &(id, n))| bag == super::items::INVENTORY && id == item && n > 0)
+    };
     let main = w.stats.as_ref().map_or(0, |s| s.main.0);
     let spells = known
         .into_iter()
         .filter(|&s| magic::magic_check(w, s).is_none() && has_tool(s, held, main))
         .filter_map(|s| {
             let r = w.actions.as_ref()?.spell(s).filter(|r| !other_school(main, r.kind))?;
-            Some(SpellFact { id: s, name: magic::spell_name(w, s), skill: r.skill, element: r.element, mp: r.mp, targets: r.targets, area: r.area != 0 })
+            Some(SpellFact {
+                id: s,
+                name: magic::spell_name(w, s),
+                skill: r.skill,
+                element: r.element,
+                mp: r.mp,
+                targets: r.targets,
+                area: r.area != 0,
+            })
         })
         .collect();
     let d = sc::data();
     let ready = |ty: u16| magic::ability_rows(w, ty).into_iter().filter(|&a| magic::ability_check(w, a).is_none());
-    let abilities = ready(1).map(|i| AbilityFact { index: i, name: magic::ability_name(w, i), ..Default::default() }).collect();
+    let abilities =
+        ready(1).map(|i| AbilityFact { index: i, name: magic::ability_name(w, i), ..Default::default() }).collect();
     let weapon_skills = ready(3)
         .map(|i| {
             let ws = w.actions.as_ref().and_then(|a| a.abilities.get(i as usize)).map_or(i, |a| a.id);
             let e = d.weapon.get(&ws);
-            AbilityFact { index: i, name: magic::ability_name(w, i), props: e.map_or([0; 3], |e| e.props), power: e.map_or(0, |e| e.skill) }
+            AbilityFact {
+                index: i,
+                name: magic::ability_name(w, i),
+                props: e.map_or([0; 3], |e| e.props),
+                power: e.map_or(0, |e| e.skill),
+            }
         })
         .collect();
     let target_id = super::skillchain::focus(w);
@@ -763,16 +900,45 @@ pub fn facts(w: &World) -> Facts {
             hpp: e.hpp,
             ours: w.timers.on.get(&t).map_or(Vec::new(), |b| b.effects.iter().map(|x| x.status).collect()),
             hitting_me: hit == Some(w.my_id),
-            hitting: hit.filter(|&h| h != w.my_id).and_then(|h| w.party.party().find(|m| m.id == h).map(|m| m.name.clone())),
+            hitting: hit
+                .filter(|&h| h != w.my_id)
+                .and_then(|h| w.party.party().find(|m| m.id == h).map(|m| m.name.clone())),
             ranks: crate::dat::resists::of(w.pos_zone, &e.name),
         }
     });
-    let resonance = target_id.and_then(|t| w.skillchain.on.get(&t)).filter(|r| r.left() > 0.0).map(|r| ResonanceFact { against: r.against(), chain: r.chain, age: r.age(), left: r.left() });
-    let partners = super::skillchain::members(w).into_iter().filter(|m| !m.me).map(|m| Partner { name: m.name.clone(), tp: m.tp, skills: m.skills.iter().map(|&s| (super::skillchain::name(w, s), d.props(s))).collect() }).collect();
+    let resonance = target_id.and_then(|t| w.skillchain.on.get(&t)).filter(|r| r.left() > 0.0).map(|r| ResonanceFact {
+        against: r.against(),
+        chain: r.chain,
+        age: r.age(),
+        left: r.left(),
+    });
+    let partners = super::skillchain::members(w)
+        .into_iter()
+        .filter(|m| !m.me)
+        .map(|m| Partner {
+            name: m.name.clone(),
+            tp: m.tp,
+            skills: m.skills.iter().map(|&s| (super::skillchain::name(w, s), d.props(s))).collect(),
+        })
+        .collect();
     // Firesday .. Darksday: 3456 s each of the 27648 s week (the location panel's day).
-    let day_element = w.clock.map(|(t, at)| DAY_ELEMENTS[((t as u64 + at.elapsed().as_secs()) % 27648 / 3456) as usize]);
+    let day_element =
+        w.clock.map(|(t, at)| DAY_ELEMENTS[((t as u64 + at.elapsed().as_secs()) % 27648 / 3456) as usize]);
     let weather_element = weather_element(super::event::weather(w));
-    Facts { party, own, tp: w.vitals.map_or(0, |v| v.2), engaged: w.my_motion.status == 1, spells, abilities, weapon_skills, target, resonance, partners, weather_element, day_element }
+    Facts {
+        party,
+        own,
+        tp: w.vitals.map_or(0, |v| v.2),
+        engaged: w.my_motion.status == 1,
+        spells,
+        abilities,
+        weapon_skills,
+        target,
+        resonance,
+        partners,
+        weather_element,
+        day_element,
+    }
 }
 
 #[cfg(test)]
@@ -788,12 +954,17 @@ mod tests {
     #[test]
     fn recorded_cases() {
         let bless = std::env::var_os("VANA_SUGGEST_BLESS").is_some();
-        let mut paths: Vec<_> = std::fs::read_dir(cases_dir()).expect("suggest_cases").filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "json")).collect();
+        let mut paths: Vec<_> = std::fs::read_dir(cases_dir())
+            .expect("suggest_cases")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x == "json"))
+            .collect();
         paths.sort();
         assert!(!paths.is_empty());
         let mut failed = Vec::new();
         for p in &paths {
-            let mut case: Case = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+            let mut case: Case = serde_json::from_str(&std::fs::read_to_string(p).unwrap())
+                .unwrap_or_else(|e| panic!("{}: {e}", p.display()));
             assert!(RULES.contains(&case.rule.as_str()), "{}: rule {:?} is not one of RULES", p.display(), case.rule);
             let got = suggest(&case.facts);
             if bless {
@@ -824,7 +995,15 @@ mod tests {
     }
 
     fn ally(name: &str, hp: u32, max: u32, effects: &[u16]) -> Member {
-        Member { name: name.into(), me: false, here: true, hp, hp_max: max, effects: effects.to_vec(), ..Default::default() }
+        Member {
+            name: name.into(),
+            me: false,
+            here: true,
+            hp,
+            hp_max: max,
+            effects: effects.to_vec(),
+            ..Default::default()
+        }
     }
 
     fn spells(ids: &[u16]) -> Vec<SpellFact> {
@@ -837,7 +1016,11 @@ mod tests {
 
     #[test]
     fn ailments_first_then_the_lowest_cure() {
-        let f = Facts { party: vec![me(900, 1000), ally("Raven", 300, 1000, &[3]), ally("Koru", 800, 1000, &[])], spells: spells(&[1, 2, 3, 4, 14]), ..Default::default() };
+        let f = Facts {
+            party: vec![me(900, 1000), ally("Raven", 300, 1000, &[3]), ally("Koru", 800, 1000, &[])],
+            spells: spells(&[1, 2, 3, 4, 14]),
+            ..Default::default()
+        };
         let s = suggest(&f);
         assert_eq!(s[0], Suggestion::new(Action::Spell(14), Some("Raven".into()), "Raven is poisoned.".into()));
         // 700 missing: Cure IV (380) is the highest known not past it.
@@ -847,7 +1030,11 @@ mod tests {
 
     #[test]
     fn several_low_curaga_and_no_spell_no_suggestion() {
-        let f = Facts { party: vec![me(500, 1000), ally("A", 600, 1000, &[]), ally("B", 400, 1000, &[])], spells: spells(&[1, 7, 8]), ..Default::default() };
+        let f = Facts {
+            party: vec![me(500, 1000), ally("A", 600, 1000, &[]), ally("B", 400, 1000, &[])],
+            spells: spells(&[1, 7, 8]),
+            ..Default::default()
+        };
         assert_eq!(suggest(&f)[0].action, Action::Spell(8));
         let none = Facts { party: vec![me(100, 1000)], ..Default::default() };
         assert!(suggest(&none).is_empty());
@@ -862,7 +1049,11 @@ mod tests {
             engaged: true,
             spells: spells(&[338, 339]),
             abilities: vec![AbilityFact { index: 700, name: "Innin".into(), ..Default::default() }],
-            weapon_skills: vec![ws(128, "Blade: Rin", [1, 0, 0], 5), ws(131, "Blade: Teki", [10, 0, 0], 75), ws(133, "Blade: Ten", [9, 0, 0], 225)],
+            weapon_skills: vec![
+                ws(128, "Blade: Rin", [1, 0, 0], 5),
+                ws(131, "Blade: Teki", [10, 0, 0], 75),
+                ws(133, "Blade: Ten", [9, 0, 0], 225),
+            ],
             target: Some(TargetFact { name: "Bat".into(), hpp: 90, ..Default::default() }),
             ..Default::default()
         };
@@ -889,15 +1080,47 @@ mod tests {
         // Fusion made: a Fire nuke bursts it.
         f.resonance = Some(ResonanceFact { against: vec![11], chain: Some(11), age: 1.0, left: 8.0 });
         f.tp = 0;
-        f.spells = vec![SpellFact { id: 144, name: "Fire".into(), skill: 36, element: 0, mp: 9, targets: 0x20, ..Default::default() }, SpellFact { id: 149, name: "Blizzard".into(), skill: 36, element: 1, mp: 8, targets: 0x20, ..Default::default() }];
+        f.spells = vec![
+            SpellFact {
+                id: 144,
+                name: "Fire".into(),
+                skill: 36,
+                element: 0,
+                mp: 9,
+                targets: 0x20,
+                ..Default::default()
+            },
+            SpellFact {
+                id: 149,
+                name: "Blizzard".into(),
+                skill: 36,
+                element: 1,
+                mp: 8,
+                targets: 0x20,
+                ..Default::default()
+            },
+        ];
         assert_eq!(suggest(&f)[0].action, Action::Spell(144));
     }
 
     #[test]
     fn bursts_prefer_one_target() {
         // Fusion (fire, light): Holy over Banishga II though it costs less.
-        let nuke = |id, name: &str, mp, area| SpellFact { id, name: name.into(), skill: 32, element: 6, mp, targets: 0x20, area };
-        let f = Facts { party: vec![me(1000, 1000)], resonance: Some(ResonanceFact { against: vec![11], chain: Some(11), age: 1.0, left: 8.0 }), spells: vec![nuke(39, "Banishga II", 120, true), nuke(21, "Holy", 100, false)], ..Default::default() };
+        let nuke = |id, name: &str, mp, area| SpellFact {
+            id,
+            name: name.into(),
+            skill: 32,
+            element: 6,
+            mp,
+            targets: 0x20,
+            area,
+        };
+        let f = Facts {
+            party: vec![me(1000, 1000)],
+            resonance: Some(ResonanceFact { against: vec![11], chain: Some(11), age: 1.0, left: 8.0 }),
+            spells: vec![nuke(39, "Banishga II", 120, true), nuke(21, "Holy", 100, false)],
+            ..Default::default()
+        };
         assert_eq!(suggest(&f)[0].action, Action::Spell(21));
     }
 
@@ -954,9 +1177,22 @@ mod tests {
     fn caster_debuffs_and_the_weakest_element() {
         let f = Facts {
             party: vec![me(1000, 1000)],
-            spells: vec![named(23, "Dia", 35, 6, 7, false), named(230, "Bio", 37, 7, 15, false), named(254, "Blind", 35, 7, 5, false), named(144, "Fire", 36, 0, 7, false), named(145, "Fire II", 36, 0, 26, false), named(174, "Firaga", 36, 0, 57, true), named(164, "Thunder", 36, 4, 9, false)],
+            spells: vec![
+                named(23, "Dia", 35, 6, 7, false),
+                named(230, "Bio", 37, 7, 15, false),
+                named(254, "Blind", 35, 7, 5, false),
+                named(144, "Fire", 36, 0, 7, false),
+                named(145, "Fire II", 36, 0, 26, false),
+                named(174, "Firaga", 36, 0, 57, true),
+                named(164, "Thunder", 36, 4, 9, false),
+            ],
             // A rabbit's ranks: thunder (-3) below fire (-2).
-            target: Some(TargetFact { name: "Wild Rabbit".into(), hpp: 90, ranks: Some([-2, -1, -2, -1, -3, -3, -1, -3]), ..Default::default() }),
+            target: Some(TargetFact {
+                name: "Wild Rabbit".into(),
+                hpp: 90,
+                ranks: Some([-2, -1, -2, -1, -3, -3, -1, -3]),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let s = suggest(&f);
@@ -979,8 +1215,19 @@ mod tests {
     fn nuke_family_order() {
         let f = Facts {
             party: vec![me(1000, 1000)],
-            spells: vec![named(206, "Freeze", 36, 1, 315, false), named(150, "Blizzard II", 36, 1, 31, false), named(149, "Blizzard", 36, 1, 8, false), named(180, "Blizzaga II", 36, 1, 175, true), named(179, "Blizzaga", 36, 1, 80, true)],
-            target: Some(TargetFact { name: "Bark Spider".into(), hpp: 90, ranks: Some([0, -2, 0, 0, 0, 0, 0, 0]), ..Default::default() }),
+            spells: vec![
+                named(206, "Freeze", 36, 1, 315, false),
+                named(150, "Blizzard II", 36, 1, 31, false),
+                named(149, "Blizzard", 36, 1, 8, false),
+                named(180, "Blizzaga II", 36, 1, 175, true),
+                named(179, "Blizzaga", 36, 1, 80, true),
+            ],
+            target: Some(TargetFact {
+                name: "Bark Spider".into(),
+                hpp: 90,
+                ranks: Some([0, -2, 0, 0, 0, 0, 0, 0]),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let s = suggest(&f);
@@ -996,10 +1243,25 @@ mod tests {
     /// moves back to the list's top.
     #[test]
     fn held_rows_regroup() {
-        let all = vec![named(150, "Blizzard II", 36, 1, 31, false), named(149, "Blizzard", 36, 1, 8, false), named(180, "Blizzaga II", 36, 1, 175, true), named(179, "Blizzaga", 36, 1, 80, true)];
-        let target = Some(TargetFact { name: "Bark Spider".into(), hpp: 90, ranks: Some([0, -2, 0, 0, 0, 0, 0, 0]), ..Default::default() });
+        let all = vec![
+            named(150, "Blizzard II", 36, 1, 31, false),
+            named(149, "Blizzard", 36, 1, 8, false),
+            named(180, "Blizzaga II", 36, 1, 175, true),
+            named(179, "Blizzaga", 36, 1, 80, true),
+        ];
+        let target = Some(TargetFact {
+            name: "Bark Spider".into(),
+            hpp: 90,
+            ranks: Some([0, -2, 0, 0, 0, 0, 0, 0]),
+            ..Default::default()
+        });
         // Built while Blizzard II and Blizzaga II recast.
-        let f = Facts { party: vec![me(1000, 1000)], spells: vec![all[1].clone(), all[3].clone()], target, ..Default::default() };
+        let f = Facts {
+            party: vec![me(1000, 1000)],
+            spells: vec![all[1].clone(), all[3].clone()],
+            target,
+            ..Default::default()
+        };
         let mut s = suggest(&f);
         let k = s.iter().position(|x| x.label.as_deref() == Some("Ice")).expect("an ice family");
         assert_eq!((s[k].action, s[k].group.as_slice()), (Action::Spell(149), &[149, 179][..]));
@@ -1009,14 +1271,28 @@ mod tests {
         regroup(&Facts { spells: vec![all[1].clone()], ..f.clone() }, &mut s);
         assert_eq!((s[k].action, s[k].group.as_slice(), s[k].label.as_deref()), (Action::Spell(149), &[][..], None));
         regroup(&Facts { spells: all, ..f }, &mut s);
-        assert_eq!((s[k].action, s[k].group.as_slice(), s[k].label.as_deref()), (Action::Spell(150), &[150, 149, 180, 179][..], Some("Ice")));
+        assert_eq!(
+            (s[k].action, s[k].group.as_slice(), s[k].label.as_deref()),
+            (Action::Spell(150), &[150, 149, 180, 179][..], Some("Ice"))
+        );
     }
 
     /// Protect's family takes Protectra; the weather breaks a tie between elements.
     #[test]
     fn families_and_the_weather() {
-        let p = |id, name: &str, mp, area| SpellFact { id, name: name.into(), skill: 34, mp, targets: 1, area, ..Default::default() };
-        let f = Facts { spells: vec![p(43, "Protect", 9, false), p(44, "Protect II", 28, false), p(125, "Protectra", 9, true)], ..Default::default() };
+        let p = |id, name: &str, mp, area| SpellFact {
+            id,
+            name: name.into(),
+            skill: 34,
+            mp,
+            targets: 1,
+            area,
+            ..Default::default()
+        };
+        let f = Facts {
+            spells: vec![p(43, "Protect", 9, false), p(44, "Protect II", 28, false), p(125, "Protectra", 9, true)],
+            ..Default::default()
+        };
         assert_eq!(family(&f.spells[1]), "Protect");
         assert_eq!(family(&f.spells[2]), "Protect");
         let mut s = vec![Suggestion::new(Action::Spell(44), None, String::new())];

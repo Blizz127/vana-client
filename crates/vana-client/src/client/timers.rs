@@ -99,7 +99,10 @@ pub struct Bearer {
 
 impl Bearer {
     fn left(&self, status: u16, now: Instant) -> Option<f32> {
-        self.effects.iter().filter(|e| e.status == status).find_map(|e| e.secs.map(|s| s - now.duration_since(e.start).as_secs_f32()))
+        self.effects
+            .iter()
+            .filter(|e| e.status == status)
+            .find_map(|e| e.secs.map(|s| s - now.duration_since(e.start).as_secs_f32()))
     }
 }
 
@@ -245,8 +248,19 @@ impl Timers {
         // Copies of one effect: the one ending first goes.
         let now = Instant::now();
         let at = |e: &Applied| e.secs.map_or(f32::MAX, |s| s - now.duration_since(e.start).as_secs_f32());
-        if let Some(i) = b.effects.iter().enumerate().filter(|(_, e)| durations::icon_matches(e.status, icon)).min_by(|a, b| at(a.1).total_cmp(&at(b.1))).map(|(i, _)| i) {
-            log::debug!("timers: {target:#x} {} ended by the server, {:.1} s before the predicted end", b.effects[i].status, at(&b.effects[i]));
+        if let Some(i) = b
+            .effects
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| durations::icon_matches(e.status, icon))
+            .min_by(|a, b| at(a.1).total_cmp(&at(b.1)))
+            .map(|(i, _)| i)
+        {
+            log::debug!(
+                "timers: {target:#x} {} ended by the server, {:.1} s before the predicted end",
+                b.effects[i].status,
+                at(&b.effects[i])
+            );
             if durations::duplicates(b.effects[i].status) {
                 b.effects.remove(i);
             } else {
@@ -309,7 +323,11 @@ fn source_name(w: &World, s: Source) -> String {
 fn target_of(w: &World, id: u32, first: bool, c: &durations::Caster) -> durations::Target {
     let me = id == w.my_id;
     let level = w.party.members().find(|m| m.id == id).map(|m| m.jobs[1]).filter(|&l| l > 0);
-    let has = if me { w.buffs.iter().copied().filter(|&b| b != 0xffff).collect() } else { w.party_buffs.get(&id).map_or(HashSet::new(), |l| l.iter().copied().filter(|&b| b != 0xffff).collect()) };
+    let has = if me {
+        w.buffs.iter().copied().filter(|&b| b != 0xffff).collect()
+    } else {
+        w.party_buffs.get(&id).map_or(HashSet::new(), |l| l.iter().copied().filter(|&b| b != 0xffff).collect())
+    };
     let mods = if me { c.mods.clone() } else { HashMap::new() };
     durations::Target { me, level, has, first, mods }
 }
@@ -323,7 +341,9 @@ fn ws_tp(w: &World, ws: u16) -> f32 {
     for slot in (0..16).filter(|s| !skip.contains(s)) {
         tp += durations::slot_mod(w, slot, 345);
     }
-    let skill = |slot: usize| durations::slot_item(w, slot).and_then(|i| w.item_info.as_ref()?.item(i)).map_or(0, |it| it.skill);
+    let skill = |slot: usize| {
+        durations::slot_item(w, slot).and_then(|i| w.item_info.as_ref()?.item(i)).map_or(0, |it| it.skill)
+    };
     if !ranged && matches!(skill(0), 2 | 3 | 5 | 9 | 11) && skill(1) == 0 {
         tp += (0..16).map(|s| durations::slot_mod(w, s, 903)).sum::<f32>();
     }
@@ -388,11 +408,20 @@ pub fn on_action(w: &mut World, a: &Action) {
     let now = Instant::now();
     for (i, t) in a.targets.iter().enumerate() {
         for r in &t.results {
-            let hit: Vec<&durations::Row> = rows.iter().filter(|row| durations::lands(row, r.message, r.value) && row.know != 'n' && row.effect != 0).collect();
+            let hit: Vec<&durations::Row> = rows
+                .iter()
+                .filter(|row| durations::lands(row, r.message, r.value) && row.know != 'n' && row.effect != 0)
+                .collect();
             // Several effects in one result: the value names the best; it being the first of the action means all
             // landed (Warm-Up, Amplification ...).
             let hit: Vec<&durations::Row> = match hit.iter().position(|row| row.param == 'E') {
-                Some(k) if hit[k].effect as u32 != r.value || rows.iter().position(|x| std::ptr::eq(x, hit[k])) != rows.iter().position(|x| x.param == 'E') => hit.into_iter().filter(|row| row.param != 'E' || row.effect as u32 == r.value).collect(),
+                Some(k)
+                    if hit[k].effect as u32 != r.value
+                        || rows.iter().position(|x| std::ptr::eq(x, hit[k]))
+                            != rows.iter().position(|x| x.param == 'E') =>
+                {
+                    hit.into_iter().filter(|row| row.param != 'E' || row.effect as u32 == r.value).collect()
+                }
                 _ => hit,
             };
             for row in hit {
@@ -409,7 +438,19 @@ pub fn on_action(w: &mut World, a: &Action) {
 
 /// One row landing on `target`.
 #[allow(clippy::too_many_arguments)]
-fn land(w: &mut World, c: &durations::Caster, a: &Action, row: &durations::Row, source: Source, target: u32, first: bool, value: u32, white: bool, double_up: bool, now: Instant) {
+fn land(
+    w: &mut World,
+    c: &durations::Caster,
+    a: &Action,
+    row: &durations::Row,
+    source: Source,
+    target: u32,
+    first: bool,
+    value: u32,
+    white: bool,
+    double_up: bool,
+    now: Instant,
+) {
     let me = w.my_id;
     match row.formula.as_str() {
         // Quick Draw boosts and Double-Up keep the end time; removals were handled.
@@ -433,7 +474,8 @@ fn land(w: &mut World, c: &durations::Caster, a: &Action, row: &durations::Row, 
             w.timers.rolls.insert(status, value);
         }
         if double_up
-            && let Some(e) = w.timers.on.get_mut(&target).and_then(|b| b.effects.iter_mut().find(|e| e.status == status))
+            && let Some(e) =
+                w.timers.on.get_mut(&target).and_then(|b| b.effects.iter_mut().find(|e| e.status == status))
         {
             e.name = name;
             return;
@@ -469,7 +511,14 @@ fn land(w: &mut World, c: &durations::Caster, a: &Action, row: &durations::Row, 
             b.effects.retain(|e| !(e.status == status && e.tier == row.tier));
             if ours as f32 >= max_songs {
                 let at = |e: &Applied| e.secs.map_or(f32::MAX, |s| s - now.duration_since(e.start).as_secs_f32());
-                if let Some(i) = b.effects.iter().enumerate().filter(|(_, e)| e.tier > 0 && (195..=223).contains(&e.status)).min_by(|x, y| at(x.1).total_cmp(&at(y.1))).map(|(i, _)| i) {
+                if let Some(i) = b
+                    .effects
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, e)| e.tier > 0 && (195..=223).contains(&e.status))
+                    .min_by(|x, y| at(x.1).total_cmp(&at(y.1)))
+                    .map(|(i, _)| i)
+                {
                     b.effects.remove(i);
                 }
             }
@@ -482,7 +531,8 @@ fn land(w: &mut World, c: &durations::Caster, a: &Action, row: &durations::Row, 
     // Rolls: a COR keeps two of its own on a target (one as a sub job); the one ending first goes.
     if row.formula == "ROLL" {
         let limit = if c.main.0 == 17 { 2 } else { 1 };
-        let rolls: Vec<usize> = b.effects.iter().enumerate().filter(|(_, e)| matches!(e.status, 310..=339 | 600)).map(|(i, _)| i).collect();
+        let rolls: Vec<usize> =
+            b.effects.iter().enumerate().filter(|(_, e)| matches!(e.status, 310..=339 | 600)).map(|(i, _)| i).collect();
         if rolls.len() >= limit {
             let at = |e: &Applied| e.secs.map_or(f32::MAX, |s| s - now.duration_since(e.start).as_secs_f32());
             if let Some(&i) = rolls.iter().min_by(|&&x, &&y| at(&b.effects[x]).total_cmp(&at(&b.effects[y]))) {
@@ -514,7 +564,14 @@ fn procs(w: &mut World, a: &Action) {
                 (b.name, b.mob) = (who, mob);
             }
             b.effects.retain(|e| e.status != status);
-            b.effects.push(Applied { status, name, start: now, secs: Some(secs), told: !durations::silent_end(status), tier: 0 });
+            b.effects.push(Applied {
+                status,
+                name,
+                start: now,
+                secs: Some(secs),
+                told: !durations::silent_end(status),
+                tier: 0,
+            });
         }
     }
 }
@@ -523,12 +580,21 @@ fn procs(w: &mut World, a: &Action) {
 /// their step extends the daze we put on; the player we raised with Arise accepting brings Reraise.
 fn others(w: &mut World, a: &Action) {
     let now = Instant::now();
-    let tiers = |status: u16| durations::tables().rows.get(&(Kind::Spell, a.arg as u16)).and_then(|r| r.iter().find(|r| r.effect == status)).map_or(0, |r| r.tier);
+    let tiers = |status: u16| {
+        durations::tables()
+            .rows
+            .get(&(Kind::Spell, a.arg as u16))
+            .and_then(|r| r.iter().find(|r| r.effect == status))
+            .map_or(0, |r| r.tier)
+    };
     for t in &a.targets {
         for r in &t.results {
             let Some(b) = w.timers.on.get_mut(&t.id) else { continue };
             if a.category == 14 && matches!(r.message, 519..=521 | 591) {
-                let Some(row) = durations::tables().rows.get(&(Kind::Ability, a.arg as u16)).and_then(|r| r.first()) else { continue };
+                let Some(row) = durations::tables().rows.get(&(Kind::Ability, a.arg as u16)).and_then(|r| r.first())
+                else {
+                    continue;
+                };
                 if let Some(e) = b.effects.iter_mut().find(|e| e.status == row.effect) {
                     let gone = now.duration_since(e.start).as_secs_f32();
                     let left = e.secs.unwrap_or(0.0) - gone;
@@ -551,7 +617,10 @@ fn others(w: &mut World, a: &Action) {
         }
     }
     // Arise accepted: the raised player's category-4 Arise action (MODLOG "Timers"); Reraise for an hour, no origin.
-    if a.category == crate::net::action::category::MAGIC_FINISH && a.arg == 494 && w.timers.arise.iter().any(|x| x.0 == a.actor) {
+    if a.category == crate::net::action::category::MAGIC_FINISH
+        && a.arg == 494
+        && w.timers.arise.iter().any(|x| x.0 == a.actor)
+    {
         w.timers.arise.retain(|x| x.0 != a.actor);
         let name = source_name(w, Source::Spell(494));
         let (who, mob) = bearer_name(w, a.actor);
@@ -582,11 +651,14 @@ pub fn on_party_effects(w: &mut World) {
     for (id, b) in w.timers.on.iter_mut() {
         let Some(list) = w.party_buffs.get(id) else { continue };
         let fresh = |e: &Applied| now.duration_since(e.start).as_secs_f32() < LIST_LAG;
-        let mut keep: Vec<bool> = b.effects.iter().map(|e| fresh(e) || list.iter().any(|&i| durations::icon_matches(e.status, i))).collect();
-        let statuses: HashSet<u16> = b.effects.iter().filter(|e| durations::duplicates(e.status)).map(|e| e.status).collect();
+        let mut keep: Vec<bool> =
+            b.effects.iter().map(|e| fresh(e) || list.iter().any(|&i| durations::icon_matches(e.status, i))).collect();
+        let statuses: HashSet<u16> =
+            b.effects.iter().filter(|e| durations::duplicates(e.status)).map(|e| e.status).collect();
         for s in statuses {
             let icons = list.iter().filter(|&&i| i == s).count();
-            let mut ours: Vec<usize> = (0..b.effects.len()).filter(|&i| b.effects[i].status == s && !fresh(&b.effects[i])).collect();
+            let mut ours: Vec<usize> =
+                (0..b.effects.len()).filter(|&i| b.effects[i].status == s && !fresh(&b.effects[i])).collect();
             let at = |e: &Applied| e.secs.map_or(f32::MAX, |x| x - now.duration_since(e.start).as_secs_f32());
             ours.sort_by(|&x, &y| at(&b.effects[x]).total_cmp(&at(&b.effects[y])));
             for &i in ours.iter().take(ours.len().saturating_sub(icons)) {
@@ -704,16 +776,34 @@ pub fn charge_rule(w: &World, kind: u8) -> Option<(i32, i32)> {
     let ((mj, ml), (sj, sl)) = (s.main, s.sub);
     let (n, full) = match kind {
         9 => {
-            let lv = if mj == 0x11 { Some(ml) } else if sj == 0x11 { Some(sl) } else { None };
+            let lv = if mj == 0x11 {
+                Some(ml)
+            } else if sj == 0x11 {
+                Some(sl)
+            } else {
+                None
+            };
             (lv.map_or(0, |l| if l < 0x28 { 0 } else { 2 }), 0x78)
         }
         0xf => {
-            let lv = if mj == 0x14 { Some(ml) } else if sj == 0x14 { Some(sl) } else { None };
+            let lv = if mj == 0x14 {
+                Some(ml)
+            } else if sj == 0x14 {
+                Some(sl)
+            } else {
+                None
+            };
             (lv.map_or(0, |l| (l as i32 - 10) / 0x14 + 1), 0xf0)
         }
         // Retail tests the sub job against 0x14 here, not 9 (kept).
         0x12 => {
-            let lv = if mj == 9 { Some(ml) } else if sj == 0x14 { Some(sl) } else { None };
+            let lv = if mj == 9 {
+                Some(ml)
+            } else if sj == 0x14 {
+                Some(sl)
+            } else {
+                None
+            };
             (lv.map_or(0, |l| if l < 0x19 { 0 } else { 3 }), 0x5a)
         }
         _ => return None,
@@ -754,7 +844,9 @@ fn charge_kind(w: &World, a: &crate::dat::actions::Ability) -> u8 {
 fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, u32)>) -> Vec<Row> {
     let mut rows = Vec::new();
     let names = w.names.clone();
-    let name_of = |id: u32, spell: bool| names.as_ref().and_then(|n| if spell { n.spell(id) } else { n.ability(id) }).unwrap_or_default();
+    let name_of = |id: u32, spell: bool| {
+        names.as_ref().and_then(|n| if spell { n.spell(id) } else { n.ability(id) }).unwrap_or_default()
+    };
     for (&timer, &end) in &w.ability_recast {
         let left = end.saturating_duration_since(now).as_secs_f32();
         if left <= 0.0 {
@@ -793,14 +885,18 @@ fn recast_rows(w: &World, t: &mut Timers, now: Instant, seen: &mut HashSet<(u8, 
 fn own_rows(w: &World, gu: &GameUi, t: &mut Timers, seen: &mut HashSet<(u8, u32)>) -> Vec<Row> {
     let small = w.game.get(0x99) & 4 != 0;
     let now60 = w.clock.map_or(0.0, |(c, at)| (c as f64 + at.elapsed().as_secs_f64()) * 60.0) as u64 as u32;
-    let names: Vec<(u16, String)> = t.on.get(&w.my_id).map_or(Vec::new(), |b| b.effects.iter().map(|e| (e.status, e.name.clone())).collect());
+    let names: Vec<(u16, String)> =
+        t.on.get(&w.my_id).map_or(Vec::new(), |b| b.effects.iter().map(|e| (e.status, e.name.clone())).collect());
     let mut rows = Vec::new();
     for i in 0..32 {
         let id = w.buffs[i];
         if id == 0xffff || id == 0 {
             continue;
         }
-        let Some(end) = w.buff_timers.as_ref().filter(|b| b.0[i] == id).map(|b| b.1[i]).filter(|&e| e != 0x7fff_ffff) else { continue };
+        let Some(end) = w.buff_timers.as_ref().filter(|b| b.0[i] == id).map(|b| b.1[i]).filter(|&e| e != 0x7fff_ffff)
+        else {
+            continue;
+        };
         if gu.status_entry(small, id).is_some_and(|e| e.no_timer) {
             continue;
         }
@@ -823,7 +919,9 @@ fn applied_rows(b: &Bearer, now: Instant) -> Vec<Row> {
         .map(|e| {
             let gone = now.duration_since(e.start).as_secs_f32();
             match e.secs {
-                Some(s) => Row { icon: Icon::Status(e.status), name: e.name.clone(), left: s - gone, total: s, fills: false },
+                Some(s) => {
+                    Row { icon: Icon::Status(e.status), name: e.name.clone(), left: s - gone, total: s, fills: false }
+                }
                 None => Row { icon: Icon::Status(e.status), name: e.name.clone(), left: 0.0, total: 0.0, fills: false },
             }
         })
@@ -855,8 +953,11 @@ pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
         buffs.push(Group { name: Some(b.name.clone()), rows: applied_rows(b, now) });
     }
     let mut mobs: Vec<(&u32, &Bearer)> = w.timers.on.iter().filter(|(_, b)| b.mob).collect();
-    mobs.sort_by_key(|(id, b)| (Some(**id) != w.target, b.effects.iter().map(|e| e.start).max().map(std::cmp::Reverse), b.name.clone()));
-    let debuffs = mobs.into_iter().map(|(_, b)| Group { name: Some(b.name.clone()), rows: applied_rows(b, now) }).collect();
+    mobs.sort_by_key(|(id, b)| {
+        (Some(**id) != w.target, b.effects.iter().map(|e| e.start).max().map(std::cmp::Reverse), b.name.clone())
+    });
+    let debuffs =
+        mobs.into_iter().map(|(_, b)| Group { name: Some(b.name.clone()), rows: applied_rows(b, now) }).collect();
     let recasts = if recasts.is_empty() { Vec::new() } else { vec![Group { name: None, rows: recasts }] };
     // With the Extra off only the mods' timers show.
     let mut secs = if w.extra_timers { [recasts, buffs, debuffs] } else { Default::default() };
@@ -867,7 +968,9 @@ pub fn sections(w: &mut World, gu: &GameUi) -> [Vec<Group>; 3] {
 /// The Lua mods' timers in their sections and groups (those of unloaded mods and a second past their end dropped).
 fn mod_rows(w: &mut World, now: Instant, secs: &mut [Vec<Group>; 3]) {
     let loaded = w.lua.mod_ids();
-    w.timers.mods.retain(|t| loaded.contains(&t.mod_id) && (t.end > now || now.duration_since(t.end).as_secs_f32() < 1.0));
+    w.timers
+        .mods
+        .retain(|t| loaded.contains(&t.mod_id) && (t.end > now || now.duration_since(t.end).as_secs_f32() < 1.0));
     for t in &w.timers.mods {
         let left = if t.end > now { t.end.duration_since(now).as_secs_f32() } else { 0.0 };
         let row = Row { icon: t.icon, name: t.name.clone(), left, total: t.total, fills: t.fills };
@@ -923,12 +1026,14 @@ pub fn place(dock: Dock, sw: f32, sh: f32, icons: usize, log_top: f32, foot: f32
     // The status icons: 26-px rows from (142, 48).
     let icons_foot = if icons == 0 { 0.0 } else { 48.0 + 2.0 + 26.0 * icons.div_ceil(9) as f32 + 4.0 };
     // The minimap's foot where it stands over the column [x0, x1).
-    let mini_foot = |x0: f32, x1: f32| mini.filter(|m| m[0] < x1 && m[0] + m[2] > x0).map_or(0.0, |m| m[1] + m[3] + 6.0);
+    let mini_foot =
+        |x0: f32, x1: f32| mini.filter(|m| m[0] < x1 && m[0] + m[2] > x0).map_or(0.0, |m| m[1] + m[3] + 6.0);
     match dock {
         Dock::Left => {
             // Under the cast bar (16, 94) + 24 and the gauges, past the icons when they reach over; above the compass
             // (its centre 42 above the log, 50 each way); under a minimap there.
-            let top = 122f32.max(if 16.0 + WIDTH > 142.0 { icons_foot } else { 0.0 }).max(mini_foot(16.0, 16.0 + WIDTH));
+            let top =
+                122f32.max(if 16.0 + WIDTH > 142.0 { icons_foot } else { 0.0 }).max(mini_foot(16.0, 16.0 + WIDTH));
             Place { dock, x: 16.0, y: top, max_h: (log_top - 96.0 - top).max(0.0) }
         }
         Dock::Right => {
@@ -949,7 +1054,11 @@ pub fn place(dock: Dock, sw: f32, sh: f32, icons: usize, log_top: f32, foot: f32
 
 fn clock(left: f32) -> String {
     let s = left.max(0.0).ceil() as u32;
-    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60)
+    } else {
+        format!("{}:{:02}", s / 60, s % 60)
+    }
 }
 
 /// The lines that fit: rows dropped from the last section up, each section's heading counting what it hides.
@@ -1002,7 +1111,16 @@ fn ease(s: f32) -> f32 {
 /// Draws the window at `p` with the drawer at `slide` (0 in .. 1 out); returns its rect and hot areas. `pulse` is the
 /// retail status icons' 40-tick triangle (their last 15 s dim with it).
 #[allow(clippy::too_many_arguments)]
-pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place, slide: f32, sw: f32, pulse: f32, small: bool) -> Option<([f32; 4], Hits)> {
+pub fn draw_panel(
+    gu: &mut GameUi,
+    secs: &[Vec<Group>; 3],
+    folded: u8,
+    p: &Place,
+    slide: f32,
+    sw: f32,
+    pulse: f32,
+    small: bool,
+) -> Option<([f32; 4], Hits)> {
     let (lines, hidden) = lines(secs, folded, p.max_h);
     if lines.is_empty() {
         return None;
@@ -1035,7 +1153,8 @@ pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place
         Dock::Right => gu.sprite("menu    frames", if inward { 25 } else { 26 }, ax, ay, N),
         // The left arrow turned a quarter: down while in, up while out.
         Dock::Top => {
-            let (m, dx, dy) = if inward { ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0) } else { ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0) };
+            let (m, dx, dy) =
+                if inward { ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0) } else { ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0) };
             gu.sprite_affine("menu    frames", 25, ax + dx, ay + dy, m, N);
             true
         }
@@ -1056,7 +1175,11 @@ pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place
     for (i, l) in lines.iter().enumerate() {
         match l {
             Line::Head(k, n) => {
-                let label = if hidden[*k] > 0 { format!("{} ({})", SECTIONS[*k], if hidden[*k] == *n { *n } else { hidden[*k] }) } else { SECTIONS[*k].to_string() };
+                let label = if hidden[*k] > 0 {
+                    format!("{} ({})", SECTIONS[*k], if hidden[*k] == *n { *n } else { hidden[*k] })
+                } else {
+                    SECTIONS[*k].to_string()
+                };
                 // The first heading makes room for the drawer arrow on the right dock.
                 let lx = if p.dock == Dock::Right && i == 0 { x + PAD + 16.0 } else { x + PAD };
                 gu.label(&label, lx, ly, N, false);
@@ -1068,7 +1191,11 @@ pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place
             Line::Row(r) => {
                 let (rx, right) = (x + PAD, x + WIDTH - PAD);
                 let waiting = r.left <= 0.0;
-                let c = if !r.fills && r.left > 0.0 && r.left <= 15.0 { (0x40 + (64.0 * pulse) as u32) as f32 / 128.0 } else { 1.0 };
+                let c = if !r.fills && r.left > 0.0 && r.left <= 15.0 {
+                    (0x40 + (64.0 * pulse) as u32) as f32 / 128.0
+                } else {
+                    1.0
+                };
                 match r.icon {
                     Icon::Status(id) => {
                         if let Some(t) = gu.status_icon(small, id) {
@@ -1080,7 +1207,13 @@ pub fn draw_panel(gu: &mut GameUi, secs: &[Vec<Group>; 3], folded: u8, p: &Place
                     }
                     Icon::None => {}
                 }
-                gu.text_fit(&r.name, rx + GAUGE_X, ly - 2.0, inner - GAUGE_X + 16.0, if waiting { 0x8060_6060 } else { N });
+                gu.text_fit(
+                    &r.name,
+                    rx + GAUGE_X,
+                    ly - 2.0,
+                    inner - GAUGE_X + 16.0,
+                    if waiting { 0x8060_6060 } else { N },
+                );
                 let t = if r.total <= 0.0 { "--:--".to_string() } else { clock(r.left) };
                 gu.shape_text(&t, right, ly + 13.0, if waiting { DIM } else { N }, true);
                 if r.total > 0.0 {
@@ -1168,7 +1301,13 @@ pub fn draw(gu: &mut GameUi, t: &mut Timers, sw: f32) {
 
 /// After every window has drawn: a click on the drawer's arrow or a section heading, unless a window over ours has the
 /// spot (`over`). Returns the window's rect for the world-click blockers.
-pub fn pointer(w: &mut World, gu: &GameUi, p: Option<(f32, f32)>, clicked: bool, over: &[[f32; 4]]) -> Option<[f32; 4]> {
+pub fn pointer(
+    w: &mut World,
+    gu: &GameUi,
+    p: Option<(f32, f32)>,
+    clicked: bool,
+    over: &[[f32; 4]],
+) -> Option<[f32; 4]> {
     let r = w.timers.rect?;
     let Some(p) = p else { return Some(r) };
     let inside = |r: &[f32; 4]| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];
@@ -1191,44 +1330,73 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: Option<(f32, f32)>, clicked: bool,
 }
 
 /// topbar-shot's sample (`--window timers:DOCK[:SLIDE[:FOLDED]]`): spell and ability icons from the action table.
-pub fn shot(gu: &mut GameUi, acts: Option<&crate::dat::actions::Actions>, spec: &str, sw: f32, sh: f32, mini: Option<[f32; 4]>) {
+pub fn shot(
+    gu: &mut GameUi,
+    acts: Option<&crate::dat::actions::Actions>,
+    spec: &str,
+    sw: f32,
+    sh: f32,
+    mini: Option<[f32; 4]>,
+) {
     let f: Vec<&str> = spec.split(':').collect();
     let dock = Dock::of(f.first().and_then(|d| d.parse().ok()).unwrap_or(0));
     let slide = f.get(1).and_then(|d| d.parse().ok()).unwrap_or(1.0);
     let folded = f.get(2).and_then(|d| d.parse().ok()).unwrap_or(0);
     let list = |spell: bool, id: u16| -> Icon {
         let Some(a) = acts else { return Icon::None };
-        let r = if spell { a.spell(id).map(|r| (r.icon, r.icon_hd)) } else { a.abilities.get(id as usize).map(|r| (r.icon as u16, r.icon_hd)) };
+        let r = if spell {
+            a.spell(id).map(|r| (r.icon, r.icon_hd))
+        } else {
+            a.abilities.get(id as usize).map(|r| (r.icon as u16, r.icon_hd))
+        };
         r.map_or(Icon::None, |(i, hd)| match hd {
             0xffff => Icon::List("menu    magiconw", i as usize),
             1000.. => Icon::List("menu    magico2w", (hd - 1000) as usize),
             _ => Icon::List("menu    magiconw", hd as usize),
         })
     };
-    let row = |icon: Icon, name: &str, left: f32, total: f32, fills: bool| Row { icon, name: name.into(), left, total, fills };
+    let row = |icon: Icon, name: &str, left: f32, total: f32, fills: bool| Row {
+        icon,
+        name: name.into(),
+        left,
+        total,
+        fills,
+    };
     let secs = [
-        vec![Group { name: None, rows: vec![
-            row(list(false, 0x200 + 35), "Provoke", 18.0, 30.0, true),
-            row(list(true, 57), "Haste", 9.5, 20.0, true),
-            row(list(false, 0x200 + 0x1f), "Berserk", 252.0, 300.0, true),
-            row(list(false, 0x200 + 0xd7), "Stratagems (2)", 22.0, 48.0, true),
-        ] }],
+        vec![Group {
+            name: None,
+            rows: vec![
+                row(list(false, 0x200 + 35), "Provoke", 18.0, 30.0, true),
+                row(list(true, 57), "Haste", 9.5, 20.0, true),
+                row(list(false, 0x200 + 0x1f), "Berserk", 252.0, 300.0, true),
+                row(list(false, 0x200 + 0xd7), "Stratagems (2)", 22.0, 48.0, true),
+            ],
+        }],
         vec![
-            Group { name: Some("Lnxcsfix".into()), rows: vec![
-                row(Icon::Status(43), "Refresh II", 9.0, 150.0, false),
-                row(Icon::Status(33), "Haste II", 134.0, 180.0, false),
-                row(Icon::Status(40), "Protect IV", 1561.0, 1800.0, false),
-            ] },
-            Group { name: Some("Tuxedo".into()), rows: vec![
-                row(Icon::Status(116), "Phalanx II", 90.0, 240.0, false),
-                row(Icon::Status(33), "Haste II", 170.0, 180.0, false),
-            ] },
+            Group {
+                name: Some("Lnxcsfix".into()),
+                rows: vec![
+                    row(Icon::Status(43), "Refresh II", 9.0, 150.0, false),
+                    row(Icon::Status(33), "Haste II", 134.0, 180.0, false),
+                    row(Icon::Status(40), "Protect IV", 1561.0, 1800.0, false),
+                ],
+            },
+            Group {
+                name: Some("Tuxedo".into()),
+                rows: vec![
+                    row(Icon::Status(116), "Phalanx II", 90.0, 240.0, false),
+                    row(Icon::Status(33), "Haste II", 170.0, 180.0, false),
+                ],
+            },
         ],
-        vec![Group { name: Some("Valkurm Emperor".into()), rows: vec![
-            row(Icon::Status(4), "Paralyze", -1.0, 120.0, false),
-            row(Icon::Status(134), "Dia II", 70.0, 120.0, false),
-            row(Icon::Status(13), "Slow II", 160.0, 180.0, false),
-        ] }],
+        vec![Group {
+            name: Some("Valkurm Emperor".into()),
+            rows: vec![
+                row(Icon::Status(4), "Paralyze", -1.0, 120.0, false),
+                row(Icon::Status(134), "Dia II", 70.0, 120.0, false),
+                row(Icon::Status(13), "Slow II", 160.0, 180.0, false),
+            ],
+        }],
     ];
     let log_top = sh - 16.0 - 8.0 * 16.0 - 14.0;
     let foot = sh - 16.0 - 34.0 - 46.0;
@@ -1253,7 +1421,10 @@ mod tests {
 
     #[test]
     fn clocks() {
-        assert_eq!([clock(0.2), clock(59.0), clock(61.5), clock(3600.0), clock(3725.0)], ["0:01", "0:59", "1:02", "1:00:00", "1:02:05"]);
+        assert_eq!(
+            [clock(0.2), clock(59.0), clock(61.5), clock(3600.0), clock(3725.0)],
+            ["0:01", "0:59", "1:02", "1:00:00", "1:02:05"]
+        );
     }
 
     fn row(left: f32) -> Row {
@@ -1263,7 +1434,11 @@ mod tests {
     /// Rows go from the last section up when the height runs out; the headings count what is hidden.
     #[test]
     fn fitting() {
-        let secs = [vec![Group { name: None, rows: vec![row(1.0), row(2.0)] }], vec![Group { name: Some("A".into()), rows: vec![row(3.0)] }], vec![Group { name: Some("Mob".into()), rows: vec![row(4.0), row(5.0)] }]];
+        let secs = [
+            vec![Group { name: None, rows: vec![row(1.0), row(2.0)] }],
+            vec![Group { name: Some("A".into()), rows: vec![row(3.0)] }],
+            vec![Group { name: Some("Mob".into()), rows: vec![row(4.0), row(5.0)] }],
+        ];
         let all = HEAD_H * 3.0 + GROUP_H * 2.0 + ROW_H * 5.0 + 2.0 * PAD;
         let (l, hidden) = lines(&secs, 0, all);
         assert_eq!((l.len(), hidden), (10, [0, 0, 0]));

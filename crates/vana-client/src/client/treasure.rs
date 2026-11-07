@@ -89,7 +89,18 @@ pub(super) fn on_list(w: &mut World, l: TrophyList) {
 /// Y."), 2 won but refused (0x0f with the winner, 0x1f without), 3 lost (no line here). 1..3 end the slot. Our own
 /// entry sets our lot and action (EntryFlg ? lotted : passed); the highest lot always follows.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn on_solution(w: &mut World, slot: u8, judge: u8, loot: u32, loot_point: i16, entry: u32, entry_point: i16, entry_flg: bool, loot_name: String, entry_name: String) {
+pub(super) fn on_solution(
+    w: &mut World,
+    slot: u8,
+    judge: u8,
+    loot: u32,
+    loot_point: i16,
+    entry: u32,
+    entry_point: i16,
+    entry_flg: bool,
+    loot_name: String,
+    entry_name: String,
+) {
     let me = w.my_id;
     let Some(s) = w.treasure.get_mut(slot as usize).filter(|s| s.item != 0) else { return };
     let (item, from) = (s.item, s.from);
@@ -101,7 +112,14 @@ pub(super) fn on_solution(w: &mut World, slot: u8, judge: u8, loot: u32, loot_po
     // The lot line needs a lot (not -1 / 0) and the lotter's name (sLootName2).
     let lot_line = |w: &mut World| {
         if entry_point > 0 && !entry_name.is_empty() {
-            line(w, if entry != 0 { 0x11 } else { 0x82 }, Some(entry), from, item as i32, [entry_point.to_string(), entry_name.clone()]);
+            line(
+                w,
+                if entry != 0 { 0x11 } else { 0x82 },
+                Some(entry),
+                from,
+                item as i32,
+                [entry_point.to_string(), entry_name.clone()],
+            );
         }
     };
     match judge {
@@ -188,7 +206,13 @@ pub fn update(w: &mut World) {
     // The modern panel's Lot / Pass stand on the cursor's row (ours): the choice stays open there, on Pass once lotted.
     let s = &w.treasure[at];
     if w.modern && !l.done && l.ope.is_none() && !passed(s) {
-        l.ope = Some(Ope { slot: at as u8, item: s.item, own_lot: s.own_lot, cursor: if lotted(s) { 2 } else { 1 }, row: l.cursor });
+        l.ope = Some(Ope {
+            slot: at as u8,
+            item: s.item,
+            own_lot: s.own_lot,
+            cursor: if lotted(s) { 2 } else { 1 },
+            row: l.cursor,
+        });
     }
     w.loot = Some(l);
 }
@@ -334,7 +358,10 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     // lnowin (shown while lootope is not): the pointer over it hands it the focus (loot's update sends itself message 8,
     // SE 0013); there a click is Enter (Done), a right click Escape.
     let off = lnowin_off(gu, w, sw, sh);
-    let in_lno = l.ope.is_none() && gu.window_rect(LNOWIN, sw, sh).is_some_and(|[x, y, ww, h]| p.0 >= x + off.0 && p.0 < x + off.0 + ww && p.1 >= y && p.1 < y + h);
+    let in_lno = l.ope.is_none()
+        && gu
+            .window_rect(LNOWIN, sw, sh)
+            .is_some_and(|[x, y, ww, h]| p.0 >= x + off.0 && p.0 < x + off.0 + ww && p.1 >= y && p.1 < y + h);
     if l.done {
         if in_lno {
             gu.hover.set(true);
@@ -351,10 +378,19 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         return;
     }
     let (Some((lx, ly)), Some(lay)) = (gu.window_xy(LOOT, sw, sh), gu.layout(LOOT)) else { return };
-    let inside = |x: f32, y: f32, e: &crate::dat::ui::MenuElement| p.0 >= x + e.x as f32 && p.0 < x + e.x as f32 + e.w as f32 && p.1 >= y + e.y as f32 && p.1 < y + e.y as f32 + e.h as f32;
+    let inside = |x: f32, y: f32, e: &crate::dat::ui::MenuElement| {
+        p.0 >= x + e.x as f32
+            && p.0 < x + e.x as f32 + e.w as f32
+            && p.1 >= y + e.y as f32
+            && p.1 < y + e.y as f32 + e.h as f32
+    };
     // lootope's frame starts at its row's right edge (draw).
     if let Some(o) = &l.ope {
-        let (Some(row), Some(ol), Some([_, _, ow, oh])) = (lay.elements.iter().skip(1).find(|e| e.id == o.row), gu.layout(LOOTOPE), gu.window_rect(LOOTOPE, sw, sh)) else { return };
+        let (Some(row), Some(ol), Some([_, _, ow, oh])) =
+            (lay.elements.iter().skip(1).find(|e| e.id == o.row), gu.layout(LOOTOPE), gu.window_rect(LOOTOPE, sw, sh))
+        else {
+            return;
+        };
         let (x, y) = (lx + row.x as f32 + row.w as f32, ly + row.y as f32);
         if right && p.0 >= x && p.0 < x + ow && p.1 >= y && p.1 < y + oh {
             key(w, egui::Key::Escape);
@@ -373,7 +409,11 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         return;
     }
     let n = rows(w).len() as u16;
-    if right && gu.window_rect(LOOT, sw, sh).is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh) {
+    if right
+        && gu
+            .window_rect(LOOT, sw, sh)
+            .is_some_and(|[fx, fy, fw, fh]| p.0 >= fx && p.0 < fx + fw && p.1 >= fy && p.1 < fy + fh)
+    {
         key(w, egui::Key::Escape);
         return;
     }
@@ -392,8 +432,16 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
 /// FUN_1013f1c0: while raid1 (the alliance list) is up and lnowin's bottom reaches its top and its right edge raid1's
 /// left - 32, lnowin moves to raid1's left - 32 - its width - 1.
 fn lnowin_off(gu: &GameUi, w: &World, sw: f32, sh: f32) -> (f32, f32) {
-    let (Some([x, y, ww, h]), Some([rx, ry, ..])) = (gu.window_rect(LNOWIN, sw, sh), gu.window_rect("menu    raid1", sw, sh)) else { return (0.0, 0.0) };
-    if w.party.slots().counts[1] > 0 && y + h >= ry && x + ww >= rx - 32.0 { (rx - 32.0 - ww - 1.0 - x, 0.0) } else { (0.0, 0.0) }
+    let (Some([x, y, ww, h]), Some([rx, ry, ..])) =
+        (gu.window_rect(LNOWIN, sw, sh), gu.window_rect("menu    raid1", sw, sh))
+    else {
+        return (0.0, 0.0);
+    };
+    if w.party.slots().counts[1] > 0 && y + h >= ry && x + ww >= rx - 32.0 {
+        (rx - 32.0 - ww - 1.0 - x, 0.0)
+    } else {
+        (0.0, 0.0)
+    }
 }
 
 /// Num+ (list message 8): the focus to lnowin, SE 0013; Num+ on lnowin gives it back.
@@ -444,7 +492,11 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         gu.lobby_window_off(LOOT, sw, sh, (0.0, 0.0), focused.then_some(l.cursor), focused, &[])
     };
     if let Some(win) = win {
-        ope_at = l.ope.as_ref().and_then(|o| win.children.iter().find(|(id, _)| *id == o.row)).map(|(_, r)| (r[0] + r[2], r[1]));
+        ope_at = l
+            .ope
+            .as_ref()
+            .and_then(|o| win.children.iter().find(|(id, _)| *id == o.row))
+            .map(|(_, r)| (r[0] + r[2], r[1]));
         super::items::upload_icons(gu, &info, rows.iter().map(|&i| w.treasure[i].item));
         let wx = win.frame[0];
         for (k, &i) in rows.iter().enumerate() {
@@ -474,7 +526,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
                 gu.shape_text(&format!("{} :", s.high_lot), x + 180.0, y + 2.0, 0x8080_8080, false);
                 let name: Vec<char> = s.high_name.chars().collect();
                 if name.len() > 8 {
-                    let end = gu.shape_text(&name[..7].iter().collect::<String>(), x + 215.0, y + 2.0, 0x8080_8080, false);
+                    let end =
+                        gu.shape_text(&name[..7].iter().collect::<String>(), x + 215.0, y + 2.0, 0x8080_8080, false);
                     gu.sprite("font    fontshp", 0x6c, end, y + 2.0, 0x8080_8080);
                 } else {
                     gu.shape_text(&s.high_name, x + 215.0, y + 2.0, 0x8080_8080, false);
@@ -493,7 +546,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             rects.push(win.frame);
         }
     } else if l.ope.is_none()
-        && let Some(win) = gu.lobby_window_off(LNOWIN, sw, sh, lnowin_off(gu, w, sw, sh), l.done.then_some(1), l.done, &[]) {
+        && let Some(win) =
+            gu.lobby_window_off(LNOWIN, sw, sh, lnowin_off(gu, w, sw, sh), l.done.then_some(1), l.done, &[])
+    {
         rects.push(win.frame);
     }
     rects
@@ -534,7 +589,12 @@ pub(super) fn view(w: &World) -> Option<View> {
         .into_iter()
         .map(|i| {
             let s = &w.treasure[i];
-            RowView { item: s.item, qty: s.qty, own_lot: s.own_lot, high: (s.high_lot != 0).then(|| (s.high_lot, s.high_name.clone())) }
+            RowView {
+                item: s.item,
+                qty: s.qty,
+                own_lot: s.own_lot,
+                high: (s.high_lot != 0).then(|| (s.high_lot, s.high_name.clone())),
+            }
         })
         .collect();
     let ope = l.ope.as_ref().map(|o| (o.row, o.cursor, o.own_lot != 0 && o.own_lot != -1));

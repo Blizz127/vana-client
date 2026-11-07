@@ -89,8 +89,11 @@ pub fn mode(c: &Ctx, id: u32, s: &Seen, eye: Vec3) -> Option<u8> {
 /// This frame's casters among the drawn actors `seen`: (id, mode, what was seen), ours first then nearest, the
 /// silhouettes past the layers turned to blobs.
 pub fn modes(c: &Ctx, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, Seen)> {
-    let mut list: Vec<(u32, u8, Seen)> = seen.iter().filter_map(|(&id, s)| Some((id, mode(c, id, s, eye)?, *s))).collect();
-    list.sort_by(|a, b| (a.0 != c.me).cmp(&(b.0 != c.me)).then(a.2.pos.distance(eye).total_cmp(&b.2.pos.distance(eye))));
+    let mut list: Vec<(u32, u8, Seen)> =
+        seen.iter().filter_map(|(&id, s)| Some((id, mode(c, id, s, eye)?, *s))).collect();
+    list.sort_by(|a, b| {
+        (a.0 != c.me).cmp(&(b.0 != c.me)).then(a.2.pos.distance(eye).total_cmp(&b.2.pos.distance(eye)))
+    });
     list.truncate(MAX_CASTERS);
     let mut layer = 0u32;
     for (id, m, s) in &mut list {
@@ -99,7 +102,13 @@ pub fn modes(c: &Ctx, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, See
                 layer += 1;
             } else {
                 let (_, covered) = c.ground.surface(s.pos);
-                *m = if (c.flags)(*id).1 { 3 } else if covered || s.depth >= 20.0 { 2 } else { 0 };
+                *m = if (c.flags)(*id).1 {
+                    3
+                } else if covered || s.depth >= 20.0 {
+                    2
+                } else {
+                    0
+                };
             }
         }
     }
@@ -108,7 +117,12 @@ pub fn modes(c: &Ctx, seen: &HashMap<u32, Seen>, eye: Vec3) -> Vec<(u32, u8, See
 }
 
 /// The casters to draw: `modes` of the actors drawn this frame (`actors`), their light slots and layers.
-pub fn casters<'a>(slots: &mut Slots, ground: &Ground, modes: Vec<(u32, u8, Seen)>, actors: &HashMap<u32, &'a crate::render::ActorGpu>) -> Vec<crate::render::shadow::Caster<'a>> {
+pub fn casters<'a>(
+    slots: &mut Slots,
+    ground: &Ground,
+    modes: Vec<(u32, u8, Seen)>,
+    actors: &HashMap<u32, &'a crate::render::ActorGpu>,
+) -> Vec<crate::render::shadow::Caster<'a>> {
     let list: Vec<(u32, u8, Seen)> = modes.into_iter().filter(|m| actors.contains_key(&m.0)).collect();
     let ids: Vec<u32> = list.iter().map(|l| l.0).collect();
     let slots = slots.assign(&ids);
@@ -141,7 +155,12 @@ pub fn casters<'a>(slots: &mut Slots, ground: &Ground, modes: Vec<(u32, u8, Seen
 pub fn kage_texture(index: &crate::dat::DatIndex) -> Option<crate::dat::zone::Texture> {
     let bytes = index.read(0x1b8c).ok()?;
     let chunks = crate::dat::chunks(&bytes).ok()?;
-    chunks.iter().filter(|c| c.kind == 0x20).filter_map(|c| crate::dat::zone::parse_img(c.data).ok()).find(|t| t.name.trim().ends_with("kage_tex")).or_else(|| chunks.iter().filter(|c| c.kind == 0x20).find_map(|c| crate::dat::zone::parse_img(c.data).ok()))
+    chunks
+        .iter()
+        .filter(|c| c.kind == 0x20)
+        .filter_map(|c| crate::dat::zone::parse_img(c.data).ok())
+        .find(|t| t.name.trim().ends_with("kage_tex"))
+        .or_else(|| chunks.iter().filter(|c| c.kind == 0x20).find_map(|c| crate::dat::zone::parse_img(c.data).ok()))
 }
 
 #[cfg(test)]

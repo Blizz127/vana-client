@@ -8,9 +8,9 @@ use glam::{Mat4, Vec3};
 
 /// The (race, slot, model id) whose part file is `file`.
 fn look_of(file: u32) -> Option<(u8, usize, u16)> {
-    (0..=8u8)
-        .flat_map(|r| (1..6).map(move |s| (r, s)))
-        .find_map(|(r, s)| (0..0x1000u16).find(|&id| dat::character::part_file(r, s, id) == Some(file)).map(|id| (r, s, id)))
+    (0..=8u8).flat_map(|r| (1..6).map(move |s| (r, s))).find_map(|(r, s)| {
+        (0..0x1000u16).find(|&id| dat::character::part_file(r, s, id) == Some(file)).map(|id| (r, s, id))
+    })
 }
 
 pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: &std::path::Path) -> Result<()> {
@@ -19,8 +19,20 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
     // Retail's cloth meshes are in whole-model files (a flag, NPCs), not PC gear; a PC part file loads on its race.
     let ch = std::sync::Arc::new(match look_of(file) {
         Some((race, slot, id)) => {
-            let mut look = dat::character::Look { race, face: 0, head: 0, body: 0, hands: 0, legs: 0, feet: 0, main: 0, sub: 0, range: 0 };
-            *[&mut look.face, &mut look.head, &mut look.body, &mut look.hands, &mut look.legs, &mut look.feet][slot] = id;
+            let mut look = dat::character::Look {
+                race,
+                face: 0,
+                head: 0,
+                body: 0,
+                hands: 0,
+                legs: 0,
+                feet: 0,
+                main: 0,
+                sub: 0,
+                range: 0,
+            };
+            *[&mut look.face, &mut look.head, &mut look.body, &mut look.hands, &mut look.legs, &mut look.feet][slot] =
+                id;
             println!("file {file}: race {race} {} {id}", dat::character::SLOTS[slot]);
             dat::character::load_character(&index, &look)?
         }
@@ -81,7 +93,12 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
         c.sheets
             .iter()
             .flat_map(|s| s.p.iter())
-            .flat_map(|q| [inv.transform_point3(q.cur).extend(1.0).to_array(), inv.transform_vector3(q.normal).normalize_or_zero().extend(1.0).to_array()])
+            .flat_map(|q| {
+                [
+                    inv.transform_point3(q.cur).extend(1.0).to_array(),
+                    inv.transform_vector3(q.normal).normalize_or_zero().extend(1.0).to_array(),
+                ]
+            })
             .collect::<Vec<_>>()
     };
     let rest: Vec<Vec3> = {
@@ -90,17 +107,24 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
         c.sheets.iter().flat_map(|s| s.p.iter().map(|q| q.cur)).collect()
     };
     let report = |label: &str, c: &Cloth, rest: &[Vec3], off: Vec3| {
-        let d: Vec<f32> = c.sheets.iter().flat_map(|s| s.p.iter()).zip(rest).map(|(q, r)| (q.cur - (*r + off)).length()).collect();
+        let d: Vec<f32> =
+            c.sheets.iter().flat_map(|s| s.p.iter()).zip(rest).map(|(q, r)| (q.cur - (*r + off)).length()).collect();
         let max = d.iter().copied().fold(0.0, f32::max);
         let bad = c.sheets.iter().flat_map(|s| s.p.iter()).any(|q| !q.cur.is_finite());
-        println!("{label}: free particles moved up to {max:.4} from the skin{}", if bad { " (NOT FINITE)" } else { "" });
+        println!(
+            "{label}: free particles moved up to {max:.4} from the skin{}",
+            if bad { " (NOT FINITE)" } else { "" }
+        );
     };
     // Standing: the gusts at their stock size, then 0x97-sized ones (base 40, spread 20).
     for (name, base, spread) in [("cloth_wind.png", 4, 10), ("cloth_gale.png", 40, 20)] {
         wind.set(base, spread);
         for _ in 0..steps {
             wind.step(2.0);
-            cloth.step(&ch.parts, &Frame { skeleton: sk, bones: &bones, model, moved: Vec3::ZERO, wind: Some((wind.dir, wind.strength)) });
+            cloth.step(
+                &ch.parts,
+                &Frame { skeleton: sk, bones: &bones, model, moved: Vec3::ZERO, wind: Some((wind.dir, wind.strength)) },
+            );
         }
         report(name, &cloth, &rest, Vec3::ZERO);
         shots.push((name.into(), model, pack(&cloth, model)));
@@ -114,7 +138,10 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
         let moved = m.w_axis.truncate() - model.w_axis.truncate();
         model = m;
         wind.step(2.0);
-        cloth.step(&ch.parts, &Frame { skeleton: sk, bones: &bones, model, moved, wind: Some((wind.dir, wind.strength)) });
+        cloth.step(
+            &ch.parts,
+            &Frame { skeleton: sk, bones: &bones, model, moved, wind: Some((wind.dir, wind.strength)) },
+        );
     }
     report("cloth_walk.png", &cloth, &rest, p - p0);
     shots.push(("cloth_walk.png".into(), model, pack(&cloth, model)));
@@ -135,8 +162,12 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
         let feet = m.w_axis.truncate();
         // Framed on the model's height (y down: the top is negative).
         let look = feet + Vec3::new(0.0, top * 0.5, 0.0);
-        let camera =
-            render::Camera { eye: look + Vec3::new(2.6, -0.5, -1.2) * (top.abs() / 1.8).max(1.0), target: look, up: Vec3::NEG_Y, fov_y: 40f32.to_radians() };
+        let camera = render::Camera {
+            eye: look + Vec3::new(2.6, -0.5, -1.2) * (top.abs() / 1.8).max(1.0),
+            target: look,
+            up: Vec3::NEG_Y,
+            fov_y: 40f32.to_radians(),
+        };
         actor.cloth = data;
         r.begin_poses();
         r.pose_actor_gpu(&mut actor, &ch, &[], &idle, &[], 1.0, m, None, None, &[]);
@@ -152,7 +183,10 @@ pub fn run(file: u32, zone: u32, hour: f32, pos: [f32; 3], steps: u32, out_dir: 
         });
         enc.copy_texture_to_buffer(
             target.as_image_copy(),
-            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(h) } },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buf,
+                layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(h) },
+            },
             wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
         );
         gpu.queue.submit([enc.finish()]);

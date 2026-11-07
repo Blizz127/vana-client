@@ -60,7 +60,17 @@ pub fn open(w: &mut World) {
         off.push(8);
     }
     let _ = w.net.commands.send(NetCommand::StatusRequest(0));
-    w.status = Some(StatusUi { sel: w.cursor_recall(STATCOM), shown: None, off, once: false, busy: true, return_menu: w.menu, cur: [None, None], cur_wait: None, m_page: 0 });
+    w.status = Some(StatusUi {
+        sel: w.cursor_recall(STATCOM),
+        shown: None,
+        off,
+        once: false,
+        busy: true,
+        return_menu: w.menu,
+        cur: [None, None],
+        cur_wait: None,
+        m_page: 0,
+    });
     w.menu = None;
 }
 
@@ -93,7 +103,11 @@ pub fn update(w: &mut World) {
         s.once = true;
         // FUN_10148be0: in Monstrosity Combat / Magic Skills are never enabled.
         if let Some(b) = skills.filter(|_| !mon) {
-            let on = [b[1..32].iter().any(|&v| exists(v)), b[32..48].iter().any(|&v| exists(v)), b[48..63].iter().any(|&v| v != 0xffff)];
+            let on = [
+                b[1..32].iter().any(|&v| exists(v)),
+                b[32..48].iter().any(|&v| exists(v)),
+                b[48..63].iter().any(|&v| v != 0xffff),
+            ];
             for (c, on) in [3u16, 4, 5].into_iter().zip(on) {
                 if on {
                     s.off.retain(|&o| o != c);
@@ -124,7 +138,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
         egui::Key::ArrowUp | egui::Key::ArrowDown => {
             let k = if key == egui::Key::ArrowUp { 2 } else { 3 };
             let to = gu.menu_links(STATCOM, s.sel).map_or(s.sel, |l| l[k] as u16);
-            if to != s.sel && to != 0 && to != 0xff
+            if to != s.sel
+                && to != 0
+                && to != 0xff
                 && let Some(st) = w.status.as_mut()
             {
                 st.sel = to;
@@ -190,13 +206,18 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         let (x, y) = (wx + e.x as f32, wy + e.y as f32);
         p.0 >= x && p.0 < x + e.w as f32 && p.1 >= y && p.1 < y + e.h as f32
     });
-    if right && gu.window_rect(STATCOM, sw, sh).is_some_and(|r| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3]) {
+    if right
+        && gu
+            .window_rect(STATCOM, sw, sh)
+            .is_some_and(|r| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3])
+    {
         key(w, gu, egui::Key::Escape);
         return;
     }
     let Some(e) = hit else { return };
     gu.hover.set(true);
-    if (moved || clicked) && e.id != s.sel
+    if (moved || clicked)
+        && e.id != s.sel
         && let Some(st) = w.status.as_mut()
     {
         st.sel = e.id;
@@ -248,12 +269,30 @@ fn draw_level(gu: &mut GameUi, w: &World, x: f32, y: f32) {
     let Some(st) = w.stats.as_ref().filter(|_| w.recasts_seen) else { return };
     let sep = gu.lobby_msg(0xc, 0x5b, ",");
     let ml = st.ml.1 & 1 != 0;
-    let capped = if ml { st.ml.1 & 2 != 0 && st.ml_exp.0 >= st.ml_exp.1.wrapping_sub(1) } else { w.merits.is_some_and(|m| m.1 & 0x4000 != 0) };
+    let capped = if ml {
+        st.ml.1 & 2 != 0 && st.ml_exp.0 >= st.ml_exp.1.wrapping_sub(1)
+    } else {
+        w.merits.is_some_and(|m| m.1 & 0x4000 != 0)
+    };
     let (c1, c2) = if capped { (BLUE, 0x8040_4040) } else { (WHITE, WHITE) };
     let (head, level, l1, l2, now, next) = if ml {
-        (gu.lobby_msg(0xc, 0x203, ""), st.ml.0, gu.lobby_msg(0xc, 0x204, ""), gu.lobby_msg(0xc, 0x205, ""), st.ml_exp.0 as i64, st.ml_exp.1 as i64)
+        (
+            gu.lobby_msg(0xc, 0x203, ""),
+            st.ml.0,
+            gu.lobby_msg(0xc, 0x204, ""),
+            gu.lobby_msg(0xc, 0x205, ""),
+            st.ml_exp.0 as i64,
+            st.ml_exp.1 as i64,
+        )
     } else {
-        (gu.lobby_msg(0xc, 0x56, ""), w.real_level.unwrap_or(st.main.1), gu.lobby_msg(0xc, 0x57, ""), gu.lobby_msg(0xc, 0x58, ""), st.exp.0 as i64, st.exp.1 as i64)
+        (
+            gu.lobby_msg(0xc, 0x56, ""),
+            w.real_level.unwrap_or(st.main.1),
+            gu.lobby_msg(0xc, 0x57, ""),
+            gu.lobby_msg(0xc, 0x58, ""),
+            st.exp.0 as i64,
+            st.exp.1 as i64,
+        )
     };
     gu.shape_text(&format!("{head} {level}"), x + 8.0, y + 10.0, c1, false);
     gu.shape_text(&l1, x + if ml { 7.0 } else { 15.0 }, y + 0x16 as f32, c2, false);
@@ -348,7 +387,13 @@ fn draw_skills(gu: &mut GameUi, x: f32, y: f32, rows: &[(usize, u16)], magic: bo
     for (k, &(id, v)) in rows.iter().enumerate() {
         let (col, ry) = (k & 1, y + 0x13 as f32 + (k / 2) as f32 * 14.0);
         gu.sprite("menu    keytops3", 208 + id, x + [0x0a, 0x82][col] as f32, ry, WHITE);
-        gu.shape_text(&(v & 0x7fff).to_string(), x + vx[col] as f32, ry, if v & 0x8000 != 0 { BLUE } else { WHITE }, true);
+        gu.shape_text(
+            &(v & 0x7fff).to_string(),
+            x + vx[col] as f32,
+            ry,
+            if v & 0x8000 != 0 { BLUE } else { WHITE },
+            true,
+        );
     }
 }
 
@@ -364,7 +409,13 @@ fn draw_crafts(gu: &mut GameUi, x: f32, y: f32, rows: &[(usize, u16)]) {
         let ry = y + 0x13 as f32 + k as f32 * 14.0;
         gu.sprite("menu    keytops3", 208 + id, x + 0x0a as f32, ry, WHITE);
         if v & 0x1f < 0x10 {
-            gu.sprite("menu    keytops3", 193 + (v & 0x1f) as usize, x + 0x6e as f32, ry, if v & 0x8000 != 0 { BLUE } else { WHITE });
+            gu.sprite(
+                "menu    keytops3",
+                193 + (v & 0x1f) as usize,
+                x + 0x6e as f32,
+                ry,
+                if v & 0x8000 != 0 { BLUE } else { WHITE },
+            );
         }
         gu.shape_text(&format!("({})", (v >> 5) & 0x3ff), x + 0xf5 as f32, ry, WHITE, true);
     }
@@ -423,7 +474,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             r
         }));
     }
-    if !mon && gu.gate_layout_at(PERSONA, sw, sh, None, Some(16))
+    if !mon
+        && gu.gate_layout_at(PERSONA, sw, sh, None, Some(16))
         && let Some(mut m) = gu.layout(PERSONA).cloned()
     {
         m.elements[0].y = 16;
@@ -490,7 +542,10 @@ mod tests {
 
     #[test]
     fn numbers() {
-        assert_eq!([grouped(0, ","), grouped(999, ","), grouped(1234, ","), grouped(12_345_678, ",")], ["0", "999", "1,234", "12,345,678"]);
+        assert_eq!(
+            [grouped(0, ","), grouped(999, ","), grouped(1234, ","), grouped(12_345_678, ",")],
+            ["0", "999", "1,234", "12,345,678"]
+        );
         assert!(exists(0) && exists(0x8005) && !exists(0x8000));
     }
 }

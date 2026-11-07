@@ -4,7 +4,9 @@
 use super::manifest::Manifest;
 
 use mlua::thread::ThreadStatus;
-use mlua::{Function, HookTriggers, IntoLuaMulti, Lua, LuaOptions, MultiValue, RegistryKey, StdLib, Thread, Value, VmState};
+use mlua::{
+    Function, HookTriggers, IntoLuaMulti, Lua, LuaOptions, MultiValue, RegistryKey, StdLib, Thread, Value, VmState,
+};
 use std::cell::RefCell;
 use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
@@ -66,7 +68,11 @@ impl Source {
     pub fn read(&self, rel: &str) -> std::io::Result<String> {
         match self {
             Source::Dir(d) => std::fs::read_to_string(inside(d, rel)?),
-            Source::Bundled(files) => files.iter().find(|f| f.0 == rel).map(|f| f.1.to_string()).ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound)),
+            Source::Bundled(files) => files
+                .iter()
+                .find(|f| f.0 == rel)
+                .map(|f| f.1.to_string())
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound)),
         }
     }
 
@@ -74,7 +80,11 @@ impl Source {
     pub fn read_bytes(&self, rel: &str) -> std::io::Result<Vec<u8>> {
         match self {
             Source::Dir(d) => std::fs::read(inside(d, rel)?),
-            Source::Bundled(files) => files.iter().find(|f| f.0 == rel).map(|f| f.1.as_bytes().to_vec()).ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound)),
+            Source::Bundled(files) => files
+                .iter()
+                .find(|f| f.0 == rel)
+                .map(|f| f.1.as_bytes().to_vec())
+                .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound)),
         }
     }
 
@@ -226,7 +236,10 @@ pub(super) struct Stats {
 impl Vm {
     pub fn new(manifest: Manifest, dir: PathBuf, src: Source) -> mlua::Result<Self> {
         // The base library always loads; no io, os, package or debug.
-        let lua = Lua::new_with(StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8 | StdLib::COROUTINE | StdLib::OS, LuaOptions::default())?;
+        let lua = Lua::new_with(
+            StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8 | StdLib::COROUTINE | StdLib::OS,
+            LuaOptions::default(),
+        )?;
         lua.set_memory_limit(MEMORY)?;
         let g = lua.globals();
         // os: the clock and the date only.
@@ -285,7 +298,12 @@ impl Vm {
     pub fn run_entry(&self) {
         let entry = self.manifest.entry.clone();
         let r = self.src.read(&entry).map_err(|e| mlua::Error::runtime(format!("{entry}: {e}"))).and_then(|src| {
-            let f = self.lua.load(src).set_name(format!("@{}", self.manifest.entry)).set_mode(mlua::chunk::ChunkMode::Text).into_function()?;
+            let f = self
+                .lua
+                .load(src)
+                .set_name(format!("@{}", self.manifest.entry))
+                .set_mode(mlua::chunk::ChunkMode::Text)
+                .into_function()?;
             Ok(f)
         });
         match r {
@@ -382,7 +400,11 @@ impl Vm {
             let kind = it.next().and_then(|v| v.as_string().map(|s| s.to_string_lossy()));
             match kind.as_deref() {
                 Some("sleep") => {
-                    let s = it.next().and_then(|v| v.as_number().or(v.as_integer().map(|i| i as f64))).unwrap_or(0.0).max(0.0);
+                    let s = it
+                        .next()
+                        .and_then(|v| v.as_number().or(v.as_integer().map(|i| i as f64)))
+                        .unwrap_or(0.0)
+                        .max(0.0);
                     Wake::At(Instant::now() + Duration::from_secs_f64(s))
                 }
                 Some("until") => {
@@ -390,7 +412,10 @@ impl Vm {
                         self.error(&mlua::Error::runtime("wait_until needs a function"));
                         return;
                     };
-                    let limit = it.next().and_then(|v| v.as_number().or(v.as_integer().map(|i| i as f64))).map(|s| Instant::now() + Duration::from_secs_f64(s.max(0.0)));
+                    let limit = it
+                        .next()
+                        .and_then(|v| v.as_number().or(v.as_integer().map(|i| i as f64)))
+                        .map(|s| Instant::now() + Duration::from_secs_f64(s.max(0.0)));
                     match self.lua.create_registry_value(test) {
                         Ok(k) => Wake::Until(k, limit),
                         Err(e) => {
@@ -400,7 +425,12 @@ impl Vm {
                     }
                 }
                 // A whole float (2.0) counts as its integer.
-                _ => Wake::Frames(it.next().and_then(|v| v.as_integer().or(v.as_number().filter(|n| n.fract() == 0.0).map(|n| n as i64))).unwrap_or(1).clamp(1, u32::MAX as i64) as u32),
+                _ => Wake::Frames(
+                    it.next()
+                        .and_then(|v| v.as_integer().or(v.as_number().filter(|n| n.fract() == 0.0).map(|n| n as i64)))
+                        .unwrap_or(1)
+                        .clamp(1, u32::MAX as i64) as u32,
+                ),
             }
         } else {
             Wake::Frames(1)
@@ -550,7 +580,9 @@ impl Vm {
 /// An error's message without mlua's wrapping ("runtime error: ", the callback's traceback).
 fn clean(e: &mlua::Error) -> String {
     match e {
-        mlua::Error::RuntimeError(s) | mlua::Error::SyntaxError { message: s, .. } => s.lines().next().unwrap_or("").to_string(),
+        mlua::Error::RuntimeError(s) | mlua::Error::SyntaxError { message: s, .. } => {
+            s.lines().next().unwrap_or("").to_string()
+        }
         mlua::Error::CallbackError { cause, .. } => clean(cause),
         mlua::Error::MemoryError(s) => format!("out of memory ({s})"),
         e => e.to_string().lines().next().unwrap_or("").to_string(),

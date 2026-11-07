@@ -37,16 +37,32 @@ pub const EASE_KEY_EASED: u32 = 1 << 21;
 #[derive(Clone, Debug)]
 pub enum Op {
     Zone(u32),
-    Weather { tag: String, ticks: u16 },
+    Weather {
+        tag: String,
+        ticks: u16,
+    },
     Time(u32),
     Env(String),
-    Camera { path: String, wait: u16, ticks: u16 },
-    Fade { rgba: [u8; 4], wait: u16, ticks: u16 },
-    Crossfade { wait: u16, ticks: u16 },
+    Camera {
+        path: String,
+        wait: u16,
+        ticks: u16,
+    },
+    Fade {
+        rgba: [u8; 4],
+        wait: u16,
+        ticks: u16,
+    },
+    Crossfade {
+        wait: u16,
+        ticks: u16,
+    },
     Call(String),
     Spawn(String),
     /// 0x3d (or 0xaf with an expansion bit): run one random entry up to the closing 0x3e.
-    Random { expansion: Option<u32> },
+    Random {
+        expansion: Option<u32>,
+    },
     EndRandom,
     Other(u8),
 }
@@ -129,8 +145,14 @@ impl Title {
                     let keys = (0..(flags & 0xff) as usize)
                         .map(|i| {
                             let o = 0x20 + 0x30 * i;
-                            let v = |o: usize| Vec3::new(f32_at(c.data, o), f32_at(c.data, o + 4), f32_at(c.data, o + 8));
-                            Key { eye: v(o), focal: f32_at(c.data, o + 12), target: v(o + 16), roll: f32_at(c.data, o + 28) }
+                            let v =
+                                |o: usize| Vec3::new(f32_at(c.data, o), f32_at(c.data, o + 4), f32_at(c.data, o + 8));
+                            Key {
+                                eye: v(o),
+                                focal: f32_at(c.data, o + 12),
+                                target: v(o + 16),
+                                roll: f32_at(c.data, o + 28),
+                            }
                         })
                         .collect();
                     paths.push(CameraPath { name: c.name(), attach, flags, ease, ease_key: None, keys });
@@ -139,7 +161,11 @@ impl Title {
             }
         }
         // FUN_1003c320: an ease beyond 4 names a KeyFrame (kind 0x19) of the file; none found, linear.
-        let keyframes: Vec<(u32, super::generator::KeyFrame)> = super::chunks(file)?.into_iter().filter(|c| c.kind == 0x19).map(|c| (u32::from_le_bytes(c.name), super::generator::KeyFrame::parse(c.data))).collect();
+        let keyframes: Vec<(u32, super::generator::KeyFrame)> = super::chunks(file)?
+            .into_iter()
+            .filter(|c| c.kind == 0x19)
+            .map(|c| (u32::from_le_bytes(c.name), super::generator::KeyFrame::parse(c.data)))
+            .collect();
         for p in paths.iter_mut().filter(|p| p.ease > 4) {
             p.ease_key = keyframes.iter().find(|k| k.0 == p.ease).map(|k| k.1.clone());
         }
@@ -151,7 +177,11 @@ impl Title {
     }
 
     pub fn scheduler(&self, name: &str) -> Result<&[Op]> {
-        self.schedulers.iter().find(|s| s.0 == name).map(|s| s.1.as_slice()).with_context(|| format!("no scheduler {name}"))
+        self.schedulers
+            .iter()
+            .find(|s| s.0 == name)
+            .map(|s| s.1.as_slice())
+            .with_context(|| format!("no scheduler {name}"))
     }
 }
 
@@ -162,7 +192,11 @@ pub fn ease(kind: u32, u: f32) -> f32 {
         1 => (u * FRAC_PI_2).sin(),
         2 => 1.0 - (u * FRAC_PI_2).cos(),
         3 => {
-            if u * 2.0 * PI <= PI { (u * PI).sin() * 0.5 } else { 1.0 - (u * PI).sin() * 0.5 }
+            if u * 2.0 * PI <= PI {
+                (u * PI).sin() * 0.5
+            } else {
+                1.0 - (u * PI).sin() * 0.5
+            }
         }
         4 => 1.0 - ((u * PI).cos() * 0.5 + 0.5),
         _ => u,
@@ -200,10 +234,22 @@ impl Spline {
             let f8 = f3 * f3;
             let f7 = f2 * f2 / f6;
             mats.push([
-                -f8 * f4, (f3 + f5) * f4, (-f3 - f5) / f6, f7,
-                2.0 * f8 * f4, (f3 * -2.0 - f5) * f4, (2.0 * f3 - (f2 - 2.0 * f5)) / f6, -f7,
-                -f8 * f4, (1.0 - 2.0 * f1) * f4, f1, 0.0,
-                0.0, 1.0, 0.0, 0.0,
+                -f8 * f4,
+                (f3 + f5) * f4,
+                (-f3 - f5) / f6,
+                f7,
+                2.0 * f8 * f4,
+                (f3 * -2.0 - f5) * f4,
+                (2.0 * f3 - (f2 - 2.0 * f5)) / f6,
+                -f7,
+                -f8 * f4,
+                (1.0 - 2.0 * f1) * f4,
+                f1,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
             ]);
         }
         for l in lens.iter_mut().take(n).skip(1) {
@@ -268,7 +314,12 @@ pub fn sample_from(path: &CameraPath, t: f32, current: Option<Key>, follow: Opti
 fn sample_keys(k: &[Key], u: f32) -> Key {
     if k.len() == 2 {
         let lerp = |a: f32, b: f32| a + (b - a) * u;
-        return Key { eye: k[0].eye.lerp(k[1].eye, u), focal: lerp(k[0].focal, k[1].focal), target: k[0].target.lerp(k[1].target, u), roll: lerp(k[0].roll, k[1].roll) };
+        return Key {
+            eye: k[0].eye.lerp(k[1].eye, u),
+            focal: lerp(k[0].focal, k[1].focal),
+            target: k[0].target.lerp(k[1].target, u),
+            roll: lerp(k[0].roll, k[1].roll),
+        };
     }
     if k.len() < 2 {
         return k[0];
@@ -345,14 +396,28 @@ mod tests {
     /// A one-key bit-19 path lerps from the current camera; without the bit it holds its key.
     #[test]
     fn starts_from_current() {
-        let p = CameraPath { name: "t".into(), attach: 0, flags: FROM_CURRENT | 1, ease: 0, ease_key: None, keys: vec![key(10.0)] };
+        let p = CameraPath {
+            name: "t".into(),
+            attach: 0,
+            flags: FROM_CURRENT | 1,
+            ease: 0,
+            ease_key: None,
+            keys: vec![key(10.0)],
+        };
         assert_eq!(sample_from(&p, 0.0, Some(key(0.0)), None).eye.x, 0.0);
         assert_eq!(sample_from(&p, 0.5, Some(key(0.0)), None).eye.x, 5.0);
         assert_eq!(sample_from(&p, 1.0, Some(key(0.0)), None).eye.x, 10.0);
         let q = CameraPath { flags: 1, ..p.clone() };
         assert_eq!(sample_from(&q, 0.0, Some(key(0.0)), None).eye.x, 10.0);
         // Three points: the spline passes through the current camera first.
-        let r = CameraPath { name: "t".into(), attach: 0, flags: FROM_CURRENT | 2, ease: 0, ease_key: None, keys: vec![key(10.0), key(20.0)] };
+        let r = CameraPath {
+            name: "t".into(),
+            attach: 0,
+            flags: FROM_CURRENT | 2,
+            ease: 0,
+            ease_key: None,
+            keys: vec![key(10.0), key(20.0)],
+        };
         assert!((sample_from(&r, 0.0, Some(key(0.0)), None).eye.x).abs() < 1e-4);
         assert!((sample_from(&r, 1.0, Some(key(0.0)), None).eye.x - 20.0).abs() < 1e-3);
         assert!((focal_of(fov_y(350.0)) - 350.0).abs() < 1e-2);

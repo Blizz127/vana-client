@@ -198,7 +198,12 @@ pub const FRIEND_INFO: usize = 0xa8;
 impl FriendInfo {
     pub fn to_bytes(&self) -> [u8; FRIEND_INFO] {
         let mut b = [0u8; FRIEND_INFO];
-        let bits = (self.op as u64 & 0xf) | (self.black as u64) << 4 | 1 << 5 | (self.handle_id & 0xfff_ffff_ffff) << 13 | 0xe << 57 | (self.pending as u64) << 62;
+        let bits = (self.op as u64 & 0xf)
+            | (self.black as u64) << 4
+            | 1 << 5
+            | (self.handle_id & 0xfff_ffff_ffff) << 13
+            | 0xe << 57
+            | (self.pending as u64) << 62;
         b[..8].copy_from_slice(&bits.to_le_bytes());
         (b[8], b[9], b[10]) = (self.num, self.order, self.result);
         b[0x10..0x18].copy_from_slice(&self.pol.to_le_bytes());
@@ -231,7 +236,12 @@ pub fn load_friend_list(c: &Cred) -> Result<Vec<FriendInfo>> {
 }
 
 /// StoreFriendList (0x02 / 0x06): every list index's display order and the changed entries; the entries answered.
-pub fn store_friend_list(c: &Cred, friend_order: &[u8; 200], black_order: &[u8; 100], entries: &[FriendInfo]) -> Result<Vec<FriendInfo>> {
+pub fn store_friend_list(
+    c: &Cred,
+    friend_order: &[u8; 200],
+    black_order: &[u8; 100],
+    entries: &[FriendInfo],
+) -> Result<Vec<FriendInfo>> {
     let mut b = Vec::with_capacity(0x130 + entries.len() * FRIEND_INFO + 8);
     b.extend_from_slice(friend_order);
     b.extend_from_slice(black_order);
@@ -315,7 +325,11 @@ pub fn mail_list(c: &Cred) -> Result<Vec<(u32, u32, String)>> {
     Ok((0..count(&a))
         .filter_map(|k| {
             let e = a.get(8 + k * 0x108..8 + (k + 1) * 0x108)?;
-            Some((u32::from_le_bytes(e[..4].try_into().unwrap()), u32::from_le_bytes(e[4..8].try_into().unwrap()), name16(&e[8..])))
+            Some((
+                u32::from_le_bytes(e[..4].try_into().unwrap()),
+                u32::from_le_bytes(e[4..8].try_into().unwrap()),
+                name16(&e[8..]),
+            ))
         })
         .collect())
 }
@@ -439,7 +453,13 @@ pub enum Irc {
     SignedOn,
     /// A friend's status (Status - 1: 0 offline, 1 online, 2 away), where we list them, the character they play, and
     /// the notice's age (only newer ones apply).
-    Status { account: u64, list_index: u8, status: u8, char_id: Option<u32>, age: u64 },
+    Status {
+        account: u64,
+        list_index: u8,
+        status: u8,
+        char_id: Option<u32>,
+        age: u64,
+    },
     /// A new message: its 0x48-byte header.
     Mail(Vec<u8>),
     Closed(String),
@@ -542,8 +562,15 @@ fn notice(payload: &str) -> Option<Irc> {
     }
     let account = u64::from_le_bytes(h[..8].try_into().unwrap()) ^ POL_MASK;
     let ext = b64_decode(&payload[96..]).unwrap_or_default();
-    let char_id = (ext.first().is_some_and(|f| f & 8 != 0) && ext.len() >= 0x18).then(|| u64::from_le_bytes(ext[0x10..0x18].try_into().unwrap()) as u32);
-    Some(Irc::Status { account, list_index: h[0x1c], status: h[0x11].saturating_sub(1), char_id, age: u64::from_le_bytes(h[0x30..0x38].try_into().unwrap()) })
+    let char_id = (ext.first().is_some_and(|f| f & 8 != 0) && ext.len() >= 0x18)
+        .then(|| u64::from_le_bytes(ext[0x10..0x18].try_into().unwrap()) as u32);
+    Some(Irc::Status {
+        account,
+        list_index: h[0x1c],
+        status: h[0x11].saturating_sub(1),
+        char_id,
+        age: u64::from_le_bytes(h[0x30..0x38].try_into().unwrap()),
+    })
 }
 
 #[cfg(test)]
@@ -583,10 +610,22 @@ mod tests {
     #[test]
     #[ignore]
     fn profile_live() {
-        let j: serde_json::Value = serde_json::from_slice(&std::fs::read(std::env::var("VANA_TEST_CREDENTIALS").expect("VANA_TEST_CREDENTIALS")).unwrap()).unwrap();
-        let req = super::super::auth::Request { username: j["username"].as_str().unwrap(), password: j["password"].as_str().unwrap(), ..Default::default() };
-        let super::super::auth::Reply::LoggedIn { account_id, session_hash, .. } = super::super::auth::send("127.0.0.1", 54231, super::super::auth::Command::Login, &req).unwrap() else { panic!() };
-        let c = Cred { host: "127.0.0.1".into(), port: 51220, irc_port: 51240, account: account_id, hash: session_hash };
+        let j: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(std::env::var("VANA_TEST_CREDENTIALS").expect("VANA_TEST_CREDENTIALS")).unwrap(),
+        )
+        .unwrap();
+        let req = super::super::auth::Request {
+            username: j["username"].as_str().unwrap(),
+            password: j["password"].as_str().unwrap(),
+            ..Default::default()
+        };
+        let super::super::auth::Reply::LoggedIn { account_id, session_hash, .. } =
+            super::super::auth::send("127.0.0.1", 54231, super::super::auth::Command::Login, &req).unwrap()
+        else {
+            panic!()
+        };
+        let c =
+            Cred { host: "127.0.0.1".into(), port: 51220, irc_port: 51240, account: account_id, hash: session_hash };
         let link = irc(c.clone());
         println!("irc: {:?}", link.events.recv_timeout(Duration::from_secs(10)));
         println!("status {:?}", load_my_status(&c));
@@ -600,7 +639,17 @@ mod tests {
 
     #[test]
     fn message_header() {
-        let h = MsgHeader { from: 1000, to: 1003, sender: "Lnxcsfix".into(), title: "Hi".into(), seq: 7, date: 1_800_000_000, length: 12, kind: FRIEND_REQUEST, no_reply: false };
+        let h = MsgHeader {
+            from: 1000,
+            to: 1003,
+            sender: "Lnxcsfix".into(),
+            title: "Hi".into(),
+            seq: 7,
+            date: 1_800_000_000,
+            length: 12,
+            kind: FRIEND_REQUEST,
+            no_reply: false,
+        };
         assert_eq!(h.file_name().len(), 96);
         assert_eq!(MsgHeader::from_name(&h.file_name()), Some(h.clone()));
         // A server's name with more after the header would be a path out of the mail folder.

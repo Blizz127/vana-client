@@ -91,7 +91,10 @@ pub struct Held {
 /// all furniture?" (0xe 0x267).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ask {
-    Dispose { c: u8, slot: u8 },
+    Dispose {
+        c: u8,
+        slot: u8,
+    },
     ClearAll,
     DisposeAll,
     /// The dressed mannequin's "Remove all equipment from the mannequin?" (9 0xe0).
@@ -116,12 +119,17 @@ pub fn placed(w: &World, table: &FurnTable, floor: u8) -> Vec<Placed> {
     let mut out = Vec::new();
     for c in [1u8, 9] {
         for slot in 1..0x51u8 {
-            let (Some(&(item, _)), Some(ext)) = (w.inv.slots.get(&(c, slot)), w.inv.ext.get(&(c, slot))) else { continue };
+            let (Some(&(item, _)), Some(ext)) = (w.inv.slots.get(&(c, slot)), w.inv.ext.get(&(c, slot))) else {
+                continue;
+            };
             if !TYPES.contains(&item_type(w, item)) || ext[1] & 0x40 == 0 || ext[1] & 3 != floor {
                 continue;
             }
             let Some(furn) = table.entry(item) else { continue };
-            out.push(Placed { piece: Piece { c, slot, furn, x: ext[6] as i8, level: ext[7] as i8, z: ext[8] as i8, rot: ext[9] & 3 }, item });
+            out.push(Placed {
+                piece: Piece { c, slot, furn, x: ext[6] as i8, level: ext[7] as i8, z: ext[8] as i8, rot: ext[9] & 3 },
+                item,
+            });
         }
     }
     out
@@ -170,7 +178,8 @@ impl Layout {
     fn grid(&self, w: &World) -> Grid {
         let mut v = placed(w, &self.table, self.floor);
         if let Some(h) = &self.held {
-            let moved: Vec<(u8, u8)> = std::iter::once(&h.piece).chain(&h.tops).map(|m| (m.piece.c, m.piece.slot)).collect();
+            let moved: Vec<(u8, u8)> =
+                std::iter::once(&h.piece).chain(&h.tops).map(|m| (m.piece.c, m.piece.slot)).collect();
             v.retain(|p| !moved.contains(&(p.piece.c, p.piece.slot)));
         }
         grid_of(&v, self.floor)
@@ -238,7 +247,21 @@ pub fn enter(w: &mut World) {
     let sel = placed(w, &table, r.floor).first().map(|p| (p.piece.c, p.piece.slot));
     log::info!("layout: entered, floor {}, selected {sel:?}", r.floor);
     let win = sel.is_none().then_some((1, 1));
-    w.layout = Some(Layout { table, floor: r.floor, map: r.map, view: w.layout_view, sel, ticks: 0.0, held: None, win, bank: None, list: None, dress: None, color_all: WHITE, colors: Default::default() });
+    w.layout = Some(Layout {
+        table,
+        floor: r.floor,
+        map: r.map,
+        view: w.layout_view,
+        sel,
+        ticks: 0.0,
+        held: None,
+        win,
+        bank: None,
+        list: None,
+        dress: None,
+        color_all: WHITE,
+        colors: Default::default(),
+    });
     w.pos = park(r.floor);
 }
 
@@ -264,7 +287,14 @@ pub fn leave(w: &mut World) {
 fn hold(w: &mut World, l: &mut Layout, p: Placed, new: bool) {
     let grid = l.grid(w);
     let pieces = l.pieces(w);
-    let tops = if p.piece.surface() { grid.on(p.piece.slot, p.piece.c).iter().filter_map(|&(s, c)| pieces.iter().copied().find(|q| (q.piece.slot, q.piece.c) == (s, c))).collect() } else { Vec::new() };
+    let tops = if p.piece.surface() {
+        grid.on(p.piece.slot, p.piece.c)
+            .iter()
+            .filter_map(|&(s, c)| pieces.iter().copied().find(|q| (q.piece.slot, q.piece.c) == (s, c)))
+            .collect()
+    } else {
+        Vec::new()
+    };
     l.sel = Some((p.piece.c, p.piece.slot));
     set_colors(l, 0x8060_6060);
     for t in std::iter::once(&p).chain(&tops) {
@@ -349,7 +379,11 @@ fn remove(w: &mut World, l: &mut Layout, c: u8, slot: u8, ask: bool) {
     let grid = l.grid(w);
     let Some(p) = pieces.iter().copied().find(|p| (p.piece.c, p.piece.slot) == (c, slot)) else { return };
     let mut all = vec![p];
-    all.extend(grid.on(slot, c).iter().filter_map(|&(s, k)| pieces.iter().copied().find(|q| (q.piece.slot, q.piece.c) == (s, k))));
+    all.extend(
+        grid.on(slot, c)
+            .iter()
+            .filter_map(|&(s, k)| pieces.iter().copied().find(|q| (q.piece.slot, q.piece.c) == (s, k))),
+    );
     if ask && all.iter().any(|q| w.inv.ext.get(&(q.piece.c, q.piece.slot)).is_some_and(|e| e[0] != 0)) {
         w.confirm = Some((super::Confirm::Layout(Ask::Dispose { c, slot }), false));
         return;
@@ -431,14 +465,34 @@ pub fn update(w: &mut World, input: &mut Input, dt: f32) {
         w.layout = Some(l);
         return;
     }
-    let dx = if input.test(0x33, mode::REPEAT) { 1 } else if input.test(0x34, mode::REPEAT) { -1 } else { 0 };
-    let dz = if input.test(0x31, mode::REPEAT) { 1 } else if input.test(0x32, mode::REPEAT) { -1 } else { 0 };
+    let dx = if input.test(0x33, mode::REPEAT) {
+        1
+    } else if input.test(0x34, mode::REPEAT) {
+        -1
+    } else {
+        0
+    };
+    let dz = if input.test(0x31, mode::REPEAT) {
+        1
+    } else if input.test(0x32, mode::REPEAT) {
+        -1
+    } else {
+        0
+    };
     if dx != 0 || dz != 0 {
         w.sounds.push(Ui::Cursor as u32);
         let grid = l.grid(w);
         let cand = |p: &Placed| {
             let pos = l.pos(&p.piece)?;
-            Some(Cand { id: (p.piece.c as u32) << 8 | p.piece.slot as u32, pos, level: p.piece.level, wall: p.piece.furn.wall(), rot: p.piece.rot, size: p.piece.furn.footprint(p.piece.rot), has_tops: !grid.on(p.piece.slot, p.piece.c).is_empty() })
+            Some(Cand {
+                id: (p.piece.c as u32) << 8 | p.piece.slot as u32,
+                pos,
+                level: p.piece.level,
+                wall: p.piece.furn.wall(),
+                rot: p.piece.rot,
+                size: p.piece.furn.footprint(p.piece.rot),
+                has_tops: !grid.on(p.piece.slot, p.piece.c).is_empty(),
+            })
         };
         let all: Vec<Cand> = pieces.iter().filter_map(cand).collect();
         if let Some(cur) = l.selected(&pieces).as_ref().and_then(cand)
@@ -602,12 +656,24 @@ fn win_name(kind: u8) -> &'static str {
 fn dim_rows(w: &World, l: &Layout, kind: u8) -> Vec<u16> {
     let stored = w.inv.slots.keys().filter(|(c, s)| *c == 2 && *s != 0).count() as i32;
     let size = w.inv.sizes[2] as i32 - 1;
-    let slots = |id: u16| w.item_info.as_ref().and_then(|i| i.item(id)).and_then(|it| it.extra.iter().find(|e| e.0 == 0xd14).map(|e| e.1 as i32)).unwrap_or(0);
+    let slots = |id: u16| {
+        w.item_info
+            .as_ref()
+            .and_then(|i| i.item(id))
+            .and_then(|it| it.extra.iter().find(|e| e.0 == 0xd14).map(|e| e.1 as i32))
+            .unwrap_or(0)
+    };
     let pieces = l.pieces(w);
     let need = match l.selected(&pieces) {
         Some(p) => {
             let grid = l.grid(w);
-            slots(p.item) + grid.on(p.piece.slot, p.piece.c).iter().filter_map(|&(s, c)| pieces.iter().find(|q| (q.piece.slot, q.piece.c) == (s, c))).map(|q| slots(q.item)).sum::<i32>()
+            slots(p.item)
+                + grid
+                    .on(p.piece.slot, p.piece.c)
+                    .iter()
+                    .filter_map(|&(s, c)| pieces.iter().find(|q| (q.piece.slot, q.piece.c) == (s, c)))
+                    .map(|q| slots(q.item))
+                    .sum::<i32>()
         }
         None => 1,
     };
@@ -659,7 +725,13 @@ pub fn key(w: &mut World, key: egui::Key) -> bool {
     let n = rows(kind).len() as u16;
     match key {
         egui::Key::ArrowUp | egui::Key::ArrowDown => {
-            let s = if key == egui::Key::ArrowUp { if sel <= 1 { n } else { sel - 1 } } else if sel >= n { 1 } else { sel + 1 };
+            let s = if key == egui::Key::ArrowUp {
+                if sel <= 1 { n } else { sel - 1 }
+            } else if sel >= n {
+                1
+            } else {
+                sel + 1
+            };
             l.win = Some((kind, s));
             w.sounds.push(Ui::Cursor as u32);
         }
@@ -771,7 +843,12 @@ fn list_rows(w: &World, l: &Layout, c: u8) -> Vec<(crate::inventory::Slot, u32)>
 
 /// Installed pieces of a type in containers 1 and 9, any floor (FUN_101f4190).
 fn installed(w: &World, ty: u16) -> usize {
-    w.inv.slots.iter().filter(|((c, _), (id, _))| matches!(c, 1 | 9) && item_type(w, *id) == ty).filter(|(k, _)| w.inv.ext.get(k).is_some_and(|e| e[1] & 0x40 != 0)).count()
+    w.inv
+        .slots
+        .iter()
+        .filter(|((c, _), (id, _))| matches!(c, 1 | 9) && item_type(w, *id) == ty)
+        .filter(|(k, _)| w.inv.ext.get(k).is_some_and(|e| e[1] & 0x40 != 0))
+        .count()
 }
 
 /// The list's keys (FUN_101f42e0): Enter holds the piece (a new one at its start, 3.5); with 10 flowerpots or 8
@@ -851,7 +928,11 @@ pub fn draw(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32) -> Vec
     {
         let rows = list_rows(w, l, c);
         let slots: Vec<_> = rows.iter().map(|r| r.0.clone()).collect();
-        let mut list = crate::inventory::ItemList { rows: crate::inventory::build_rows(&slots, info.as_ref(), false), scroll, cursor };
+        let mut list = crate::inventory::ItemList {
+            rows: crate::inventory::build_rows(&slots, info.as_ref(), false),
+            scroll,
+            cursor,
+        };
         for (r, (_, tint)) in list.rows.iter_mut().zip(&rows) {
             r.tint = *tint;
         }
@@ -860,7 +941,18 @@ pub fn draw(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32) -> Vec
         let frame = gu.cursor_frame();
         let (b, ui, style, font) = gu.parts();
         if let Some(m) = ui.menu(INVENTOR).filter(|_| open) {
-            let _ = crate::render::invwin::push_inventory(b, ui, style, font, super::game_ui::GameUi::ATLAS, m, &list, sw, sh, if w.confirm.is_none() { frame } else { usize::MAX });
+            let _ = crate::render::invwin::push_inventory(
+                b,
+                ui,
+                style,
+                font,
+                super::game_ui::GameUi::ATLAS,
+                m,
+                &list,
+                sw,
+                sh,
+                if w.confirm.is_none() { frame } else { usize::MAX },
+            );
             out.extend(gu.window_rect(INVENTOR, sw, sh));
         }
     }
@@ -883,19 +975,28 @@ pub(super) fn look(w: &World) -> Option<Look> {
         let rows = list_rows(w, l, c);
         (rows.iter().map(|r| r.0.clone()).collect(), rows.iter().map(|r| r.1).collect(), scroll + cursor)
     });
-    Some(Look { win: l.win.map(|(kind, sel)| (win_name(kind), sel, dim_rows(w, l, kind))), bank: l.bank.map(|r| (r, bank_dim(w))), list })
+    Some(Look {
+        win: l.win.map(|(kind, sel)| (win_name(kind), sel, dim_rows(w, l, kind))),
+        bank: l.bank.map(|r| (r, bank_dim(w))),
+        list,
+    })
 }
 
 /// The mouse's cursor moves: the rmlo window, bankmenu, the furniture list's row. True when it moved.
 pub(super) fn set_win(w: &mut World, k: u16) -> bool {
     let Some(l) = w.layout.as_mut().filter(|l| l.bank.is_none() && l.list.is_none()) else { return false };
-    let Some((_, sel)) = l.win.as_mut().filter(|(kind, sel)| *sel != k && (1..=rows(*kind).len() as u16).contains(&k)) else { return false };
+    let Some((_, sel)) = l.win.as_mut().filter(|(kind, sel)| *sel != k && (1..=rows(*kind).len() as u16).contains(&k))
+    else {
+        return false;
+    };
     *sel = k;
     true
 }
 
 pub(super) fn set_bank(w: &mut World, k: u16) -> bool {
-    let Some(r) = w.layout.as_mut().and_then(|l| l.bank.as_mut()).filter(|r| **r != k && (1..=2).contains(&k)) else { return false };
+    let Some(r) = w.layout.as_mut().and_then(|l| l.bank.as_mut()).filter(|r| **r != k && (1..=2).contains(&k)) else {
+        return false;
+    };
     *r = k;
     true
 }
@@ -915,7 +1016,16 @@ pub(super) fn set_row(w: &mut World, k: usize) -> bool {
 
 /// The mouse (winhits.rs): an rmlo window or bankmenu as the generic window; the furniture list's rows as the item
 /// list (hover moves the row, a click on it is Enter, a right click Escape). The dressing windows have their own.
-pub fn pointer(w: &mut World, gu: &super::game_ui::GameUi, sw: f32, sh: f32, p: (f32, f32), moved: bool, clicked: bool, right: bool) {
+pub fn pointer(
+    w: &mut World,
+    gu: &super::game_ui::GameUi,
+    sw: f32,
+    sh: f32,
+    p: (f32, f32),
+    moved: bool,
+    clicked: bool,
+    right: bool,
+) {
     use super::winhits::generic;
     let Some(l) = &w.layout else { return };
     // The modern layer draws these and takes their mouse.
@@ -947,18 +1057,42 @@ pub fn pointer(w: &mut World, gu: &super::game_ui::GameUi, sw: f32, sh: f32, p: 
             key(w, egui::Key::Enter);
         }
     } else if let Some(row) = l.bank {
-        generic(w, gu, BANKMENU, row, 1..=2, p, moved, clicked, right, |w, id| {
-            if let Some(l) = w.layout.as_mut() {
-                l.bank = Some(id);
-            }
-        }, keys);
+        generic(
+            w,
+            gu,
+            BANKMENU,
+            row,
+            1..=2,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(l) = w.layout.as_mut() {
+                    l.bank = Some(id);
+                }
+            },
+            keys,
+        );
     } else if let Some((kind, sel)) = l.win {
         let n = rows(kind).len() as u16;
-        generic(w, gu, win_name(kind), sel, 1..=n, p, moved, clicked, right, |w, id| {
-            if let Some(l) = w.layout.as_mut() {
-                l.win = Some((kind, id));
-            }
-        }, keys);
+        generic(
+            w,
+            gu,
+            win_name(kind),
+            sel,
+            1..=n,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(l) = w.layout.as_mut() {
+                    l.win = Some((kind, id));
+                }
+            },
+            keys,
+        );
     }
 }
 
@@ -972,7 +1106,13 @@ pub fn info_source(w: &World) -> Option<(u16, Option<[u8; 24]>)> {
 
 /// The context: 0x3e while a window or a prompt is up, else 0x42.
 pub fn context(w: &World) -> u16 {
-    if w.layout.as_ref().is_some_and(|l| l.win.is_some() || l.bank.is_some() || l.list.is_some() || l.dress.is_some()) || w.confirm.is_some() { 0x3e } else { 0x42 }
+    if w.layout.as_ref().is_some_and(|l| l.win.is_some() || l.bank.is_some() || l.list.is_some() || l.dress.is_some())
+        || w.confirm.is_some()
+    {
+        0x3e
+    } else {
+        0x42
+    }
 }
 
 /// The layout camera each frame (FUN_101d4080, the dressing one in mode 4) into the world camera; true while laying
@@ -995,7 +1135,11 @@ pub fn draw_cursor(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32,
     let Some(l) = w.layout.as_ref().filter(|l| l.dress.is_none()) else { return };
     let Some(p) = l.sel_pos(w) else { return };
     let clip = view_proj * p.extend(1.0);
-    let (x, y) = if clip.w > 0.0 { ((clip.x / clip.w + 1.0) / 2.0 * sw, (1.0 - clip.y / clip.w) / 2.0 * sh) } else { (100.0, 100.0) };
+    let (x, y) = if clip.w > 0.0 {
+        ((clip.x / clip.w + 1.0) / 2.0 * sw, (1.0 - clip.y / clip.w) / 2.0 * sh)
+    } else {
+        (100.0, 100.0)
+    };
     let frame = (l.ticks / 3.0) as usize % gu.lib_len("anc     anc_l").max(1);
     gu.sprite("anc     anc_l", frame, x.trunc().max(0.0), y.trunc().max(0.0), 0x8080_8080);
 }
@@ -1036,7 +1180,11 @@ fn cell_outline(out: &mut Vec<crate::render::LineVertex>, grid: &Grid, floor: u8
     let y = -(h as f32) * 0.01 - if c == BLUE { 0.04 } else { 0.06 };
     let (x0, z0) = ((x as f32 - o[0]) * 0.6 + i, (z as f32 - o[2]) * 0.6 + i);
     let s = 0.6 - 2.0 * i;
-    outline(out, [Vec3::new(x0, y, z0), Vec3::new(x0 + s, y, z0), Vec3::new(x0 + s, y, z0 + s), Vec3::new(x0, y, z0 + s)], c);
+    outline(
+        out,
+        [Vec3::new(x0, y, z0), Vec3::new(x0 + s, y, z0), Vec3::new(x0 + s, y, z0 + s), Vec3::new(x0, y, z0 + s)],
+        c,
+    );
 }
 
 /// The overlay while a piece is held (FUN_101cf110, drawn with ZENABLE off): a wall piece shows every wall slot blue
@@ -1345,7 +1493,11 @@ pub fn shift(grid: &Grid, p: &mut Piece, floor: u8, dx: i32, dz: i32) -> bool {
 pub fn step(grid: &Grid, p: &mut Piece, floor: u8, dir: u8) -> Option<(i32, i32)> {
     if p.furn.wall() {
         let s = p.x as u8 as usize;
-        let next = if floor == 0 { MOVE_1F.get(s).map(|m| m[dir as usize & 3]) } else { MOVE_2F.get(s).map(|m| m[dir as usize & 3]) };
+        let next = if floor == 0 {
+            MOVE_1F.get(s).map(|m| m[dir as usize & 3])
+        } else {
+            MOVE_2F.get(s).map(|m| m[dir as usize & 3])
+        };
         let s = next.unwrap_or(s as u8);
         (p.x, p.level, p.z, p.rot) = (s as i8, 0, 0, wall_rot(floor, s));
         return Some((0, 0));
@@ -1585,7 +1737,8 @@ mod tests {
     fn live_room() {
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let t = FurnTable::load(&index).unwrap();
-        let mk = |slot, item: u16, x, level, z, rot| Piece { c: 1, slot, furn: t.entry(item).unwrap(), x, level, z, rot };
+        let mk =
+            |slot, item: u16, x, level, z, rot| Piece { c: 1, slot, furn: t.entry(item).unwrap(), x, level, z, rot };
         let others = [mk(2, 21, 16, 0, 4, 0), mk(3, 216, 17, 5, 5, 0), mk(4, 207, 0, 0, 20, 0), mk(6, 129, 3, 0, 0, 3)];
         let mut g = Grid::new(0);
         for p in others.iter().filter(|p| p.level == 0) {
@@ -1614,7 +1767,15 @@ mod tests {
     /// Pieces at (0, 0) current, (2, 0.5), (0.5, 2), (-3, 0); a pot at the table's centre; view 2 swaps.
     #[test]
     fn picks() {
-        let c = |id, x, z, level| Cand { id, pos: Vec3::new(x, 0.0, z), level, wall: false, rot: 0, size: (1, 1), has_tops: false };
+        let c = |id, x, z, level| Cand {
+            id,
+            pos: Vec3::new(x, 0.0, z),
+            level,
+            wall: false,
+            rot: 0,
+            size: (1, 1),
+            has_tops: false,
+        };
         let cur = c(1, 0.0, 0.0, 0);
         let others = [c(2, 2.0, 0.5, 0), c(3, 0.5, 2.0, 0), c(4, -3.0, 0.0, 0)];
         assert_eq!(pick(&cur, &others, 1, 0, 0), Some(2));

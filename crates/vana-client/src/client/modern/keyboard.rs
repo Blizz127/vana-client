@@ -33,7 +33,15 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         let o = area.min;
         let mut key = |ui: &mut egui::Ui, id: u16, r: egui::Rect, label: &str, font: &FontId, lit: bool, off: bool| {
             let resp = ui.interact(r, egui::Id::new(("swkbd key", id)), Sense::click());
-            kit::paint_button(ui.painter(), m, r, label, font, kit::Btn { lit: lit || k.cursor == id, cursor: k.cursor == id, off }, resp.hovered());
+            kit::paint_button(
+                ui.painter(),
+                m,
+                r,
+                label,
+                font,
+                kit::Btn { lit: lit || k.cursor == id, cursor: k.cursor == id, off },
+                resp.hovered(),
+            );
             if resp.hovered() && ui.input(|i| i.pointer.delta() != egui::Vec2::ZERO) {
                 hovered = Some(id);
             }
@@ -50,7 +58,13 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         // The keys right of the grid, as retail's: Backspace and Config, then Tab, SHIFT, SPACE, Enter.
         let x = o.x + 15.0 * (KEY + GAP) + GAP;
         let half = (wide - GAP) / 2.0;
-        let rows: [&[(u16, &str, f32)]; 5] = [&[(6, "Back", half), (0x53, "Config", half)], &[(7, "Tab", wide)], &[(0x55, "Shift", wide)], &[(0x56, "Space", wide)], &[(0x57, "Enter", wide)]];
+        let rows: [&[(u16, &str, f32)]; 5] = [
+            &[(6, "Back", half), (0x53, "Config", half)],
+            &[(7, "Tab", wide)],
+            &[(0x55, "Shift", wide)],
+            &[(0x56, "Space", wide)],
+            &[(0x57, "Enter", wide)],
+        ];
         for (row, keys) in rows.iter().enumerate() {
             let mut kx = x;
             for &(id, label, kw) in keys.iter() {

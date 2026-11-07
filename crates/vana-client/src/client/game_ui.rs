@@ -72,7 +72,9 @@ pub struct GameUiData {
 fn menu_registry(ffximain: &[u8]) -> (std::collections::HashMap<String, u32>, std::collections::HashMap<String, u16>) {
     let (mut out, mut groups) = (std::collections::HashMap::new(), std::collections::HashMap::new());
     let first = b"menu    menuwind";
-    let Some(at) = (0..ffximain.len().saturating_sub(0x60)).find(|&i| ffximain[i..].starts_with(first) && ffximain[i + 16] == 0 && ffximain[i + 0x2c..].starts_with(b"menu    ")) else {
+    let Some(at) = (0..ffximain.len().saturating_sub(0x60)).find(|&i| {
+        ffximain[i..].starts_with(first) && ffximain[i + 16] == 0 && ffximain[i + 0x2c..].starts_with(b"menu    ")
+    }) else {
         log::warn!("menu registry not found");
         return (out, groups);
     };
@@ -133,42 +135,94 @@ impl GameUiData {
                 (m.elements[0].w, m.elements[0].h) = (w, h);
             }
         }
-        let style = parse(WINDOW_STYLE_BASE)?.libs.into_iter().next().context("window style file has no sprite library")?;
+        let style =
+            parse(WINDOW_STYLE_BASE)?.libs.into_iter().next().context("window style file has no sprite library")?;
         let font = Font::load(index, ffximain, 1, quality)?;
         let t = crate::dat::tables::of(ffximain)?;
-        let menu_msgs = group_file(ffximain, 1, 0x0e).and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("menu messages: {e:#}")).ok());
-        let title_msgs = group_file(ffximain, 1, 0x0d).and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("title messages: {e:#}")).ok());
-        let cmd_help = crate::dat::battle::va_bytes(ffximain, t.cmd_help, 0x1c * 12).map_or(Vec::new(), |b| b.chunks(12).map(|r| u16::from_le_bytes([r[0], r[1]])).collect());
+        let menu_msgs = group_file(ffximain, 1, 0x0e)
+            .and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("menu messages: {e:#}")).ok());
+        let title_msgs = group_file(ffximain, 1, 0x0d)
+            .and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("title messages: {e:#}")).ok());
+        let cmd_help = crate::dat::battle::va_bytes(ffximain, t.cmd_help, 0x1c * 12)
+            .map_or(Vec::new(), |b| b.chunks(12).map(|r| u16::from_le_bytes([r[0], r[1]])).collect());
         let lobby_msgs = [1u8, 3, 6, 7, 8, 9, 10, 0x0b, 0x0c, 0x12, 0x13, 0x15, 0x1a, 0x1b]
             .into_iter()
-            .filter_map(|g| Some((g, group_file(ffximain, 1, g).and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("message group {g:#x}: {e:#}")).ok())?)))
+            .filter_map(|g| {
+                Some((
+                    g,
+                    group_file(ffximain, 1, g).and_then(|f| {
+                        Messages::load(index, f).map_err(|e| log::warn!("message group {g:#x}: {e:#}")).ok()
+                    })?,
+                ))
+            })
             .collect();
         let stats = crate::dat::battle::va_bytes(ffximain, t.stats, 8 * 6 * 7).map(<[u8]>::to_vec).unwrap_or_default();
         let map_regions = super::map::regions(ffximain);
         let region_groups = super::map::region_groups(ffximain);
-        let aug_text = crate::dat::msg::slot_file(ffximain, 1, 0x1b).and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("augment texts: {e:#}")).ok());
+        let aug_text = crate::dat::msg::slot_file(ffximain, 1, 0x1b)
+            .and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("augment texts: {e:#}")).ok());
         let servers = crate::dat::msg::group_file(ffximain, 1, 0x16).and_then(|f| Messages::load(index, f).ok());
         let aug_tables = super::augment::AugTables::find(ffximain);
         let f81 = index.read(81).ok();
         let mnc2 = f81.as_deref().and_then(super::augment::mnc2);
         let mon_order = f81.as_deref().map(super::monstrosity::order).unwrap_or_default();
-        let item_fmt = crate::dat::msg::slot_file(ffximain, 1, 0x1c).and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("item info formats: {e:#}")).ok());
+        let item_fmt = crate::dat::msg::slot_file(ffximain, 1, 0x1c)
+            .and_then(|f| Messages::load(index, f).map_err(|e| log::warn!("item info formats: {e:#}")).ok());
         let area_names = Messages::load(index, 0xd8aa).map_err(|e| log::error!("area names (group 4): {e:#}")).ok();
         let errors = crate::dat::battle::va_bytes(ffximain, t.errors, 16 * 128)
-            .map(|b| b.chunks(16).map(|r| std::array::from_fn(|k| u32::from_le_bytes(r[k * 4..k * 4 + 4].try_into().unwrap()))).take_while(|r: &[u32; 4]| r[0] != 9999).collect())
+            .map(|b| {
+                b.chunks(16)
+                    .map(|r| std::array::from_fn(|k| u32::from_le_bytes(r[k * 4..k * 4 + 4].try_into().unwrap())))
+                    .take_while(|r: &[u32; 4]| r[0] != 9999)
+                    .collect()
+            })
             .unwrap_or_default();
         let count_fmt = t.count_fmt.map(|va| va_str(ffximain, va));
-        let styles = (0..8).filter_map(|k| parse(WINDOW_STYLE_BASE + k).map_err(|e| log::warn!("window style {k}: {e:#}")).ok()).collect();
+        let styles = (0..8)
+            .filter_map(|k| parse(WINDOW_STYLE_BASE + k).map_err(|e| log::warn!("window style {k}: {e:#}")).ok())
+            .collect();
         let (registry, groups) = menu_registry(ffximain);
-        let status = [0x3a, 0x3b].map(|slot| crate::dat::msg::current_slot_file(ffximain, 1, slot).and_then(|f| index.read(f).map_err(|e| log::warn!("status info {f}: {e:#}")).ok()).map(std::sync::Arc::new));
-        Ok(Self { lobby, style, font, menu_msgs, title_msgs, cmd_help, map_regions, region_groups, item_fmt, aug_text, servers, aug_tables, mnc2, mon_order, lobby_msgs, stats, area_names, errors, count_fmt, styles, status, registry, groups })
+        let status = [0x3a, 0x3b].map(|slot| {
+            crate::dat::msg::current_slot_file(ffximain, 1, slot)
+                .and_then(|f| index.read(f).map_err(|e| log::warn!("status info {f}: {e:#}")).ok())
+                .map(std::sync::Arc::new)
+        });
+        Ok(Self {
+            lobby,
+            style,
+            font,
+            menu_msgs,
+            title_msgs,
+            cmd_help,
+            map_regions,
+            region_groups,
+            item_fmt,
+            aug_text,
+            servers,
+            aug_tables,
+            mnc2,
+            mon_order,
+            lobby_msgs,
+            stats,
+            area_names,
+            errors,
+            count_fmt,
+            styles,
+            status,
+            registry,
+            groups,
+        })
     }
 }
 
 /// A caption read from glyph cells: the gap after a hyphen inside a word ("Hand- to-Hand") is the cut's, not a space.
 fn hyphens(s: &str) -> String {
     let c: Vec<char> = s.chars().collect();
-    c.iter().enumerate().filter(|&(i, &ch)| !(ch == ' ' && i > 1 && c[i - 1] == '-' && c[i - 2].is_alphabetic())).map(|(_, &ch)| ch).collect()
+    c.iter()
+        .enumerate()
+        .filter(|&(i, &ch)| !(ch == ' ' && i > 1 && c[i - 1] == '-' && c[i - 2].is_alphabetic()))
+        .map(|(_, &ch)| ch)
+        .collect()
 }
 
 impl GameUi {
@@ -191,12 +245,17 @@ pub enum HudFace {
 /// The English words of the interface's texts (menu help, titles, lobby, area names, item formats, augments), lower
 /// case: what settles a doubtful gap in a menu caption.
 fn caption_words(d: &GameUiData) -> std::collections::HashSet<String> {
-    let tables = [&d.menu_msgs, &d.title_msgs, &d.area_names, &d.item_fmt, &d.aug_text].into_iter().flatten().chain(d.lobby_msgs.values());
+    let tables = [&d.menu_msgs, &d.title_msgs, &d.area_names, &d.item_fmt, &d.aug_text]
+        .into_iter()
+        .flatten()
+        .chain(d.lobby_msgs.values());
     let mut out = std::collections::HashSet::new();
     for m in tables {
         for id in 0..m.len() {
             let Some(t) = m.get(id) else { continue };
-            for w in t.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| w.len() > 1 || matches!(*w, "a" | "A" | "I")) {
+            for w in
+                t.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| w.len() > 1 || matches!(*w, "a" | "A" | "I"))
+            {
                 out.insert(w.to_ascii_lowercase());
             }
         }
@@ -230,7 +289,9 @@ fn icon_runs(s: &str) -> Option<Vec<Result<String, usize>>> {
                     code = format!("{c}{x}");
                 }
             }
-            c if (crate::dat::font::CODE_BASE..crate::dat::font::CODE_BASE + 0x200).contains(&(c as u32)) => code = c.to_string(),
+            c if (crate::dat::font::CODE_BASE..crate::dat::font::CODE_BASE + 0x200).contains(&(c as u32)) => {
+                code = c.to_string()
+            }
             _ => {}
         }
     }
@@ -384,7 +445,43 @@ pub struct WorldView<'a> {
 impl GameUi {
     pub fn new(data: GameUiData) -> Self {
         crate::render::ui::set_caption_words(caption_words(&data));
-        Self { data, renderer: None, scene_depth: None, batch: UiBatch::default(), modern_frame: None, skin_on: false, modern_scale: 1.0, ttf_text: false, modern_help: None, started: Instant::now(), pending: Vec::new(), images: Default::default(), help: HelpScroll::default(), party_window: "menu    ptw0".into(), log_top: None, style_index: 0, replaced: Vec::new(), stale: Vec::new(), style_saved: Default::default(), scroll_seen: Default::default(), hover: Default::default(), modern_order: Default::default(), bars: Vec::new(), bar_hold: None, anims: Default::default(), contents: Default::default(), anim_frame: 1, anim_acc: 0.0, open_ticks: 25.0, log_faded: false, log_bottom: None, target_up: false, walk: Walk::default(), focus: (None, None), presses: Default::default() }
+        Self {
+            data,
+            renderer: None,
+            scene_depth: None,
+            batch: UiBatch::default(),
+            modern_frame: None,
+            skin_on: false,
+            modern_scale: 1.0,
+            ttf_text: false,
+            modern_help: None,
+            started: Instant::now(),
+            pending: Vec::new(),
+            images: Default::default(),
+            help: HelpScroll::default(),
+            party_window: "menu    ptw0".into(),
+            log_top: None,
+            style_index: 0,
+            replaced: Vec::new(),
+            stale: Vec::new(),
+            style_saved: Default::default(),
+            scroll_seen: Default::default(),
+            hover: Default::default(),
+            modern_order: Default::default(),
+            bars: Vec::new(),
+            bar_hold: None,
+            anims: Default::default(),
+            contents: Default::default(),
+            anim_frame: 1,
+            anim_acc: 0.0,
+            open_ticks: 25.0,
+            log_faded: false,
+            log_bottom: None,
+            target_up: false,
+            walk: Walk::default(),
+            focus: (None, None),
+            presses: Default::default(),
+        }
     }
 
     /// FUN_1015e530 / FUN_101177d0 for a window drawn this frame with frame rect `r`: false while it opens (only the
@@ -399,9 +496,16 @@ impl GameUi {
             return false;
         }
         let n = self.open_ticks;
-        let animates = n > 0.0 && self.data.registry.get(name.trim_end().to_ascii_lowercase().as_str()).copied().unwrap_or(0) & 8 == 0;
+        let animates = n > 0.0
+            && self.data.registry.get(name.trim_end().to_ascii_lowercase().as_str()).copied().unwrap_or(0) & 8 == 0;
         let frame = self.anim_frame;
-        let a = self.anims.entry(name.to_string()).or_insert(WinAnim { open: 0.0, close: 0.0, animated: false, shape: shape.clone(), seen: 0 });
+        let a = self.anims.entry(name.to_string()).or_insert(WinAnim {
+            open: 0.0,
+            close: 0.0,
+            animated: false,
+            shape: shape.clone(),
+            seen: 0,
+        });
         if a.seen == 0 || a.seen + 1 < frame {
             (a.open, a.close, a.animated) = (if animates { n } else { 0.0 }, 0.0, animates);
         }
@@ -453,7 +557,20 @@ impl GameUi {
         let alpha = (96.0 - 80.0 * g) as i32 as u32;
         let alpha = if alpha > 0x80 { 0x80 } else { alpha };
         let (bx, by) = at(g);
-        self.batch.push_frame(&self.data.lobby, &self.data.style, bx, by, w, h, g, g, alpha << 24 | 0x80_8080, 0x44, false, false);
+        self.batch.push_frame(
+            &self.data.lobby,
+            &self.data.style,
+            bx,
+            by,
+            w,
+            h,
+            g,
+            g,
+            alpha << 24 | 0x80_8080,
+            0x44,
+            false,
+            false,
+        );
     }
 
     /// Once a frame, after every window: open counts run down, windows no longer drawn play their close (the frame
@@ -505,7 +622,12 @@ impl GameUi {
 
     /// A click on the focused window's cursor child is its Enter.
     pub fn press_at(&self, p: (f32, f32)) {
-        if self.focus.1.as_ref().is_some_and(|(_, _, r)| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3]) {
+        if self
+            .focus
+            .1
+            .as_ref()
+            .is_some_and(|(_, _, r)| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3])
+        {
             self.press();
         }
     }
@@ -520,7 +642,11 @@ impl GameUi {
                 Some(&s) => s,
                 None => {
                     let g = self.win_group(&key);
-                    let under = if key == "menu    targetwi" { self.walk.last.iter().filter(|(n, _)| self.win_group(n) & g != 0).map(|(_, &s)| s - 1).min() } else { None };
+                    let under = if key == "menu    targetwi" {
+                        self.walk.last.iter().filter(|(n, _)| self.win_group(n) & g != 0).map(|(_, &s)| s - 1).min()
+                    } else {
+                        None
+                    };
                     under.unwrap_or_else(|| {
                         self.walk.top += 1000;
                         self.walk.top
@@ -568,8 +694,32 @@ impl GameUi {
     /// The title with the Update button above Select Character (selected, enabled).
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
-    pub fn title_update(&mut self, w: f32, h: f32, selected: Option<usize>, owned: u32, enabled: [bool; 5], update: Option<(bool, bool)>, wardrobes: u32, press: Option<(f32, bool)>, hand: bool, modern: bool) -> Vec<TextSlot> {
-        let st = TitleState { selected: selected.unwrap_or(0), owned: owned >> 1, cursor_frame: self.cursor_frame(), buttons: selected.is_some(), shift: Self::shift(owned), enabled, update, hand, wardrobes, press, modern };
+    pub fn title_update(
+        &mut self,
+        w: f32,
+        h: f32,
+        selected: Option<usize>,
+        owned: u32,
+        enabled: [bool; 5],
+        update: Option<(bool, bool)>,
+        wardrobes: u32,
+        press: Option<(f32, bool)>,
+        hand: bool,
+        modern: bool,
+    ) -> Vec<TextSlot> {
+        let st = TitleState {
+            selected: selected.unwrap_or(0),
+            owned: owned >> 1,
+            cursor_frame: self.cursor_frame(),
+            buttons: selected.is_some(),
+            shift: Self::shift(owned),
+            enabled,
+            update,
+            hand,
+            wardrobes,
+            press,
+            modern,
+        };
         let (b, text) = screens::title_screen(&self.data.lobby, &self.data.style, w, h, &st);
         self.batch = b;
         text
@@ -590,10 +740,17 @@ impl GameUi {
 
     pub fn text_width(&self, s: &str) -> f32 {
         if let Some(runs) = icon_runs(s) {
-            return runs.iter().map(|r| r.as_ref().map_or_else(|&k| icon_size(k).0 + 1.0, |t| self.text_width(t))).sum();
+            return runs
+                .iter()
+                .map(|r| r.as_ref().map_or_else(|&k| icon_size(k).0 + 1.0, |t| self.text_width(t)))
+                .sum();
         }
         if self.batch.ttf_text() {
-            return self.modern_runs(s, [0x80; 4]).iter().map(|(t, _)| mtext::width(t, Face::Regular, mtext::TEXT_EM)).sum();
+            return self
+                .modern_runs(s, [0x80; 4])
+                .iter()
+                .map(|(t, _)| mtext::width(t, Face::Regular, mtext::TEXT_EM))
+                .sum();
         }
         self.data.font.text_width(&encode_sjis(s)) as f32
     }
@@ -701,7 +858,13 @@ impl GameUi {
         match face {
             None => self.text_width(s),
             Some(HudFace::Game) => self.data.font.text_width(&encode_sjis(s)) as f32,
-            Some(f) => self.modern_runs(s, [0x80; 4]).iter().map(|(t, _)| mtext::width(t, if f == HudFace::Bold { Face::Bold } else { Face::Regular }, mtext::TEXT_EM)).sum(),
+            Some(f) => self
+                .modern_runs(s, [0x80; 4])
+                .iter()
+                .map(|(t, _)| {
+                    mtext::width(t, if f == HudFace::Bold { Face::Bold } else { Face::Regular }, mtext::TEXT_EM)
+                })
+                .sum(),
         }
     }
 
@@ -710,7 +873,15 @@ impl GameUi {
             let mut x = x;
             for (t, c) in self.modern_runs(s, color) {
                 let col = [c[2], c[1], c[0], c[3]].map(|v| (v as f32 / 128.0).min(1.0));
-                x = self.batch.push_mtext(&t, Face::Regular, mtext::TEXT_EM * scale, x, y + mtext::TEXT_DY * scale, col, false);
+                x = self.batch.push_mtext(
+                    &t,
+                    Face::Regular,
+                    mtext::TEXT_EM * scale,
+                    x,
+                    y + mtext::TEXT_DY * scale,
+                    col,
+                    false,
+                );
             }
             return;
         }
@@ -721,9 +892,26 @@ impl GameUi {
     }
 
     /// The select screen's 16-slot list (dbnamese); returns the slot rects and the list window's area.
-    pub fn select_list(&mut self, w: f32, h: f32, cursor: usize, used: &[bool], focused: bool, press: Option<f32>) -> (Vec<[f32; 4]>, [f32; 4]) {
+    pub fn select_list(
+        &mut self,
+        w: f32,
+        h: f32,
+        cursor: usize,
+        used: &[bool],
+        focused: bool,
+        press: Option<f32>,
+    ) -> (Vec<[f32; 4]>, [f32; 4]) {
         let cursor_frame = self.cursor_frame();
-        screens::select_list(&mut self.batch, &self.data.lobby, w, h, cursor, used, focused.then_some(cursor_frame), press)
+        screens::select_list(
+            &mut self.batch,
+            &self.data.lobby,
+            w,
+            h,
+            cursor,
+            used,
+            focused.then_some(cursor_frame),
+            press,
+        )
     }
 
     /// Game-font text fitted into `max` px (FUN_101ca250): cut where 16 px plus the text so far would pass `max`,
@@ -806,11 +994,25 @@ impl GameUi {
         let m = self.data.lobby.menu(name)?;
         let (fx, fy, fw, fh) = screens::frame_rect(m, w, h, 1.0, 1.0);
         let (x, y) = screens::window_pos(m, w, h, 1.0, 1.0);
-        let children = m.elements.iter().skip(1).map(|c| (c.id, [x + dx + c.x as f32, y + dy + c.y as f32, c.w as f32, c.h as f32])).collect();
+        let children = m
+            .elements
+            .iter()
+            .skip(1)
+            .map(|c| (c.id, [x + dx + c.x as f32, y + dy + c.y as f32, c.w as f32, c.h as f32]))
+            .collect();
         Some(LobbyWin { frame: [fx + dx, fy + dy, fw, fh], children })
     }
 
-    pub fn lobby_window(&mut self, name: &str, w: f32, h: f32, centred: bool, sel: Option<u16>, hand: bool, hide: &[u16]) -> Option<LobbyWin> {
+    pub fn lobby_window(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        centred: bool,
+        sel: Option<u16>,
+        hand: bool,
+        hide: &[u16],
+    ) -> Option<LobbyWin> {
         let off = if centred { (((w - 512.0) / 2.0).trunc(), ((h - 448.0) / 2.0).trunc()) } else { (0.0, 0.0) };
         self.lobby_window_off(name, w, h, off, sel, hand, hide)
     }
@@ -872,34 +1074,84 @@ impl GameUi {
         true
     }
 
-    pub fn lobby_window_off(&mut self, name: &str, w: f32, h: f32, off: (f32, f32), sel: Option<u16>, hand: bool, hide: &[u16]) -> Option<LobbyWin> {
+    pub fn lobby_window_off(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        off: (f32, f32),
+        sel: Option<u16>,
+        hand: bool,
+        hide: &[u16],
+    ) -> Option<LobbyWin> {
         self.lobby_window_swaps(name, w, h, off, sel, hand, hide, &[])
     }
 
     /// `lobby_window_off` with children's own sprites replaced (FUN_1011ae50: (child, sprite in the same library)).
     #[allow(clippy::too_many_arguments)]
-    pub fn lobby_window_swaps(&mut self, name: &str, w: f32, h: f32, off: (f32, f32), sel: Option<u16>, hand: bool, hide: &[u16], swaps: &[(u16, usize)]) -> Option<LobbyWin> {
+    pub fn lobby_window_swaps(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        off: (f32, f32),
+        sel: Option<u16>,
+        hand: bool,
+        hide: &[u16],
+        swaps: &[(u16, usize)],
+    ) -> Option<LobbyWin> {
         let swaps: Vec<(u16, Option<&str>, usize)> = swaps.iter().map(|&(c, k)| (c, None, k)).collect();
         self.lobby_window_lib_swaps(name, w, h, off, sel, hand, hide, &swaps)
     }
 
     /// `lobby_window_swaps` where a swap may take its sprite from another library (FUN_1011ae50 with another table).
     #[allow(clippy::too_many_arguments)]
-    pub fn lobby_window_lib_swaps(&mut self, name: &str, w: f32, h: f32, off: (f32, f32), sel: Option<u16>, hand: bool, hide: &[u16], swaps: &[(u16, Option<&str>, usize)]) -> Option<LobbyWin> {
+    pub fn lobby_window_lib_swaps(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        off: (f32, f32),
+        sel: Option<u16>,
+        hand: bool,
+        hide: &[u16],
+        swaps: &[(u16, Option<&str>, usize)],
+    ) -> Option<LobbyWin> {
         self.lobby_window_full(name, w, h, off, sel, hand, hide, swaps, [0.0; 4])
     }
 
     /// Ours, not retail: the frame grown by `pad` (left, top, right, bottom) around the unchanged content; its left
     /// and bottom edges stay where the layout puts them (the content moves right and up).
-    pub fn lobby_window_padded(&mut self, name: &str, w: f32, h: f32, sel: Option<u16>, hand: bool, pad: [f32; 4]) -> Option<LobbyWin> {
+    pub fn lobby_window_padded(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        sel: Option<u16>,
+        hand: bool,
+        pad: [f32; 4],
+    ) -> Option<LobbyWin> {
         self.lobby_window_full(name, w, h, (pad[0], -pad[3]), sel, hand, &[], &[], pad)
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn lobby_window_full(&mut self, name: &str, w: f32, h: f32, off: (f32, f32), sel: Option<u16>, hand: bool, hide: &[u16], swaps: &[(u16, Option<&str>, usize)], pad: [f32; 4]) -> Option<LobbyWin> {
+    fn lobby_window_full(
+        &mut self,
+        name: &str,
+        w: f32,
+        h: f32,
+        off: (f32, f32),
+        sel: Option<u16>,
+        hand: bool,
+        hide: &[u16],
+        swaps: &[(u16, Option<&str>, usize)],
+        pad: [f32; 4],
+    ) -> Option<LobbyWin> {
         let frame = self.cursor_frame();
         let (dx, dy) = (off.0, off.1 + self.stack_dy(name, w, h));
-        let grow = |(fx, fy, fw, fh): (f32, f32, f32, f32)| (fx - pad[0], fy - pad[1], fw + pad[0] + pad[2], fh + pad[1] + pad[3]);
+        let grow = |(fx, fy, fw, fh): (f32, f32, f32, f32)| {
+            (fx - pad[0], fy - pad[1], fw + pad[0] + pad[2], fh + pad[1] + pad[3])
+        };
         let (fx, fy, fw, fh) = grow(screens::frame_rect(self.data.lobby.menu(name)?, w, h, 1.0, 1.0));
         if !self.win_gate(name, [fx + dx, fy + dy, fw, fh]) {
             return None;
@@ -927,17 +1179,34 @@ impl GameUi {
             {
                 let on = sel == Some(c.id);
                 let press = pressed.filter(|p| on && p.0 == c.id).map(|p| p.1);
-                let d = if press.is_some() { 1.0 } else if on { -1.0 } else { 0.0 };
+                let d = if press.is_some() {
+                    1.0
+                } else if on {
+                    -1.0
+                } else {
+                    0.0
+                };
                 let (lib, k) = match swaps.iter().find(|s| s.0 == c.id) {
                     Some(&(_, Some(l), k)) => (ui.lib(l).unwrap_or(own), k),
                     Some(&(_, None, k)) => (own, k),
                     None => (own, r.index as usize),
                 };
-                self.batch.push_sprite(ui, lib, k, cx + d, cy + d, 1.0, 1.0, if on { 0x8080_5020 } else { 0x8080_8080 }, 0);
+                self.batch.push_sprite(
+                    ui,
+                    lib,
+                    k,
+                    cx + d,
+                    cy + d,
+                    1.0,
+                    1.0,
+                    if on { 0x8080_5020 } else { 0x8080_8080 },
+                    0,
+                );
                 if let Some(t) = press {
                     let (bw, bh) = (screens::sprite_width(lib, k), screens::sprite_height(lib, k));
                     for (s, a, blend) in screens::press_rings(20.0, t) {
-                        let (rx, ry) = (cx + d - ((s - 1.0) * bw / 2.0).trunc(), cy + d - ((s - 1.0) * bh / 2.0).trunc());
+                        let (rx, ry) =
+                            (cx + d - ((s - 1.0) * bw / 2.0).trunc(), cy + d - ((s - 1.0) * bh / 2.0).trunc());
                         self.batch.push_sprite(ui, lib, k, rx, ry, s, s, a << 24 | 0x80_5020, blend);
                     }
                 }
@@ -955,7 +1224,14 @@ impl GameUi {
 
     /// Ours: window `name` drawn `s` times its size with its own top left at `at` (the frame keeps its header offset,
     /// scaled), its cursor child `sel` lifted and tinted, `hide` not drawn. No hand: the caller draws its own.
-    pub fn window_scaled(&mut self, name: &str, at: (f32, f32), s: f32, sel: Option<u16>, hide: &[u16]) -> Option<LobbyWin> {
+    pub fn window_scaled(
+        &mut self,
+        name: &str,
+        at: (f32, f32),
+        s: f32,
+        sel: Option<u16>,
+        hide: &[u16],
+    ) -> Option<LobbyWin> {
         let e = &self.data.lobby.menu(name)?.elements[0];
         let ox = i16::from_le_bytes([e.head[0x0e], e.head[0x0f]]) as f32;
         let oy = i16::from_le_bytes([e.head[0x10], e.head[0x11]]) as f32;
@@ -982,13 +1258,20 @@ impl GameUi {
             {
                 let on = sel == Some(c.id);
                 let press = pressed.filter(|p| on && p.0 == c.id).map(|p| p.1);
-                let d = if press.is_some() { s } else if on { -s } else { 0.0 };
+                let d = if press.is_some() {
+                    s
+                } else if on {
+                    -s
+                } else {
+                    0.0
+                };
                 let k = r.index as usize;
                 self.batch.push_sprite(ui, lib, k, cx + d, cy + d, s, s, if on { 0x8080_5020 } else { 0x8080_8080 }, 0);
                 if let Some(t) = press {
                     let (bw, bh) = (screens::sprite_width(lib, k) * s, screens::sprite_height(lib, k) * s);
                     for (rs, a, blend) in screens::press_rings(20.0, t) {
-                        let (rx, ry) = (cx + d - ((rs - 1.0) * bw / 2.0).trunc(), cy + d - ((rs - 1.0) * bh / 2.0).trunc());
+                        let (rx, ry) =
+                            (cx + d - ((rs - 1.0) * bw / 2.0).trunc(), cy + d - ((rs - 1.0) * bh / 2.0).trunc());
                         self.batch.push_sprite(ui, lib, k, rx, ry, rs * s, rs * s, a << 24 | 0x80_5020, blend);
                     }
                 }
@@ -1035,7 +1318,9 @@ impl GameUi {
     /// Returns its width (0 when the layout is missing).
     pub fn warning_icon(&mut self, x: f32, y: f32) -> f32 {
         let ui = &self.data.lobby;
-        let Some(c) = ui.menu("menu    ptc6yesn").and_then(|m| m.elements.iter().find(|e| e.id == 3)) else { return 0.0 };
+        let Some(c) = ui.menu("menu    ptc6yesn").and_then(|m| m.elements.iter().find(|e| e.id == 3)) else {
+            return 0.0;
+        };
         let Some(r) = c.refs.iter().find(|r| r.kind == 0) else { return 0.0 };
         let Some(lib) = ui.lib(&r.lib) else { return 0.0 };
         let k = r.index as usize;
@@ -1175,7 +1460,17 @@ impl GameUi {
 
     /// Sprite `k` scaled by (sx, sy) with a blend word (8: the gauge fills).
     #[allow(clippy::too_many_arguments)]
-    pub fn sprite_scaled_blend(&mut self, lib: &str, k: usize, x: f32, y: f32, sx: f32, sy: f32, tint: u32, blend: u32) {
+    pub fn sprite_scaled_blend(
+        &mut self,
+        lib: &str,
+        k: usize,
+        x: f32,
+        y: f32,
+        sx: f32,
+        sy: f32,
+        tint: u32,
+        blend: u32,
+    ) {
         if let Some(l) = self.data.lobby.lib(lib).filter(|l| k < l.sprites.len()) {
             self.batch.push_sprite(&self.data.lobby, l, k, x, y, sx, sy, tint, blend);
         }
@@ -1183,7 +1478,17 @@ impl GameUi {
 
     /// Sprite `k` scaled, its cells' vertex colours replaced by `rgba` (0x80 = 1.0).
     #[allow(clippy::too_many_arguments)]
-    pub fn sprite_coloured(&mut self, lib: &str, k: usize, x: f32, y: f32, sx: f32, sy: f32, rgba: [u8; 4], blend: u32) {
+    pub fn sprite_coloured(
+        &mut self,
+        lib: &str,
+        k: usize,
+        x: f32,
+        y: f32,
+        sx: f32,
+        sy: f32,
+        rgba: [u8; 4],
+        blend: u32,
+    ) {
         let Some(sp) = self.data.lobby.lib(lib).and_then(|l| l.sprites.get(k)) else { return };
         for c in &sp.cells {
             let c = crate::dat::ui::Cell { colors: [rgba; 4], ..c.clone() };
@@ -1250,7 +1555,10 @@ impl GameUi {
         self.style_index = k;
         self.data.style = lib.clone();
         for (name, img) in &f.images {
-            let old = self.data.lobby.images.insert(name.clone(), crate::dat::ui::UiImage { width: img.width, height: img.height, rgba: img.rgba.clone() });
+            let old = self.data.lobby.images.insert(
+                name.clone(),
+                crate::dat::ui::UiImage { width: img.width, height: img.height, rgba: img.rgba.clone() },
+            );
             if let Some(old) = old
                 && !self.style_saved.contains_key(name)
             {
@@ -1289,7 +1597,16 @@ impl GameUi {
     /// A focused list's bar at (x, y), h tall, for the mouse and the wheel; registered whether it shows or not (the
     /// wheel goes to the focused list either way).
     #[allow(clippy::too_many_arguments)]
-    pub fn bar_site(&mut self, owner: super::scrollbar::Owner, x: f32, y: f32, h: f32, total: usize, visible: usize, top: usize) {
+    pub fn bar_site(
+        &mut self,
+        owner: super::scrollbar::Owner,
+        x: f32,
+        y: f32,
+        h: f32,
+        total: usize,
+        visible: usize,
+        top: usize,
+    ) {
         self.bars.push(super::scrollbar::Site { owner, rect: [x, y, h], bar: (total, visible, top) });
     }
 
@@ -1305,10 +1622,34 @@ impl GameUi {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn cell_stretch_blend(&mut self, lib: &str, k: usize, cell: usize, x: f32, y: f32, w: f32, h: f32, tint: u32, blend_word: u32) {
-        let Some(c) = self.data.lobby.lib(lib).and_then(|l| l.sprites.get(k)).and_then(|s| s.cells.get(cell)) else { return };
+    pub fn cell_stretch_blend(
+        &mut self,
+        lib: &str,
+        k: usize,
+        cell: usize,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        tint: u32,
+        blend_word: u32,
+    ) {
+        let Some(c) = self.data.lobby.lib(lib).and_then(|l| l.sprites.get(k)).and_then(|s| s.cells.get(cell)) else {
+            return;
+        };
         let (cw, ch) = (c.size[0] as f32, c.size[1] as f32);
-        self.batch.push_cell_rect(&self.data.lobby, c, x, y, cw, ch, w / cw.max(1.0), h / ch.max(1.0), tint, blend_word);
+        self.batch.push_cell_rect(
+            &self.data.lobby,
+            c,
+            x,
+            y,
+            cw,
+            ch,
+            w / cw.max(1.0),
+            h / ch.max(1.0),
+            tint,
+            blend_word,
+        );
     }
 
     /// A menu layout by name (window element first, then the children).
@@ -1334,7 +1675,9 @@ impl GameUi {
         e.refs
             .iter()
             .filter_map(|r| self.data.lobby.lib(&r.lib)?.sprites.get(r.index as usize))
-            .filter_map(|s| crate::render::ui::caption_runs(&self.data.lobby.images, &s.cells, 0.0, 0.0, 1.0, 1.0, 0x8080_8080))
+            .filter_map(|s| {
+                crate::render::ui::caption_runs(&self.data.lobby.images, &s.cells, 0.0, 0.0, 1.0, 1.0, 0x8080_8080)
+            })
             .flatten()
             .map(|(x, y, t, _)| (hyphens(&t), x, y))
             .collect()
@@ -1366,11 +1709,35 @@ impl GameUi {
             return None;
         }
         let m = self.data.lobby.menu(name)?;
-        self.batch.push_frame(&self.data.lobby, &self.data.style, fx + dx, fy + dy, fw, fh, 1.0, 1.0, 0x8080_8080, 0, false, false);
+        self.batch.push_frame(
+            &self.data.lobby,
+            &self.data.style,
+            fx + dx,
+            fy + dy,
+            fw,
+            fh,
+            1.0,
+            1.0,
+            0x8080_8080,
+            0,
+            false,
+            false,
+        );
         if let Some(r) = m.elements[0].refs.iter().find(|r| r.kind == 0)
             && let Some(lib) = self.data.lobby.lib(&r.lib)
         {
-            self.batch.push_sprite_from(&self.data.lobby, lib, r.index as usize, 1, x + dx, y + dy, 1.0, 1.0, 0x8080_8080, 0);
+            self.batch.push_sprite_from(
+                &self.data.lobby,
+                lib,
+                r.index as usize,
+                1,
+                x + dx,
+                y + dy,
+                1.0,
+                1.0,
+                0x8080_8080,
+                0,
+            );
         }
         Some((x + dx, y + dy))
     }
@@ -1415,7 +1782,16 @@ impl GameUi {
                 && let Some((file, _)) = name.rsplit_once('#')
             {
                 self.stale.retain(|n| n != name);
-                let old: Vec<String> = self.images.iter().filter(|n| n.as_str() != name && n.rsplit_once('#').is_some_and(|(f, _)| f == file) && !self.stale.contains(n)).cloned().collect();
+                let old: Vec<String> = self
+                    .images
+                    .iter()
+                    .filter(|n| {
+                        n.as_str() != name
+                            && n.rsplit_once('#').is_some_and(|(f, _)| f == file)
+                            && !self.stale.contains(n)
+                    })
+                    .cloned()
+                    .collect();
                 self.stale.extend(old);
             }
             self.pending.push((name.to_string(), w, h, rgba));
@@ -1440,7 +1816,9 @@ impl GameUi {
         let a = &self.data.font.atlas;
         fonts.images.insert(ATLAS.into(), UiImage { width: a.width, height: a.height, rgba: a.rgba.clone() });
         for (name, t) in &self.data.font.textures {
-            fonts.images.insert(norm_name(name.as_bytes()), UiImage { width: t.width, height: t.height, rgba: t.rgba.clone() });
+            fonts
+                .images
+                .insert(norm_name(name.as_bytes()), UiImage { width: t.width, height: t.height, rgba: t.rgba.clone() });
         }
         for (name, w, h, rgba) in &self.pending {
             fonts.images.insert(name.clone(), UiImage { width: *w, height: *h, rgba: rgba.clone() });
@@ -1489,7 +1867,14 @@ impl GameUi {
         if on && self.modern_frame.is_none() {
             let f = super::modern::frame_image("window_normal").map(|fi| {
                 self.image("modern frame", fi.size[0] as u32, fi.size[1] as u32, fi.rgba);
-                crate::render::ui::ModernFrame { texture: "modern frame".into(), corner_uv: fi.corner_uv, corner: MODERN_CORNER, top: fi.top, bottom: fi.bottom, inset: fi.inset }
+                crate::render::ui::ModernFrame {
+                    texture: "modern frame".into(),
+                    corner_uv: fi.corner_uv,
+                    corner: MODERN_CORNER,
+                    top: fi.top,
+                    bottom: fi.bottom,
+                    inset: fi.inset,
+                }
             });
             self.modern_frame = Some(f);
         }
@@ -1534,7 +1919,11 @@ impl GameUi {
     /// (FUN_1011a8f0).
     fn reg_flags(&self, name: &str) -> u32 {
         let key = name.trim_end().to_ascii_lowercase();
-        let reg = if key.starts_with("menu    actionm") || key.starts_with("menu    actiom") { "menu    playermo" } else { key.as_str() };
+        let reg = if key.starts_with("menu    actionm") || key.starts_with("menu    actiom") {
+            "menu    playermo"
+        } else {
+            key.as_str()
+        };
         self.data.registry.get(reg).copied().unwrap_or(0) | self.walk.flags.get(&key).copied().unwrap_or(0)
     }
 
@@ -1554,12 +1943,20 @@ impl GameUi {
 
     /// The frames of those windows as last drawn.
     pub fn frames_with_flag(&self, mask: u32) -> Vec<[f32; 4]> {
-        self.anims.iter().filter(|(n, a)| a.seen + 1 >= self.anim_frame && self.reg_flags(n) & mask != 0).filter_map(|(_, a)| if let Shape::Frame(r) = &a.shape { Some(*r) } else { None }).collect()
+        self.anims
+            .iter()
+            .filter(|(n, a)| a.seen + 1 >= self.anim_frame && self.reg_flags(n) & mask != 0)
+            .filter_map(|(_, a)| if let Shape::Frame(r) = &a.shape { Some(*r) } else { None })
+            .collect()
     }
 
     /// The left edge of the windows drawn last frame that reach the screen's right edge (within 32) over rows [y0, y1).
     pub fn edge_column(&self, sw: f32, y0: f32, y1: f32) -> Option<f32> {
-        let frames = self.anims.values().filter(|a| a.seen + 1 >= self.anim_frame).filter_map(|a| if let Shape::Frame(r) = &a.shape { Some(*r) } else { None });
+        let frames = self
+            .anims
+            .values()
+            .filter(|a| a.seen + 1 >= self.anim_frame)
+            .filter_map(|a| if let Shape::Frame(r) = &a.shape { Some(*r) } else { None });
         frames.filter(|r| r[0] + r[2] >= sw - 32.0 && r[1] < y1 && r[1] + r[3] > y0).map(|r| r[0]).reduce(f32::min)
     }
 
@@ -1595,7 +1992,11 @@ impl GameUi {
             (_, Some(m)) if flags & 0x4000 != 0 => {
                 let (_, wy) = screens::window_pos(m, w, h, 1.0, 1.0);
                 let wh = m.elements[0].h as f32;
-                let base = if self.target_up { self.window_rect("menu    targetwi", w, h) } else { self.window_rect(&self.party_window, w, h) };
+                let base = if self.target_up {
+                    self.window_rect("menu    targetwi", w, h)
+                } else {
+                    self.window_rect(&self.party_window, w, h)
+                };
                 base.map_or(0.0, |r| (r[1] - wh - 2.0).max(16.0) - wy)
             }
             // Region 1 (flag 0x2000: targetwi, the region map legends): on the party window (FUN_10158e10).
@@ -1646,11 +2047,33 @@ impl GameUi {
     /// A name plate in a name colour (an "menu    ncol" tint, FUN_10119590), bottom at (x, y).
     /// A name plate: the icon bytes (client/plate.rs) and the name, the job master stars above it.
     #[allow(clippy::too_many_arguments)]
-    pub fn name_plate(&mut self, prefix: &[u8], name: &str, x: f32, y: f32, scale: [f32; 2], colour: u32, pulse: f32, icon: u32, stars: bool) {
+    pub fn name_plate(
+        &mut self,
+        prefix: &[u8],
+        name: &str,
+        x: f32,
+        y: f32,
+        scale: [f32; 2],
+        colour: u32,
+        pulse: f32,
+        icon: u32,
+        stars: bool,
+    ) {
         // Alpha is MODULATE4X in that pass: a full-alpha tint saturates it as the card does; `pulse` scales it.
         let a = (255.0 * pulse.clamp(0.0, 1.0)) as u32;
         let tint = colour & 0x00ff_ffff | a << 24;
-        screens::push_name_plate(&mut self.batch, &self.data.lobby, prefix, &encode_sjis(name), x, y, scale[0], scale[1], tint, icon);
+        screens::push_name_plate(
+            &mut self.batch,
+            &self.data.lobby,
+            prefix,
+            &encode_sjis(name),
+            x,
+            y,
+            scale[0],
+            scale[1],
+            tint,
+            icon,
+        );
         if stars {
             screens::push_plate_stars(&mut self.batch, &self.data.lobby, x, y, scale[0], scale[1]);
         }
@@ -1659,7 +2082,11 @@ impl GameUi {
     /// Sprite-font text ("font    fontshp"), left aligned or ending at x.
     pub fn shape_text(&mut self, s: &str, x: f32, y: f32, tint: u32, right: bool) -> f32 {
         let b = encode_sjis(s);
-        if right { screens::push_shape_text_right(&mut self.batch, &self.data.lobby, &b, x, y, tint) } else { screens::push_shape_text(&mut self.batch, &self.data.lobby, &b, x, y, tint) }
+        if right {
+            screens::push_shape_text_right(&mut self.batch, &self.data.lobby, &b, x, y, tint)
+        } else {
+            screens::push_shape_text(&mut self.batch, &self.data.lobby, &b, x, y, tint)
+        }
     }
 
     /// A Config page caption in fontshp (see screens::push_label); returns the end x.
@@ -1748,7 +2175,11 @@ impl GameUi {
         let Some(m) = self.data.lobby.menu(name) else { return [None, None] };
         let msg = |e: &crate::dat::ui::MenuElement, k: usize| {
             let id = e.strings[k].parse::<i32>().ok().filter(|&i| i >= 0)? as usize;
-            if k == 0 { self.data.menu_msgs.as_ref()?.get(id).filter(|s| !s.is_empty()).map(|s| self.shown(s)) } else { self.title_msg(id) }
+            if k == 0 {
+                self.data.menu_msgs.as_ref()?.get(id).filter(|s| !s.is_empty()).map(|s| self.shown(s))
+            } else {
+                self.title_msg(id)
+            }
         };
         let item = m.elements.iter().skip(1).find(|e| e.id == child);
         [0, 1].map(|k| item.and_then(|e| msg(e, k)).or_else(|| msg(&m.elements[0], k)))
@@ -1796,7 +2227,8 @@ impl GameUi {
         for c in &s.cells {
             let Some(img) = ui.images.get(&c.texture) else { continue };
             let (l, t) = (c.corners[0][0] as i32 - x0, c.corners[0][1] as i32 - y0);
-            let (cw, ch) = ((c.corners[3][0] - c.corners[0][0]).max(1) as i32, (c.corners[3][1] - c.corners[0][1]).max(1) as i32);
+            let (cw, ch) =
+                ((c.corners[3][0] - c.corners[0][0]).max(1) as i32, (c.corners[3][1] - c.corners[0][1]).max(1) as i32);
             let k = c.colors[0].map(|v| v as f32 / 128.0);
             for py in 0..ch {
                 for px in 0..cw {
@@ -1809,7 +2241,15 @@ impl GameUi {
                     }
                     let (u, v) = (c.uv[0] as i32 + u, c.uv[1] as i32 + v);
                     let (ox, oy) = (l + px, t + py);
-                    if u < 0 || v < 0 || u >= img.width as i32 || v >= img.height as i32 || ox < 0 || oy < 0 || ox >= w as i32 || oy >= h as i32 {
+                    if u < 0
+                        || v < 0
+                        || u >= img.width as i32
+                        || v >= img.height as i32
+                        || ox < 0
+                        || oy < 0
+                        || ox >= w as i32
+                        || oy >= h as i32
+                    {
                         continue;
                     }
                     let si = (v as usize * img.width as usize + u as usize) * 4;
@@ -1878,7 +2318,9 @@ impl GameUi {
 
     /// A menu's children (cursor stops) as (x, y, w, h) relative to the window.
     pub fn children(&self, name: &str) -> Vec<[f32; 4]> {
-        self.data.lobby.menu(name).map_or(Vec::new(), |m| m.elements.iter().skip(1).map(|e| [e.x as f32, e.y as f32, e.w as f32, e.h as f32]).collect())
+        self.data.lobby.menu(name).map_or(Vec::new(), |m| {
+            m.elements.iter().skip(1).map(|e| [e.x as f32, e.y as f32, e.w as f32, e.h as f32]).collect()
+        })
     }
 
     pub fn window_rect(&self, name: &str, w: f32, h: f32) -> Option<[f32; 4]> {
@@ -1978,7 +2420,20 @@ impl GameUi {
     /// The frame at window alpha a, alpha blended while a < 1 (FUN_101144b0).
     pub fn frame_alpha(&mut self, x: f32, y: f32, w: f32, h: f32, a: f32) {
         let blend = if a < 1.0 { 0x44 } else { 0 };
-        self.batch.push_frame(&self.data.lobby, &self.data.style, x, y, w, h, 1.0, 1.0, screens::alpha_tint(a), blend, false, false);
+        self.batch.push_frame(
+            &self.data.lobby,
+            &self.data.style,
+            x,
+            y,
+            w,
+            h,
+            1.0,
+            1.0,
+            screens::alpha_tint(a),
+            blend,
+            false,
+            false,
+        );
     }
 
     pub fn rect(&mut self, x: f32, y: f32, w: f32, h: f32, rgba: [f32; 4]) {
@@ -2011,7 +2466,17 @@ impl GameUi {
     pub fn cursor(&mut self, x: f32, y: f32) {
         let frame = self.cursor_frame();
         if let Some(anc) = self.data.lobby.lib("anc     anc_s") {
-            self.batch.push_sprite(&self.data.lobby, anc, frame % anc.sprites.len().max(1), x, y, 1.0, 1.0, 0x8080_8080, 0);
+            self.batch.push_sprite(
+                &self.data.lobby,
+                anc,
+                frame % anc.sprites.len().max(1),
+                x,
+                y,
+                1.0,
+                1.0,
+                0x8080_8080,
+                0,
+            );
         }
     }
 
@@ -2021,7 +2486,13 @@ impl GameUi {
     }
 
     /// The top quads, after the modern layer's pass.
-    pub fn render_top(&mut self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, layout: [u32; 2], size: [u32; 2]) {
+    pub fn render_top(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        layout: [u32; 2],
+        size: [u32; 2],
+    ) {
         if let Some(r) = self.renderer.as_mut() {
             r.render_top(encoder, view, layout, size, &self.batch);
         }
@@ -2032,7 +2503,18 @@ impl GameUi {
     #[allow(clippy::too_many_arguments)]
     /// `layout`: the menu size the batch was laid out at; `size`: the target's pixels.
     #[allow(clippy::too_many_arguments)]
-    pub fn render(&mut self, gpu: &Gpu, format: wgpu::TextureFormat, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, layout: [u32; 2], size: [u32; 2], over: bool, fade: f32, scene: f32) {
+    pub fn render(
+        &mut self,
+        gpu: &Gpu,
+        format: wgpu::TextureFormat,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        layout: [u32; 2],
+        size: [u32; 2],
+        over: bool,
+        fade: f32,
+        scene: f32,
+    ) {
         let r = self.renderer.get_or_insert_with(|| {
             let mut r = UiRenderer::new(gpu, format);
             r.load(gpu, &self.data.lobby);
@@ -2044,7 +2526,8 @@ impl GameUi {
             r
         });
         let batch = &self.batch;
-        let (gone, kept): (Vec<String>, Vec<String>) = std::mem::take(&mut self.stale).into_iter().partition(|n| !batch.uses(n));
+        let (gone, kept): (Vec<String>, Vec<String>) =
+            std::mem::take(&mut self.stale).into_iter().partition(|n| !batch.uses(n));
         self.stale = kept;
         for name in gone {
             self.images.remove(&name);
@@ -2228,7 +2711,8 @@ impl GameUi {
         let m = self.data.lobby.menu(name)?;
         let (x, y) = screens::window_pos(m, w, h, 1.0, 1.0);
         let (x, y) = (x + off.0, y + off.1);
-        let (lib_name, k) = m.elements[0].refs.iter().find(|r| r.kind == 0).map(|r| (r.lib.clone(), r.index as usize))?;
+        let (lib_name, k) =
+            m.elements[0].refs.iter().find(|r| r.kind == 0).map(|r| (r.lib.clone(), r.index as usize))?;
         if !self.gate(name, Shape::Sprite(lib_name, k, x, y)) {
             return None;
         }
@@ -2287,7 +2771,11 @@ impl GameUi {
         let Some(m) = self.data.lobby.menu("menu    chmkname") else { return };
         let (x, y) = screens::window_pos(m, w, h, 1.0, 1.0);
         let child = m.elements.iter().find(|e| e.id == 2).map(|c| (c.x as f32, c.y as f32));
-        let name: String = name.chars().enumerate().map(|(i, c)| if i == 0 { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() }).collect();
+        let name: String = name
+            .chars()
+            .enumerate()
+            .map(|(i, c)| if i == 0 { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() })
+            .collect();
         self.text(&name, x + 16.0, y + 4.0, 0, WHITE);
         if !active {
             return;
@@ -2315,7 +2803,13 @@ impl GameUi {
     /// the cursor row and the names at (+16, 4 + 16 i) (FUN_101f6a60), or chmkpass with the pass or 8 0x3e, a '|'
     /// over the caret's character (FUN_10238c60). Returns the list's rows that hold a world.
     pub fn world_step(&mut self, v: &WorldView, w: f32, h: f32) -> Vec<[f32; 4]> {
-        let at = |gu: &Self, name: &str, dy: f32| gu.data.lobby.menu(name).map(|m| screens::window_pos(m, w, h, 1.0, 1.0)).map(|(x, y)| (x + 16.0, y + dy + 4.0));
+        let at = |gu: &Self, name: &str, dy: f32| {
+            gu.data
+                .lobby
+                .menu(name)
+                .map(|m| screens::window_pos(m, w, h, 1.0, 1.0))
+                .map(|(x, y)| (x + 16.0, y + dy + 4.0))
+        };
         if self.lobby_window_off("menu    chmkserv", w, h, (0.0, 4.0), None, false, &[]).is_some()
             && let Some((x, y)) = at(self, "menu    chmkserv", 4.0)
             && let Some(world) = v.rows.get(v.cursor)
@@ -2324,7 +2818,9 @@ impl GameUi {
         }
         let Some((pass, caret, on)) = v.pass else {
             let sel = (v.cursor - v.top + 1) as u16;
-            let Some(win) = self.lobby_window_off("menu    worldsel", w, h, (0.0, 8.0), Some(sel), true, &[]) else { return Vec::new() };
+            let Some(win) = self.lobby_window_off("menu    worldsel", w, h, (0.0, 8.0), Some(sel), true, &[]) else {
+                return Vec::new();
+            };
             if let Some((x, y)) = at(self, "menu    worldsel", 8.0) {
                 for (i, world) in v.rows.iter().skip(v.top).take(super::creator::WORLD_ROWS).enumerate() {
                     self.text(world, x, y + 16.0 * i as f32, 0, WHITE);

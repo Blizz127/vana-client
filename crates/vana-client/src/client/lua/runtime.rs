@@ -124,7 +124,11 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
                 }
                 let r = if append {
                     use std::io::Write;
-                    std::fs::OpenOptions::new().create(true).append(true).open(&p).and_then(|mut f| f.write_all(&text.as_bytes()))
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&p)
+                        .and_then(|mut f| f.write_all(&text.as_bytes()))
                 } else {
                     std::fs::write(&p, &*text.as_bytes())
                 };
@@ -204,7 +208,9 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
                 // A whole data folder (the mod's, or the shared one) is never removed by one call.
                 let bare = path.trim_matches(|c| c == '/' || c == '\\' || c == '.' || c == ' ');
                 if bare.is_empty() || bare.eq_ignore_ascii_case("shared") {
-                    return Err(mlua::Error::runtime(format!("fs.remove {path:?}: name a file or folder inside the data folder")));
+                    return Err(mlua::Error::runtime(format!(
+                        "fs.remove {path:?}: name a file or folder inside the data folder"
+                    )));
                 }
                 let p = place(lua, &data, &path)?;
                 let r = if p.is_dir() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
@@ -236,7 +242,8 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
         "encode",
         lua.create_function(|_, (v, opts): (Value, Option<Table>)| {
             let mut skipped = Vec::new();
-            let j = super::api::plain(&v, "value", &mut skipped).map_err(|e| mlua::Error::runtime(format!("json.encode: {e}")))?;
+            let j = super::api::plain(&v, "value", &mut skipped)
+                .map_err(|e| mlua::Error::runtime(format!("json.encode: {e}")))?;
             if let Some(s) = skipped.first() {
                 return Err(mlua::Error::runtime(format!("json.encode: {s} is not plain data")));
             }
@@ -248,7 +255,8 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     json.set(
         "decode",
         lua.create_function(|lua, text: mlua::LuaString| {
-            let j: serde_json::Value = serde_json::from_slice(&text.as_bytes()).map_err(|e| mlua::Error::runtime(format!("json.decode: {e}")))?;
+            let j: serde_json::Value = serde_json::from_slice(&text.as_bytes())
+                .map_err(|e| mlua::Error::runtime(format!("json.decode: {e}")))?;
             super::api::to_lua(lua, &j)
         })?,
     )?;
@@ -284,7 +292,12 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             let out = lua.create_table()?;
             for (id, name, version, enabled, bundled) in super::installed() {
                 let t = lua.create_table()?;
-                (t.set("loaded", loaded.contains(&id))?, t.set("id", id)?, t.set("name", name)?, t.set("version", version)?);
+                (
+                    t.set("loaded", loaded.contains(&id))?,
+                    t.set("id", id)?,
+                    t.set("name", name)?,
+                    t.set("version", version)?,
+                );
                 (t.set("enabled", enabled)?, t.set("bundled", bundled)?);
                 out.push(t)?;
             }
@@ -308,7 +321,12 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             Ok(())
         })?,
     )?;
-    mods.set("call", lua.create_function(|lua, (id, name, args): (String, String, mlua::Variadic<Value>)| call(lua, &id, &name, args))?)?;
+    mods.set(
+        "call",
+        lua.create_function(|lua, (id, name, args): (String, String, mlua::Variadic<Value>)| {
+            call(lua, &id, &name, args)
+        })?,
+    )?;
     let me = vm.manifest.id.clone();
     mods.set(
         "emit",
@@ -322,8 +340,14 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
 
     // text: Shift-JIS and auto-translate.
     let text = lua.create_table()?;
-    text.set("from_shift_jis", lua.create_function(|_, b: mlua::LuaString| Ok(crate::dat::font::decode_sjis(&b.as_bytes())))?)?;
-    text.set("to_shift_jis", lua.create_function(|lua, s: String| lua.create_string(crate::dat::font::encode_sjis(&s)))?)?;
+    text.set(
+        "from_shift_jis",
+        lua.create_function(|_, b: mlua::LuaString| Ok(crate::dat::font::decode_sjis(&b.as_bytes())))?,
+    )?;
+    text.set(
+        "to_shift_jis",
+        lua.create_function(|lua, s: String| lua.create_string(crate::dat::font::encode_sjis(&s)))?,
+    )?;
     text.set("plain", lua.create_function(|lua, s: String| Ok(super::super::fep::plain(world(lua)?, &s)))?)?;
     text.set("phrase", lua.create_function(|_, (group, id): (u8, u8)| Ok(phrase([2, 2, group, id])))?)?;
     text.set(
@@ -365,7 +389,8 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
     client.set(
         "option",
         lua.create_function(|lua, name: String| {
-            let v = super::option(world(lua)?, &name).ok_or_else(|| mlua::Error::runtime(format!("no option {name:?} ({})", super::OPTIONS.join(", "))))?;
+            let v = super::option(world(lua)?, &name)
+                .ok_or_else(|| mlua::Error::runtime(format!("no option {name:?} ({})", super::OPTIONS.join(", "))))?;
             super::api::to_lua(lua, &v)
         })?,
     )?;
@@ -476,7 +501,13 @@ pub(super) fn install(lua: &Lua, g: &Table, vm: &super::vm::Vm) -> mlua::Result<
             std::thread::Builder::new()
                 .name("lua-run".into())
                 .spawn(move || {
-                    let r = child.wait_with_output().map_err(|e| e.to_string()).map(|o| (exit_status(o.status), o.stdout, vec![("stderr".to_string(), String::from_utf8_lossy(&o.stderr).into_owned())]));
+                    let r = child.wait_with_output().map_err(|e| e.to_string()).map(|o| {
+                        (
+                            exit_status(o.status),
+                            o.stdout,
+                            vec![("stderr".to_string(), String::from_utf8_lossy(&o.stderr).into_owned())],
+                        )
+                    });
                     let _ = tx.send((id, r));
                 })
                 .map_err(|e| mlua::Error::runtime(format!("client.run: {e}")))?;
@@ -507,7 +538,10 @@ fn exit_status(s: std::process::ExitStatus) -> i64 {
 /// An auto-translate phrase as the line holds it: its block (kind, language, group, id) as four private-use chars,
 /// which the Shift-JIS encoder writes back as `FD .. FD`.
 pub(super) fn phrase(b: [u8; 4]) -> String {
-    b.iter().enumerate().filter_map(|(k, &x)| char::from_u32(crate::dat::font::PHRASE_BASE + 0x100 * k as u32 + x as u32)).collect()
+    b.iter()
+        .enumerate()
+        .filter_map(|(k, &x)| char::from_u32(crate::dat::font::PHRASE_BASE + 0x100 * k as u32 + x as u32))
+        .collect()
 }
 
 /// Values copied between mods: plain data only (api::plain), an error naming what is not.
@@ -530,7 +564,11 @@ fn call(lua: &Lua, id: &str, name: &str, args: mlua::Variadic<Value>) -> mlua::R
     let dir = directory(lua);
     let (tl, st) = {
         let d = dir.borrow();
-        let m = d.mods.iter().find(|m| m.id.eq_ignore_ascii_case(id)).ok_or_else(|| mlua::Error::runtime(format!("mods.call: no mod {id} loaded")))?;
+        let m = d
+            .mods
+            .iter()
+            .find(|m| m.id.eq_ignore_ascii_case(id))
+            .ok_or_else(|| mlua::Error::runtime(format!("mods.call: no mod {id} loaded")))?;
         (m.lua.try_upgrade().ok_or_else(|| mlua::Error::runtime(format!("mods.call: {id} is gone")))?, m.st.clone())
     };
     let f: Function = {
@@ -538,7 +576,11 @@ fn call(lua: &Lua, id: &str, name: &str, args: mlua::Variadic<Value>) -> mlua::R
         if s.suspended {
             return Err(mlua::Error::runtime(format!("mods.call: {id} is suspended")));
         }
-        let p = s.provided.iter().find(|p| p.0 == name).ok_or_else(|| mlua::Error::runtime(format!("mods.call: {id} provides no {name}")))?;
+        let p = s
+            .provided
+            .iter()
+            .find(|p| p.0 == name)
+            .ok_or_else(|| mlua::Error::runtime(format!("mods.call: {id} provides no {name}")))?;
         tl.registry_value(&p.1)?
     };
     let vals = copies(args, "mods.call argument")?;

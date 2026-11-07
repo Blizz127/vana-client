@@ -150,7 +150,8 @@ pub fn string_table(b: &[u8]) -> Vec<Field> {
     let mut out = Vec::new();
     for i in 0..n.min(64) {
         let Some(e) = b.get(4 + i * 8..12 + i * 8) else { break };
-        let (off, ty) = (u32::from_le_bytes(e[0..4].try_into().unwrap()) as usize, u32::from_le_bytes(e[4..8].try_into().unwrap()));
+        let (off, ty) =
+            (u32::from_le_bytes(e[0..4].try_into().unwrap()) as usize, u32::from_le_bytes(e[4..8].try_into().unwrap()));
         if ty == 0 {
             let s = b.get(off + 0x1c..).unwrap_or_default();
             let end = s.iter().position(|&c| c == 0).unwrap_or(s.len());
@@ -172,11 +173,7 @@ fn text(f: Option<&Field>) -> String {
 /// A 2019 record offset in this record: wide records (0x1400) put fields from +6 on 2 later, and those from the
 /// jobs word on (`jobs`, where the kind has one) 2 more.
 fn wide_at(wide: bool, jobs: Option<usize>, old: usize) -> usize {
-    if !wide || old < 6 {
-        old
-    } else {
-        old + 2 + if jobs.is_some_and(|j| old >= j) { 2 } else { 0 }
-    }
+    if !wide || old < 6 { old } else { old + 2 + if jobs.is_some_and(|j| old >= j) { 2 } else { 0 } }
 }
 
 /// Decodes one decrypted record (`wide`: a 0x1400-byte record).
@@ -212,7 +209,15 @@ pub fn parse(r: &[u8], kind: Kind, lang: Lang, wide: bool) -> Item {
         }
         Kind::Usable => {
             header(&mut it);
-            it.extra = vec![x16(0xd08, 0xe), x16(0xd34, 0x10), x8(0xd54, 0x13), x16(0xd58, 0x14), x8(0xd9c, 0x16), x8(0xda0, 0x17), x8(0xda4, 0x18)];
+            it.extra = vec![
+                x16(0xd08, 0xe),
+                x16(0xd34, 0x10),
+                x8(0xd54, 0x13),
+                x16(0xd58, 0x14),
+                x8(0xd9c, 0x16),
+                x8(0xda0, 0x17),
+                x8(0xda4, 0x18),
+            ];
             (Some(0x1c), 1, true)
         }
         Kind::Automaton => {
@@ -235,7 +240,15 @@ pub fn parse(r: &[u8], kind: Kind, lang: Lang, wide: bool) -> Item {
             it.cast_time = r8(0x1d);
             it.use_delay = r16(0x1e);
             it.reuse_delay = r32(0x20);
-            it.extra = vec![x16(0xd34, 0x24), x8(0xd50, 0x26), x8(0xd4c, 0x27), x8(0xd84, 0x28), x8(0xd9c, 0x29), x8(0xda0, 0x2a), x8(0xda4, 0x2b)];
+            it.extra = vec![
+                x16(0xd34, 0x24),
+                x8(0xd50, 0x26),
+                x8(0xd4c, 0x27),
+                x8(0xd84, 0x28),
+                x8(0xd9c, 0x29),
+                x8(0xda0, 0x2a),
+                x8(0xda4, 0x2b),
+            ];
             (Some(if wide { 0x30 } else { 0x2c }), 1, true)
         }
         Kind::Weapon => {
@@ -253,7 +266,16 @@ pub fn parse(r: &[u8], kind: Kind, lang: Lang, wide: bool) -> Item {
             it.cast_time = r8(0x29);
             it.use_delay = r16(0x2a);
             it.reuse_delay = r32(0x2c);
-            it.extra = vec![x16(0xd18, 0x24), x16(0xd34, 0x30), x8(0xd50, 0x32), x8(0xd4c, 0x33), x8(0xd84, 0x34), x8(0xd9c, 0x35), x8(0xda0, 0x36), x8(0xda4, 0x37)];
+            it.extra = vec![
+                x16(0xd18, 0x24),
+                x16(0xd34, 0x30),
+                x8(0xd50, 0x32),
+                x8(0xd4c, 0x33),
+                x8(0xd84, 0x34),
+                x8(0xd9c, 0x35),
+                x8(0xda0, 0x36),
+                x8(0xda4, 0x37),
+            ];
             (Some(if wide { 0x3c } else { 0x38 }), 1, true)
         }
         Kind::K7000 => {
@@ -374,7 +396,10 @@ impl Item {
 
     /// Equipment slot names (bit order of the equipment window).
     pub fn slot_names(&self) -> Vec<&'static str> {
-        const S: [&str; 16] = ["main", "sub", "range", "ammo", "head", "body", "hands", "legs", "feet", "neck", "waist", "ear1", "ear2", "ring1", "ring2", "back"];
+        const S: [&str; 16] = [
+            "main", "sub", "range", "ammo", "head", "body", "hands", "legs", "feet", "neck", "waist", "ear1", "ear2",
+            "ring1", "ring2", "back",
+        ];
         (0..16).filter(|i| self.slots & (1 << i) != 0).map(|i| S[i]).collect()
     }
 }
@@ -391,7 +416,10 @@ impl Items {
             Ok(len) if len == n as u64 * 0x1400 => 0x1400,
             _ => 0xc00,
         };
-        let paths: Vec<_> = RANGES.iter().map(|r| index.path(r.3[lang as usize]).map(|p| (stride(&p, r.1 - r.0), p)).map(|(n, p)| (p, n))).collect();
+        let paths: Vec<_> = RANGES
+            .iter()
+            .map(|r| index.path(r.3[lang as usize]).map(|p| (stride(&p, r.1 - r.0), p)).map(|(n, p)| (p, n)))
+            .collect();
         paths.iter().any(|p| p.is_some()).then_some(()).context("no item files")?;
         Ok(Items { lang, paths })
     }
@@ -411,7 +439,11 @@ impl Items {
     pub fn catalogue(&self, id: u32) -> Vec<(u16, u16)> {
         let Some((Kind::Keff8, r)) = self.record(id) else { return Vec::new() };
         let n = u16::from_le_bytes([r[4], r[5]]) as usize;
-        r[8..].chunks_exact(4).take(n).map(|c| (u16::from_le_bytes([c[0], c[1]]), u16::from_le_bytes([c[2], c[3]]))).collect()
+        r[8..]
+            .chunks_exact(4)
+            .take(n)
+            .map(|c| (u16::from_le_bytes([c[0], c[1]]), u16::from_le_bytes([c[2], c[3]])))
+            .collect()
     }
 
     /// Decrypted record bytes of `id`.
@@ -464,7 +496,10 @@ mod tests {
         let all: Vec<(u16, u16)> = (0xeff8..0xefff).flat_map(|id| items.catalogue(id)).collect();
         let mut ids: Vec<u16> = all.iter().map(|e| e.0).collect();
         ids.sort();
-        assert_eq!((all.len(), items.catalogue(0xeffe).len(), ids.first(), ids.last()), (864, 102, Some(&0x7400), Some(&0x775f)));
+        assert_eq!(
+            (all.len(), items.catalogue(0xeffe).len(), ids.first(), ids.last()),
+            (864, 102, Some(&0x7400), Some(&0x775f))
+        );
     }
 
     /// Species records: the name at +8 (variants keep the base's), the help line from the string table.
@@ -506,7 +541,10 @@ mod tests {
         let s = items.item(0x4097).expect("bronze sword");
         assert_eq!((s.name.as_str(), s.level, s.damage, s.delay, s.skill), ("Bronze Sword", 1, 6, 231, 3));
         let b = items.item(1).expect("chocobo bedding");
-        assert_eq!((b.singular.as_str(), b.plural.as_str(), b.article), ("pile of chocobo bedding", "piles of chocobo bedding", 0));
+        assert_eq!(
+            (b.singular.as_str(), b.plural.as_str(), b.article),
+            ("pile of chocobo bedding", "piles of chocobo bedding", 0)
+        );
         assert_eq!(b.icon_rgba().map(|i| (i.0, i.1)), Some((32, 32)));
     }
 }

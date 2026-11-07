@@ -12,10 +12,17 @@ const COEF: [[i32; 2]; 5] = [[0, 0], [60, 0], [115, -52], [98, -55], [122, -60]]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
     /// 4-bit ADPCM: per channel a header byte (filter << 4 | shift) and block / 2 bytes.
-    Adpcm { block: u8 },
-    Pcm16 { big_endian: bool },
+    Adpcm {
+        block: u8,
+    },
+    Pcm16 {
+        big_endian: bool,
+    },
     /// XOR-scrambled ATRAC3 (mode byte: 1 = 0x130-byte frames, 2 = 0xc0 joint stereo, else 0x180).
-    Atrac3 { mode: u8, key: u32 },
+    Atrac3 {
+        mode: u8,
+        key: u32,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -90,7 +97,13 @@ impl Header {
         while at + 8 <= b.len() {
             let size = u(at + 4) as usize;
             match &b[at..at + 4] {
-                b"fmt " if at + 24 <= b.len() => fmt = Some((u16::from_le_bytes([b[at + 10], b[at + 11]]), u(at + 12), u16::from_le_bytes([b[at + 22], b[at + 23]]))),
+                b"fmt " if at + 24 <= b.len() => {
+                    fmt = Some((
+                        u16::from_le_bytes([b[at + 10], b[at + 11]]),
+                        u(at + 12),
+                        u16::from_le_bytes([b[at + 22], b[at + 23]]),
+                    ))
+                }
                 b"data" => data = Some((at + 8, size.min(b.len() - at - 8))),
                 _ => {}
             }
@@ -100,7 +113,18 @@ impl Header {
         if bits != 16 || !(1..=2).contains(&ch) {
             bail!("unsupported WAV: {ch} channels, {bits} bits");
         }
-        Ok(Self { music: true, codec: Codec::Pcm16 { big_endian: false }, id: 0x400, channels: ch as u8, rate, length: (len / (2 * ch as usize)) as u32, loop_start: None, data, volume: 0x7f, flags: 0 })
+        Ok(Self {
+            music: true,
+            codec: Codec::Pcm16 { big_endian: false },
+            id: 0x400,
+            channels: ch as u8,
+            rate,
+            length: (len / (2 * ch as usize)) as u32,
+            loop_start: None,
+            data,
+            volume: 0x7f,
+            flags: 0,
+        })
     }
 
     /// Sample frames per length unit.
@@ -152,11 +176,24 @@ impl Decoder {
     pub fn new(bytes: Arc<[u8]>) -> Result<Self> {
         let header = Header::parse(&bytes)?;
         let at3 = match header.codec {
-            Codec::Atrac3 { mode, key } => Some((Box::new(Atrac3::new(header.channels, mode)), Box::new(atrac3::key_stream(key)))),
+            Codec::Atrac3 { mode, key } => {
+                Some((Box::new(Atrac3::new(header.channels, mode)), Box::new(atrac3::key_stream(key))))
+            }
             _ => None,
         };
         let loops = header.loop_start.is_some();
-        Ok(Self { header, bytes, unit: 0, hist: [[0; 2]; 2], at3, at3_next: 0, pending: Vec::new(), pending_at: 0, ended: false, loops })
+        Ok(Self {
+            header,
+            bytes,
+            unit: 0,
+            hist: [[0; 2]; 2],
+            at3,
+            at3_next: 0,
+            pending: Vec::new(),
+            pending_at: 0,
+            ended: false,
+            loops,
+        })
     }
 
     pub fn channels(&self) -> usize {
@@ -314,7 +351,12 @@ pub fn sound_dirs(ffxi_dir: &Path) -> Vec<PathBuf> {
 }
 
 fn sound_dirs_in(roots: &[PathBuf]) -> Vec<PathBuf> {
-    roots.iter().flat_map(|r| (1..=9).map(move |n| r.join(if n == 1 { "sound".to_string() } else { format!("sound{n}") }).join("win"))).collect()
+    roots
+        .iter()
+        .flat_map(|r| {
+            (1..=9).map(move |n| r.join(if n == 1 { "sound".to_string() } else { format!("sound{n}") }).join("win"))
+        })
+        .collect()
 }
 
 /// `music%03u.bgw` from the first root that has it (FUN_1023bed0; id & 0x3ff); id 0x400 is the opening movie's
@@ -323,12 +365,18 @@ pub fn music_path(ffxi_dir: &Path, id: u32) -> Option<PathBuf> {
     if id == 0x400 {
         return Some(ffxi_dir.join("mov").join("music999.bgw")).filter(|p| p.exists());
     }
-    sound_dirs(ffxi_dir).into_iter().map(|d| d.join("music/data").join(format!("music{:03}.bgw", id & 0x3ff))).find(|p| p.exists())
+    sound_dirs(ffxi_dir)
+        .into_iter()
+        .map(|d| d.join("music/data").join(format!("music{:03}.bgw", id & 0x3ff)))
+        .find(|p| p.exists())
 }
 
 /// `se%03u/se%06u.spw` (FUN_1023f6f0).
 pub fn se_path(ffxi_dir: &Path, id: u32) -> Option<PathBuf> {
-    sound_dirs(ffxi_dir).into_iter().map(|d| d.join("se").join(format!("se{:03}", id / 1000)).join(format!("se{id:06}.spw"))).find(|p| p.exists())
+    sound_dirs(ffxi_dir)
+        .into_iter()
+        .map(|d| d.join("se").join(format!("se{:03}", id / 1000)).join(format!("se{id:06}.spw")))
+        .find(|p| p.exists())
 }
 
 /// 16-bit PCM WAV with a `smpl` loop (start, end) when the sound loops.

@@ -51,7 +51,17 @@ impl Opening {
                 }
             })
             .ok()?;
-        Some(Self { frames: Some(rx), fps, rows: d_rows, opened: Instant::now(), clock: None, taken: 0, fresh: None, skipped: None, ended: false })
+        Some(Self {
+            frames: Some(rx),
+            fps,
+            rows: d_rows,
+            opened: Instant::now(),
+            clock: None,
+            taken: 0,
+            fresh: None,
+            skipped: None,
+            ended: false,
+        })
     }
 
     /// Any input (FUN_10007c70(0)): the movie stops; the caller fades the music over SKIP_FADE ticks.
@@ -81,7 +91,11 @@ impl Opening {
             return false;
         }
         if self.clock.is_none() && (music_started || now.duration_since(self.opened) > Duration::from_secs(1)) {
-            log::info!("opening: the movie starts at {:.2} fps (music {})", self.fps, if music_started { "playing" } else { "not started" });
+            log::info!(
+                "opening: the movie starts at {:.2} fps (music {})",
+                self.fps,
+                if music_started { "playing" } else { "not started" }
+            );
             self.clock = Some(now);
         }
         let (Some(clock), Some(rx)) = (self.clock, &self.frames) else { return true };

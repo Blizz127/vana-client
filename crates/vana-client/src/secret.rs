@@ -49,7 +49,8 @@ fn seal_with(key: &[u8; 32], server: &str, account: &str, password: &str) -> Res
     let mut nonce = [0u8; NONCE_LEN];
     getrandom::fill(&mut nonce).map_err(|e| anyhow!("random nonce: {e}"))?;
     let mut data = password.as_bytes().to_vec();
-    k.seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(aad(server, account)), &mut data).map_err(|_| anyhow!("sealing failed"))?;
+    k.seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(aad(server, account)), &mut data)
+        .map_err(|_| anyhow!("sealing failed"))?;
     Ok(hex::encode([&nonce[..], &data].concat()))
 }
 
@@ -61,7 +62,9 @@ fn open_with(key: &[u8; 32], server: &str, account: &str, sealed: &str) -> Optio
     let (nonce, data) = raw.split_at(NONCE_LEN);
     let k = LessSafeKey::new(UnboundKey::new(&CHACHA20_POLY1305, key).ok()?);
     let mut data = data.to_vec();
-    let plain = k.open_in_place(Nonce::try_assume_unique_for_key(nonce).ok()?, Aad::from(aad(server, account)), &mut data).ok()?;
+    let plain = k
+        .open_in_place(Nonce::try_assume_unique_for_key(nonce).ok()?, Aad::from(aad(server, account)), &mut data)
+        .ok()?;
     String::from_utf8(plain.to_vec()).ok()
 }
 

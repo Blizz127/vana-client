@@ -122,7 +122,13 @@ pub fn sender_blocked(w: &mut World, id: u32, msg: u16, kind: u8) -> bool {
     if id == w.my_id {
         return false;
     }
-    let name = w.party.members().find(|m| m.id == id).map(|m| m.name.clone()).or_else(|| w.entities.get(&id).map(|e| e.name.clone())).unwrap_or_default();
+    let name = w
+        .party
+        .members()
+        .find(|m| m.id == id)
+        .map(|m| m.name.clone())
+        .or_else(|| w.entities.get(&id).map(|e| e.name.clone()))
+        .unwrap_or_default();
     if !name.is_empty() && name == w.name {
         return false;
     }
@@ -258,7 +264,10 @@ pub fn load(w: &mut World, dir: &Path) {
         if n == 0 {
             break;
         }
-        recs.push((String::from_utf8_lossy(&r[..n]).into_owned(), u32::from_le_bytes([r[0x10], r[0x11], r[0x12], r[0x13]])));
+        recs.push((
+            String::from_utf8_lossy(&r[..n]).into_owned(),
+            u32::from_le_bytes([r[0x10], r[0x11], r[0x12], r[0x13]]),
+        ));
     }
     s.recs = recs;
 }

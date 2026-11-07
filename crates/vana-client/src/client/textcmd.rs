@@ -213,7 +213,11 @@ fn parse_rows(dll: &[u8]) -> Option<Vec<(String, u16, u16)>> {
         }
         let end = e[..0x14].iter().position(|&b| b == 0).unwrap_or(0x14);
         if end > 0 {
-            t.push((String::from_utf8_lossy(&e[..end]).into_owned(), id as u16, u16::from_le_bytes([e[0x16], e[0x17]])));
+            t.push((
+                String::from_utf8_lossy(&e[..end]).into_owned(),
+                id as u16,
+                u16::from_le_bytes([e[0x16], e[0x17]]),
+            ));
         }
     }
     Some(t)
@@ -332,7 +336,12 @@ fn current_target(w: &World) -> Option<(u32, u16)> {
 /// FUN_10077d80: the first living actor claimed by a party member.
 fn battle_target(w: &World) -> Option<(u32, u16)> {
     let party: Vec<u32> = w.party.members().map(|m| m.id).filter(|&id| id != 0).chain([w.my_id]).collect();
-    let mut found: Vec<(u32, u16)> = w.entities.iter().filter(|(_, e)| e.hpp > 0 && e.claim != 0 && party.contains(&e.claim)).map(|(id, e)| (*id, e.index)).collect();
+    let mut found: Vec<(u32, u16)> = w
+        .entities
+        .iter()
+        .filter(|(_, e)| e.hpp > 0 && e.claim != 0 && party.contains(&e.claim))
+        .map(|(id, e)| (*id, e.index))
+        .collect();
     found.sort_by_key(|f| f.1);
     found.first().copied()
 }
@@ -359,17 +368,23 @@ fn name_of(w: &World, t: (u32, u16)) -> Option<String> {
 
 /// FUN_10076ff0: a tag's text, None to leave it literal. In a target command the targets stay for the resolver.
 fn tag(w: &World, tag: &str, target_cmd: bool) -> Option<String> {
-    let party_slot = |i: usize| w.party.slots().slots.get(i).cloned().flatten().map(|m| m.name).filter(|n| !n.is_empty());
+    let party_slot =
+        |i: usize| w.party.slots().slots.get(i).cloned().flatten().map(|m| m.name).filter(|n| !n.is_empty());
     let stats = w.stats.as_ref();
     let vit = w.vitals;
-    let job = |(j, lv): (u8, u8)| (j != 0).then(|| format!("{}{lv}", super::items::JOBS.get(j as usize).copied().unwrap_or("")));
+    let job = |(j, lv): (u8, u8)| {
+        (j != 0).then(|| format!("{}{lv}", super::items::JOBS.get(j as usize).copied().unwrap_or("")))
+    };
     match tag {
         "<t>" if !target_cmd => current_target(w).and_then(|t| name_of(w, t)),
         "<me>" if !target_cmd => Some(w.name.clone()),
         "<bt>" if !target_cmd => battle_target(w).and_then(|t| name_of(w, t)),
         "<pet>" if !target_cmd => pet(w).and_then(|t| name_of(w, t)),
         // FUN_10076ff0 type 0x16: the zone NPC-list name of the call-for-help monster.
-        "<ht>" if !target_cmd => super::target::call_for_help(w).and_then(|id| w.entities.get(&id)).and_then(|e| w.npc_names.iter().find(|(n, _)| (*n & 0x3ff) as u16 == e.index & 0x3ff)).map(|(_, n)| n.clone()),
+        "<ht>" if !target_cmd => super::target::call_for_help(w)
+            .and_then(|id| w.entities.get(&id))
+            .and_then(|e| w.npc_names.iter().find(|(n, _)| (*n & 0x3ff) as u16 == e.index & 0x3ff))
+            .map(|(_, n)| n.clone()),
         // Type 0x1d, in target commands too.
         "<focust>" => focus_name(w),
         // Ours, modern only: <ft> is <focust>; <lt> the last target's name (a target command resolves it itself).
@@ -392,7 +407,9 @@ fn tag(w: &World, tag: &str, target_cmd: bool) -> Option<String> {
         }
         "<pos>" if !w.room_flag => Some(w.hud_top.grid().to_string()).filter(|g| !g.is_empty()),
         // FUN_10076ff0 type 0x15: the tracked target's name from the zone NPC list.
-        "<scan>" => w.scan.tracking().and_then(|t| w.npc_names.iter().find(|(id, _)| (*id & 0x3ff) as u16 == t.index & 0x3ff).map(|(_, n)| n.clone())),
+        "<scan>" => w.scan.tracking().and_then(|t| {
+            w.npc_names.iter().find(|(id, _)| (*id & 0x3ff) as u16 == t.index & 0x3ff).map(|(_, n)| n.clone())
+        }),
         _ => {
             // <p0>..<p5>, <a10>..<a15>, <a20>..<a25>: party window slots 0..17.
             let inner = tag.strip_prefix('<')?.strip_suffix('>')?;
@@ -452,7 +469,10 @@ pub(super) fn resolve(w: &World, text: Option<&str>, fallback: bool, wide: bool,
             "<me>" => Some((w.my_id, w.my_index)),
             "<bt>" => battle_target(w),
             // FUN_1007a1c0: the tracked actor while tracking, when it is here.
-            "<scan>" => w.scan.tracking().and_then(|t| w.entities.iter().find(|(_, e)| e.index == t.index).map(|(id, e)| (*id, e.index))),
+            "<scan>" => w
+                .scan
+                .tracking()
+                .and_then(|t| w.entities.iter().find(|(_, e)| e.index == t.index).map(|(id, e)| (*id, e.index))),
             "<pet>" => pet(w),
             "<lt>" if w.modern => super::target::last_target(w),
             "<ht>" => super::target::call_for_help(w).and_then(|id| w.entities.get(&id).map(|e| (id, e.index))),
@@ -469,7 +489,8 @@ pub(super) fn resolve(w: &World, text: Option<&str>, fallback: bool, wide: bool,
         // +0x12c bit 22 / FUN_1008e260).
         let ours = |id: u32, index: u16| index == w.my_pet || w.party.members().any(|m| m.id == id);
         let hit = w.entities.iter().find(|(id, e)| {
-            let range = (0x400..0x700).contains(&e.index) || (wide && (0x700..0x900).contains(&e.index) && ours(**id, e.index));
+            let range =
+                (0x400..0x700).contains(&e.index) || (wide && (0x700..0x900).contains(&e.index) && ours(**id, e.index));
             let same = e.name == name || (wide && name_case(&e.name).is_some_and(|n| n == name));
             range && e.targetable() && same
         });
@@ -568,7 +589,10 @@ pub(super) fn gate_line(w: &World, mask: u8) -> Option<usize> {
 
 /// FUN_10087070(0): an event, frozen, charmed, or fishing / digging (FUN_100956f0 / FUN_10095750).
 pub(super) fn busy(w: &World) -> bool {
-    event::active(w) || w.my_plate.frozen || w.my_plate.charmed || matches!(w.my_motion.status, 6 | 0x26..=0x2b | 0x32..=0x35 | 0x38..=0x3e)
+    event::active(w)
+        || w.my_plate.frozen
+        || w.my_plate.charmed
+        || matches!(w.my_motion.status, 6 | 0x26..=0x2b | 0x32..=0x35 | 0x38..=0x3e)
 }
 
 /// FUN_10081230: dead (0x20), mounted (0x40) and event (0x80) states a command's flags don't allow; then UI-free.
@@ -578,7 +602,9 @@ fn state_gate(w: &mut World, flags: u16) -> bool {
     }
     let s = w.my_motion.status;
     let busy = busy(w);
-    let state = if w.dead() && !w.opts.dead_commands { 0x20 } else { 0 } | if matches!(s, 5 | 0x55) { 0x40 } else { 0 } | if busy { 0x80 } else { 0 };
+    let state = if w.dead() && !w.opts.dead_commands { 0x20 } else { 0 }
+        | if matches!(s, 5 | 0x55) { 0x40 } else { 0 }
+        | if busy { 0x80 } else { 0 };
     // Any disallowed state refuses; the line goes by the states held, first match.
     if state & !flags != 0 {
         if state & 0x20 != 0 {
@@ -624,7 +650,11 @@ pub fn run(w: &mut World, line: &str, mode: Mode) {
         return;
     }
     // The mods' typed-line filters may rewrite or block it (once: not again when a sub-target prompt completes it).
-    let Some(filtered) = (if mode == Mode::SubTarget { Some(line.to_string()) } else { super::lua::filter_typed(w, line) }) else { return };
+    let Some(filtered) =
+        (if mode == Mode::SubTarget { Some(line.to_string()) } else { super::lua::filter_typed(w, line) })
+    else {
+        return;
+    };
     run_unfiltered(w, &filtered, mode);
 }
 
@@ -696,8 +726,12 @@ pub(super) fn run_unfiltered(w: &mut World, line: &str, mode: Mode) {
     }
     // FUN_10080d20 (table 0x10357bb8): in Monstrosity these drop silently; /heal still runs while healing (0x21 / 7).
     // FUN_10080d90: with only us and trusts the party commands get group 7 0x9e.
-    const MON_DENY: [u16; 16] = [0x56, 0x57, 0x58, 0x59, 0x5d, 0x5e, 0x21, 0x2c, 0x22, 0x32, 0x33, 0x34, 0x35, 0x36, 0x9d, 0x61];
-    if super::monstrosity::active(w) && MON_DENY.contains(&cid) && !(cid == id::HEAL && matches!(w.my_motion.status, 0x21 | 7)) {
+    const MON_DENY: [u16; 16] =
+        [0x56, 0x57, 0x58, 0x59, 0x5d, 0x5e, 0x21, 0x2c, 0x22, 0x32, 0x33, 0x34, 0x35, 0x36, 0x9d, 0x61];
+    if super::monstrosity::active(w)
+        && MON_DENY.contains(&cid)
+        && !(cid == id::HEAL && matches!(w.my_motion.status, 0x21 | 7))
+    {
         return;
     }
     if w.party.slots().trusts_only() && [0x56, 0x57, 0x58, 0x59, 0x5d, 0x5e].contains(&cid) {
@@ -712,7 +746,8 @@ pub(super) fn run_unfiltered(w: &mut World, line: &str, mode: Mode) {
 /// FUN_10076ab0's sub-target tags (prefix compare at each '<'): `<st>` 0x7f, `<stpc>` 0x1d, `<stnpc>` 0xa0,
 /// `<stpt>` 5, `<stal>` 0xd: where the first one starts, and its target flags.
 fn sub_tag(line: &str) -> Option<(usize, u32)> {
-    const TAGS: [(&str, u32); 5] = [("<st>", 0x7f), ("<stpc>", 0x1d), ("<stnpc>", 0xa0), ("<stpt>", 5), ("<stal>", 0xd)];
+    const TAGS: [(&str, u32); 5] =
+        [("<st>", 0x7f), ("<stpc>", 0x1d), ("<stnpc>", 0xa0), ("<stpt>", 5), ("<stal>", 0xd)];
     line.match_indices('<').find_map(|(i, _)| TAGS.iter().find(|(t, _)| line[i..].starts_with(t)).map(|(_, m)| (i, *m)))
 }
 
@@ -738,7 +773,9 @@ fn open_prompt(w: &mut World, stash: &str, mask: u32, target_cmd: bool, quoted: 
         Some(id::MAGIC | id::NINJUTSU | id::SONG) => args.get(1).and_then(|n| find_spell(w, n, 0).ok()),
         _ => None,
     };
-    let range = spell.and_then(|s| w.actions.as_ref()?.spell(s)).map(|r| crate::dat::actions::RANGES[(r.range & 0xf) as usize] as f32);
+    let range = spell
+        .and_then(|s| w.actions.as_ref()?.spell(s))
+        .map(|r| crate::dat::actions::RANGES[(r.range & 0xf) as usize] as f32);
     let then = target::SubThen::Line { stash, quoted, from_macro: mode == Mode::Macro };
     if matches!(mask, 5 | 0xd) {
         target::open_party_cursor(w, if mask == 5 { 6 } else { 18 }, then, range);
@@ -792,7 +829,16 @@ type Done = Result<(), ()>;
 fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> Done {
     let arg = |i: usize| args.get(i).map(String::as_str);
     match cid {
-        id::SAY | id::SHOUT | id::YELL | id::PARTY | id::LS | id::LS2 | id::UNITY | id::ASSISTJ | id::ASSISTE | id::EMOTE_TEXT => chat(w, cid, tail(line, 1)),
+        id::SAY
+        | id::SHOUT
+        | id::YELL
+        | id::PARTY
+        | id::LS
+        | id::LS2
+        | id::UNITY
+        | id::ASSISTJ
+        | id::ASSISTE
+        | id::EMOTE_TEXT => chat(w, cid, tail(line, 1)),
         id::TELL => tell(w, args, line),
         id::ECHO => {
             let text = tail(line, 1).to_string();
@@ -839,7 +885,9 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
             }
             let names = w.names.clone().ok_or(())?;
             let want = name.trim_matches('"').to_ascii_lowercase();
-            let idx = (0..names.mount_count() as u32).find(|&i| names.mount(i).is_some_and(|m| m.0.to_ascii_lowercase() == want)).ok_or(())?;
+            let idx = (0..names.mount_count() as u32)
+                .find(|&i| names.mount(i).is_some_and(|m| m.0.to_ascii_lowercase() == want))
+                .ok_or(())?;
             act(w, (w.my_id, w.my_index), 0x1a, idx);
             Ok(())
         }
@@ -1021,7 +1069,11 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
             Ok(())
         }
         id::BANK2 => {
-            if super::items::open_dae10(w, 9, false) { Ok(()) } else { Err(()) }
+            if super::items::open_dae10(w, 9, false) {
+                Ok(())
+            } else {
+                Err(())
+            }
         }
         id::RANDOM => {
             let v = arg(1).map_or(0, |a| number(a).unwrap_or(-1)) as u32;
@@ -1232,7 +1284,8 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
         // fallback; the focus again clears it (9 0x13b), anyone but us in our six slots sets it (9 0x13a + "(name)"),
         // else group 7 0xc3.
         id::FOCUSTARGET => {
-            let named = arg(1).and_then(|n| w.party.party().find(|m| m.name.eq_ignore_ascii_case(n)).map(|m| (m.id, m.index)));
+            let named =
+                arg(1).and_then(|n| w.party.party().find(|m| m.name.eq_ignore_ascii_case(n)).map(|m| (m.id, m.index)));
             let Some((id, index)) = named.or_else(|| resolve(w, arg(1), true, false, mode)) else { return Err(()) };
             if id == 0 {
                 return Ok(());
@@ -1322,7 +1375,16 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
                 w.se_mute = mute;
             }
             w.volume_dirty = true;
-            log9(w, if bgm { if mute { 0x147 } else { 0x148 } } else if mute { 0x149 } else { 0x14a });
+            log9(
+                w,
+                if bgm {
+                    if mute { 0x147 } else { 0x148 }
+                } else if mute {
+                    0x149
+                } else {
+                    0x14a
+                },
+            );
             Ok(())
         }
         // FUN_10078170: "version %s" in mode 0xbf.
@@ -1395,7 +1457,8 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
                 Some("echo") => super::equipsets::lock_mode(w, 4, false, 1),
                 Some(n) => {
                     let n = atoi(n);
-                    let ok = (1..=200).contains(&n) && super::equipsets::lock_set(w, n as usize - 1, arg(2) == Some("echo"));
+                    let ok =
+                        (1..=200).contains(&n) && super::equipsets::lock_set(w, n as usize - 1, arg(2) == Some("echo"));
                     return ok.then_some(()).ok_or(());
                 }
             }
@@ -1474,7 +1537,12 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
                 refuse(w, 0x4b);
                 return Ok(());
             }
-            let trusts: Vec<(u32, u16, String)> = w.party.party().filter(|m| (0x700..0x900).contains(&m.index)).map(|m| (m.id, m.index, m.name.clone())).collect();
+            let trusts: Vec<(u32, u16, String)> = w
+                .party
+                .party()
+                .filter(|m| (0x700..0x900).contains(&m.index))
+                .map(|m| (m.id, m.index, m.name.clone()))
+                .collect();
             let picked: Vec<(u32, u16)> = match arg(1) {
                 Some("all") if args.len() == 2 => trusts.iter().map(|t| (t.0, t.1)).collect(),
                 Some(n) => trusts.iter().filter(|t| t.2.eq_ignore_ascii_case(n)).map(|t| (t.0, t.1)).collect(),
@@ -1577,7 +1645,11 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
                 },
                 _ => return Err(()),
             };
-            if name.is_empty() || name.len() > 15 || !name.starts_with(|c: char| c.is_ascii_alphabetic()) || super::partyreq::blacklisted(w, &name) != 0 {
+            if name.is_empty()
+                || name.len() > 15
+                || !name.starts_with(|c: char| c.is_ascii_alphabetic())
+                || super::partyreq::blacklisted(w, &name) != 0
+            {
                 return Err(());
             }
             let mut b = vec![0u8; 0x10];
@@ -1762,7 +1834,12 @@ fn handle(w: &mut World, cid: u16, args: &[String], line: &str, mode: Mode) -> D
         }
         id::MUTELIST => {
             if !super::search::busy(w) {
-                let cond = crate::net::search::Cond { flags: crate::net::search::STATUS, status: 0x2000_0000, last_area: -1, ..Default::default() };
+                let cond = crate::net::search::Cond {
+                    flags: crate::net::search::STATUS,
+                    status: 0x2000_0000,
+                    last_area: -1,
+                    ..Default::default()
+                };
                 super::search::run(w, cond, super::search::Scope::World);
             }
             Ok(())
@@ -1884,7 +1961,10 @@ fn chat(w: &mut World, cid: u16, msg: &str) -> Done {
     };
     let (line, mode) = match cid {
         id::YELL => {
-            let zone = w.zone.and_then(|z| w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, z as u32))).unwrap_or_default();
+            let zone = w
+                .zone
+                .and_then(|z| w.names.as_ref().and_then(|n| crate::dat::names::NameSource::place(&**n, z as u32)))
+                .unwrap_or_default();
             (format!("{me}[{zone}]: {msg}"), 3)
         }
         id::SHOUT => (format!("{me} : {msg}"), 2),
@@ -2006,7 +2086,9 @@ fn attack(w: &mut World, args: &[String], mode: Mode) -> Done {
     match on_off(args.get(1)) {
         2 => act(w, me, cat::DISENGAGE, 0),
         1 => {
-            if let Some(t) = current_target(w).or_else(|| resolve(w, args.get(2).map(String::as_str), true, false, mode)) {
+            if let Some(t) =
+                current_target(w).or_else(|| resolve(w, args.get(2).map(String::as_str), true, false, mode))
+            {
                 start(w, t);
             }
         }
@@ -2040,7 +2122,14 @@ const EQUIP_BAGS: [u8; 9] = [0, 8, 10, 11, 12, 13, 14, 15, 16];
 /// A bag slot holding an item named `name` (record name, case-insensitive), in the bags' order.
 fn find_item(w: &World, name: &str, bags: &[u8]) -> Option<(u8, u8, u16)> {
     let info = w.item_info.as_ref()?;
-    bags.iter().find_map(|&bag| w.inv.slots.iter().filter(|((c, i), _)| *c == bag && *i != 0).find(|(_, (id, _))| info.item(*id).is_some_and(|it| it.name.eq_ignore_ascii_case(name))).map(|((c, i), (id, _))| (*c, *i, *id)))
+    bags.iter().find_map(|&bag| {
+        w.inv
+            .slots
+            .iter()
+            .filter(|((c, i), _)| *c == bag && *i != 0)
+            .find(|(_, (id, _))| info.item(*id).is_some_and(|it| it.name.eq_ignore_ascii_case(name)))
+            .map(|((c, i), (id, _))| (*c, *i, *id))
+    })
 }
 
 /// FUN_1007bc10: /recast NAME: a spell (FUN_1022b430, then FUN_1022b2f0: (ticks + 59) / 60) or an ability
@@ -2081,9 +2170,19 @@ fn clock(w: &mut World, args: &[String]) -> Done {
     let dec = |b: Vec<u8>| crate::dat::font::decode_sjis(&b);
     let date = dec(msgfmt::vana_datetime(&g, t, 2, date_key));
     let time = dec(g(0x46).map(|s| msgfmt::format(&s, &[], &[p.hour, p.minute], &|_, _, _| None)).unwrap_or_default());
-    let vana = printf(&bt.group10(0x42).unwrap_or_default(), &[date, bt.day_name(p.weekday).unwrap_or_default(), time, bt.moon_name(p.phase).unwrap_or_default(), p.moon.to_string()]);
+    let vana = printf(
+        &bt.group10(0x42).unwrap_or_default(),
+        &[
+            date,
+            bt.day_name(p.weekday).unwrap_or_default(),
+            time,
+            bt.moon_name(p.phase).unwrap_or_default(),
+            p.moon.to_string(),
+        ],
+    );
     let unix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
-    let earth = printf(&bt.group10(0x3a).unwrap_or_default(), &[dec(msgfmt::earth_datetime(&g, unix, 1, date_key, h12))]);
+    let earth =
+        printf(&bt.group10(0x3a).unwrap_or_default(), &[dec(msgfmt::earth_datetime(&g, unix, 1, date_key, h12))]);
     let colour = bt.colour_in(0x8c, &w.game);
     w.chat.push_colour(vana, colour);
     w.chat.push_colour(earth, colour);
@@ -2098,7 +2197,9 @@ fn clock(w: &mut World, args: &[String]) -> Done {
 
 fn recast(w: &mut World, args: &[String]) -> Done {
     let name = args.get(1).ok_or(())?.clone();
-    let left = |t: Option<&std::time::Instant>| t.map_or(0, |t| t.saturating_duration_since(std::time::Instant::now()).as_secs_f32().ceil() as u32);
+    let left = |t: Option<&std::time::Instant>| {
+        t.map_or(0, |t| t.saturating_duration_since(std::time::Instant::now()).as_secs_f32().ceil() as u32)
+    };
     let mut unusable = false;
     let mut secs = None;
     let mut ready = None;
@@ -2106,7 +2207,10 @@ fn recast(w: &mut World, args: &[String]) -> Done {
         acts.spells
             .iter()
             .filter(|s| s.id != 0 && s.levels.iter().any(|&l| l >= 0))
-            .find(|s| crate::dat::names::NameSource::spell(&**names, s.id as u32).is_some_and(|n| n.eq_ignore_ascii_case(&name)))
+            .find(|s| {
+                crate::dat::names::NameSource::spell(&**names, s.id as u32)
+                    .is_some_and(|n| n.eq_ignore_ascii_case(&name))
+            })
             .map(|s| s.id)
     });
     if let Some(id) = spell {
@@ -2126,16 +2230,28 @@ fn recast(w: &mut World, args: &[String]) -> Done {
                 let s = if t == 900 { 0 } else { left(w.ability_recast.get(&t)) };
                 secs = Some(s);
                 let calc = w.ability_calc.get(&t).copied().unwrap_or((0, 0));
-                let kind = w.actions.as_ref().and_then(|a| a.abilities.get(id as usize)).map_or(0, |a| if a.sub != 0 { a.sub } else { a.kind });
+                let kind = w
+                    .actions
+                    .as_ref()
+                    .and_then(|a| a.abilities.get(id as usize))
+                    .map_or(0, |a| if a.sub != 0 { a.sub } else { a.kind });
                 // A job without the charges (n 0) divides by zero in retail; ours prints the plain line (inferred).
-                if let Some((next, n, _)) = super::timers::charge_rule(w, kind).and_then(|(n, full)| super::timers::charges(s as i32, n, full, calc)) {
+                if let Some((next, n, _)) = super::timers::charge_rule(w, kind)
+                    .and_then(|(n, full)| super::timers::charges(s as i32, n, full, calc))
+                {
                     (secs, ready) = (Some(next as u32), Some(n));
                 }
             }
             _ => unusable = true,
         }
     }
-    let time = |s: u32| if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) };
+    let time = |s: u32| {
+        if s >= 3600 {
+            format!("{}:{:02}:{:02}", s / 3600, s % 3600 / 60, s % 60)
+        } else {
+            format!("{}:{:02}", s / 60, s % 60)
+        }
+    };
     let line = match (secs, ready) {
         (Some(s), Some(n)) => format!("[{name}] {} ({n})", time(s)),
         (Some(s), None) => format!("[{name}] {}", time(s)),
@@ -2185,11 +2301,16 @@ fn equip(w: &mut World, args: &[String]) -> Done {
     };
     let bags: Vec<u8> = match args.get(3).map(String::as_str) {
         None => EQUIP_BAGS.to_vec(),
-        Some(b) if b.len() == 1 && b.as_bytes()[0].is_ascii_digit() && b.as_bytes()[0] <= b'8' => vec![EQUIP_BAGS[(b.as_bytes()[0] - b'0') as usize]],
+        Some(b) if b.len() == 1 && b.as_bytes()[0].is_ascii_digit() && b.as_bytes()[0] <= b'8' => {
+            vec![EQUIP_BAGS[(b.as_bytes()[0] - b'0') as usize]]
+        }
         Some(_) => return Err(()),
     };
     // FUN_1007b1c0: the slot already wears an item of that name: nothing.
-    let worn = w.inv.equip[slot as usize].and_then(|s| w.inv.slots.get(&s)).and_then(|&(id, _)| w.item_info.as_ref()?.item(id)).is_some_and(|it| it.name.eq_ignore_ascii_case(name));
+    let worn = w.inv.equip[slot as usize]
+        .and_then(|s| w.inv.slots.get(&s))
+        .and_then(|&(id, _)| w.item_info.as_ref()?.item(id))
+        .is_some_and(|it| it.name.eq_ignore_ascii_case(name));
     if worn {
         return Ok(());
     }
@@ -2217,7 +2338,16 @@ fn find_free(w: &World, name: &str, bags: &[u8]) -> Option<(u8, u8, u16)> {
     let info = w.item_info.as_ref()?;
     let claimed = |k: &(u8, u8)| w.equip_claims.iter().any(|c| c.0 == *k && c.1.elapsed().as_secs_f32() < 2.0);
     bags.iter().find_map(|&bag| {
-        w.inv.slots.iter().filter(|((c, i), _)| *c == bag && *i != 0).find(|(k, (id, _))| info.item(*id).is_some_and(|it| it.name.eq_ignore_ascii_case(name)) && w.inv.locks.get(k).is_none_or(|&l| l == 0) && !claimed(k)).map(|((c, i), (id, _))| (*c, *i, *id))
+        w.inv
+            .slots
+            .iter()
+            .filter(|((c, i), _)| *c == bag && *i != 0)
+            .find(|(k, (id, _))| {
+                info.item(*id).is_some_and(|it| it.name.eq_ignore_ascii_case(name))
+                    && w.inv.locks.get(k).is_none_or(|&l| l == 0)
+                    && !claimed(k)
+            })
+            .map(|((c, i), (id, _))| (*c, *i, *id))
     })
 }
 
@@ -2317,7 +2447,13 @@ pub(super) fn translate_result(w: &mut World, item: u16, from: u8, to: u8, from_
         vec![fmt(0x67, &[from_text, &letter(from), &letter(to)])]
     } else {
         let (hi, lo) = ((item >> 8) as u8, item as u8);
-        let kind = if hi == 0 { 9 } else if lo == 0 { 10 } else { 7 };
+        let kind = if hi == 0 {
+            9
+        } else if lo == 0 {
+            10
+        } else {
+            7
+        };
         let block: String = [kind, to + 1, if hi == 0 { 0xff } else { hi }, if lo == 0 { 0xff } else { lo }]
             .iter()
             .enumerate()
@@ -2340,8 +2476,30 @@ pub(super) fn item_search_result(w: &mut World, item: u16, flag: u8) {
     if !std::mem::take(&mut w.item_search) || flag != 0 {
         return;
     }
-    const BAGS: [(u8, u16); 17] = [(0, 0x114), (1, 0x115), (9, 0x124), (2, 0x116), (4, 0x117), (5, 0x118), (6, 0x119), (7, 0x11a), (8, 0x11b), (10, 0x12f), (11, 0x130), (12, 0x131), (13, 0x13f), (14, 0x140), (15, 0x141), (16, 0x142), (17, 0x143)];
-    let held: Vec<u16> = if item == 0 { Vec::new() } else { BAGS.iter().filter(|(b, _)| w.inv.slots.iter().any(|(k, v)| k.0 == *b && v.0 == item)).map(|b| b.1).collect() };
+    const BAGS: [(u8, u16); 17] = [
+        (0, 0x114),
+        (1, 0x115),
+        (9, 0x124),
+        (2, 0x116),
+        (4, 0x117),
+        (5, 0x118),
+        (6, 0x119),
+        (7, 0x11a),
+        (8, 0x11b),
+        (10, 0x12f),
+        (11, 0x130),
+        (12, 0x131),
+        (13, 0x13f),
+        (14, 0x140),
+        (15, 0x141),
+        (16, 0x142),
+        (17, 0x143),
+    ];
+    let held: Vec<u16> = if item == 0 {
+        Vec::new()
+    } else {
+        BAGS.iter().filter(|(b, _)| w.inv.slots.iter().any(|(k, v)| k.0 == *b && v.0 == item)).map(|b| b.1).collect()
+    };
     if held.is_empty() {
         super::post::system_line(w, 0x11d, [item as i32, 0, 0, 0, 0], String::new());
         return;
@@ -2396,7 +2554,14 @@ fn only_on_off(args: &[String]) -> u32 {
 }
 
 /// "on" / "off" set the state (`on` = the state "on" asks for) and print `lines[0]` / `[1]`; else report `cur`.
-fn switch(w: &mut World, word: u32, cur: bool, set: impl FnOnce(&mut World, bool), lines: [usize; 2], report: [usize; 2]) {
+fn switch(
+    w: &mut World,
+    word: u32,
+    cur: bool,
+    set: impl FnOnce(&mut World, bool),
+    lines: [usize; 2],
+    report: [usize; 2],
+) {
     if word == 0 {
         log9(w, report[!cur as usize]);
     } else {
@@ -2712,7 +2877,8 @@ fn prcmd(w: &mut World, args: &[String], mode: Mode) -> Done {
         }
         return Ok(());
     };
-    let name = if id == w.my_id { w.name.clone() } else { w.entities.get(&id).map(|e| e.name.clone()).unwrap_or_default() };
+    let name =
+        if id == w.my_id { w.name.clone() } else { w.entities.get(&id).map(|e| e.name.clone()).unwrap_or_default() };
     // Anonymous (bit 5) or Away (bit 7): "You were unable to make a request to join." and nothing is sent. Checked
     // here before the blacklist *(inf: the order between the two tests, and that remove skips it)*.
     let anon_away = kind == 0 && w.self_flags & (1 << 5 | 1 << 7) != 0;
@@ -2733,11 +2899,57 @@ fn is_emote(c: u16) -> bool {
 
 /// /bell's notes (table 0x1032ca18, _stricmp): the param, 6..0x1e.
 const BELL: [(&str, u16); 51] = [
-    ("c3", 19), ("c3+", 26), ("d3-", 26), ("d3", 20), ("d3+", 27), ("e3-", 27), ("e3", 21), ("f3-", 21), ("f3", 22), ("e3+", 22),
-    ("f3+", 28), ("g3-", 28), ("g3", 23), ("g3+", 29), ("a3-", 29), ("a3", 24), ("a3+", 30), ("b3-", 30), ("b3", 25), ("c4-", 25),
-    ("b3+", 6), ("c4", 6), ("c4+", 14), ("d4-", 14), ("d4", 7), ("d4+", 15), ("e4-", 15), ("e4", 8), ("f4-", 8), ("e4+", 9),
-    ("f4", 9), ("f4+", 16), ("g4-", 16), ("g4", 10), ("g4+", 17), ("a4-", 17), ("a4", 11), ("a4+", 18), ("b4-", 18), ("b4", 12),
-    ("c5-", 12), ("b4+", 13), ("c5", 13), ("1", 6), ("2", 7), ("3", 8), ("4", 9), ("5", 10), ("6", 11), ("7", 12), ("8", 13),
+    ("c3", 19),
+    ("c3+", 26),
+    ("d3-", 26),
+    ("d3", 20),
+    ("d3+", 27),
+    ("e3-", 27),
+    ("e3", 21),
+    ("f3-", 21),
+    ("f3", 22),
+    ("e3+", 22),
+    ("f3+", 28),
+    ("g3-", 28),
+    ("g3", 23),
+    ("g3+", 29),
+    ("a3-", 29),
+    ("a3", 24),
+    ("a3+", 30),
+    ("b3-", 30),
+    ("b3", 25),
+    ("c4-", 25),
+    ("b3+", 6),
+    ("c4", 6),
+    ("c4+", 14),
+    ("d4-", 14),
+    ("d4", 7),
+    ("d4+", 15),
+    ("e4-", 15),
+    ("e4", 8),
+    ("f4-", 8),
+    ("e4+", 9),
+    ("f4", 9),
+    ("f4+", 16),
+    ("g4-", 16),
+    ("g4", 10),
+    ("g4+", 17),
+    ("a4-", 17),
+    ("a4", 11),
+    ("a4+", 18),
+    ("b4-", 18),
+    ("b4", 12),
+    ("c5-", 12),
+    ("b4+", 13),
+    ("c5", 13),
+    ("1", 6),
+    ("2", 7),
+    ("3", 8),
+    ("4", 9),
+    ("5", 10),
+    ("6", 11),
+    ("7", 12),
+    ("8", 13),
 ];
 
 /// FUN_1007fcc0: emote (command id - 0xa2), an optional mode word ("text" 1, "motion" 2, else 0), then the target
@@ -2814,7 +3026,9 @@ fn spell_named(w: &World, name: &str, kind: u16) -> Option<u16> {
         .spells
         .iter()
         .filter(|s| s.id != 0 && (kind == 0 || s.kind == kind) && s.levels.iter().any(|&l| l >= 0))
-        .find(|s| crate::dat::names::NameSource::spell(&**names, s.id as u32).is_some_and(|n| n.eq_ignore_ascii_case(name)))?;
+        .find(|s| {
+            crate::dat::names::NameSource::spell(&**names, s.id as u32).is_some_and(|n| n.eq_ignore_ascii_case(name))
+        })?;
     Some(s.id)
 }
 
@@ -2831,7 +3045,9 @@ pub(super) fn line_action(w: &World, line: &str) -> Option<(super::magic::Kind, 
     match table().get(args.first()?.as_str())?.0 {
         id::MAGIC | id::NINJUTSU | id::SONG => spell_named(w, name, 0).map(|s| (Kind::Magic, s)),
         id::WS => ability_named(w, name, 0..0x200).map(|a| (Kind::Ability, a)),
-        id::JA | id::PET => ability_named(w, name, 0x400..0x600).or_else(|| ability_named(w, name, 0x200..0x400)).map(|a| (Kind::Ability, a)),
+        id::JA | id::PET => ability_named(w, name, 0x400..0x600)
+            .or_else(|| ability_named(w, name, 0x200..0x400))
+            .map(|a| (Kind::Ability, a)),
         _ => None,
     }
 }
@@ -2941,7 +3157,8 @@ fn question(w: &mut World, args: &[String]) -> Done {
         Some("normal") => return Ok(list(1, None)),
         Some(word) => word,
     };
-    let name: String = if word.starts_with('/') { String::new() } else { "/".into() } + &word.chars().take(0x12).collect::<String>();
+    let name: String =
+        if word.starts_with('/') { String::new() } else { "/".into() } + &word.chars().take(0x12).collect::<String>();
     match c.rows.iter().find(|r| r.0 == name) {
         None => list(7, Some(&name[1..])),
         Some(&(_, id, _)) if id != 0 && id != 0x10b => {
@@ -2962,7 +3179,10 @@ fn help_text(w: &World, id: u16) -> Option<String> {
         return None;
     }
     let entry = c.help.iter().find(|r| r.0 == id as i16).map_or(0, |r| r.1 as usize);
-    let text = crate::dat::msg::Messages::load(w.index.as_ref()?, c.help_file?).map_err(|e| log::warn!("/? help: {e:#}")).ok()?.get(entry)?;
+    let text = crate::dat::msg::Messages::load(w.index.as_ref()?, c.help_file?)
+        .map_err(|e| log::warn!("/? help: {e:#}"))
+        .ok()?
+        .get(entry)?;
     // 0x07 is the text's line break.
     Some(text.replace('\u{7}', "\n"))
 }
@@ -2974,9 +3194,14 @@ fn bstpet(w: &mut World, args: &[String], mode: Mode) -> Done {
     if !status_gate(w, 0x7f) {
         return Ok(());
     }
-    let (Some(acts), Some(names), Some(bt)) = (w.actions.clone(), w.names.clone(), w.battle.clone()) else { return Err(()) };
-    let ready: Vec<&crate::dat::actions::Ability> = super::magic::ability_rows(w, 0x12).iter().filter_map(|&i| acts.abilities.get(i as usize)).collect();
-    let name = |a: &crate::dat::actions::Ability| crate::dat::names::NameSource::ability(&*names, a.id as u32).unwrap_or_default();
+    let (Some(acts), Some(names), Some(bt)) = (w.actions.clone(), w.names.clone(), w.battle.clone()) else {
+        return Err(());
+    };
+    let ready: Vec<&crate::dat::actions::Ability> =
+        super::magic::ability_rows(w, 0x12).iter().filter_map(|&i| acts.abilities.get(i as usize)).collect();
+    let name = |a: &crate::dat::actions::Ability| {
+        crate::dat::names::NameSource::ability(&*names, a.id as u32).unwrap_or_default()
+    };
     let Some(word) = args.get(1) else {
         let colour = bt.colour_in(0x9d, &w.game);
         for (n, a) in ready.iter().enumerate() {
@@ -3025,7 +3250,10 @@ mod tests {
         assert_eq!(name_case("shantotto").as_deref(), Some("Shantotto"));
         assert_eq!(name_case("ab"), None);
         assert_eq!(name_case("Ajido-Marujido"), None);
-        assert_eq!((number("0x10"), number("$10"), number("%101"), number("42"), number("x")), (Some(16), Some(16), Some(5), Some(42), None));
+        assert_eq!(
+            (number("0x10"), number("$10"), number("%101"), number("42"), number("x")),
+            (Some(16), Some(16), Some(5), Some(42), None)
+        );
     }
 
     #[test]

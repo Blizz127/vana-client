@@ -192,13 +192,18 @@ pub(super) fn view(w: &World) -> Option<View> {
     let es = w.equipsets.as_ref()?;
     Some(View {
         page: es.page.unwrap_or(0),
-        names: (0..20).map(|k| es.sets.get(k).map_or(String::new(), |x| crate::dat::font::decode_sjis(x.raw_name()))).collect(),
+        names: (0..20)
+            .map(|k| es.sets.get(k).map_or(String::new(), |x| crate::dat::font::decode_sjis(x.raw_name())))
+            .collect(),
         cur: (1..=20).contains(&s.sel).then(|| s.sel as usize - 1),
         row: s.row,
         opt: s.opt,
         off: menu_off(w),
         rename: s.rename.as_ref().map(|t| super::macroedit::shown(w, t)),
-        rename_caret: s.rename.as_ref().map_or(0, |t| super::macroedit::shown(w, &t[..s.caret.min(t.len())]).chars().count()),
+        rename_caret: s
+            .rename
+            .as_ref()
+            .map_or(0, |t| super::macroedit::shown(w, &t[..s.caret.min(t.len())]).chars().count()),
         focused: w.confirm.is_none() && s.opt.is_none() && s.rename.is_none() && s.ed.is_none(),
         editor: super::esedit::view(w),
     })
@@ -328,7 +333,10 @@ pub fn answer(w: &mut World, a: Ask) {
 
 /// The set's name for the title bar's slot 2.
 fn name(w: &World, row: usize) -> String {
-    w.equipsets.as_ref().and_then(|e| e.sets.get(row)).map_or(String::new(), |s| crate::dat::font::decode_sjis(s.raw_name()))
+    w.equipsets
+        .as_ref()
+        .and_then(|e| e.sets.get(row))
+        .map_or(String::new(), |s| crate::dat::font::decode_sjis(s.raw_name()))
 }
 
 /// FUN_101a6d60: on a row, title slot 2 = the set's name and the help "Equipment Set (#%d)" (group 10 0x75); on an
@@ -364,7 +372,15 @@ pub fn draw(gu: &mut GameUi, w: &World, s: &SetList, sw: f32, sh: f32, free: boo
         return rects;
     }
     let Some(es) = w.equipsets.as_ref() else { return rects };
-    if let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), Some(s.sel), free && s.opt.is_none() && s.rename.is_none() && s.ed.is_none(), &[]) {
+    if let Some(win) = gu.lobby_window_off(
+        LIST,
+        sw,
+        sh,
+        (0.0, 0.0),
+        Some(s.sel),
+        free && s.opt.is_none() && s.rename.is_none() && s.ed.is_none(),
+        &[],
+    ) {
         super::macroedit::hit(w, LIST, &win);
         for &(id, r) in win.children.iter().filter(|(id, _)| (1..=20).contains(id)) {
             let row = id as usize - 1;
@@ -377,7 +393,9 @@ pub fn draw(gu: &mut GameUi, w: &World, s: &SetList, sw: f32, sh: f32, free: boo
             }
         }
         rects.push(win.frame);
-        if let (Some(o), Some(&(_, r)), Some([lx, ly, lw, lh])) = (s.opt, win.children.iter().find(|(id, _)| *id as usize == s.row + 1), gu.window_rect(MENU, sw, sh)) {
+        if let (Some(o), Some(&(_, r)), Some([lx, ly, lw, lh])) =
+            (s.opt, win.children.iter().find(|(id, _)| *id as usize == s.row + 1), gu.window_rect(MENU, sw, sh))
+        {
             let [_, fy, _, fh] = win.frame;
             let (x, y) = (r[0] - lw, r[1].min(fy + fh - lh));
             let off = menu_off(w);

@@ -111,7 +111,8 @@ pub fn open(w: &mut World) {
     for week in 0..2u32 {
         if w.unity_tables.complete[week as usize] {
             w.unity_tables.complete[week as usize] = false;
-            let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x116, body: week.to_le_bytes().to_vec() });
+            let _ =
+                w.net.commands.send(super::net::NetCommand::Packet { id: 0x116, body: week.to_le_bytes().to_vec() });
         }
     }
     w.unity = Some(Unity { sel: 1, info: None });
@@ -134,7 +135,8 @@ pub fn update(w: &mut World, ticks: f32) {
         i.hold = 30.0;
         if i.chat != i.sent {
             i.sent = i.chat;
-            let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x118, body: vec![i.chat as u8, 0, 0, 0] });
+            let _ =
+                w.net.commands.send(super::net::NetCommand::Packet { id: 0x118, body: vec![i.chat as u8, 0, 0, 0] });
         }
     }
 }
@@ -171,7 +173,8 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, page: bool) {
             }
             K::ArrowLeft | K::ArrowRight if page => {
                 let mut row = r.cursor - r.top;
-                let m = if key == K::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
+                let m =
+                    if key == K::ArrowRight { super::scrollbar::Msg::PageDown } else { super::scrollbar::Msg::PageUp };
                 if n > 0 && super::scrollbar::paged(m, &mut r.top, &mut row, n, VISIBLE) {
                     r.cursor = r.top + row;
                     w.sounds.push(Ui::Cursor as u32);
@@ -303,7 +306,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         rects.push(win.frame);
     }
     let Some(i) = &u.info else { return rects };
-    let Some(win) = gu.lobby_window_off(CHOOSER, sw, sh, (0.0, 0.0), None, false, &[1, 2, 3, 4, 5]) else { return rects };
+    let Some(win) = gu.lobby_window_off(CHOOSER, sw, sh, (0.0, 0.0), None, false, &[1, 2, 3, 4, 5]) else {
+        return rects;
+    };
     rects.push(win.frame);
     let Some((x, y)) = gu.window_xy(CHOOSER, sw, sh) else { return rects };
     let bt = w.battle.clone();
@@ -316,7 +321,11 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     };
     let rows_y: [f32; 2] = if i.mode == 1 { [195.0, 218.0] } else { [52.0, 82.0] };
     // The two rows are drawn by code: their plates (quest 0, 320 x 18) are the hit rects.
-    let plates = if i.ranks.is_none() { rows_y.iter().enumerate().map(|(k, ry)| (k as u16 + 1, [x + 39.0, y + ry, 320.0, 18.0])).collect() } else { Vec::new() };
+    let plates = if i.ranks.is_none() {
+        rows_y.iter().enumerate().map(|(k, ry)| (k as u16 + 1, [x + 39.0, y + ry, 320.0, 18.0])).collect()
+    } else {
+        Vec::new()
+    };
     super::winhits::record_rects(w, CHOOSER, win.frame, plates);
     if i.mode == 1 {
         // FUN_1022fb50.
@@ -370,7 +379,8 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let Some(rk) = &i.ranks else { return rects };
     // quest01 modes 5 / 6 (FUN_10232720): the unities in ranking order, the week's title, the bar.
-    let order: Vec<(u8, u32)> = if ready(w) { w.unity_tables.ranking(rk.week).into_iter().filter(|e| e.0 != 0).collect() } else { Vec::new() };
+    let order: Vec<(u8, u32)> =
+        if ready(w) { w.unity_tables.ranking(rk.week).into_iter().filter(|e| e.0 != 0).collect() } else { Vec::new() };
     let hide: Vec<u16> = (1..=VISIBLE as u16).filter(|&c| rk.top + c as usize > order.len()).collect();
     let sel = (!order.is_empty()).then(|| (rk.cursor - rk.top + 1) as u16);
     let Some(win) = gu.lobby_window_off(LIST, sw, sh, (0.0, 0.0), sel, free, &hide) else { return rects };
@@ -429,7 +439,8 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
     let u = w.unity.as_ref()?;
     let accolades = if w.recasts_seen { w.stats.as_ref().map_or(0, |s| s.unity >> 10 & 0x1ffff) } else { 0 };
     let msg = |id: usize| gu.lobby_msg(0xc, id, "");
-    let waiting: Vec<String> = w.battle.as_ref().map_or(Vec::new(), |bt| [0x61, 0x62].iter().filter_map(|&k| bt.group9(k)).collect());
+    let waiting: Vec<String> =
+        w.battle.as_ref().map_or(Vec::new(), |bt| [0x61, 0x62].iter().filter_map(|&k| bt.group9(k)).collect());
     let info = u.info.as_ref().map(|i| {
         let ok = ready(w);
         let mut lines = Vec::new();
@@ -438,7 +449,11 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
             lines.push([msg(0x18d), msg(0x192 + me as usize), String::new()]);
             for (week, id) in [(0usize, 0x18e), (1, 0x18f)] {
                 let r = w.unity_tables.ranking(week);
-                let (rk, pt) = if me == 0 { (msg(0x1b2), String::new()) } else { (rank_text(gu, rank(&r, me)), format!("{}pt", average(&r, me).min(999_999))) };
+                let (rk, pt) = if me == 0 {
+                    (msg(0x1b2), String::new())
+                } else {
+                    (rank_text(gu, rank(&r, me)), format!("{}pt", average(&r, me).min(999_999)))
+                };
                 lines.push([msg(id), rk, pt]);
             }
             if me != 0 {
@@ -451,7 +466,10 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
         let ranks = i.ranks.as_ref().map(|rk| {
             let full = w.unity_tables.ranking(rk.week);
             let order: Vec<[String; 3]> = if ok {
-                full.iter().filter(|e| e.0 != 0).map(|&(un, avg)| [rank_text(gu, rank(&full, un)), msg(0x192 + un as usize), format!("{avg}pt")]).collect()
+                full.iter()
+                    .filter(|e| e.0 != 0)
+                    .map(|&(un, avg)| [rank_text(gu, rank(&full, un)), msg(0x192 + un as usize), format!("{avg}pt")])
+                    .collect()
             } else {
                 Vec::new()
             };
@@ -474,20 +492,37 @@ pub(super) fn look(w: &World, gu: &GameUi) -> Option<Look> {
 
 /// The mouse's cursor moves: ut_menu, quest00's two rows, quest01's rows. True when it moved.
 pub(super) fn set_menu(w: &mut World, k: u16) -> bool {
-    let Some(u) = w.unity.as_mut().filter(|u| u.info.is_none() && u.sel != k && (1..=3).contains(&k)) else { return false };
+    let Some(u) = w.unity.as_mut().filter(|u| u.info.is_none() && u.sel != k && (1..=3).contains(&k)) else {
+        return false;
+    };
     u.sel = k;
     true
 }
 
 pub(super) fn set_info(w: &mut World, k: u16) -> bool {
-    let Some(i) = w.unity.as_mut().and_then(|u| u.info.as_mut()).filter(|i| i.ranks.is_none() && i.sel != k && (1..=2).contains(&k)) else { return false };
+    let Some(i) = w
+        .unity
+        .as_mut()
+        .and_then(|u| u.info.as_mut())
+        .filter(|i| i.ranks.is_none() && i.sel != k && (1..=2).contains(&k))
+    else {
+        return false;
+    };
     i.sel = k;
     true
 }
 
 pub(super) fn set_rank(w: &mut World, k: usize) -> bool {
     let n = if ready(w) { 11 } else { 0 };
-    let Some(r) = w.unity.as_mut().and_then(|u| u.info.as_mut()).and_then(|i| i.ranks.as_mut()).filter(|r| r.cursor != k && k < n) else { return false };
+    let Some(r) = w
+        .unity
+        .as_mut()
+        .and_then(|u| u.info.as_mut())
+        .and_then(|i| i.ranks.as_mut())
+        .filter(|r| r.cursor != k && k < n)
+    else {
+        return false;
+    };
     r.cursor = k;
     r.top = r.top.min(k).max((k + 1).saturating_sub(VISIBLE));
     true
@@ -513,24 +548,60 @@ pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: 
     }
     let keys = |w: &mut World, gu: &GameUi, k: egui::Key| key(w, gu, k, false);
     match &u.info {
-        None => generic(w, gu, MENU, u.sel, 1..=3, p, moved, clicked, right, |w, id| {
-            if let Some(u) = w.unity.as_mut() {
-                u.sel = id;
-            }
-        }, keys),
-        Some(i) => match &i.ranks {
-            None => generic(w, gu, CHOOSER, i.sel, 1..=2, p, moved, clicked, right, |w, id| {
-                if let Some(i) = w.unity.as_mut().and_then(|u| u.info.as_mut()) {
-                    i.sel = id;
+        None => generic(
+            w,
+            gu,
+            MENU,
+            u.sel,
+            1..=3,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(u) = w.unity.as_mut() {
+                    u.sel = id;
                 }
-            }, keys),
+            },
+            keys,
+        ),
+        Some(i) => match &i.ranks {
+            None => generic(
+                w,
+                gu,
+                CHOOSER,
+                i.sel,
+                1..=2,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(i) = w.unity.as_mut().and_then(|u| u.info.as_mut()) {
+                        i.sel = id;
+                    }
+                },
+                keys,
+            ),
             Some(r) => {
                 let top = r.top;
-                generic(w, gu, LIST, (r.cursor - top + 1) as u16, 1..=VISIBLE as u16, p, moved, clicked, right, |w, id| {
-                    if let Some(r) = w.unity.as_mut().and_then(|u| u.info.as_mut()).and_then(|i| i.ranks.as_mut()) {
-                        r.cursor = top + id as usize - 1;
-                    }
-                }, keys);
+                generic(
+                    w,
+                    gu,
+                    LIST,
+                    (r.cursor - top + 1) as u16,
+                    1..=VISIBLE as u16,
+                    p,
+                    moved,
+                    clicked,
+                    right,
+                    |w, id| {
+                        if let Some(r) = w.unity.as_mut().and_then(|u| u.info.as_mut()).and_then(|i| i.ranks.as_mut()) {
+                            r.cursor = top + id as usize - 1;
+                        }
+                    },
+                    keys,
+                );
             }
         },
     }

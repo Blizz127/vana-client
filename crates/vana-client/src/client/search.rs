@@ -75,7 +75,8 @@ pub const ROWS: usize = 15;
 /// area by name only.
 pub fn lookup(w: &mut World, name: &str, then: impl FnOnce(String) -> Then) {
     let mut chars = name.chars().take(15);
-    let name: String = chars.next().map(|c| c.to_ascii_uppercase()).into_iter().chain(chars.map(|c| c.to_ascii_lowercase())).collect();
+    let name: String =
+        chars.next().map(|c| c.to_ascii_uppercase()).into_iter().chain(chars.map(|c| c.to_ascii_lowercase())).collect();
     log::info!("search: name lookup {name}");
     let rx = search::spawn(w.search_addr, Cond::name(name.clone()));
     w.searches.push((rx, then(name)));
@@ -93,8 +94,20 @@ pub fn command(w: &mut World, tail: &str) {
         run(w, Cond::zone(w.pos_zone), Scope::Area);
         return;
     };
-    let ls = |num: usize| w.linkshells.get(num).filter(|l| l.0 != 0).and_then(|&(index, bag)| w.inv.ext.get(&(bag, index))).map_or(0, |e| u32::from_le_bytes([e[0], e[1], e[2], e[3]]));
-    let ctx = Ctx { zone: w.pos_zone, region: words.region_of(w.pos_zone), ls: [ls(1), ls(2)], unity: NO_UNITY, known: w.known_zones.as_ref().map(|k| &k[..]) };
+    let ls = |num: usize| {
+        w.linkshells
+            .get(num)
+            .filter(|l| l.0 != 0)
+            .and_then(|&(index, bag)| w.inv.ext.get(&(bag, index)))
+            .map_or(0, |e| u32::from_le_bytes([e[0], e[1], e[2], e[3]]))
+    };
+    let ctx = Ctx {
+        zone: w.pos_zone,
+        region: words.region_of(w.pos_zone),
+        ls: [ls(1), ls(2)],
+        unity: NO_UNITY,
+        known: w.known_zones.as_ref().map(|k| &k[..]),
+    };
     let cond = parse(tail, &words, &ctx);
     let scope = scope_of(&cond);
     run(w, cond, scope);
@@ -180,7 +193,8 @@ fn value<'s>(c: &mut Cond, t: u8, unity: bool, s: &'s str, words: &SearchWords, 
         0 => {
             let s = skip_ws(s);
             let (quoted, body) = s.strip_prefix('"').map_or((false, s), |r| (true, r));
-            let end = body.find(|ch: char| if quoted { ch == '"' } else { ch.is_ascii_whitespace() }).unwrap_or(body.len());
+            let end =
+                body.find(|ch: char| if quoted { ch == '"' } else { ch.is_ascii_whitespace() }).unwrap_or(body.len());
             c.name = body[..end].chars().take(15).collect();
             let rest = &body[end..];
             Some(if quoted { rest.strip_prefix('"').unwrap_or(rest) } else { rest })
@@ -224,7 +238,11 @@ fn value<'s>(c: &mut Cond, t: u8, unity: bool, s: &'s str, words: &SearchWords, 
         // FUN_10105de0: a pair clamps to 0..100, a single value is kept as a byte.
         0x10 => {
             let (a, b, pair, rest) = range(s)?;
-            c.rank = if pair { ((if a > 99 { 100 } else { a.max(0) }) as u8, if (0..=99).contains(&b) { b as u8 } else { 100 }) } else { (a as u8, a as u8) };
+            c.rank = if pair {
+                ((if a > 99 { 100 } else { a.max(0) }) as u8, if (0..=99).contains(&b) { b as u8 } else { 100 })
+            } else {
+                (a as u8, a as u8)
+            };
             Some(rest)
         }
         // FUN_10105ab0: a unity leader, the own unity for UNITY or nothing; an unknown word sets 0x0f800000 and is
@@ -368,7 +386,20 @@ pub fn run(w: &mut World, mut cond: Cond, scope: Scope) {
     }
     let rx = search::spawn(w.search_addr, cond);
     w.searches.push((rx, Then::Results));
-    w.search = Some(Results { busy: true, failed: false, scope, rows: Vec::new(), total: 0, cursor: 0, scroll: 0, alt: false, option: None, ac: false, title: 0, mode: 1 });
+    w.search = Some(Results {
+        busy: true,
+        failed: false,
+        scope,
+        rows: Vec::new(),
+        total: 0,
+        cursor: 0,
+        scroll: 0,
+        alt: false,
+        option: None,
+        ac: false,
+        title: 0,
+        mode: 1,
+    });
 }
 
 /// FUN_1020c390 (View Request, /recruitlist): once s2c 0x119 came, the request list in every area (mode 2, title
@@ -399,7 +430,20 @@ pub fn run_group(w: &mut World, ids: [u32; 4], title: usize) {
     w.search_cond = cond.clone();
     let rx = search::spawn(w.search_addr, cond);
     w.searches.push((rx, Then::Results));
-    w.search = Some(Results { busy: true, failed: false, scope: Scope::Area, rows: Vec::new(), total: 0, cursor: 0, scroll: 0, alt: false, option: None, ac: false, title, mode: 3 });
+    w.search = Some(Results {
+        busy: true,
+        failed: false,
+        scope: Scope::Area,
+        rows: Vec::new(),
+        total: 0,
+        cursor: 0,
+        scroll: 0,
+        alt: false,
+        option: None,
+        ac: false,
+        title,
+        mode: 3,
+    });
 }
 
 /// The same with p6 = 1: the old results window closes (FUN_1020b3a0), none opens; only the summary line comes.
@@ -469,10 +513,12 @@ fn finish(w: &mut World, reply: Option<Reply>, then: Then) {
         }
         // An exact name: c2s 0x03D; none: group 9 0x75 / 0x77.
         // No record (or ourselves): 7 0xa2; else the friend request's lookup (FUN_101ffa20 flag 1).
-        Then::Befriend(name) => match reply.and_then(|r| r.records.iter().find(|r| r.name == name).cloned()).filter(|r| r.id != w.my_id) {
-            Some(r) => super::friends::befriend(w, r.id, r.name, true),
-            None => super::textcmd::refuse(w, 0xa2),
-        },
+        Then::Befriend(name) => {
+            match reply.and_then(|r| r.records.iter().find(|r| r.name == name).cloned()).filter(|r| r.id != w.my_id) {
+                Some(r) => super::friends::befriend(w, r.id, r.name, true),
+                None => super::textcmd::refuse(w, 0xa2),
+            }
+        }
         Then::Black(name, mode) => match reply.and_then(|r| r.records.iter().find(|r| r.name == name).map(|r| r.id)) {
             Some(id) => super::partyreq::black_edit(w, id, &name, mode),
             None => super::textcmd::log9(w, if mode == 0 { 0x75 } else { 0x77 }),
@@ -602,7 +648,9 @@ pub fn key(w: &mut World, key: egui::Key) {
                         w.sounds.push(Ui::Select as u32);
                         match c {
                             // Clear History: the prompt over scoption, which stays open.
-                            4 if request_mode(w, &res) => w.confirm = Some((super::Confirm::Request(super::partyreq::Ask::Clear), false)),
+                            4 if request_mode(w, &res) => {
+                                w.confirm = Some((super::Confirm::Request(super::partyreq::Ask::Clear), false))
+                            }
                             // Delete Request: delete (9 0x141), everything closes (FUN_1020c010), View Request again.
                             5 if request_mode(w, &res) => {
                                 super::partyreq::delete_named(w, &r.name);
@@ -675,19 +723,43 @@ pub fn pointer(w: &mut World, gu: &super::game_ui::GameUi, p: (f32, f32), moved:
     let keys = |w: &mut World, _: &super::game_ui::GameUi, k: egui::Key| key(w, k);
     if let Some(c) = res.option {
         let (name, rows) = option_window(res);
-        generic(w, gu, name, c, 1..=rows.len() as u16, p, moved, clicked, right, |w, id| {
-            if let Some(r) = w.search.as_mut() {
-                r.option = Some(id);
-            }
-        }, keys);
+        generic(
+            w,
+            gu,
+            name,
+            c,
+            1..=rows.len() as u16,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(r) = w.search.as_mut() {
+                    r.option = Some(id);
+                }
+            },
+            keys,
+        );
         return;
     }
     let (scroll, cursor) = (res.scroll, res.cursor);
-    generic(w, gu, SCRESULT, (cursor - scroll + 1) as u16, 1..=ROWS as u16, p, moved, clicked, right, |w, id| {
-        if let Some(r) = w.search.as_mut() {
-            r.cursor = scroll + id as usize - 1;
-        }
-    }, keys);
+    generic(
+        w,
+        gu,
+        SCRESULT,
+        (cursor - scroll + 1) as u16,
+        1..=ROWS as u16,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(r) = w.search.as_mut() {
+                r.cursor = scroll + id as usize - 1;
+            }
+        },
+        keys,
+    );
 }
 
 /// Num+ in the list (list message 8).
@@ -704,7 +776,11 @@ pub fn option_enabled(w: &World, c: u16, r: &Record) -> bool {
         2 => r.name != w.name,
         3 => {
             let in_party = w.party.members().any(|m| m.id == r.id && m.id != 0);
-            !(in_party || (r.flags & 0x2000 != 0 && r.flags & 8 == 0) || r.flags & 0x1000_0000 != 0 || r.job.0 == 0x17 || r.name == w.name)
+            !(in_party
+                || (r.flags & 0x2000 != 0 && r.flags & 8 == 0)
+                || r.flags & 0x1000_0000 != 0
+                || r.job.0 == 0x17
+                || r.name == w.name)
         }
         _ => true,
     }
@@ -856,7 +932,9 @@ pub fn draw(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32) -> Vec
     let count = res.rows.len() + 1;
     // The rows are drawn by code: 16 apart from (0, 4), the header first.
     if let Some(frame) = gu.window_rect(SCRESULT, sw, sh) {
-        let rows = (0..count.saturating_sub(res.scroll).min(ROWS)).map(|k| (k as u16 + 1, [wx, wy + 4.0 + 16.0 * k as f32, 356.0, 16.0])).collect();
+        let rows = (0..count.saturating_sub(res.scroll).min(ROWS))
+            .map(|k| (k as u16 + 1, [wx, wy + 4.0 + 16.0 * k as f32, 356.0, 16.0]))
+            .collect();
         super::winhits::record_rects(w, SCRESULT, frame, rows);
     }
     for i in res.scroll..count.min(res.scroll + ROWS) {
@@ -864,7 +942,11 @@ pub fn draw(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32) -> Vec
         if i == 0 {
             // The header: windowps 323 and " [Searching]" / " [%d]" at +150 in 0x60808080.
             gu.sprite("menu    windowps", 323, rx - 3.0, ry, G);
-            let s = if res.busy { bt.as_ref().and_then(|b| b.group9(0x27)).unwrap_or_default() } else { format!(" [{}]", res.total) };
+            let s = if res.busy {
+                bt.as_ref().and_then(|b| b.group9(0x27)).unwrap_or_default()
+            } else {
+                format!(" [{}]", res.total)
+            };
             gu.shape_text(&s, rx + 150.0, ry, 0x6080_8080, false);
             continue;
         }
@@ -893,7 +975,15 @@ pub fn draw(gu: &mut super::game_ui::GameUi, w: &World, sw: f32, sh: f32) -> Vec
             };
             if let Some((lib, s)) = icon(k2).filter(|_| k2 > 1) {
                 let b = gu.cell_bounds(lib, s, 0).unwrap_or([0.0; 4]);
-                gu.sprite_scaled(lib, s, rx + ((b[2] - b[0]) / 2.0).trunc(), ry + 2.0 + ((b[3] - b[1]) / 2.0).trunc(), 0.8, 0.8, G);
+                gu.sprite_scaled(
+                    lib,
+                    s,
+                    rx + ((b[2] - b[0]) / 2.0).trunc(),
+                    ry + 2.0 + ((b[3] - b[1]) / 2.0).trunc(),
+                    0.8,
+                    0.8,
+                    G,
+                );
             }
         }
         job_cell(gu, r, rx + 18.0, ry + 2.0, tc, res.alt);
@@ -976,7 +1066,12 @@ pub fn bars(gu: &super::game_ui::GameUi, w: &World, bars: &mut super::hudtop::Ba
     bars.help[2] = match res.cursor {
         0 if res.mode == 3 => String::new(),
         0 => gu.menu_msg(0x13, ""),
-        i => res.rows.get(i - 1).filter(|r| status_icon(r.flags).0 == 8).map(|_| gu.menu_msg(0x259, "")).unwrap_or_default(),
+        i => res
+            .rows
+            .get(i - 1)
+            .filter(|r| status_icon(r.flags).0 == 8)
+            .map(|_| gu.menu_msg(0x259, ""))
+            .unwrap_or_default(),
     };
 }
 
@@ -1006,7 +1101,10 @@ mod tests {
         assert_eq!((c.areas.clone(), c.status, c.area_given), (vec![245], 0x8020, true));
         assert_eq!(p("name Lnx").name, "Lnx");
         let c = p("all -level 1-75 elv");
-        assert_eq!((c.sorts.clone(), c.level, c.race, c.flags & (LEVEL | RACE)), (vec![0x84], (1, 75), 1, LEVEL | RACE));
+        assert_eq!(
+            (c.sorts.clone(), c.level, c.race, c.flags & (LEVEL | RACE)),
+            (vec![0x84], (1, 75), 1, LEVEL | RACE)
+        );
         // Level and master level share their fields.
         let c = p("75 30-40");
         assert_eq!((c.flags & (LEVEL | MLEVEL), c.level), (LEVEL | MLEVEL, (30, 40)));

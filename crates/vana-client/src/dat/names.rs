@@ -43,7 +43,12 @@ impl DMsg {
             bail!("not a d_msg file");
         }
         let xor = if d.get(0xa..0xc) == Some(&[1, 0]) { 0xff } else { 0 };
-        let (h, t, fixed, n) = (u32_at(d, 0x18).context("header")? as usize, u32_at(d, 0x1c).context("header")? as usize, u32_at(d, 0x20).context("header")? as usize, u32_at(d, 0x28).context("header")? as usize);
+        let (h, t, fixed, n) = (
+            u32_at(d, 0x18).context("header")? as usize,
+            u32_at(d, 0x1c).context("header")? as usize,
+            u32_at(d, 0x20).context("header")? as usize,
+            u32_at(d, 0x28).context("header")? as usize,
+        );
         let tab: Vec<u8> = d.get(h..h + t).context("table")?.iter().map(|b| b ^ xor).collect();
         let body: Vec<u8> = d.get(h + t..).context("body")?.iter().map(|b| b ^ xor).collect();
         // Every entry takes at least one byte, so a count past the file size is corrupt.
@@ -219,7 +224,13 @@ impl Names {
             .filter_map(|i| {
                 let f = self.key_items.fields(i)?;
                 let Field::Num(id) = f.first()? else { return None };
-                let name = if self.lang == Lang::En { text_at(f, 4) } else { f.iter().find_map(|x| if let Field::Text(s) = x { Some(s.clone()) } else { None }).unwrap_or_default() };
+                let name = if self.lang == Lang::En {
+                    text_at(f, 4)
+                } else {
+                    f.iter()
+                        .find_map(|x| if let Field::Text(s) = x { Some(s.clone()) } else { None })
+                        .unwrap_or_default()
+                };
                 Some((*id, name))
             })
             .collect()
@@ -253,16 +264,16 @@ pub fn item_noun(it: super::items::Item) -> Noun {
         return plain(it.name);
     }
     let pair = matches!(it.article, 2 | 3);
-        let an = match it.article {
-            0 => false,
-            1 => true,
-            _ => vowel(&it.singular),
-        };
-        let prefix = match it.article {
-            2 => "pair of ",
-            3 => "suit of ",
-            _ => "",
-        };
+    let an = match it.article {
+        0 => false,
+        1 => true,
+        _ => vowel(&it.singular),
+    };
+    let prefix = match it.article {
+        2 => "pair of ",
+        3 => "suit of ",
+        _ => "",
+    };
     Noun {
         bare: it.singular.clone(),
         singular: format!("{prefix}{}", it.singular),
@@ -285,16 +296,34 @@ impl NameSource for Names {
     fn key_item(&self, id: u32) -> Option<Noun> {
         let f = self.key_item_fields(id)?;
         if self.lang != Lang::En {
-            let name = f.iter().find_map(|x| if let Field::Text(s) = x { (!s.is_empty()).then(|| s.clone()) } else { None })?;
+            let name = f
+                .iter()
+                .find_map(|x| if let Field::Text(s) = x { (!s.is_empty()).then(|| s.clone()) } else { None })?;
             return Some(plain(name));
         }
         // FUN_1014d7e0 (English) -> FUN_1014e900 -> object vtable 0x10329aa0.
         let ty = if let Some(Field::Num(t)) = f.get(1) { *t } else { 0 };
         let (sing, plur) = (text_at(f, 4), text_at(f, 5));
         Some(match ty {
-            4 => Noun { bare: sing.clone(), singular: sing.clone(), plural: sing.clone(), an: vowel(&sing), singular_an: vowel(&sing), mode: 2 },
-            2 | 3 => Noun { bare: sing.clone(), singular: sing, plural: plur, an: ty == 3, singular_an: ty == 3, mode: 3 },
-            _ => Noun { an: vowel(&sing), singular_an: vowel(&sing), bare: sing.clone(), singular: sing, plural: plur, mode: 3 },
+            4 => Noun {
+                bare: sing.clone(),
+                singular: sing.clone(),
+                plural: sing.clone(),
+                an: vowel(&sing),
+                singular_an: vowel(&sing),
+                mode: 2,
+            },
+            2 | 3 => {
+                Noun { bare: sing.clone(), singular: sing, plural: plur, an: ty == 3, singular_an: ty == 3, mode: 3 }
+            }
+            _ => Noun {
+                an: vowel(&sing),
+                singular_an: vowel(&sing),
+                bare: sing.clone(),
+                singular: sing,
+                plural: plur,
+                mode: 3,
+            },
         })
     }
 
@@ -332,7 +361,14 @@ mod tests {
     struct Stub;
     impl NameSource for Stub {
         fn item(&self, id: u32) -> Option<Noun> {
-            let n = |b: &str, p: &str| Noun { bare: b.into(), singular: b.into(), plural: p.into(), an: vowel(b), singular_an: vowel(b), mode: 3 };
+            let n = |b: &str, p: &str| Noun {
+                bare: b.into(),
+                singular: b.into(),
+                plural: p.into(),
+                an: vowel(b),
+                singular_an: vowel(b),
+                mode: 3,
+            };
             match id {
                 513 => Some(n("linkshell", "linkshells")),
                 536 => Some(n("adventurer coupon", "adventurer coupons")),
@@ -359,17 +395,25 @@ mod tests {
     #[test]
     fn grammar_blocks() {
         use crate::dat::dialog::{Ctx, expand};
-        let ctx = Ctx { num: [536, 513, 0, 0, 0, 0, 0, 0], names: Some(std::sync::Arc::new(Stub)), ..Default::default() };
-        let line = |s: &[u8]| crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&expand(s, &ctx).lines.concat()));
+        let ctx =
+            Ctx { num: [536, 513, 0, 0, 0, 0, 0, 0], names: Some(std::sync::Arc::new(Stub)), ..Default::default() };
+        let line =
+            |s: &[u8]| crate::dat::font::strip_codes(&crate::dat::font::decode_sjis(&expand(s, &ctx).lines.concat()));
         // FUN_100be760: the item's name in `1e 02` .. `1e 01`, after its article.
-        assert_eq!(expand(b"take \x01\x01\x01 \x01\x05\x24\x82\x80\x80\x80.", &ctx).lines.concat(), b"take an \x1e\x02adventurer coupon\x1e\x01.");
+        assert_eq!(
+            expand(b"take \x01\x01\x01 \x01\x05\x24\x82\x80\x80\x80.", &ctx).lines.concat(),
+            b"take an \x1e\x02adventurer coupon\x1e\x01."
+        );
         // zone 230 #8311: article block, space, item-with-article block (num1)
         assert_eq!(line(b"called \x01\x01\x01 \x01\x05\x24\x82\x81\x80\x80."), "called a linkshell.");
         // #7704: bare item name (num0); an article before a vowel
         assert_eq!(line(b"take this \x01\x05\x23\x82\x80\x80\x80."), "take this adventurer coupon.");
         assert_eq!(line(b"\x01\x01\x01 \x01\x05\x24\x82\x80\x80\x80"), "an adventurer coupon");
         // plural form, place name by index
-        assert_eq!(line(b"\x01\x05\x25\x82\x81\x80\x80 in \x01\x05\x37\x82\xe6\x81\x80"), "linkshells in Southern San d'Oria");
+        assert_eq!(
+            line(b"\x01\x05\x25\x82\x81\x80\x80 in \x01\x05\x37\x82\xe6\x81\x80"),
+            "linkshells in Southern San d'Oria"
+        );
     }
 
     #[test]

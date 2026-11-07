@@ -116,7 +116,9 @@ pub fn parse(b: &[u8]) -> Script {
         let num = |k: usize| std::str::from_utf8(word(k)).ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
         match (word(0), word(1)) {
             (b"DEF", b"DATASET") => s.version = num(2),
-            (b"DEF", b"SELECTNODE" | b"QUESTIONNODE") => cur = Some((num(2) as u16, Node { question: word(1) == b"QUESTIONNODE", ..Default::default() })),
+            (b"DEF", b"SELECTNODE" | b"QUESTIONNODE") => {
+                cur = Some((num(2) as u16, Node { question: word(1) == b"QUESTIONNODE", ..Default::default() }))
+            }
             (b"END", b"NODE") => {
                 if let Some((id, n)) = cur.take() {
                     s.nodes.insert(id, n);
@@ -128,9 +130,13 @@ pub fn parse(b: &[u8]) -> Script {
                 match k {
                     b"HEADER" => n.header = text(2),
                     b"EVAL" => n.evals.push(text(1)),
-                    b"SLOT" if word(2).starts_with(b"Input:") => n.slots.push(Slot { id: num(1) as u16, text: text(5), var: Some(text(3)) }),
+                    b"SLOT" if word(2).starts_with(b"Input:") => {
+                        n.slots.push(Slot { id: num(1) as u16, text: text(5), var: Some(text(3)) })
+                    }
                     b"SLOT" => n.slots.push(Slot { id: num(1) as u16, text: text(3), var: None }),
-                    b"DISP" => n.disp.push(Disp { slot: num(1) as u16, var: text(2), eq: word(3) == b"S:eq", value: text(4) }),
+                    b"DISP" => {
+                        n.disp.push(Disp { slot: num(1) as u16, var: text(2), eq: word(3) == b"S:eq", value: text(4) })
+                    }
                     _ => {}
                 }
             }
@@ -178,7 +184,10 @@ impl FaqMain {
     /// FUN_1010f350(node, 2, 1, 0): the slots whose DISP conditions hold, in file order.
     fn visible(&self) -> Vec<&Slot> {
         let Some(n) = self.node() else { return Vec::new() };
-        n.slots.iter().filter(|s| n.disp.iter().filter(|d| d.slot == s.id).all(|d| (value(&d.var) == d.value) == d.eq)).collect()
+        n.slots
+            .iter()
+            .filter(|s| n.disp.iter().filter(|d| d.slot == s.id).all(|d| (value(&d.var) == d.value) == d.eq))
+            .collect()
     }
 
     /// FUN_1010ea10's states: a select node with slots draws as the select page *(inf: 3 -> state 4)*, any other select
@@ -263,7 +272,16 @@ pub fn open(w: &mut World) -> Option<FaqMain> {
         let mut b = vec![0u8; 4];
         b[..2].copy_from_slice(&w.faq_counter.to_le_bytes());
         let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x0D4, body: b });
-        let mut f = FaqMain { script, path: vec![0], cursor: 0, scroll: 0.0, follow: true, field: None, inputs: HashMap::new(), remembered: None };
+        let mut f = FaqMain {
+            script,
+            path: vec![0],
+            cursor: 0,
+            scroll: 0.0,
+            follow: true,
+            field: None,
+            inputs: HashMap::new(),
+            remembered: None,
+        };
         f.enter_page();
         return Some(f);
     }
@@ -272,7 +290,16 @@ pub fn open(w: &mut World) -> Option<FaqMain> {
     let mut b = vec![0u8; 4];
     b[..2].copy_from_slice(&w.faq_counter.to_le_bytes());
     let _ = w.net.commands.send(super::net::NetCommand::Packet { id: 0x0D4, body: b });
-    let mut f = FaqMain { script: parse(&bytes), path: vec![0], cursor: 0, scroll: 0.0, follow: true, field: None, inputs: HashMap::new(), remembered: None };
+    let mut f = FaqMain {
+        script: parse(&bytes),
+        path: vec![0],
+        cursor: 0,
+        scroll: 0.0,
+        follow: true,
+        field: None,
+        inputs: HashMap::new(),
+        remembered: None,
+    };
     f.enter_page();
     Some(f)
 }
@@ -434,8 +461,11 @@ fn execute(w: &mut World) {
     for (k, v) in [("GENERIC.CLILANG", "1"), ("GENERIC.AREACODE", "0"), ("GENERIC.SELLANG", "0")] {
         f.inputs.insert(k.into(), v.into());
     }
-    let has = |f: &FaqMain, k: &str| f.path.iter().filter_map(|n| f.script.nodes.get(n)).any(|n| n.evals.iter().any(|e| e == k));
-    let (call, notice, logout, rescue) = (has(f, "GMREPORT.GMCALL"), has(f, "GMREPORT.NOTICE"), has(f, "EXEC.LOGOUT"), has(f, "EXEC.RESCUE"));
+    let has = |f: &FaqMain, k: &str| {
+        f.path.iter().filter_map(|n| f.script.nodes.get(n)).any(|n| n.evals.iter().any(|e| e == k))
+    };
+    let (call, notice, logout, rescue) =
+        (has(f, "GMREPORT.GMCALL"), has(f, "GMREPORT.NOTICE"), has(f, "EXEC.LOGOUT"), has(f, "EXEC.RESCUE"));
     if call {
         report(w, 2);
         super::post::system_line(w, 0x14, [0; 5], String::new());
@@ -529,7 +559,8 @@ pub fn view(w: &World, gu: &GameUi) -> Option<super::helpdesk::PageView> {
     let slots: Vec<(String, Option<String>)> = f.visible().iter().map(|s| (s.text.clone(), s.var.clone())).collect();
     if page != Page::Leaf {
         for (k, (text, var)) in slots.iter().enumerate() {
-            let value = var.as_ref().filter(|_| page == Page::Question).map(|v| f.inputs.get(v).cloned().unwrap_or_default());
+            let value =
+                var.as_ref().filter(|_| page == Page::Question).map(|v| f.inputs.get(v).cloned().unwrap_or_default());
             lines.push(Line::Row { id: k as i32 + 1, text: text.clone(), on: true, value });
         }
     }
@@ -585,22 +616,24 @@ fn layout(gu: &GameUi, w: &World, f: &FaqMain, width: f32) -> (Vec<Entry>, f32) 
     let mut y = top + 16.0 * lines.len() as f32;
     out.push(Entry { row: None, x: left, y: top, lines, value: None, bullet: false, h: 0.0 });
     let rx = left + INDENT;
-    let push = |out: &mut Vec<Entry>, y: &mut f32, gap: f32, row: i16, text: String, value: Option<String>, bullet: bool| {
-        *y += gap;
-        let lines = gu.wrap(&text, row_w);
-        let mut h = 16.0 * lines.len() as f32;
-        let value = value.map(|v| {
-            let vy = *y + h + GAP - 7.0;
-            h += 20.0;
-            (vy, v)
-        });
-        out.push(Entry { row: Some(row), x: rx, y: *y, lines, value, bullet, h });
-        *y += h;
-    };
+    let push =
+        |out: &mut Vec<Entry>, y: &mut f32, gap: f32, row: i16, text: String, value: Option<String>, bullet: bool| {
+            *y += gap;
+            let lines = gu.wrap(&text, row_w);
+            let mut h = 16.0 * lines.len() as f32;
+            let value = value.map(|v| {
+                let vy = *y + h + GAP - 7.0;
+                h += 20.0;
+                (vy, v)
+            });
+            out.push(Entry { row: Some(row), x: rx, y: *y, lines, value, bullet, h });
+            *y += h;
+        };
     let slots: Vec<(String, Option<String>)> = f.visible().iter().map(|s| (s.text.clone(), s.var.clone())).collect();
     if page != Page::Leaf {
         for (k, (text, var)) in slots.iter().enumerate() {
-            let value = var.as_ref().filter(|_| page == Page::Question).map(|v| f.inputs.get(v).cloned().unwrap_or_default());
+            let value =
+                var.as_ref().filter(|_| page == Page::Question).map(|v| f.inputs.get(v).cloned().unwrap_or_default());
             push(&mut out, &mut y, GAP, k as i16 + 1, text.clone(), value, true);
         }
     }
@@ -697,7 +730,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Option<[f32; 4]> {
     gu.clip(None);
     gu.scroll_bar(fx + fw - 8.0, fy, fh, total as usize, view as usize, f.scroll as usize);
     if focused && f.field.is_none() {
-        gu.bar_site(super::scrollbar::Owner::Faq, fx + fw - 8.0, fy, fh, total as usize, view as usize, f.scroll as usize);
+        gu.bar_site(
+            super::scrollbar::Owner::Faq,
+            fx + fw - 8.0,
+            fy,
+            fh,
+            total as usize,
+            view as usize,
+            f.scroll as usize,
+        );
     }
     Some(win.frame)
 }
@@ -737,14 +778,22 @@ mod tests {
         assert!(q.question);
         assert_eq!((q.slots[0].text.as_str(), q.slots[0].var.as_deref()), ("Describe it.", Some("GMCALL.INPUT")));
         assert_eq!(s.links, vec![(1, 0, 3)]);
-        let mut f = FaqMain { script: s, path: vec![0], cursor: 0, scroll: 0.0, follow: false, field: None, inputs: HashMap::new(), remembered: None };
+        let mut f = FaqMain {
+            script: s,
+            path: vec![0],
+            cursor: 0,
+            scroll: 0.0,
+            follow: false,
+            field: None,
+            inputs: HashMap::new(),
+            remembered: None,
+        };
         assert_eq!(f.visible().len(), 1);
         assert_eq!((f.page(), f.rows()), (Page::Select, vec![1, -1]));
         f.path.push(3);
         assert_eq!((f.page(), f.rows()), (Page::Question, vec![1, 2, 0, -1]));
     }
 }
-
 
 #[cfg(test)]
 mod reply_tests {

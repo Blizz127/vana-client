@@ -108,7 +108,8 @@ fn icons(painter: &egui::Painter, m: &Modern, line: &str, g: &egui::Galley, at: 
         let h = r.height() * 0.9;
         let Some(t) = m.chat_icon(painter.ctx(), k) else { continue };
         let (w, ih) = super::super::chaticons::get(k).map_or((1, 1), |(w, h, _)| (w, h.max(1)));
-        let rect = Rect::from_min_size(pos2(at.x + r.min.x, at.y + r.center().y - h / 2.0), vec2(h * w as f32 / ih as f32, h));
+        let rect =
+            Rect::from_min_size(pos2(at.x + r.min.x, at.y + r.center().y - h / 2.0), vec2(h * w as f32 / ih as f32, h));
         painter.image(t, rect, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
     }
 }
@@ -145,7 +146,11 @@ pub fn line_job(stamp: (&str, Color32), line: &str, base: [u8; 4], font: &FontId
         match ch {
             '\u{E008}' | '\u{E009}' => {
                 flush(&mut job, &mut run, cur);
-                let (t, c) = if ch == '\u{E008}' { ("{", Color32::from_rgb(0x50, 0xd0, 0x50)) } else { ("}", Color32::from_rgb(0xe0, 0x50, 0x50)) };
+                let (t, c) = if ch == '\u{E008}' {
+                    ("{", Color32::from_rgb(0x50, 0xd0, 0x50))
+                } else {
+                    ("}", Color32::from_rgb(0xe0, 0x50, 0x50))
+                };
                 job.append(t, 0.0, TextFormat::simple(font.clone(), c));
             }
             // A mod's chat icon: an em space it is painted over (icons below).
@@ -171,7 +176,10 @@ fn tabs(ui: &mut Ui, m: &Modern, alpha: f32, unread: &[u32; 11], hidden: &[Strin
     // The tabs on a baseline up to the settings button; the open one painted last, over the baseline.
     let end = row.max.x - row.height() - 4.0;
     super::tabs::baseline(ui.painter(), m, Rect::from_min_max(row.min, pos2(end, row.min.y + super::tabs::H)), alpha);
-    let widths: Vec<(usize, f32)> = (0..TABS.len()).filter(|&i| tab_shown(hidden, i)).map(|i| (i, super::tabs::width(ui, TABS[i].0, &font, 56.0))).collect();
+    let widths: Vec<(usize, f32)> = (0..TABS.len())
+        .filter(|&i| tab_shown(hidden, i))
+        .map(|i| (i, super::tabs::width(ui, TABS[i].0, &font, 56.0)))
+        .collect();
     let mut open_tab = None;
     for (i, w) in fitting(&widths, tab as usize, end - row.min.x) {
         let name = TABS[i].0;
@@ -191,14 +199,28 @@ fn tabs(ui: &mut Ui, m: &Modern, alpha: f32, unread: &[u32; 11], hidden: &[Strin
             let tw = ui.fonts_mut(|fs| fs.layout_no_wrap(text.clone(), f.clone(), Color32::WHITE).size().x);
             let b = Rect::from_center_size(pos2(r.max.x - 5.0, r.min.y + 3.0), vec2((tw + 8.0).max(15.0), 15.0));
             ui.painter().rect_filled(b, 7.5, m.theme.color("gold").gamma_multiply(alpha));
-            ui.painter().text(b.center(), egui::Align2::CENTER_CENTER, text, f, Color32::from_rgb(0x18, 0x14, 0x0c).gamma_multiply(alpha));
+            ui.painter().text(
+                b.center(),
+                egui::Align2::CENTER_CENTER,
+                text,
+                f,
+                Color32::from_rgb(0x18, 0x14, 0x0c).gamma_multiply(alpha),
+            );
         }
         if resp.clicked() {
             m.chat_tab.set(i as u8);
         }
     }
     if let Some((r, name)) = open_tab {
-        super::tabs::paint(ui.painter(), m, r, name, &font, super::tabs::State { open: true, ..Default::default() }, alpha);
+        super::tabs::paint(
+            ui.painter(),
+            m,
+            r,
+            name,
+            &font,
+            super::tabs::State { open: true, ..Default::default() },
+            alpha,
+        );
     }
     let g = Rect::from_min_size(pos2(row.max.x - row.height(), row.min.y), Vec2::splat(row.height()));
     let resp = ui.interact(g, ui.scope_id().with("chat settings"), Sense::click());
@@ -213,103 +235,156 @@ fn tabs(ui: &mut Ui, m: &Modern, alpha: f32, unread: &[u32; 11], hidden: &[Strin
 
 /// The settings by the button (`at`, on the screen): the font size, - and +, the battle lines on All, their condensing,
 /// the tabs shown (All always). Closed by the button or a click elsewhere; true when one changed.
-fn settings(ctx: &egui::Context, m: &Modern, at: Rect, size: &mut f32, battle_in_all: &mut bool, condense: &mut bool, hidden: &mut Vec<String>) -> bool {
+fn settings(
+    ctx: &egui::Context,
+    m: &Modern,
+    at: Rect,
+    size: &mut f32,
+    battle_in_all: &mut bool,
+    condense: &mut bool,
+    hidden: &mut Vec<String>,
+) -> bool {
     let mut changed = false;
     // Below the button, or above it when the chat window sits in the screen's lower half.
     let up = at.center().y > ctx.content_rect().center().y;
-    let (pivot, y) = if up { (egui::Align2::RIGHT_BOTTOM, at.min.y - 6.0) } else { (egui::Align2::RIGHT_TOP, at.max.y + 6.0) };
-    let shown = egui::Area::new(Id::unique("modern chat settings")).order(Order::Foreground).pivot(pivot).fixed_pos(pos2(at.max.x, y)).show(ctx, |ui| {
-        let bg = ui.painter().add(egui::Shape::Noop);
-        let inner = egui::Frame::NONE.inner_margin(super::MARGIN).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
-                ui.painter().text(pos2(r.min.x, r.center().y), egui::Align2::LEFT_CENTER, "Font Size", FontId::proportional(m.theme.ui), m.theme.color("text"));
-                let now = *size;
-                let mut step = |ui: &mut Ui, label: &str, d: f32| {
-                    let (r, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
-                    let can = FONT_SIZES.contains(&(now + d));
-                    let face = if !can {
-                        "controls/button_disabled"
-                    } else if resp.hovered() {
-                        "controls/button_hover"
-                    } else {
-                        "controls/button_normal"
+    let (pivot, y) =
+        if up { (egui::Align2::RIGHT_BOTTOM, at.min.y - 6.0) } else { (egui::Align2::RIGHT_TOP, at.max.y + 6.0) };
+    let shown = egui::Area::new(Id::unique("modern chat settings"))
+        .order(Order::Foreground)
+        .pivot(pivot)
+        .fixed_pos(pos2(at.max.x, y))
+        .show(ctx, |ui| {
+            let bg = ui.painter().add(egui::Shape::Noop);
+            let inner = egui::Frame::NONE.inner_margin(super::MARGIN).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
+                    ui.painter().text(
+                        pos2(r.min.x, r.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        "Font Size",
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("text"),
+                    );
+                    let now = *size;
+                    let mut step = |ui: &mut Ui, label: &str, d: f32| {
+                        let (r, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
+                        let can = FONT_SIZES.contains(&(now + d));
+                        let face = if !can {
+                            "controls/button_disabled"
+                        } else if resp.hovered() {
+                            "controls/button_hover"
+                        } else {
+                            "controls/button_normal"
+                        };
+                        if let Some(s) = m.art.sprite(face) {
+                            ui.painter().add(paint::nine_slice(&s, r, 0.5, Color32::WHITE));
+                        }
+                        let c = if can { m.theme.color("text") } else { m.theme.color("muted") };
+                        ui.painter().text(
+                            r.center(),
+                            egui::Align2::CENTER_CENTER,
+                            label,
+                            FontId::proportional(m.theme.title),
+                            c,
+                        );
+                        if can && resp.clicked() {
+                            *size += d;
+                            changed = true;
+                        }
                     };
-                    if let Some(s) = m.art.sprite(face) {
-                        ui.painter().add(paint::nine_slice(&s, r, 0.5, Color32::WHITE));
-                    }
-                    let c = if can { m.theme.color("text") } else { m.theme.color("muted") };
-                    ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, label, FontId::proportional(m.theme.title), c);
-                    if can && resp.clicked() {
-                        *size += d;
-                        changed = true;
-                    }
-                };
-                step(ui, "\u{2212}", -1.0);
-                let (r, _) = ui.allocate_exact_size(vec2(30.0, 28.0), Sense::hover());
-                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, format!("{}", now as u32), FontId::proportional(m.theme.ui), m.theme.color("gold"));
-                step(ui, "+", 1.0);
-            });
-            ui.add_space(6.0);
-            // The battle lines on All, or on the Battle tab alone (not retail).
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
-                ui.painter().text(pos2(r.min.x, r.center().y), egui::Align2::LEFT_CENTER, "Battle in All", FontId::proportional(m.theme.ui), m.theme.color("text"));
-                for (val, label) in [(true, "Shown"), (false, "Hidden")] {
-                    if super::craft::button(ui, m, label, 80.0, *battle_in_all == val, false) && *battle_in_all != val {
-                        *battle_in_all = val;
-                        changed = true;
-                    }
-                }
-            });
-            ui.add_space(6.0);
-            // An action's lines that differ only in their number as one line (BattleMod's condensing; not retail).
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
-                ui.painter().text(pos2(r.min.x, r.center().y), egui::Align2::LEFT_CENTER, "Condense", FontId::proportional(m.theme.ui), m.theme.color("text"));
-                for (val, label) in [(true, "On"), (false, "Off")] {
-                    if super::craft::button(ui, m, label, 80.0, *condense == val, false) && *condense != val {
-                        *condense = val;
-                        changed = true;
-                    }
-                }
-            });
-            ui.add_space(6.0);
-            // The tabs (not retail): each lit while it shows; a hidden tab's lines still show on All.
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
-                ui.painter().text(pos2(r.min.x, r.center().y), egui::Align2::LEFT_CENTER, "Tabs", FontId::proportional(m.theme.ui), m.theme.color("text"));
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
-                    for row in (1..TABS.len()).collect::<Vec<_>>().chunks(3) {
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 6.0;
-                            for &i in row {
-                                let shown = tab_shown(hidden, i);
-                                if super::craft::button(ui, m, TABS[i].0, 104.0, shown, false) {
-                                    if shown {
-                                        hidden.push(TABS[i].0.to_string());
-                                    } else {
-                                        hidden.retain(|h| h != TABS[i].0);
-                                    }
-                                    changed = true;
-                                }
-                            }
-                        });
+                    step(ui, "\u{2212}", -1.0);
+                    let (r, _) = ui.allocate_exact_size(vec2(30.0, 28.0), Sense::hover());
+                    ui.painter().text(
+                        r.center(),
+                        egui::Align2::CENTER_CENTER,
+                        format!("{}", now as u32),
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("gold"),
+                    );
+                    step(ui, "+", 1.0);
+                });
+                ui.add_space(6.0);
+                // The battle lines on All, or on the Battle tab alone (not retail).
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
+                    ui.painter().text(
+                        pos2(r.min.x, r.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        "Battle in All",
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("text"),
+                    );
+                    for (val, label) in [(true, "Shown"), (false, "Hidden")] {
+                        if super::craft::button(ui, m, label, 80.0, *battle_in_all == val, false)
+                            && *battle_in_all != val
+                        {
+                            *battle_in_all = val;
+                            changed = true;
+                        }
                     }
                 });
+                ui.add_space(6.0);
+                // An action's lines that differ only in their number as one line (BattleMod's condensing; not retail).
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
+                    ui.painter().text(
+                        pos2(r.min.x, r.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        "Condense",
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("text"),
+                    );
+                    for (val, label) in [(true, "On"), (false, "Off")] {
+                        if super::craft::button(ui, m, label, 80.0, *condense == val, false) && *condense != val {
+                            *condense = val;
+                            changed = true;
+                        }
+                    }
+                });
+                ui.add_space(6.0);
+                // The tabs (not retail): each lit while it shows; a hidden tab's lines still show on All.
+                ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (r, _) = ui.allocate_exact_size(vec2(96.0, 28.0), Sense::hover());
+                    ui.painter().text(
+                        pos2(r.min.x, r.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        "Tabs",
+                        FontId::proportional(m.theme.ui),
+                        m.theme.color("text"),
+                    );
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 4.0;
+                        for row in (1..TABS.len()).collect::<Vec<_>>().chunks(3) {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                for &i in row {
+                                    let shown = tab_shown(hidden, i);
+                                    if super::craft::button(ui, m, TABS[i].0, 104.0, shown, false) {
+                                        if shown {
+                                            hidden.push(TABS[i].0.to_string());
+                                        } else {
+                                            hidden.retain(|h| h != TABS[i].0);
+                                        }
+                                        changed = true;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
             });
+            let r = inner.response.rect;
+            ui.painter().set(bg, super::borders::window(m, "window_normal", r));
+            r
         });
-        let r = inner.response.rect;
-        ui.painter().set(bg, super::borders::window(m, "window_normal", r));
-        r
-    });
     let r = shown.inner;
-    let away = ctx.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !r.contains(p) && !at.contains(p)));
+    let away = ctx.input(|i| {
+        i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !r.contains(p) && !at.contains(p))
+    });
     if away {
         m.chat_settings.set(false);
     }
@@ -411,8 +486,28 @@ fn view_keep(w: &World, keep: usize) -> ChatView<'_> {
     let modes = w.chat.modes();
     let all: Vec<_> = w.chat.iter_timed().zip(modes.iter().copied()).collect();
     let from = all.len().saturating_sub(keep);
-    let lines = all[from..].iter().enumerate().map(|(i, (((line, c), (time, chat, _)), mode))| (stamp_of(stamps, *time, *chat), line.as_str(), *c, *mode, incoming(*mode) && mentions(line, &w.name), from + i)).collect();
-    let input = w.typing.then(|| InputView { channel: channel(super::super::chatctrl::line_mode(&w.chat_input, w.chat_mode)), pieces: fep::pieces(w, &w.chat_input), caret: fep::caret(w), sel: fep::selection(w), fep: w.fep.as_ref().map(|f| (f.cands.iter().map(|c| c.text.clone()).collect(), f.sel)), preedit: w.ime_preedit.clone() });
+    let lines = all[from..]
+        .iter()
+        .enumerate()
+        .map(|(i, (((line, c), (time, chat, _)), mode))| {
+            (
+                stamp_of(stamps, *time, *chat),
+                line.as_str(),
+                *c,
+                *mode,
+                incoming(*mode) && mentions(line, &w.name),
+                from + i,
+            )
+        })
+        .collect();
+    let input = w.typing.then(|| InputView {
+        channel: channel(super::super::chatctrl::line_mode(&w.chat_input, w.chat_mode)),
+        pieces: fep::pieces(w, &w.chat_input),
+        caret: fep::caret(w),
+        sel: fep::selection(w),
+        fep: w.fep.as_ref().map(|f| (f.cands.iter().map(|c| c.text.clone()).collect(), f.sel)),
+        preedit: w.ime_preedit.clone(),
+    });
     ChatView { lines, input, waiting: event::prompt(w), unread: [0; 11] }
 }
 
@@ -440,7 +535,11 @@ fn input(ui: &mut Ui, m: &Modern, v: &InputView, t: f32, size: f32, r: Rect) {
     m.line_sel.set(v.sel.is_some());
     if let Some((a, b)) = v.sel {
         let at = |c: usize| stops.iter().find(|s| s.0 >= c).map_or(x, |s| s.1);
-        p.rect_filled(Rect::from_min_max(pos2(at(a), r.center().y - size * 0.62), pos2(at(b), r.center().y + size * 0.62)), 2.0, m.theme.color("focus").gamma_multiply(0.45));
+        p.rect_filled(
+            Rect::from_min_max(pos2(at(a), r.center().y - size * 0.62), pos2(at(b), r.center().y + size * 0.62)),
+            2.0,
+            m.theme.color("focus").gamma_multiply(0.45),
+        );
     }
     let (mut caret_x, mut chars) = (x, 0);
     for (text, phrase) in &v.pieces {
@@ -448,7 +547,11 @@ fn input(ui: &mut Ui, m: &Modern, v: &InputView, t: f32, size: f32, r: Rect) {
         // A phrase is one unit of four chars in the line (fep.rs): the caret stands before or after it.
         let n = if *phrase { 4 } else { text.chars().count() };
         if v.caret >= chars && v.caret <= chars + n {
-            let before: String = if *phrase { if v.caret > chars { text.clone() } else { String::new() } } else { text.chars().take(v.caret - chars).collect() };
+            let before: String = if *phrase {
+                if v.caret > chars { text.clone() } else { String::new() }
+            } else {
+                text.chars().take(v.caret - chars).collect()
+            };
             caret_x = x + ui.fonts_mut(|f| f.layout_no_wrap(before, font.clone(), c).size().x);
         }
         x = p.text(pos2(x, r.center().y), egui::Align2::LEFT_CENTER, text, font.clone(), c).max.x;
@@ -464,10 +567,24 @@ fn input(ui: &mut Ui, m: &Modern, v: &InputView, t: f32, size: f32, r: Rect) {
         let g = ui.fonts_mut(|f| f.layout_no_wrap(v.preedit.clone(), font.clone(), m.theme.color("text")));
         let box_r = Rect::from_min_size(pos2(caret_x, top - 2.0), vec2(g.size().x + 2.0, bottom - top + 4.0));
         p.rect_filled(box_r, 2.0, m.theme.color("charcoal"));
-        p.text(pos2(caret_x + 1.0, r.center().y), egui::Align2::LEFT_CENTER, &v.preedit, font.clone(), m.theme.color("text"));
-        p.hline((caret_x + 1.0)..=(caret_x + 1.0 + g.size().x), bottom + 1.0, egui::Stroke::new(1.0, m.theme.color("text")));
+        p.text(
+            pos2(caret_x + 1.0, r.center().y),
+            egui::Align2::LEFT_CENTER,
+            &v.preedit,
+            font.clone(),
+            m.theme.color("text"),
+        );
+        p.hline(
+            (caret_x + 1.0)..=(caret_x + 1.0 + g.size().x),
+            bottom + 1.0,
+            egui::Stroke::new(1.0, m.theme.color("text")),
+        );
     } else if (10..=24).contains(&((t * 30.0) as u64 % 26)) {
-        p.vline(caret_x + 1.0, (r.center().y - size * 0.55)..=(r.center().y + size * 0.55), egui::Stroke::new(1.5, m.theme.color("text")));
+        p.vline(
+            caret_x + 1.0,
+            (r.center().y - size * 0.55)..=(r.center().y + size * 0.55),
+            egui::Stroke::new(1.5, m.theme.color("text")),
+        );
     }
     if let Some((cands, sel)) = &v.fep {
         candidates(ui, m, cands, *sel, pos2(caret_x - 8.0, r.min.y - TAB_H));
@@ -479,19 +596,41 @@ fn input(ui: &mut Ui, m: &Modern, v: &InputView, t: f32, size: f32, r: Rect) {
 pub(super) fn candidates(ui: &mut Ui, m: &Modern, cands: &[String], sel: usize, bottom_left: egui::Pos2) {
     let font = FontId::proportional(m.theme.small);
     let first = sel / fep::ROWS * fep::ROWS;
-    egui::Area::new(egui::Id::unique("fep list")).order(egui::Order::Foreground).pivot(egui::Align2::LEFT_BOTTOM).fixed_pos(bottom_left).show(ui.ctx(), |ui| {
-        egui::Frame::NONE.fill(m.bg(m.theme.color("charcoal"))).stroke(egui::Stroke::new(1.0, m.theme.color("bronze"))).corner_radius(6.0).inner_margin(6.0).show(ui, |ui| {
-            ui.set_min_width(160.0);
-            ui.label(egui::RichText::new(format!("{}/{}", sel + 1, cands.len())).size(m.theme.small - 1.0).color(m.theme.color("muted")));
-            for (k, c) in cands.iter().enumerate().skip(first).take(fep::ROWS) {
-                let (rr, _) = ui.allocate_exact_size(vec2(ui.available_width().max(160.0), m.theme.small + 8.0), Sense::hover());
-                if k == sel {
-                    ui.painter().rect_filled(rr, 4.0, m.theme.color("focus").gamma_multiply(0.35));
-                }
-                ui.painter().text(pos2(rr.min.x + 6.0, rr.center().y), egui::Align2::LEFT_CENTER, c, font.clone(), if k == sel { m.theme.color("gold") } else { m.theme.color("text") });
-            }
+    egui::Area::new(egui::Id::unique("fep list"))
+        .order(egui::Order::Foreground)
+        .pivot(egui::Align2::LEFT_BOTTOM)
+        .fixed_pos(bottom_left)
+        .show(ui.ctx(), |ui| {
+            egui::Frame::NONE
+                .fill(m.bg(m.theme.color("charcoal")))
+                .stroke(egui::Stroke::new(1.0, m.theme.color("bronze")))
+                .corner_radius(6.0)
+                .inner_margin(6.0)
+                .show(ui, |ui| {
+                    ui.set_min_width(160.0);
+                    ui.label(
+                        egui::RichText::new(format!("{}/{}", sel + 1, cands.len()))
+                            .size(m.theme.small - 1.0)
+                            .color(m.theme.color("muted")),
+                    );
+                    for (k, c) in cands.iter().enumerate().skip(first).take(fep::ROWS) {
+                        let (rr, _) = ui.allocate_exact_size(
+                            vec2(ui.available_width().max(160.0), m.theme.small + 8.0),
+                            Sense::hover(),
+                        );
+                        if k == sel {
+                            ui.painter().rect_filled(rr, 4.0, m.theme.color("focus").gamma_multiply(0.35));
+                        }
+                        ui.painter().text(
+                            pos2(rr.min.x + 6.0, rr.center().y),
+                            egui::Align2::LEFT_CENTER,
+                            c,
+                            font.clone(),
+                            if k == sel { m.theme.color("gold") } else { m.theme.color("text") },
+                        );
+                    }
+                });
         });
-    });
 }
 
 /// What the rule gives the window this frame (logwin::LogAnim): its height in rows over its chrome (eased; below 0 the
@@ -523,7 +662,9 @@ fn wrap_width(room: Vec2) -> f32 {
 pub fn panel(p: &mut Panels, w: &mut World) {
     // A message waiting for a key (an NPC talking) shows on All: the channel tabs never show it (retail's either). A
     // tab the settings hid goes back to All too.
-    if (super::super::event::prompt(w) || !tab_shown(p.chat_hidden, p.m.chat_tab.get() as usize)) && p.m.chat_tab.get() != 0 {
+    if (super::super::event::prompt(w) || !tab_shown(p.chat_hidden, p.m.chat_tab.get() as usize))
+        && p.m.chat_tab.get() != 0
+    {
         p.m.chat_tab.set(0);
     }
     if w.full_log.is_some() {
@@ -590,7 +731,12 @@ pub fn panel(p: &mut Panels, w: &mut World) {
     }
     ml.shown = Some(h.max(floor));
     let a = &ml.anim;
-    let shown = Shown { rows: h.max(floor), draw_n: a.draw_n(), pending: a.pending(), slide: a.off() + if rule.line_open { 16 } else { 0 } };
+    let shown = Shown {
+        rows: h.max(floor),
+        draw_n: a.draw_n(),
+        pending: a.pending(),
+        slide: a.off() + if rule.line_open { 16 } else { 0 },
+    };
     let mut v = view(w);
     v.unread = unread(m, w, *p.battle_in_all);
     draw(p, &v, shown, rule.line_open);
@@ -607,7 +753,12 @@ fn line_text(stamp: &str, line: &str) -> String {
 fn selected(m: &Modern, v: &ChatView, tab: u8, battle_in_all: bool) {
     let sel = m.log_sel.borrow().filter(|s| !s.empty());
     let text = sel.map(|s| {
-        let lines: Vec<(usize, String)> = v.lines.iter().filter(|l| shows(tab, l.3, battle_in_all) && s.span(l.5, usize::MAX).is_some()).map(|l| (l.5, line_text(&l.0, l.1))).collect();
+        let lines: Vec<(usize, String)> = v
+            .lines
+            .iter()
+            .filter(|l| shows(tab, l.3, battle_in_all) && s.span(l.5, usize::MAX).is_some())
+            .map(|l| (l.5, line_text(&l.0, l.1)))
+            .collect();
         s.text(&lines)
     });
     *m.log_text.borrow_mut() = text;
@@ -615,14 +766,28 @@ fn selected(m: &Modern, v: &ChatView, tab: u8, battle_in_all: bool) {
 
 /// A line naming us (rChat's mentions): a faint gold wash behind it and a gold bar at its left.
 fn mention_mark(p: &egui::Painter, m: &Modern, r: Rect) {
-    p.rect_filled(Rect::from_min_max(pos2(r.min.x - 4.0, r.min.y), pos2(r.max.x + 6.0, r.max.y)), 3.0, m.theme.color("gold").gamma_multiply(0.24));
-    p.rect_filled(Rect::from_min_max(pos2(r.min.x - 8.0, r.min.y + 1.0), pos2(r.min.x - 5.5, r.max.y - 1.0)), 1.0, m.theme.color("gold"));
+    p.rect_filled(
+        Rect::from_min_max(pos2(r.min.x - 4.0, r.min.y), pos2(r.max.x + 6.0, r.max.y)),
+        3.0,
+        m.theme.color("gold").gamma_multiply(0.24),
+    );
+    p.rect_filled(
+        Rect::from_min_max(pos2(r.min.x - 8.0, r.min.y + 1.0), pos2(r.min.x - 5.5, r.max.y - 1.0)),
+        1.0,
+        m.theme.color("gold"),
+    );
 }
 
 /// A channel tab with nothing on it says so (and where everything is).
 fn empty_tab(p: &egui::Painter, m: &Modern, tab: u8, at: egui::Pos2, size: f32) {
     let name = TABS.get(tab as usize).map_or("", |t| t.0);
-    p.text(at, egui::Align2::LEFT_TOP, format!("No {name} messages. All shows everything."), FontId::proportional(size * 0.85), m.theme.color("muted"));
+    p.text(
+        at,
+        egui::Align2::LEFT_TOP,
+        format!("No {name} messages. All shows everything."),
+        FontId::proportional(size * 0.85),
+        m.theme.color("muted"),
+    );
 }
 
 /// The full log (Enter on the focused log) in the chat window itself: from under the top bar to its bottom, its tabs,
@@ -632,7 +797,10 @@ fn full(p: &mut Panels, w: &mut World) {
     let m = p.m;
     // Num+ (the full log's tab key): the next tab in the row.
     if std::mem::take(&mut w.full_log_next) {
-        let next = (1..=TABS.len()).map(|d| (m.chat_tab.get() as usize + d) % TABS.len()).find(|&i| tab_shown(p.chat_hidden, i)).unwrap_or(0);
+        let next = (1..=TABS.len())
+            .map(|d| (m.chat_tab.get() as usize + d) % TABS.len())
+            .find(|&i| tab_shown(p.chat_hidden, i))
+            .unwrap_or(0);
         m.chat_tab.set(next as u8);
     }
     let size = *p.chat_font;
@@ -645,7 +813,13 @@ fn full(p: &mut Panels, w: &mut World) {
     let bottom = if place.dock.is_none() && place.b > 0.0 { place.b * sh } else { sh * 0.985 };
     let riders = {
         let rects = m.rects.borrow();
-        rects.get("chat").map_or(0.0, |c| rects.iter().filter(|(id, _)| id.as_str() != "chat" && p.rests_on(id, "chat")).map(|(_, r)| c.min.y - r.min.y).fold(0.0, f32::max))
+        rects.get("chat").map_or(0.0, |c| {
+            rects
+                .iter()
+                .filter(|(id, _)| id.as_str() != "chat" && p.rests_on(id, "chat"))
+                .map(|(_, r)| c.min.y - r.min.y)
+                .fold(0.0, f32::max)
+        })
     };
     let height = (bottom - sh * 0.107 - riders).max(chrome() + 4.0 * row);
     let lines_h = height - chrome();
@@ -664,82 +838,115 @@ fn full(p: &mut Panels, w: &mut World) {
     let (mut clicked, mut picked) = (None, None);
     // The hidden tabs out of `p` for the frame (the window's closure can't borrow it), back after.
     let hidden = std::mem::take(p.chat_hidden);
-    let r = p.show("chat", Show { size: default_room(p.ctx), resizable: true, height: Some(height), ..Default::default() }, |ui, room| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        button = tabs(ui, m, 1.0, &v.unread, &hidden);
-        ui.add_space(GAP);
-        let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), lines_h), Sense::click_and_drag());
-        hovered = resp.hovered();
-        let selecting = m.log_sel.borrow().is_some_and(|s| !s.empty());
-        clicked = (resp.clicked() && !selecting).then(|| resp.interact_pointer_pos()).flatten();
-        let wrap = wrap_width(room);
-        // The chat line in the bottom row while typing.
-        let input_r = v.input.as_ref().map(|_| Rect::from_min_max(pos2(area.min.x, area.max.y - row - 5.0), pos2(area.max.x, area.max.y + 5.0)));
-        // The find's field at the top of the lines.
-        let area = match &find {
-            Some(f) => {
-                let fr = Rect::from_min_size(area.min, vec2(area.width().min(420.0), 26.0));
-                if let Some(s) = m.art.sprite("controls/input_focused") {
-                    ui.painter().add(paint::nine_slice(&s, fr, (fr.height() / s.size.y).min(1.0), Color32::WHITE));
+    let r = p.show(
+        "chat",
+        Show { size: default_room(p.ctx), resizable: true, height: Some(height), ..Default::default() },
+        |ui, room| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            button = tabs(ui, m, 1.0, &v.unread, &hidden);
+            ui.add_space(GAP);
+            let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), lines_h), Sense::click_and_drag());
+            hovered = resp.hovered();
+            let selecting = m.log_sel.borrow().is_some_and(|s| !s.empty());
+            clicked = (resp.clicked() && !selecting).then(|| resp.interact_pointer_pos()).flatten();
+            let wrap = wrap_width(room);
+            // The chat line in the bottom row while typing.
+            let input_r = v.input.as_ref().map(|_| {
+                Rect::from_min_max(pos2(area.min.x, area.max.y - row - 5.0), pos2(area.max.x, area.max.y + 5.0))
+            });
+            // The find's field at the top of the lines.
+            let area = match &find {
+                Some(f) => {
+                    let fr = Rect::from_min_size(area.min, vec2(area.width().min(420.0), 26.0));
+                    if let Some(s) = m.art.sprite("controls/input_focused") {
+                        ui.painter().add(paint::nine_slice(&s, fr, (fr.height() / s.size.y).min(1.0), Color32::WHITE));
+                    }
+                    if let Some(s) = m.art.sprite("controls/search") {
+                        ui.painter().add(paint::image(
+                            &s,
+                            pos2(fr.min.x + 6.0, fr.center().y - 8.0),
+                            16.0,
+                            Color32::WHITE,
+                        ));
+                    }
+                    let shown = v.lines.iter().filter(|l| shows(tab, l.3, battle_in_all)).count();
+                    let blink = if (t * 2.0) as i64 % 2 == 0 { "|" } else { "" };
+                    ui.painter().text(
+                        pos2(fr.min.x + 28.0, fr.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        format!("{f}{blink}"),
+                        FontId::proportional(m.theme.small),
+                        m.theme.color("text"),
+                    );
+                    ui.painter().text(
+                        pos2(fr.max.x + 10.0, fr.center().y),
+                        egui::Align2::LEFT_CENTER,
+                        format!("{shown} lines"),
+                        FontId::proportional(m.theme.small),
+                        m.theme.color("muted"),
+                    );
+                    Rect::from_min_max(pos2(area.min.x, fr.max.y + 6.0), area.max)
                 }
-                if let Some(s) = m.art.sprite("controls/search") {
-                    ui.painter().add(paint::image(&s, pos2(fr.min.x + 6.0, fr.center().y - 8.0), 16.0, Color32::WHITE));
+                None => area,
+            };
+            let lines = Rect::from_min_max(area.min, pos2(area.max.x, input_r.map_or(area.max.y, |r| r.min.y - TAB_H)));
+            let painter = ui.painter().with_clip_rect(
+                Rect::from_min_max(
+                    lines.min - vec2(10.0, 0.0),
+                    lines.max + vec2(0.0, if input_r.is_some() { 0.0 } else { 4.0 }),
+                )
+                .intersect(ui.clip_rect()),
+            );
+            let mut y = lines.max.y + fl.scroll as f32 * row;
+            let open = w.charlnk.as_ref().map(|c| c.line);
+            let sel = *m.log_sel.borrow();
+            let mut drawn: chatsel::Drawn = Vec::new();
+            for (st, line, c, mode, named, k) in v.lines.iter().rev() {
+                if !shows(tab, *mode, battle_in_all) {
+                    continue;
                 }
-                let shown = v.lines.iter().filter(|l| shows(tab, l.3, battle_in_all)).count();
-                let blink = if (t * 2.0) as i64 % 2 == 0 { "|" } else { "" };
-                ui.painter().text(pos2(fr.min.x + 28.0, fr.center().y), egui::Align2::LEFT_CENTER, format!("{f}{blink}"), FontId::proportional(m.theme.small), m.theme.color("text"));
-                ui.painter().text(pos2(fr.max.x + 10.0, fr.center().y), egui::Align2::LEFT_CENTER, format!("{shown} lines"), FontId::proportional(m.theme.small), m.theme.color("muted"));
-                Rect::from_min_max(pos2(area.min.x, fr.max.y + 6.0), area.max)
+                if y <= area.min.y {
+                    break;
+                }
+                let galley = painter.layout_job(line_job((st, m.theme.color("muted")), line, *c, &font, wrap));
+                y -= galley.size().y;
+                let lr = Rect::from_min_size(pos2(area.min.x, y), vec2(area.width(), galley.size().y));
+                // A player's line (charlnk's) lights under the pointer and while its menu is open.
+                let player = w.chat.who(*k).is_some();
+                if player && (open == Some(*k) || hovered && ui.rect_contains_pointer(lr.intersect(lines))) {
+                    painter.rect_filled(lr.expand2(vec2(4.0, 0.0)), 3.0, m.theme.color("gold").gamma_multiply(0.14));
+                }
+                if clicked.is_some_and(|p| lr.intersect(lines).contains(p)) {
+                    picked = Some((*k, crate::dat::font::strip_codes(line).to_string()));
+                }
+                if *named {
+                    mention_mark(
+                        &painter,
+                        m,
+                        Rect::from_min_size(pos2(area.min.x, y), vec2(galley.size().x, galley.size().y)),
+                    );
+                }
+                let at = pos2(area.min.x, y);
+                if let Some(span) = sel.and_then(|s| s.span(*k, galley.text().chars().count())) {
+                    chatsel::wash(&painter, m, &galley, at, span);
+                }
+                drawn.push((*k, at, galley.clone()));
+                painter.galley(at, galley.clone(), m.theme.color("text"));
+                icons(&painter, m, line, &galley, at);
             }
-            None => area,
-        };
-        let lines = Rect::from_min_max(area.min, pos2(area.max.x, input_r.map_or(area.max.y, |r| r.min.y - TAB_H)));
-        let painter = ui.painter().with_clip_rect(Rect::from_min_max(lines.min - vec2(10.0, 0.0), lines.max + vec2(0.0, if input_r.is_some() { 0.0 } else { 4.0 })).intersect(ui.clip_rect()));
-        let mut y = lines.max.y + fl.scroll as f32 * row;
-        let open = w.charlnk.as_ref().map(|c| c.line);
-        let sel = *m.log_sel.borrow();
-        let mut drawn: chatsel::Drawn = Vec::new();
-        for (st, line, c, mode, named, k) in v.lines.iter().rev() {
-            if !shows(tab, *mode, battle_in_all) {
-                continue;
+            chatsel::log_mouse(m, &resp, &drawn);
+            // The oldest line reached below the top: scrolled past it by this many rows.
+            if tab != 0 && y >= lines.max.y + fl.scroll as f32 * row - 0.5 {
+                empty_tab(&painter, m, tab, pos2(area.min.x, lines.max.y - row), size);
             }
-            if y <= area.min.y {
-                break;
+            if y > area.min.y + 0.5 {
+                short = Some(((y - area.min.y) / row).floor() as usize);
             }
-            let galley = painter.layout_job(line_job((st, m.theme.color("muted")), line, *c, &font, wrap));
-            y -= galley.size().y;
-            let lr = Rect::from_min_size(pos2(area.min.x, y), vec2(area.width(), galley.size().y));
-            // A player's line (charlnk's) lights under the pointer and while its menu is open.
-            let player = w.chat.who(*k).is_some();
-            if player && (open == Some(*k) || hovered && ui.rect_contains_pointer(lr.intersect(lines))) {
-                painter.rect_filled(lr.expand2(vec2(4.0, 0.0)), 3.0, m.theme.color("gold").gamma_multiply(0.14));
+            if let (Some(i), Some(r)) = (&v.input, input_r) {
+                input(ui, m, i, t, size, r);
             }
-            if clicked.is_some_and(|p| lr.intersect(lines).contains(p)) {
-                picked = Some((*k, crate::dat::font::strip_codes(line).to_string()));
-            }
-            if *named {
-                mention_mark(&painter, m, Rect::from_min_size(pos2(area.min.x, y), vec2(galley.size().x, galley.size().y)));
-            }
-            let at = pos2(area.min.x, y);
-            if let Some(span) = sel.and_then(|s| s.span(*k, galley.text().chars().count())) {
-                chatsel::wash(&painter, m, &galley, at, span);
-            }
-            drawn.push((*k, at, galley.clone()));
-            painter.galley(at, galley.clone(), m.theme.color("text"));
-            icons(&painter, m, line, &galley, at);
-        }
-        chatsel::log_mouse(m, &resp, &drawn);
-        // The oldest line reached below the top: scrolled past it by this many rows.
-        if tab != 0 && y >= lines.max.y + fl.scroll as f32 * row - 0.5 {
-            empty_tab(&painter, m, tab, pos2(area.min.x, lines.max.y - row), size);
-        }
-        if y > area.min.y + 0.5 {
-            short = Some(((y - area.min.y) / row).floor() as usize);
-        }
-        if let (Some(i), Some(r)) = (&v.input, input_r) {
-            input(ui, m, i, t, size, r);
-        }
-    });
+        },
+    );
     selected(m, &v, tab, battle_in_all);
     chatsel::draw_menu(p.ctx, m);
     if let Some(r) = r {
@@ -753,7 +960,9 @@ fn full(p: &mut Panels, w: &mut World) {
     if let Some((k, text)) = picked
         && w.confirm.is_none()
     {
-        let at = r.map_or(pos2(0.0, 0.0), |r| pos2(r.max.x + 8.0, p.ctx.pointer_latest_pos().map_or(r.min.y, |q| q.y - 20.0)));
+        let at = r.map_or(pos2(0.0, 0.0), |r| {
+            pos2(r.max.x + 8.0, p.ctx.pointer_latest_pos().map_or(r.min.y, |q| q.y - 20.0))
+        });
         m.charlnk_at.set(Some(at));
         super::super::charlnk::open(w, Some((k, text)));
     }
@@ -772,7 +981,10 @@ fn full(p: &mut Panels, w: &mut World) {
         m.chat_settings.set(!m.chat_settings.get());
     }
     *p.chat_hidden = hidden;
-    if r.is_some() && m.chat_settings.get() && settings(p.ctx, m, button.0, p.chat_font, p.battle_in_all, p.condense, p.chat_hidden) {
+    if r.is_some()
+        && m.chat_settings.get()
+        && settings(p.ctx, m, button.0, p.chat_font, p.battle_in_all, p.condense, p.chat_hidden)
+    {
         *p.changed = true;
     }
     chatsel::apply(m, w);
@@ -814,62 +1026,82 @@ pub fn draw(p: &mut Panels, v: &ChatView, s: Shown, lift: bool) {
     // Below its chrome it folds into its bottom edge, what rides on it going down with it.
     // The hidden tabs out of `p` for the frame (the window's closure can't borrow it), back after.
     let hidden = std::mem::take(p.chat_hidden);
-    let r = p.show("chat", Show { size: default_room(p.ctx), resizable: true, height: Some(height), fold: total / height, ..Default::default() }, |ui, room| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        button = tabs(ui, m, 1.0, &v.unread, &hidden);
-        ui.add_space(GAP);
-        let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), lines_h), Sense::click_and_drag());
-        let wrap = wrap_width(room);
-        let input_r = v.input.as_ref().map(|_| Rect::from_min_max(pos2(area.min.x, floor - row - 5.0), pos2(area.max.x, floor + 5.0)));
-        let base = floor - if lift { 2.0 * row } else { 0.0 } + s.slide as f32 * row / 16.0;
-        let top = area.min.y.max(base - s.draw_n as f32 * row);
-        // Room left of the lines for the mention mark.
-        let clip = Rect::from_min_max(pos2(area.min.x - 10.0, top), pos2(area.max.x + 8.0, input_r.map_or(floor + if s.slide == 0 { 4.0 } else { 0.0 }, |r| r.min.y)));
-        let painter = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
-        let mut y = base + s.pending as f32 * row;
-        let mut newest = None;
-        let sel = *m.log_sel.borrow();
-        let mut drawn: chatsel::Drawn = Vec::new();
-        for (st, line, c, mode, named, k) in v.lines.iter().rev() {
-            if !shows(tab, *mode, battle_in_all) {
-                continue;
+    let r = p.show(
+        "chat",
+        Show {
+            size: default_room(p.ctx),
+            resizable: true,
+            height: Some(height),
+            fold: total / height,
+            ..Default::default()
+        },
+        |ui, room| {
+            ui.spacing_mut().item_spacing.y = 0.0;
+            button = tabs(ui, m, 1.0, &v.unread, &hidden);
+            ui.add_space(GAP);
+            let (area, resp) = ui.allocate_exact_size(vec2(ui.available_width(), lines_h), Sense::click_and_drag());
+            let wrap = wrap_width(room);
+            let input_r = v
+                .input
+                .as_ref()
+                .map(|_| Rect::from_min_max(pos2(area.min.x, floor - row - 5.0), pos2(area.max.x, floor + 5.0)));
+            let base = floor - if lift { 2.0 * row } else { 0.0 } + s.slide as f32 * row / 16.0;
+            let top = area.min.y.max(base - s.draw_n as f32 * row);
+            // Room left of the lines for the mention mark.
+            let clip = Rect::from_min_max(
+                pos2(area.min.x - 10.0, top),
+                pos2(area.max.x + 8.0, input_r.map_or(floor + if s.slide == 0 { 4.0 } else { 0.0 }, |r| r.min.y)),
+            );
+            let painter = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
+            let mut y = base + s.pending as f32 * row;
+            let mut newest = None;
+            let sel = *m.log_sel.borrow();
+            let mut drawn: chatsel::Drawn = Vec::new();
+            for (st, line, c, mode, named, k) in v.lines.iter().rev() {
+                if !shows(tab, *mode, battle_in_all) {
+                    continue;
+                }
+                if y <= clip.min.y {
+                    break;
+                }
+                let galley = painter.layout_job(line_job((st, m.theme.color("muted")), line, *c, &font, wrap));
+                y -= galley.size().y;
+                if *named {
+                    mention_mark(
+                        &painter,
+                        m,
+                        Rect::from_min_size(pos2(area.min.x, y), vec2(galley.size().x, galley.size().y)),
+                    );
+                }
+                if newest.is_none() {
+                    newest = galley.rows.last().map(|r| pos2(area.min.x + r.rect().max.x, y + r.rect().center().y));
+                }
+                let at = pos2(area.min.x, y);
+                if let Some(span) = sel.and_then(|s| s.span(*k, galley.text().chars().count())) {
+                    chatsel::wash(&painter, m, &galley, at, span);
+                }
+                // Only lines inside the window's clip take the mouse.
+                if at.y + galley.size().y > clip.min.y {
+                    drawn.push((*k, at, galley.clone()));
+                }
+                painter.galley(at, galley.clone(), m.theme.color("text"));
+                icons(&painter, m, line, &galley, at);
             }
-            if y <= clip.min.y {
-                break;
+            chatsel::log_mouse(m, &resp, &drawn);
+            if newest.is_none() && tab != 0 {
+                empty_tab(&painter, m, tab, pos2(area.min.x, base - row), size);
             }
-            let galley = painter.layout_job(line_job((st, m.theme.color("muted")), line, *c, &font, wrap));
-            y -= galley.size().y;
-            if *named {
-                mention_mark(&painter, m, Rect::from_min_size(pos2(area.min.x, y), vec2(galley.size().x, galley.size().y)));
+            if v.waiting
+                && let (Some(at), Some(k)) = (newest, m.art.sprite("controls/key_enter"))
+            {
+                let kw = row * 1.6;
+                painter.add(paint::image(&k, pos2(at.x + 6.0, at.y - kw / 4.0), kw, Color32::WHITE));
             }
-            if newest.is_none() {
-                newest = galley.rows.last().map(|r| pos2(area.min.x + r.rect().max.x, y + r.rect().center().y));
+            if let (Some(i), Some(r)) = (&v.input, input_r) {
+                input(ui, m, i, t, size, r);
             }
-            let at = pos2(area.min.x, y);
-            if let Some(span) = sel.and_then(|s| s.span(*k, galley.text().chars().count())) {
-                chatsel::wash(&painter, m, &galley, at, span);
-            }
-            // Only lines inside the window's clip take the mouse.
-            if at.y + galley.size().y > clip.min.y {
-                drawn.push((*k, at, galley.clone()));
-            }
-            painter.galley(at, galley.clone(), m.theme.color("text"));
-            icons(&painter, m, line, &galley, at);
-        }
-        chatsel::log_mouse(m, &resp, &drawn);
-        if newest.is_none() && tab != 0 {
-            empty_tab(&painter, m, tab, pos2(area.min.x, base - row), size);
-        }
-        if v.waiting
-            && let (Some(at), Some(k)) = (newest, m.art.sprite("controls/key_enter"))
-        {
-            let kw = row * 1.6;
-            painter.add(paint::image(&k, pos2(at.x + 6.0, at.y - kw / 4.0), kw, Color32::WHITE));
-        }
-        if let (Some(i), Some(r)) = (&v.input, input_r) {
-            input(ui, m, i, t, size, r);
-        }
-    });
+        },
+    );
     selected(m, v, tab, battle_in_all);
     chatsel::draw_menu(p.ctx, m);
     if let Some(r) = r {
@@ -879,7 +1111,10 @@ pub fn draw(p: &mut Panels, v: &ChatView, s: Shown, lift: bool) {
         m.chat_settings.set(!m.chat_settings.get());
     }
     *p.chat_hidden = hidden;
-    if r.is_some() && m.chat_settings.get() && settings(p.ctx, m, button.0, p.chat_font, p.battle_in_all, p.condense, p.chat_hidden) {
+    if r.is_some()
+        && m.chat_settings.get()
+        && settings(p.ctx, m, button.0, p.chat_font, p.battle_in_all, p.condense, p.chat_hidden)
+    {
         *p.changed = true;
     }
 }

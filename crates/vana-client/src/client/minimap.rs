@@ -71,10 +71,28 @@ pub fn prepare(gu: &GameUi, w: &mut World, sw: f32) {
         .entities
         .iter()
         .filter(|(id, e)| **id != w.my_id && radar::shown(e))
-        .filter_map(|(&id, e)| Some(((e.pos.x, e.pos.z, radar::colour(radar::kind_bits(w, id, e), e.monstrosity, e.motion.status, true)? | 0x8000_0000, w.target == Some(id)), id)))
+        .filter_map(|(&id, e)| {
+            Some((
+                (
+                    e.pos.x,
+                    e.pos.z,
+                    radar::colour(radar::kind_bits(w, id, e), e.monstrosity, e.motion.status, true)? | 0x8000_0000,
+                    w.target == Some(id),
+                ),
+                id,
+            ))
+        })
         .unzip();
     w.minimap_rect = Some(rect);
-    w.minimap_frame = Some(Frame { rect, pos: (w.pos.x, w.pos.z), facing, span: w.minimap_span.clamp(SPAN.0, SPAN.1), dots, ids, mix: w.map_opacity });
+    w.minimap_frame = Some(Frame {
+        rect,
+        pos: (w.pos.x, w.pos.z),
+        facing,
+        span: w.minimap_span.clamp(SPAN.0, SPAN.1),
+        dots,
+        ids,
+        mix: w.map_opacity,
+    });
 }
 
 /// Draws what `prepare` set up (after the HUD's clear, under the party / target windows and the menus).

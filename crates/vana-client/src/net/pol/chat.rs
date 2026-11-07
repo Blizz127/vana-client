@@ -494,7 +494,8 @@ impl Chat {
         let mut target = (host.to_string(), port);
         let mut redirected = false;
         let (mut sock, mut buf, greeting) = loop {
-            let sock = TcpStream::connect((target.0.as_str(), target.1)).with_context(|| format!("connecting to PlayOnline ({}:{})", target.0, target.1))?;
+            let sock = TcpStream::connect((target.0.as_str(), target.1))
+                .with_context(|| format!("connecting to PlayOnline ({}:{})", target.0, target.1))?;
             sock.set_read_timeout(Some(Duration::from_secs(30)))?;
             let mut s = sock;
             let mut buf = Vec::new();
@@ -557,7 +558,8 @@ impl Chat {
             host_byte: 0,
             skip_member_login: false,
         };
-        let nick = nick_line(pol_id, &challenge, pol_password).context("a PlayOnline ID is four letters and four digits")?;
+        let nick =
+            nick_line(pol_id, &challenge, pol_password).context("a PlayOnline ID is four letters and four digits")?;
         chat.send_line(&nick)?;
         let mut registered = false;
         loop {
@@ -591,7 +593,13 @@ impl Chat {
                     }
                     // The profile service's "available" notice (0x1001b6f0).
                     let ty = u16::from_le_bytes([h[0x3e], h[0x3f]]) >> 7 & 0x1f;
-                    if h[0x42] & 1 != 0 && ty == 31 && h[0x1b] != 0 && h[0x18] == 0xff && h[0x1c] == 0xff && h[0x10] == 1 {
+                    if h[0x42] & 1 != 0
+                        && ty == 31
+                        && h[0x1b] != 0
+                        && h[0x18] == 0xff
+                        && h[0x1c] == 0xff
+                        && h[0x10] == 1
+                    {
                         chat.skip_member_login = h[0x21] != 0;
                         chat.sock.set_read_timeout(None)?;
                         return Ok(chat);
@@ -643,7 +651,10 @@ mod tests {
         assert_eq!(b64_encode(&h("00")), "TT");
         assert_eq!(b64_encode(&h("00010203")), "TTIGTt");
         assert_eq!(b64_encode(&(0..32).collect::<Vec<u8>>()), "TTIGTt7nSAY3G7iK8TdO8pT9IUoen9sZcS5ycptEWUN");
-        assert_eq!(b64_decode(b"TTIGTt7nSAY3G7iK8TdO8pT9IUoen9sZcS5ycptEWUN", 43)[..32].to_vec(), (0..32).collect::<Vec<u8>>());
+        assert_eq!(
+            b64_decode(b"TTIGTt7nSAY3G7iK8TdO8pT9IUoen9sZcS5ycptEWUN", 43)[..32].to_vec(),
+            (0..32).collect::<Vec<u8>>()
+        );
         assert_eq!(b32_encode(&h("0001020304")), "NNNEVNZV");
         assert_eq!(b32_encode(&(0..25).collect::<Vec<u8>>()), "NNNEVNZVNFONS3NY41HEZO1S4A143VEQ3E2D0HZZ");
         assert_eq!(b32_decode(b"NNNEVNZVNFONS3NY41HEZO1S4A143VEQ3E2D0HZZ", 40), (0..25).collect::<Vec<u8>>());
@@ -660,7 +671,10 @@ mod tests {
         assert_eq!(identity_pad(b"EFKAOYMJ").to_vec(), h("6cc447f2f5608141"));
         // As 1.18.15e sends it after app.dll's area "01" (chat runs/15e/full).
         assert_eq!(nick_token("ABCD1234"), "TTTTTAISTTTTTTTTTTTTTHBy5pjMnc0G");
-        assert_eq!(nick_line("ABCD1234", b"CHALLENGE", "testpass").as_deref(), Some("NICK US77G53VV:82c40f69877fc2359531c90cc3f090dc:TTTTTAISTTTTTTTTTTTTTHBy5pjMnc0G"));
+        assert_eq!(
+            nick_line("ABCD1234", b"CHALLENGE", "testpass").as_deref(),
+            Some("NICK US77G53VV:82c40f69877fc2359531c90cc3f090dc:TTTTTAISTTTTTTTTTTTTTHBy5pjMnc0G")
+        );
     }
 
     #[test]
@@ -669,8 +683,14 @@ mod tests {
             n: Big::from_le(&h("a9117fcd9fc86ba6ff0444ab91083b0f1b440d15457364a6e1cfc47d0c4d094a")),
             d: Big::from_le(&h("af83a34b7d9da940222e3fa56a724d79fd396e56595f026a272f96431bb43c40")),
         };
-        assert_eq!(k.decrypt(&h("0e4cc04625bcb376824893ff1c49e6e4777d7bdb03968d85c47a100193d45984")), Some(h("1122334455667788")));
-        assert_eq!(b64_encode(&h("97400b4f21d135a21c85ba38b12b7ed1e31e309b078f7f68c73dab4b0971d444")), "rdTKzvW9ky3YUBiJjqMudQoQoHjWR_6ipaf@qtrp0I7");
+        assert_eq!(
+            k.decrypt(&h("0e4cc04625bcb376824893ff1c49e6e4777d7bdb03968d85c47a100193d45984")),
+            Some(h("1122334455667788"))
+        );
+        assert_eq!(
+            b64_encode(&h("97400b4f21d135a21c85ba38b12b7ed1e31e309b078f7f68c73dab4b0971d444")),
+            "rdTKzvW9ky3YUBiJjqMudQoQoHjWR_6ipaf@qtrp0I7"
+        );
         // A fresh pair decrypts what the server encrypts with e = 0xffff.
         let k = RsaKey::generate().unwrap();
         assert_eq!(k.n.bits(), 255);

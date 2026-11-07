@@ -105,7 +105,8 @@ impl Mods {
         let (tx, rx) = channel();
         let pr = progress.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(modpack::pack_of(&path).and_then(|p| modpack::install(&p, &crate::config::mods_dir(), &pr)));
+            let _ =
+                tx.send(modpack::pack_of(&path).and_then(|p| modpack::install(&p, &crate::config::mods_dir(), &pr)));
         });
         self.installing = Some((slug, progress, rx));
         true
@@ -139,7 +140,12 @@ impl Mods {
 pub fn remove_folder(name: &str) -> bool {
     let root = crate::config::mods_dir();
     let dir = root.join(name);
-    if name.is_empty() || name.contains(['/', '\\']) || name.starts_with('.') || dir.parent() != Some(root.as_path()) || !dir.is_dir() {
+    if name.is_empty()
+        || name.contains(['/', '\\'])
+        || name.starts_with('.')
+        || dir.parent() != Some(root.as_path())
+        || !dir.is_dir()
+    {
         return false;
     }
     std::thread::spawn(move || {
@@ -188,7 +194,14 @@ impl Browse {
         }
         dirs.sort_by_key(|n| n.to_lowercase());
         files.sort_by_key(|n| n.to_lowercase());
-        self.entries = self.dir.parent().map(|_| ("..".to_string(), true)).into_iter().chain(dirs.into_iter().map(|d| (d, true))).chain(files.into_iter().map(|f| (f, false))).collect();
+        self.entries = self
+            .dir
+            .parent()
+            .map(|_| ("..".to_string(), true))
+            .into_iter()
+            .chain(dirs.into_iter().map(|d| (d, true)))
+            .chain(files.into_iter().map(|f| (f, false)))
+            .collect();
         self.cursor = 0;
     }
 

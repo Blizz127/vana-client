@@ -31,7 +31,9 @@ fn u32_at(b: &[u8], o: usize) -> Option<u32> {
 
 /// A `.cur` (or `.ico`) file: its first image.
 pub fn parse_cur(b: &[u8]) -> Result<Frame> {
-    let (Some(0), Some(kind), Some(count)) = (u16_at(b, 0), u16_at(b, 2), u16_at(b, 4)) else { bail!("not an icon directory") };
+    let (Some(0), Some(kind), Some(count)) = (u16_at(b, 0), u16_at(b, 2), u16_at(b, 4)) else {
+        bail!("not an icon directory")
+    };
     if !matches!(kind, 1 | 2) || count == 0 {
         bail!("icon directory type {kind} with {count} images");
     }
@@ -55,7 +57,9 @@ fn png(img: &[u8]) -> Result<(u32, u32, Vec<u8>)> {
     let (w, h) = (info.width, info.height);
     let rgba = match info.color_type {
         png::ColorType::Rgba => buf[..(w * h * 4) as usize].to_vec(),
-        png::ColorType::GrayscaleAlpha => buf.chunks(2).take((w * h) as usize).flat_map(|p| [p[0], p[0], p[0], p[1]]).collect(),
+        png::ColorType::GrayscaleAlpha => {
+            buf.chunks(2).take((w * h) as usize).flat_map(|p| [p[0], p[0], p[0], p[1]]).collect()
+        }
         other => bail!("cursor PNG colour type {other:?}"),
     };
     Ok((w, h, rgba))
@@ -64,9 +68,24 @@ fn png(img: &[u8]) -> Result<(u32, u32, Vec<u8>)> {
 /// A DIB as in icon files: BITMAPINFOHEADER whose height covers the XOR image and the AND mask, palette for <= 8 bpp,
 /// rows bottom-up padded to 4 bytes. 32 bpp carries its own alpha; otherwise the AND mask's set bits are transparent.
 fn dib(img: &[u8], w0: u32, h0: u32) -> Result<(u32, u32, Vec<u8>)> {
-    let (Some(hdr), Some(w), Some(h2), Some(bpp)) = (u32_at(img, 0), u32_at(img, 4), u32_at(img, 8), u16_at(img, 14)) else { bail!("short DIB header") };
-    let w = if w > 0 { w } else if w0 > 0 { w0 } else { 256 };
-    let h = if h2 > 0 { h2 / 2 } else if h0 > 0 { h0 } else { 256 };
+    let (Some(hdr), Some(w), Some(h2), Some(bpp)) = (u32_at(img, 0), u32_at(img, 4), u32_at(img, 8), u16_at(img, 14))
+    else {
+        bail!("short DIB header")
+    };
+    let w = if w > 0 {
+        w
+    } else if w0 > 0 {
+        w0
+    } else {
+        256
+    };
+    let h = if h2 > 0 {
+        h2 / 2
+    } else if h0 > 0 {
+        h0
+    } else {
+        256
+    };
     let colors = match u32_at(img, 32).unwrap_or(0) {
         0 if bpp <= 8 => 1usize << bpp,
         n => n as usize,
@@ -156,7 +175,9 @@ pub fn parse(b: &[u8]) -> Result<Cursor> {
         bail!("animated cursor without frames");
     }
     let steps = steps.max(if seq.is_empty() { frames.len() } else { seq.len() });
-    let steps = (0..steps).map(|i| (seq.get(i).copied().unwrap_or(i).min(frames.len() - 1), rate.get(i).copied().unwrap_or(jiffies))).collect();
+    let steps = (0..steps)
+        .map(|i| (seq.get(i).copied().unwrap_or(i).min(frames.len() - 1), rate.get(i).copied().unwrap_or(jiffies)))
+        .collect();
     Ok(Cursor { frames, steps })
 }
 
@@ -176,13 +197,20 @@ mod tests {
         assert!(f.rgba.chunks(4).any(|p| p[3] == 255));
         // Every cursor file in the game folder and the mods parses.
         let mods = crate::config::mods_dir();
-        let dirs = std::iter::once(dir).chain(std::fs::read_dir(&mods).into_iter().flatten().flatten().map(|e| e.path()));
+        let dirs =
+            std::iter::once(dir).chain(std::fs::read_dir(&mods).into_iter().flatten().flatten().map(|e| e.path()));
         for d in dirs {
             for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
                 let p = e.path();
                 if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("ani")) {
-                    let c = super::parse(&std::fs::read(&p).unwrap()).unwrap_or_else(|e| panic!("{}: {e:#}", p.display()));
-                    assert!(!c.frames.is_empty() && c.frames.iter().all(|f| f.rgba.len() == (f.width * f.height * 4) as usize), "{}", p.display());
+                    let c =
+                        super::parse(&std::fs::read(&p).unwrap()).unwrap_or_else(|e| panic!("{}: {e:#}", p.display()));
+                    assert!(
+                        !c.frames.is_empty()
+                            && c.frames.iter().all(|f| f.rgba.len() == (f.width * f.height * 4) as usize),
+                        "{}",
+                        p.display()
+                    );
                 }
             }
         }

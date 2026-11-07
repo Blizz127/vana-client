@@ -4,8 +4,8 @@
 //! were drawn whatever order their buffers map in. The game never waits on the GPU or the encoder.
 
 use crate::render::Gpu;
-use std::io::Write;
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -63,13 +63,34 @@ pub struct Recorder {
 
 impl Recorder {
     /// Starts ffmpeg on `path` for frames of `size` in the surface's `format`.
-    pub fn start(gpu: &Gpu, size: [u32; 2], format: wgpu::TextureFormat, path: PathBuf, fps: u32, owner: String) -> anyhow::Result<Self> {
+    pub fn start(
+        gpu: &Gpu,
+        size: [u32; 2],
+        format: wgpu::TextureFormat,
+        path: PathBuf,
+        fps: u32,
+        owner: String,
+    ) -> anyhow::Result<Self> {
         let bgra = matches!(format, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb);
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d)?;
         }
         let mut child = std::process::Command::new("ffmpeg")
-            .args(["-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", if bgra { "bgra" } else { "rgba" }, "-s", &format!("{}x{}", size[0], size[1]), "-r", &fps.to_string(), "-i", "-"])
+            .args([
+                "-loglevel",
+                "error",
+                "-y",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                if bgra { "bgra" } else { "rgba" },
+                "-s",
+                &format!("{}x{}", size[0], size[1]),
+                "-r",
+                &fps.to_string(),
+                "-i",
+                "-",
+            ])
             .args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"])
             .arg(&path)
             .stdin(std::process::Stdio::piped())
@@ -93,7 +114,12 @@ impl Recorder {
         let row = (size[0] * 4).div_ceil(256) * 256;
         let ring = (0..4)
             .map(|_| Slot {
-                buf: gpu.device.create_buffer(&wgpu::BufferDescriptor { label: Some("record"), size: (row * size[1]) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false }),
+                buf: gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("record"),
+                    size: (row * size[1]) as u64,
+                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                    mapped_at_creation: false,
+                }),
                 state: Arc::new(AtomicU8::new(FREE)),
                 copied: false,
                 seq: 0,
@@ -102,7 +128,22 @@ impl Recorder {
             .collect();
         let fps = fps.clamp(1, 120);
         let every = Duration::from_secs_f64(1.0 / fps as f64);
-        Ok(Self { path, owner, size, row, every, next: Instant::now(), ring, tx: Some(tx), last: None, fps, ready: BTreeMap::new(), next_seq: 1, frames: 0, copies: 0 })
+        Ok(Self {
+            path,
+            owner,
+            size,
+            row,
+            every,
+            next: Instant::now(),
+            ring,
+            tx: Some(tx),
+            last: None,
+            fps,
+            ready: BTreeMap::new(),
+            next_seq: 1,
+            frames: 0,
+            copies: 0,
+        })
     }
 
     /// Before the submit: a frame due goes into a free buffer, else the last one is sent again; either fills every
@@ -120,7 +161,14 @@ impl Recorder {
             Some(s) => {
                 encoder.copy_texture_to_buffer(
                     frame.as_image_copy(),
-                    wgpu::TexelCopyBufferInfo { buffer: &s.buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(self.row), rows_per_image: Some(self.size[1]) } },
+                    wgpu::TexelCopyBufferInfo {
+                        buffer: &s.buf,
+                        layout: wgpu::TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(self.row),
+                            rows_per_image: Some(self.size[1]),
+                        },
+                    },
                     wgpu::Extent3d { width: self.size[0], height: self.size[1], depth_or_array_layers: 1 },
                 );
                 s.state.store(PENDING, Ordering::Release);
@@ -150,7 +198,9 @@ impl Recorder {
                 continue;
             }
             let state = s.state.clone();
-            s.buf.slice(..).map_async(wgpu::MapMode::Read, move |r| state.store(if r.is_ok() { MAPPED } else { FAILED }, Ordering::Release));
+            s.buf.slice(..).map_async(wgpu::MapMode::Read, move |r| {
+                state.store(if r.is_ok() { MAPPED } else { FAILED }, Ordering::Release)
+            });
         }
         let _ = gpu.device.poll(wgpu::PollType::Poll);
         self.collect();
@@ -207,7 +257,12 @@ impl Recorder {
     pub fn stop(mut self) {
         // The frames already mapped go out; a copy still mapping keeps its time with the last frame.
         self.collect();
-        let pending: Vec<(u64, u32)> = self.ring.iter().filter(|s| s.copied || s.state.load(Ordering::Acquire) == PENDING).map(|s| (s.seq, s.times)).collect();
+        let pending: Vec<(u64, u32)> = self
+            .ring
+            .iter()
+            .filter(|s| s.copied || s.state.load(Ordering::Acquire) == PENDING)
+            .map(|s| (s.seq, s.times))
+            .collect();
         for (seq, times) in pending {
             self.ready.entry(seq).or_insert(Out::Again(times));
         }

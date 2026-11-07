@@ -55,10 +55,12 @@ impl Lamps {
         let scan = fx.lamp_scan(on);
         self.data = scan.lights.clone();
         let first = fx.reg.light_keys.len() as u32;
-        let mut list = if on { build(&scan.glows, &scan.lights, first, |a, b| ground?.raycast(a, b)) } else { Vec::new() };
+        let mut list =
+            if on { build(&scan.glows, &scan.lights, first, |a, b| ground?.raycast(a, b)) } else { Vec::new() };
         // A lamp keeps the colour it was first given (glows pulse; the list changes only when the lamps do).
         for l in &mut list {
-            if let Some(old) = self.list.iter().find(|o| o.slot == l.slot && o.pos == l.pos && o.template == l.template) {
+            if let Some(old) = self.list.iter().find(|o| o.slot == l.slot && o.pos == l.pos && o.template == l.template)
+            {
                 l.colour = old.colour;
             }
         }
@@ -69,7 +71,13 @@ impl Lamps {
         if list == self.list && !first_seen {
             return None;
         }
-        log::info!("lamps: {} glows, {} data lights, {} shells: {} lamp lights", counts.0, counts.1, counts.2, list.len());
+        log::info!(
+            "lamps: {} glows, {} data lights, {} shells: {} lamp lights",
+            counts.0,
+            counts.1,
+            counts.2,
+            list.len()
+        );
         if list == self.list {
             return None;
         }
@@ -79,7 +87,12 @@ impl Lamps {
 }
 
 /// The lamps of `glows` not already lit by `lights` (position, slot), slots from `first`.
-fn build(glows: &[(Vec3, u32)], lights: &[(Vec3, u32)], first: u32, ray: impl Fn(Vec3, Vec3) -> Option<f32>) -> Vec<Lamp> {
+fn build(
+    glows: &[(Vec3, u32)],
+    lights: &[(Vec3, u32)],
+    first: u32,
+    ray: impl Fn(Vec3, Vec3) -> Option<f32>,
+) -> Vec<Lamp> {
     // Merged glows: position sum, count, the first glow's colour.
     let mut groups: Vec<(Vec3, f32, u32)> = Vec::new();
     for &(g, colour) in glows {
@@ -91,8 +104,13 @@ fn build(glows: &[(Vec3, u32)], lights: &[(Vec3, u32)], first: u32, ray: impl Fn
             None => groups.push((g, 1.0, colour)),
         }
     }
-    let mut lamps: Vec<(Vec3, u32)> = groups.into_iter().map(|(s, n, c)| (s / n, c)).filter(|(c, _)| !lights.iter().any(|(p, _)| p.distance(*c) < LIT)).collect();
-    lamps.sort_by(|a, b| (a.0.x, a.0.z, a.0.y).partial_cmp(&(b.0.x, b.0.z, b.0.y)).unwrap_or(std::cmp::Ordering::Equal));
+    let mut lamps: Vec<(Vec3, u32)> = groups
+        .into_iter()
+        .map(|(s, n, c)| (s / n, c))
+        .filter(|(c, _)| !lights.iter().any(|(p, _)| p.distance(*c) < LIT))
+        .collect();
+    lamps
+        .sort_by(|a, b| (a.0.x, a.0.z, a.0.y).partial_cmp(&(b.0.x, b.0.z, b.0.y)).unwrap_or(std::cmp::Ordering::Equal));
     let mut out = Vec::new();
     for (k, (c, colour)) in lamps.into_iter().enumerate() {
         let slot = first + k as u32;
@@ -122,7 +140,11 @@ pub fn offer(lamps: &[Lamp], pos: Vec3, lights: &mut [u8; 4]) {
     if lamps.is_empty() {
         return;
     }
-    let mut near: Vec<(f32, u32)> = lamps.iter().map(|l| (l.pos.distance(pos), l.slot)).filter(|(d, s)| *d < REACH && !lights.contains(&((s + 1) as u8))).collect();
+    let mut near: Vec<(f32, u32)> = lamps
+        .iter()
+        .map(|l| (l.pos.distance(pos), l.slot))
+        .filter(|(d, s)| *d < REACH && !lights.contains(&((s + 1) as u8)))
+        .collect();
     near.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut more = near.into_iter();
     for k in lights.iter_mut().filter(|k| **k == 0) {
@@ -141,7 +163,13 @@ mod tests {
     #[test]
     fn lamps_from_glows() {
         let lights = [(Vec3::new(88.6, -65.5, 262.7), 3), (Vec3::new(97.4, -65.5, 271.0), 1)];
-        let glows = [Vec3::new(86.0, -65.0, 264.0), Vec3::new(74.5, -65.0, 275.5), Vec3::new(74.9, -65.0, 275.5), Vec3::new(0.5, -65.0, 300.0)].map(|g| (g, 0x80604020));
+        let glows = [
+            Vec3::new(86.0, -65.0, 264.0),
+            Vec3::new(74.5, -65.0, 275.5),
+            Vec3::new(74.9, -65.0, 275.5),
+            Vec3::new(0.5, -65.0, 300.0),
+        ]
+        .map(|g| (g, 0x80604020));
         let ray = |a: Vec3, b: Vec3| {
             let d = b - a;
             (d.x < 0.0 && a.x > 0.0 && a.x + d.x <= 0.0).then(|| a.x / -d.x * d.length())

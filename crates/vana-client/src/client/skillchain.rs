@@ -139,12 +139,26 @@ pub fn on_action(w: &mut World, a: &Action) {
         let res = match chain {
             Some(c) => {
                 let life = old.filter(|o| o.left() > 0.0).map_or(LIFE, |o| o.life) - 1.0;
-                Resonance { props: [c, 0, 0], chain: Some(c), start: Instant::now(), life, links: old.map_or(0, |o| o.links) + 1, by: a.actor, skill }
+                Resonance {
+                    props: [c, 0, 0],
+                    chain: Some(c),
+                    start: Instant::now(),
+                    life,
+                    links: old.map_or(0, |o| o.links) + 1,
+                    by: a.actor,
+                    skill,
+                }
             }
-            None if props.iter().any(|&p| p != 0) => Resonance { props, chain: None, start: Instant::now(), life: LIFE, links: 0, by: a.actor, skill },
+            None if props.iter().any(|&p| p != 0) => {
+                Resonance { props, chain: None, start: Instant::now(), life: LIFE, links: 0, by: a.actor, skill }
+            }
             None => continue,
         };
-        log::debug!("skillchain: {target:#x} {:?} by {:#x} {skill:?}", res.chain.map_or(res.props.to_vec(), |c| vec![c]), a.actor);
+        log::debug!(
+            "skillchain: {target:#x} {:?} by {:#x} {skill:?}",
+            res.chain.map_or(res.props.to_vec(), |c| vec![c]),
+            a.actor
+        );
         w.skillchain.on.insert(target, res);
     }
 }
@@ -177,7 +191,11 @@ pub fn members(w: &World) -> Vec<Member> {
     out.push(Member { name: w.name.clone(), me: true, tp: w.vitals.map_or(0, |v| v.2), skills: mine });
     for m in w.party.party().filter(|m| m.id != w.my_id) {
         let trust = w.entities.get(&m.id).is_some_and(|e| e.marks.trust);
-        let mut skills: Vec<Skill> = if trust { d.trust(&m.name).map_or(Vec::new(), |ids| ids.iter().map(|&i| Skill::Mob(i)).collect()) } else { Vec::new() };
+        let mut skills: Vec<Skill> = if trust {
+            d.trust(&m.name).map_or(Vec::new(), |ids| ids.iter().map(|&i| Skill::Mob(i)).collect())
+        } else {
+            Vec::new()
+        };
         for &s in w.skillchain.seen.get(&m.id).into_iter().flatten() {
             if !skills.contains(&s) {
                 skills.push(s);
@@ -261,7 +279,9 @@ pub fn closers(members: &[Member], res: &Resonance) -> Vec<(usize, Skill, Prop)>
 
 /// The monster the helper follows: our target when it is a monster, else the one resonating most recently.
 pub fn focus(w: &World) -> Option<u32> {
-    w.target.filter(|t| w.entities.get(t).is_some_and(|e| e.mob)).or_else(|| w.skillchain.on.iter().max_by_key(|(_, r)| r.start).map(|(id, _)| *id))
+    w.target
+        .filter(|t| w.entities.get(t).is_some_and(|e| e.mob))
+        .or_else(|| w.skillchain.on.iter().max_by_key(|(_, r)| r.start).map(|(id, _)| *id))
 }
 
 /// What the helper shows, ready to draw: the open resonance on the focus monster, then every chain the party can make.
@@ -319,10 +339,28 @@ pub fn view(w: &World) -> Option<View> {
     let ready = |k: usize| members[k].tp >= 1000;
     let focus = focus(w);
     let now = focus.and_then(|t| w.skillchain.on.get(&t)).filter(|r| r.left() > 0.0).map(|r| {
-        let mob = focus.and_then(|t| w.entities.get(&t)).map(|e| super::monstrosity::name(e).to_string()).unwrap_or_default();
-        let by = members.iter().position(|x| x.me && r.by == w.my_id).map(|k| who(k)).or_else(|| w.party.party().find(|x| x.id == r.by).map(|x| x.name.clone())).unwrap_or_default();
-        let closers = closers(&members, r).into_iter().map(|(k, s, c)| Closer { who: who(k), skill: name(w, s), chain: c, ready: ready(k) }).collect();
-        Now { mob, props: r.props.iter().copied().filter(|&p| p != 0).collect(), chain: r.chain, by: if by.is_empty() { name(w, r.skill) } else { format!("{by}: {}", name(w, r.skill)) }, age: r.age(), left: r.left(), life: r.life, closers }
+        let mob =
+            focus.and_then(|t| w.entities.get(&t)).map(|e| super::monstrosity::name(e).to_string()).unwrap_or_default();
+        let by = members
+            .iter()
+            .position(|x| x.me && r.by == w.my_id)
+            .map(|k| who(k))
+            .or_else(|| w.party.party().find(|x| x.id == r.by).map(|x| x.name.clone()))
+            .unwrap_or_default();
+        let closers = closers(&members, r)
+            .into_iter()
+            .map(|(k, s, c)| Closer { who: who(k), skill: name(w, s), chain: c, ready: ready(k) })
+            .collect();
+        Now {
+            mob,
+            props: r.props.iter().copied().filter(|&p| p != 0).collect(),
+            chain: r.chain,
+            by: if by.is_empty() { name(w, r.skill) } else { format!("{by}: {}", name(w, r.skill)) },
+            age: r.age(),
+            left: r.left(),
+            life: r.life,
+            closers,
+        }
     });
     let combos = combos(&members);
     let mut chains: Vec<ChainWays> = Vec::new();
@@ -332,8 +370,22 @@ pub fn view(w: &World) -> Option<View> {
             continue;
         }
         let mut ways: Vec<&Combo> = combos.iter().filter(|x| sc::family(x.chain) == fam).collect();
-        ways.sort_by_key(|x| (std::cmp::Reverse(sc::level(x.chain)), !(members[x.opener.0].me || members[x.closer.0].me), !ready(x.opener.0)));
-        let ways = ways.into_iter().map(|x| Way { opener: (who(x.opener.0), name(w, x.opener.1)), closer: (who(x.closer.0), name(w, x.closer.1)), ready: ready(x.opener.0), chain: x.chain }).collect();
+        ways.sort_by_key(|x| {
+            (
+                std::cmp::Reverse(sc::level(x.chain)),
+                !(members[x.opener.0].me || members[x.closer.0].me),
+                !ready(x.opener.0),
+            )
+        });
+        let ways = ways
+            .into_iter()
+            .map(|x| Way {
+                opener: (who(x.opener.0), name(w, x.opener.1)),
+                closer: (who(x.closer.0), name(w, x.closer.1)),
+                ready: ready(x.opener.0),
+                chain: x.chain,
+            })
+            .collect();
         chains.push(ChainWays { chain: fam, ways });
     }
     Some(View { now, chains })
@@ -400,7 +452,8 @@ pub fn lines(w: &World) -> Vec<Line> {
     let ready = |k: usize| members[k].tp >= 1000;
     let focus = focus(w);
     if let Some(r) = focus.and_then(|t| w.skillchain.on.get(&t)).filter(|r| r.left() > 0.0) {
-        let mob = focus.and_then(|t| w.entities.get(&t)).map(|e| super::monstrosity::name(e).to_string()).unwrap_or_default();
+        let mob =
+            focus.and_then(|t| w.entities.get(&t)).map(|e| super::monstrosity::name(e).to_string()).unwrap_or_default();
         match r.chain {
             Some(c) => {
                 out.push(Line::Text(format!("Skillchain: {}", sc::NAMES[c as usize]), GOLD));
@@ -435,9 +488,16 @@ pub fn lines(w: &World) -> Vec<Line> {
             continue;
         }
         chains.push(cb.chain);
-        let best = combos.iter().filter(|x| x.chain == cb.chain).min_by_key(|x| (!(members[x.opener.0].me || members[x.closer.0].me), !ready(x.opener.0))).unwrap_or(cb);
+        let best = combos
+            .iter()
+            .filter(|x| x.chain == cb.chain)
+            .min_by_key(|x| (!(members[x.opener.0].me || members[x.closer.0].me), !ready(x.opener.0)))
+            .unwrap_or(cb);
         out.push(Line::Text(chain_text(cb.chain), level_tint(cb.chain)));
-        out.push(Line::Text(format!("{}: {}", who(best.opener.0), name(w, best.opener.1)), if ready(best.opener.0) { N } else { MUTED }));
+        out.push(Line::Text(
+            format!("{}: {}", who(best.opener.0), name(w, best.opener.1)),
+            if ready(best.opener.0) { N } else { MUTED },
+        ));
         out.push(Line::Text(format!("  > {}: {}", who(best.closer.0), name(w, best.closer.1)), MUTED));
     }
     out
@@ -460,11 +520,14 @@ pub fn prepare(w: &mut World, base: Place) {
         return;
     }
     // Under the Timers and the training regime windows (above them on the right).
-    let over = [if w.extra_timers { w.timers.rect() } else { None }, if w.extra_regime { w.regime.rect() } else { None }];
+    let over =
+        [if w.extra_timers { w.timers.rect() } else { None }, if w.extra_regime { w.regime.rect() } else { None }];
     let place = over.iter().flatten().fold(base, |p, r| match p.dock {
         Dock::Right if r[1] - 4.0 < p.y => Place { y: r[1] - 4.0, max_h: (p.max_h - (p.y - r[1] + 4.0)).max(0.0), ..p },
         Dock::Right => p,
-        _ if r[1] + r[3] + 4.0 > p.y => Place { y: r[1] + r[3] + 4.0, max_h: (p.max_h - (r[1] + r[3] + 4.0 - p.y)).max(0.0), ..p },
+        _ if r[1] + r[3] + 4.0 > p.y => {
+            Place { y: r[1] + r[3] + 4.0, max_h: (p.max_h - (r[1] + r[3] + 4.0 - p.y)).max(0.0), ..p }
+        }
         _ => p,
     });
     w.skillchain.frame = Some((lines, place));
@@ -504,7 +567,11 @@ pub fn draw_panel(gu: &mut GameUi, lines: &[Line], p: &Place, slide: f32, sw: f3
         Dock::Left => gu.sprite("menu    frames", if inward { 26 } else { 25 }, x + WIDTH - 20.0, y + 6.0, N),
         Dock::Right => gu.sprite("menu    frames", if inward { 25 } else { 26 }, x + 4.0, y + 6.0, N),
         Dock::Top => {
-            let (m, dx, dy, ay) = if inward { ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0, y + h - 18.0) } else { ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0, y + 4.0) };
+            let (m, dx, dy, ay) = if inward {
+                ([0.0, 1.0, -1.0, 0.0], 0.0, 18.0, y + h - 18.0)
+            } else {
+                ([0.0, -1.0, 1.0, 0.0], 9.0, 0.0, y + 4.0)
+            };
             gu.sprite_affine("menu    frames", 25, x + WIDTH - 18.0 + dx, ay + dy, m, N);
             true
         }
@@ -515,7 +582,11 @@ pub fn draw_panel(gu: &mut GameUi, lines: &[Line], p: &Place, slide: f32, sw: f3
         Dock::Top if inward => [x, y + h - SLIVER, WIDTH, SLIVER],
         Dock::Top => [x + WIDTH - 24.0, y, 24.0, 24.0],
     };
-    let rect = if p.dock == Dock::Top && y < TOP_EDGE { [x, TOP_EDGE, WIDTH, (y + h - TOP_EDGE).max(0.0)] } else { [x, y, WIDTH, h] };
+    let rect = if p.dock == Dock::Top && y < TOP_EDGE {
+        [x, TOP_EDGE, WIDTH, (y + h - TOP_EDGE).max(0.0)]
+    } else {
+        [x, y, WIDTH, h]
+    };
     if slide <= 0.0 {
         gu.clip(None);
         return Some((rect, drawer));
@@ -553,7 +624,13 @@ pub fn draw(gu: &mut GameUi, t: &mut Tracker, sw: f32) {
 
 /// After every window: a click on the drawer's arrow, unless a window over ours has the spot. The window's rect for
 /// the world-click blockers.
-pub fn pointer(w: &mut World, gu: &GameUi, p: Option<(f32, f32)>, clicked: bool, over: &[[f32; 4]]) -> Option<[f32; 4]> {
+pub fn pointer(
+    w: &mut World,
+    gu: &GameUi,
+    p: Option<(f32, f32)>,
+    clicked: bool,
+    over: &[[f32; 4]],
+) -> Option<[f32; 4]> {
     let r = w.skillchain.rect?;
     let Some(p) = p else { return Some(r) };
     let inside = |r: &[f32; 4]| p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3];

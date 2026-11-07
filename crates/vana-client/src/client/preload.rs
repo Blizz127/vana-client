@@ -39,7 +39,8 @@ pub fn step(w: &mut super::World) -> Option<(u16, u16)> {
         return None;
     }
     let zone = w.zone?;
-    if !w.in_scene() || w.zoning_since.is_some() || w.loading.is_some() || w.preload.as_ref().is_some_and(|p| p.claimed) {
+    if !w.in_scene() || w.zoning_since.is_some() || w.loading.is_some() || w.preload.as_ref().is_some_and(|p| p.claimed)
+    {
         return None;
     }
     let want = nearest(&w.zone_lines, zone, w.pos, RANGE);
@@ -97,7 +98,12 @@ fn distance(r: &Region, p: Vec3) -> f32 {
 
 /// The destination of the nearest known zone line within `range`.
 pub fn nearest(lines: &[Region], zone: u16, p: Vec3, range: f32) -> Option<(u16, u16)> {
-    lines.iter().filter_map(|r| Some((distance(r, p), destination(zone, r.tag())?))).filter(|(d, _)| *d <= range).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, to)| to)
+    lines
+        .iter()
+        .filter_map(|r| Some((distance(r, p), destination(zone, r.tag())?)))
+        .filter(|(d, _)| *d <= range)
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, to)| to)
 }
 
 /// Whether a line to `to` is still within KEEP.

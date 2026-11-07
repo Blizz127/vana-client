@@ -108,7 +108,20 @@ pub fn furniture_box(m: glam::Mat4, size: Vec3) -> Vec<([Vec3; 3], Vec3)> {
     ]
     .map(|p| m.transform_point3(p));
     const N: [Vec3; 6] = [Vec3::NEG_Y, Vec3::Y, Vec3::Z, Vec3::NEG_Z, Vec3::X, Vec3::NEG_X];
-    const T: [(usize, usize, usize, usize); 12] = [(0, 1, 2, 0), (1, 3, 2, 0), (5, 4, 7, 1), (4, 6, 7, 1), (0, 2, 4, 5), (2, 6, 5, 5), (1, 0, 5, 2), (0, 4, 5, 2), (3, 1, 7, 4), (1, 5, 7, 4), (2, 3, 6, 3), (3, 7, 6, 3)];
+    const T: [(usize, usize, usize, usize); 12] = [
+        (0, 1, 2, 0),
+        (1, 3, 2, 0),
+        (5, 4, 7, 1),
+        (4, 6, 7, 1),
+        (0, 2, 4, 5),
+        (2, 6, 5, 5),
+        (1, 0, 5, 2),
+        (0, 4, 5, 2),
+        (3, 1, 7, 4),
+        (1, 5, 7, 4),
+        (2, 3, 6, 3),
+        (3, 7, 6, 3),
+    ];
     T.iter().map(|&(a, b, d, n)| ([c[a], c[b], c[d]], m.transform_vector3(N[n]))).collect()
 }
 
@@ -206,7 +219,11 @@ impl Sweep {
             return;
         }
         let foot = p + n * ((a - p).dot(n) / nn);
-        if !(inside(a, b, c, foot, n) || touches_edge(a, b, p, R2) || touches_edge(b, c, p, R2) || touches_edge(c, a, p, R2)) {
+        if !(inside(a, b, c, foot, n)
+            || touches_edge(a, b, p, R2)
+            || touches_edge(b, c, p, R2)
+            || touches_edge(c, a, p, R2))
+        {
             return;
         }
         let d2 = (foot - p).length_squared();
@@ -252,7 +269,11 @@ impl Ground {
     /// The furniture boxes of the pieces standing on the floor (FUN_1016e930: pos.y >= -0.1), and every piece's mesh
     /// triangles (world space) for the camera.
     pub fn set_furniture(&mut self, boxes: Vec<(glam::Mat4, Vec3)>, meshes: Vec<Vec<[Vec3; 3]>>) {
-        self.furniture = boxes.into_iter().filter(|(m, _)| m.w_axis.y >= -0.1).map(|(m, size)| (m.w_axis.truncate(), furniture_box(m, size))).collect();
+        self.furniture = boxes
+            .into_iter()
+            .filter(|(m, _)| m.w_axis.y >= -0.1)
+            .map(|(m, size)| (m.w_axis.truncate(), furniture_box(m, size)))
+            .collect();
         // Normals as the zone's: against cross(b - a, c - a), which inside() expects.
         self.furn_mesh = meshes
             .into_iter()
@@ -260,7 +281,14 @@ impl Ground {
             .map(|t| {
                 let lo = t.iter().flatten().fold(Vec3::splat(f32::MAX), |a, &p| a.min(p));
                 let hi = t.iter().flatten().fold(Vec3::splat(f32::MIN), |a, &p| a.max(p));
-                (lo, hi, t.into_iter().map(|[a, b, c]| ([a, b, c], (c - a).cross(b - a).normalize_or_zero())).filter(|(_, n)| *n != Vec3::ZERO).collect())
+                (
+                    lo,
+                    hi,
+                    t.into_iter()
+                        .map(|[a, b, c]| ([a, b, c], (c - a).cross(b - a).normalize_or_zero()))
+                        .filter(|(_, n)| *n != Vec3::ZERO)
+                        .collect(),
+                )
             })
             .collect();
     }
@@ -268,7 +296,31 @@ impl Ground {
     pub fn build(scene: &ZoneScene) -> Self {
         match scene.collision.as_ref() {
             Some(c) => Self::from_collision(c, &scene.light_keys),
-            None => Self { tris: Vec::new(), normals: Vec::new(), y_range: Vec::new(), degenerate: Vec::new(), cells: HashMap::new(), grid: None, body: Cell::new(Body::NEW), covers: Vec::new(), map_keys: Vec::new(), kinds: Vec::new(), areas: Vec::new(), objs: Vec::new(), obj_lights: Vec::new(), obj_water: Vec::new(), obj_vis: Vec::new(), doors: Vec::new(), open: Default::default(), cam_pass: Vec::new(), decal: Vec::new(), plain: Vec::new(), furniture: Vec::new(), furn_mesh: Vec::new(), furcc: true },
+            None => Self {
+                tris: Vec::new(),
+                normals: Vec::new(),
+                y_range: Vec::new(),
+                degenerate: Vec::new(),
+                cells: HashMap::new(),
+                grid: None,
+                body: Cell::new(Body::NEW),
+                covers: Vec::new(),
+                map_keys: Vec::new(),
+                kinds: Vec::new(),
+                areas: Vec::new(),
+                objs: Vec::new(),
+                obj_lights: Vec::new(),
+                obj_water: Vec::new(),
+                obj_vis: Vec::new(),
+                doors: Vec::new(),
+                open: Default::default(),
+                cam_pass: Vec::new(),
+                decal: Vec::new(),
+                plain: Vec::new(),
+                furniture: Vec::new(),
+                furn_mesh: Vec::new(),
+                furcc: true,
+            },
         }
     }
 
@@ -304,11 +356,45 @@ impl Ground {
                 }
             }
         }
-        let entries = c.entries.iter().map(|e| (e.first, e.count, c.objects[e.object as usize].flags & 2 != 0)).collect();
-        let bounds = c.entries.iter().map(|e| tris[e.first as usize..(e.first + e.count) as usize].iter().flatten().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)))).collect();
+        let entries =
+            c.entries.iter().map(|e| (e.first, e.count, c.objects[e.object as usize].flags & 2 != 0)).collect();
+        let bounds = c
+            .entries
+            .iter()
+            .map(|e| {
+                tris[e.first as usize..(e.first + e.count) as usize]
+                    .iter()
+                    .flatten()
+                    .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)))
+            })
+            .collect();
         let grid = Some(Grid { w: c.grid.0, h: c.grid.1, cells: c.cells.clone(), entries, bounds });
         let doors = c.object.iter().map(|&o| c.objects[o as usize].door).collect();
-        Self { tris, normals: c.normals.clone(), y_range, degenerate, cells, grid, body: Cell::new(Body::NEW), covers, map_keys, kinds: c.kinds.clone(), areas, objs: c.object.clone(), obj_lights, obj_water, obj_vis, doors, open: Default::default(), cam_pass: c.cam_pass.clone(), decal: c.decal.clone(), plain: c.flags.iter().zip(&c.object).map(|(&f, &o)| f == 0 && c.objects[o as usize].door == 0).collect(), furniture: Vec::new(), furn_mesh: Vec::new(), furcc: true }
+        Self {
+            tris,
+            normals: c.normals.clone(),
+            y_range,
+            degenerate,
+            cells,
+            grid,
+            body: Cell::new(Body::NEW),
+            covers,
+            map_keys,
+            kinds: c.kinds.clone(),
+            areas,
+            objs: c.object.clone(),
+            obj_lights,
+            obj_water,
+            obj_vis,
+            doors,
+            open: Default::default(),
+            cam_pass: c.cam_pass.clone(),
+            decal: c.decal.clone(),
+            plain: c.flags.iter().zip(&c.object).map(|(&f, &o)| f == 0 && c.objects[o as usize].door == 0).collect(),
+            furniture: Vec::new(),
+            furn_mesh: Vec::new(),
+            furcc: true,
+        }
     }
 
     /// FUN_10182700's cells: the MZB cell of `c` (truncated) and its neighbours clamped to the grid; None without one.
@@ -377,14 +463,22 @@ impl Ground {
     /// FUN_1017ac40: a door's box is skipped while it is open (state 0), solid while closed.
     pub fn set_door(&self, door: u32, solid: bool) {
         let mut open = self.open.borrow_mut();
-        if solid { open.remove(&door) } else { open.insert(door) };
+        if solid {
+            open.remove(&door)
+        } else {
+            open.insert(door)
+        };
     }
 
     /// Every door's box skipped, but those whose box centre is within `r` of one of `keep` (x, z), which stay solid
     /// (zone-path's --open-doors / --closed). The doors kept, by id.
     pub fn open_doors_except(&self, keep: &[(f32, f32)], r: f32) -> Vec<u32> {
-        let kept: std::collections::HashSet<u32> =
-            self.door_boxes().into_iter().filter(|(_, c)| keep.iter().any(|&(x, z)| (c.x - x).hypot(c.z - z) < r)).map(|(d, _)| d).collect();
+        let kept: std::collections::HashSet<u32> = self
+            .door_boxes()
+            .into_iter()
+            .filter(|(_, c)| keep.iter().any(|&(x, z)| (c.x - x).hypot(c.z - z) < r))
+            .map(|(d, _)| d)
+            .collect();
         let mut open = self.open.borrow_mut();
         open.extend(self.doors.iter().copied().filter(|d| *d != 0 && !kept.contains(d)));
         kept.into_iter().collect()
@@ -409,7 +503,10 @@ impl Ground {
         for i in (0..self.tris.len()).filter(|&i| self.map_keys[i] == a && floor(i)) {
             for p in self.tris[i] {
                 let (cx, cz) = cell(p);
-                let near = (-1..=1).any(|dx| (-1..=1).any(|dz| grid.get(&(cx + dx, cz + dz)).is_some_and(|v| v.iter().any(|q| q.distance(p) < 0.6))));
+                let near = (-1..=1).any(|dx| {
+                    (-1..=1)
+                        .any(|dz| grid.get(&(cx + dx, cz + dz)).is_some_and(|v| v.iter().any(|q| q.distance(p) < 0.6)))
+                });
                 if near {
                     hits.push(p);
                 }
@@ -456,7 +553,11 @@ impl Ground {
                 for &i in self.cells.get(&(cx, cz)).into_iter().flatten() {
                     let i = i as usize;
                     let t = self.tris[i];
-                    if self.live(i) && !self.degenerate[i] && seen.insert(i) && t.iter().any(|v| (v.x - x).powi(2) + (v.z - z).powi(2) <= r * r) {
+                    if self.live(i)
+                        && !self.degenerate[i]
+                        && seen.insert(i)
+                        && t.iter().any(|v| (v.x - x).powi(2) + (v.z - z).powi(2) <= r * r)
+                    {
                         out.push((t, self.normals[i], self.kinds[i]));
                     }
                 }
@@ -486,7 +587,8 @@ impl Ground {
     /// The same face's normal, turned to +y (into the floor; -vt+0x210 *(inf: the sign, from flat ground giving
     /// FUN_100d3750 the identity)*).
     pub fn floor_normal(&self, p: Vec3) -> Option<Vec3> {
-        let (_, i) = self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
+        let (_, i) =
+            self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
         let n = *self.normals.get(i)?;
         Some(if n.y < 0.0 { -n } else { n })
     }
@@ -494,26 +596,35 @@ impl Ground {
     /// The point lights of the floor under `p` (ground info +0x20..+0x23, FUN_1017aba0).
     pub fn lights(&self, p: Vec3) -> [u8; 4] {
         let floor = self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0));
-        floor.and_then(|(_, i)| self.objs.get(i)).and_then(|&o| self.obj_lights.get(o as usize)).copied().unwrap_or([0; 4])
+        floor
+            .and_then(|(_, i)| self.objs.get(i))
+            .and_then(|&o| self.obj_lights.get(o as usize))
+            .copied()
+            .unwrap_or([0; 4])
     }
 
     /// The area 4cc of the floor under `p` (FUN_100a3560: the ground info +0x34), None without a floor.
     pub fn area(&self, p: Vec3) -> Option<u32> {
-        let (_, i) = self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
+        let (_, i) =
+            self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
         self.areas.get(i).copied()
     }
 
     /// The wade height under `p` (FUN_100d4bc0: the floor's type 9 and its object's water, actor +0x174 / +0x178);
     /// None off a type-9 floor (the face `surface` takes).
     pub fn wade(&self, p: Vec3) -> Option<f32> {
-        let (h, i) = self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
-        (h - p.y <= 0.4 && self.kinds.get(i) == Some(&9)).then(|| self.objs.get(i).and_then(|&o| self.obj_water.get(o as usize)).copied().unwrap_or(0.0))
+        let (h, i) =
+            self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0))?;
+        (h - p.y <= 0.4 && self.kinds.get(i) == Some(&9))
+            .then(|| self.objs.get(i).and_then(|&o| self.obj_water.get(o as usize)).copied().unwrap_or(0.0))
     }
 
     pub fn surface(&self, p: Vec3) -> (u8, bool) {
         let floor = self.heights(p.x, p.z).into_iter().filter(|h| h.0 >= p.y - 0.5).min_by(|a, b| a.0.total_cmp(&b.0));
         match floor {
-            Some((h, i)) if h - p.y <= 0.4 => (self.kinds.get(i).copied().unwrap_or(0), self.covers.get(i).copied().unwrap_or(false)),
+            Some((h, i)) if h - p.y <= 0.4 => {
+                (self.kinds.get(i).copied().unwrap_or(0), self.covers.get(i).copied().unwrap_or(false))
+            }
             Some((_, i)) => (0, self.covers.get(i).copied().unwrap_or(false)),
             None => (0, false),
         }
@@ -523,8 +634,10 @@ impl Ground {
     /// up; the nearest face hit says whether its object is covered (+0xa4 bit 2), which stops weather.
     pub fn covered(&self, eye: Vec3) -> bool {
         let hits = self.heights(eye.x, eye.z);
-        let down = hits.iter().filter(|h| h.0 >= eye.y - 0.51 && h.0 <= eye.y + 100.0).min_by(|a, b| a.0.total_cmp(&b.0));
-        let up = || hits.iter().filter(|h| h.0 <= eye.y + 0.51 && h.0 >= eye.y - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
+        let down =
+            hits.iter().filter(|h| h.0 >= eye.y - 0.51 && h.0 <= eye.y + 100.0).min_by(|a, b| a.0.total_cmp(&b.0));
+        let up =
+            || hits.iter().filter(|h| h.0 <= eye.y + 0.51 && h.0 >= eye.y - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
         down.or_else(up).is_some_and(|h| self.covers.get(h.1).copied().unwrap_or(false))
     }
 
@@ -533,17 +646,25 @@ impl Ground {
     /// *(inf: door boxes name none; retail links them in lists of their own)*
     pub fn camera_list(&self, eye: Vec3) -> u32 {
         let hits = self.heights(eye.x, eye.z);
-        let down = hits.iter().filter(|h| h.0 >= eye.y - 0.51 && h.0 <= eye.y + 100.0).min_by(|a, b| a.0.total_cmp(&b.0));
-        let up = || hits.iter().filter(|h| h.0 <= eye.y + 0.51 && h.0 >= eye.y - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
-        down.or_else(up).and_then(|h| self.objs.get(h.1)).and_then(|&o| self.obj_vis.get(o as usize)).copied().unwrap_or(0)
+        let down =
+            hits.iter().filter(|h| h.0 >= eye.y - 0.51 && h.0 <= eye.y + 100.0).min_by(|a, b| a.0.total_cmp(&b.0));
+        let up =
+            || hits.iter().filter(|h| h.0 <= eye.y + 0.51 && h.0 >= eye.y - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
+        down.or_else(up)
+            .and_then(|h| self.objs.get(h.1))
+            .and_then(|&o| self.obj_vis.get(o as usize))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// FUN_101811d0: the map sub-key under a point, from the nearest face a ray from 0.51 above it 10 down hits,
     /// else one from 0.51 below it 15 up; 0 when both miss.
     pub fn map_key(&self, p: Vec3) -> u8 {
         let hits = self.heights(p.x, p.z);
-        let down = hits.iter().filter(|h| h.0 >= p.y - 0.51 && h.0 <= p.y - 0.51 + 10.0).min_by(|a, b| a.0.total_cmp(&b.0));
-        let up = || hits.iter().filter(|h| h.0 <= p.y + 0.51 && h.0 >= p.y + 0.51 - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
+        let down =
+            hits.iter().filter(|h| h.0 >= p.y - 0.51 && h.0 <= p.y - 0.51 + 10.0).min_by(|a, b| a.0.total_cmp(&b.0));
+        let up =
+            || hits.iter().filter(|h| h.0 <= p.y + 0.51 && h.0 >= p.y + 0.51 - 15.0).max_by(|a, b| a.0.total_cmp(&b.0));
         down.or_else(up).and_then(|h| self.map_keys.get(h.1).copied()).unwrap_or(0)
     }
 
@@ -559,7 +680,9 @@ impl Ground {
     /// Where a character placed at height `y` lands: the first floor below (zone-in points sit mid-air at the
     /// zone line's centre), allowing a small sink; failing that the nearest surface.
     pub fn settle(&self, x: f32, z: f32, y: f32) -> Option<f32> {
-        self.floor(x, z, y, 0.5).or_else(|| self.heights(x, z).into_iter().map(|(h, _)| h).min_by(|a, b| (a - y).abs().total_cmp(&(b - y).abs())))
+        self.floor(x, z, y, 0.5).or_else(|| {
+            self.heights(x, z).into_iter().map(|(h, _)| h).min_by(|a, b| (a - y).abs().total_cmp(&(b - y).abs()))
+        })
     }
 
     /// FUN_1017a400: a vertical segment from y - 2 down to y + 50, else from y + 2 up to y - 13, against every
@@ -567,7 +690,9 @@ impl Ground {
     pub fn snap(&self, x: f32, z: f32, y: f32) -> Option<f32> {
         let hits = self.heights(x, z);
         let down = hits.iter().map(|h| h.0).filter(|&h| h >= y - 2.0 && h < y + 50.0).min_by(|a, b| a.total_cmp(b));
-        down.or_else(|| hits.iter().map(|h| h.0).filter(|&h| h <= y + 2.0 && h > y - 13.0).max_by(|a, b| a.total_cmp(b)))
+        down.or_else(|| {
+            hits.iter().map(|h| h.0).filter(|&h| h <= y + 2.0 && h > y - 13.0).max_by(|a, b| a.total_cmp(b))
+        })
     }
 
     /// The highest face over (x, z) from `top` down to `bottom` (y points down), if any.
@@ -577,7 +702,11 @@ impl Ground {
 
     /// The height of the face over (x, z) nearest `y`, at most `within` from it.
     pub fn nearest(&self, x: f32, z: f32, y: f32, within: f32) -> Option<f32> {
-        self.heights(x, z).into_iter().map(|h| h.0).filter(|h| (h - y).abs() <= within).min_by(|a, b| (a - y).abs().total_cmp(&(b - y).abs()))
+        self.heights(x, z)
+            .into_iter()
+            .map(|h| h.0)
+            .filter(|h| (h - y).abs() <= within)
+            .min_by(|a, b| (a - y).abs().total_cmp(&(b - y).abs()))
     }
 
     /// The heights of every face over (x, z), top first (diagnostics).
@@ -625,7 +754,9 @@ impl Ground {
     pub fn cam_ray(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
         let g = self.grid.as_ref()?;
         let n = 1 + ((to - from).length() * 0.25) as usize;
-        (0..n).find_map(|k| self.cam_piece(g, from.lerp(to, k as f32 / n as f32), from.lerp(to, (k + 1) as f32 / n as f32)))
+        (0..n).find_map(|k| {
+            self.cam_piece(g, from.lerp(to, k as f32 / n as f32), from.lerp(to, (k + 1) as f32 / n as f32))
+        })
     }
 
     /// FUN_1016b1d0: the MZB cells within 2 of the start's (none when the start is off the grid), objects whose y range
@@ -643,7 +774,14 @@ impl Ground {
             for x in (cx - 2).max(0)..=(cx + 2).min(g.w as i32 - 1) {
                 for &en in &g.cells[z as usize * g.w + x as usize] {
                     let (bl, bh) = g.bounds[en as usize];
-                    if !seen.insert(en) || bh.x < lo.x || bl.x > hi.x || bh.y < lo.y || bl.y > hi.y || bh.z < lo.z || bl.z > hi.z {
+                    if !seen.insert(en)
+                        || bh.x < lo.x
+                        || bl.x > hi.x
+                        || bh.y < lo.y
+                        || bl.y > hi.y
+                        || bh.z < lo.z
+                        || bl.z > hi.z
+                    {
                         continue;
                     }
                     let (first, count, _) = g.entries[en as usize];
@@ -785,7 +923,10 @@ impl Ground {
             None => {
                 let (lo, hi) = (s.min(e) - Vec3::splat(R * 1.75), s.max(e) + Vec3::splat(R * 1.75));
                 let (c0, c1) = (cell(lo.x, lo.z), cell(hi.x, hi.z));
-                let mut ids: Vec<u32> = (c0.0..=c1.0).flat_map(|cx| (c0.1..=c1.1).map(move |cz| (cx, cz))).flat_map(|k| self.cells.get(&k).into_iter().flatten().copied()).collect();
+                let mut ids: Vec<u32> = (c0.0..=c1.0)
+                    .flat_map(|cx| (c0.1..=c1.1).map(move |cz| (cx, cz)))
+                    .flat_map(|k| self.cells.get(&k).into_iter().flatten().copied())
+                    .collect();
                 ids.sort_unstable();
                 ids.dedup();
                 ids
@@ -806,7 +947,13 @@ impl Ground {
             let (bmin, bmax) = (l[0].min(l[1]).min(l[2]), l[0].max(l[1]).max(l[2]));
             let (mid, half) = ((bmin + bmax) * 0.5, (bmax - bmin) * 0.5);
             let (hx, hy) = (half.x + R, half.y + R);
-            if mid.x + hx > 0.0 && mid.y + hy > 0.0 && mid.z + half.z + R > 0.0 && hx - mid.x > 0.0 && hy - mid.y > 0.0 && half.z + len + R - mid.z > 0.0 {
+            if mid.x + hx > 0.0
+                && mid.y + hy > 0.0
+                && mid.z + half.z + R > 0.0
+                && hx - mid.x > 0.0
+                && hy - mid.y > 0.0
+                && half.z + len + R - mid.z > 0.0
+            {
                 let n = self.normals[i];
                 cands.push(Cand { v, n, nz: n.dot(fz) });
             }
@@ -821,7 +968,15 @@ impl Ground {
             }
             cands.extend(tris.iter().map(|&(v, n)| Cand { v, n, nz: n.dot(fz) }));
         }
-        let mut sw = Sweep { out: s, first: true, wall: false, floor_fixed: false, floor_touched: false, best_floor: 0.0, best_wall: 0.0 };
+        let mut sw = Sweep {
+            out: s,
+            first: true,
+            wall: false,
+            floor_fixed: false,
+            floor_touched: false,
+            best_floor: 0.0,
+            best_wall: 0.0,
+        };
         let mut t = 0.0f32;
         loop {
             let p = s + fz * t;
@@ -984,7 +1139,6 @@ impl Ground {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1015,8 +1169,33 @@ mod tests {
         let n = tris.len();
         // One MZB entry listed in every cell of a 256-unit grid, for cam_ray.
         let bounds = vec![tris.iter().flatten().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)))];
-        let grid = Some(Grid { w: 64, h: 64, cells: vec![vec![0]; 64 * 64], entries: vec![(0, n as u32, false)], bounds });
-        Ground { tris, normals, y_range: vec![(f32::MIN, f32::MAX); n], degenerate: vec![false; n], cells, grid, body: Cell::new(Body::NEW), covers: vec![false; n], map_keys: vec![0; n], kinds: vec![0; n], areas: vec![0; n], objs: vec![0; n], obj_lights: vec![[0; 4]], obj_water: vec![0.0], obj_vis: vec![0], doors: vec![0; n], open: Default::default(), cam_pass: vec![false; n], decal: vec![true; n], plain: vec![true; n], furniture: Vec::new(), furn_mesh: Vec::new(), furcc: true }
+        let grid =
+            Some(Grid { w: 64, h: 64, cells: vec![vec![0]; 64 * 64], entries: vec![(0, n as u32, false)], bounds });
+        Ground {
+            tris,
+            normals,
+            y_range: vec![(f32::MIN, f32::MAX); n],
+            degenerate: vec![false; n],
+            cells,
+            grid,
+            body: Cell::new(Body::NEW),
+            covers: vec![false; n],
+            map_keys: vec![0; n],
+            kinds: vec![0; n],
+            areas: vec![0; n],
+            objs: vec![0; n],
+            obj_lights: vec![[0; 4]],
+            obj_water: vec![0.0],
+            obj_vis: vec![0],
+            doors: vec![0; n],
+            open: Default::default(),
+            cam_pass: vec![false; n],
+            decal: vec![true; n],
+            plain: vec![true; n],
+            furniture: Vec::new(),
+            furn_mesh: Vec::new(),
+            furcc: true,
+        }
     }
 
     fn quad(x0: f32, x1: f32, y0: f32, y1: f32) -> [Vec3; 4] {
@@ -1039,7 +1218,10 @@ mod tests {
     fn furniture_box_and_camera() {
         let mut g = ground(&[(quad(-10.0, 10.0, 0.0, 0.0), Vec3::NEG_Y)]);
         let bed = glam::Mat4::from_translation(Vec3::new(-4.8, 0.0, 0.0));
-        let wall = vec![[Vec3::new(-3.6, -1.0, -1.0), Vec3::new(-3.6, 0.0, -1.0), Vec3::new(-3.6, 0.0, 1.0)], [Vec3::new(-3.6, -1.0, -1.0), Vec3::new(-3.6, 0.0, 1.0), Vec3::new(-3.6, -1.0, 1.0)]];
+        let wall = vec![
+            [Vec3::new(-3.6, -1.0, -1.0), Vec3::new(-3.6, 0.0, -1.0), Vec3::new(-3.6, 0.0, 1.0)],
+            [Vec3::new(-3.6, -1.0, -1.0), Vec3::new(-3.6, 0.0, 1.0), Vec3::new(-3.6, -1.0, 1.0)],
+        ];
         g.set_furniture(vec![(bed, Vec3::new(2.4, 0.7, 3.6))], vec![wall]);
         let (to, _) = g.sweep(Vec3::new(-2.0, 0.0, 0.0), Vec3::new(-3.4, 0.0, 0.0));
         assert!(to.x > -3.2, "walked into the bed: {to:?}");
@@ -1051,8 +1233,13 @@ mod tests {
 
     /// Floor at y 0 for x < 0, a riser at x 0 and a top at y -h beyond.
     fn step(h: f32) -> Ground {
-        let riser = [Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, -h, -5.0), Vec3::new(0.0, -h, 5.0), Vec3::new(0.0, 0.0, 5.0)];
-        ground(&[(quad(-10.0, 0.0, 0.0, 0.0), Vec3::NEG_Y), (riser, Vec3::NEG_X), (quad(0.0, 10.0, -h, -h), Vec3::NEG_Y)])
+        let riser =
+            [Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, -h, -5.0), Vec3::new(0.0, -h, 5.0), Vec3::new(0.0, 0.0, 5.0)];
+        ground(&[
+            (quad(-10.0, 0.0, 0.0, 0.0), Vec3::NEG_Y),
+            (riser, Vec3::NEG_X),
+            (quad(0.0, 10.0, -h, -h), Vec3::NEG_Y),
+        ])
     }
 
     /// Floor at y 0 for x < 0, then a slope rising `deg` degrees for 10 units.
@@ -1147,7 +1334,12 @@ mod tests {
         let (s, e) = (Vec3::new(v[1], v[2], v[3]), Vec3::new(v[4], v[2], v[5]));
         for i in 0..=20 {
             let p = s + (e - s) * (i as f32 / 20.0);
-            let hs: Vec<String> = g.heights(p.x, p.z).iter().filter(|h| (h.0 - s.y).abs() < 12.0).map(|&(h, t)| format!("{h:.2}({:.2})", g.normals[t].y)).collect();
+            let hs: Vec<String> = g
+                .heights(p.x, p.z)
+                .iter()
+                .filter(|h| (h.0 - s.y).abs() < 12.0)
+                .map(|&(h, t)| format!("{h:.2}({:.2})", g.normals[t].y))
+                .collect();
             println!("p {:.2},{:.2}: {}", p.x, p.z, hs.join(" "));
         }
         let mut body = Body::NEW;
@@ -1231,8 +1423,11 @@ mod tests {
     fn zone(id: u32) -> Option<Ground> {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).ok()?;
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
-        Some(Ground::build(&crate::dat::zone::load_scene(&keys, &index.read(crate::dat::zone::file_id(id)).ok()?).ok()?))
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).ok()?).ok()?;
+        Some(Ground::build(
+            &crate::dat::zone::load_scene(&keys, &index.read(crate::dat::zone::file_id(id)).ok()?).ok()?,
+        ))
     }
 
     /// Holds the key from `from` towards `to` for `steps` physics steps.
@@ -1251,11 +1446,18 @@ mod tests {
     fn collision_of() {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).unwrap();
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap()).unwrap();
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap())
+                .unwrap();
         for id in [194u32, 116] {
             let s = crate::dat::zone::load_scene(&keys, &index.read(crate::dat::zone::file_id(id)).unwrap()).unwrap();
             let c = s.collision.as_ref();
-            println!("zone {id}: file {}, warnings {:?}, collision tris {:?}", crate::dat::zone::file_id(id), s.warnings, c.map(|c| c.tris.len()));
+            println!(
+                "zone {id}: file {}, warnings {:?}, collision tris {:?}",
+                crate::dat::zone::file_id(id),
+                s.warnings,
+                c.map(|c| c.tris.len())
+            );
             if let Some(c) = c {
                 let (mut lo, mut hi) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
                 for t in &c.tris {
@@ -1277,7 +1479,9 @@ mod tests {
     fn all_zones_collide() {
         let cfg = crate::config::Config::load();
         let index = crate::dat::DatIndex::open(&cfg.ffxi_dir()).unwrap();
-        let keys = crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap()).unwrap();
+        let keys =
+            crate::dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap())
+                .unwrap();
         let mut bad = Vec::new();
         for id in 0..300u32 {
             let Ok(file) = index.read(crate::dat::zone::file_id(id)) else { continue };
@@ -1296,7 +1500,12 @@ mod tests {
         let at = |x: f32, z: f32, y0: f32| {
             let y = g.snap(x, z, y0).unwrap_or(y0);
             let pos = Vec3::new(x, y, z);
-            (0..16).filter(|k| { let a = *k as f32 * std::f32::consts::TAU / 16.0; g.water_ahead(pos, Vec3::new(a.sin(), 0.0, a.cos())) }).collect::<Vec<_>>()
+            (0..16)
+                .filter(|k| {
+                    let a = *k as f32 * std::f32::consts::TAU / 16.0;
+                    g.water_ahead(pos, Vec3::new(a.sin(), 0.0, a.cos()))
+                })
+                .collect::<Vec<_>>()
         };
         let river = at(458.558, -316.667, -16.5);
         println!("river facings (k x 22.5 deg from +z): {river:?}");
@@ -1309,7 +1518,10 @@ mod tests {
         let Some(g) = zone(101) else { return };
         // South of the San d'Oria gate: 11 units of 49-64 degree hillside rise beyond these spots.
         // Holding the key slides along the foot of the slope (a wall push each frame) but gains no ground uphill.
-        for (from, to) in [(Vec3::new(27.69, -52.28, 53.10), Vec3::new(30.16, -52.28, 62.79)), (Vec3::new(-48.73, -60.21, 102.19), Vec3::new(-44.25, -60.21, 95.55))] {
+        for (from, to) in [
+            (Vec3::new(27.69, -52.28, 53.10), Vec3::new(30.16, -52.28, 62.79)),
+            (Vec3::new(-48.73, -60.21, 102.19), Vec3::new(-44.25, -60.21, 95.55)),
+        ] {
             let dir = (to - from).normalize();
             let got = g.walk(from, to, 1.2);
             assert!(from.y - got.y < 0.8 && (got - from).dot(dir) < 1.5, "walk {from} -> {got}");

@@ -41,7 +41,11 @@ const JOURNAL: &[Entry] = &[
     Entry { label: "Records of Eminence", icon: "icons/quest_log", kind: Kind::Roe },
     row("Key Items", "icons/key", 1, 3),
 ];
-const WORLD: &[Entry] = &[row("Map", "icons/map", 0, 12), row("Region Info", "icons/find", 0, 11), row("Current Time", "icons/timer", 1, 10)];
+const WORLD: &[Entry] = &[
+    row("Map", "icons/map", 0, 12),
+    row("Region Info", "icons/find", 0, 11),
+    row("Current Time", "icons/timer", 1, 10),
+];
 const SYSTEM: &[Entry] = &[
     row("Macros", "icons/macro", 1, 6),
     row("Config", "icons/config", 1, 7),
@@ -178,7 +182,9 @@ pub fn bar_focus(w: &World) -> BarFocus {
     };
     match e.kind {
         Kind::Row(page, id) => BarFocus::Row(page, id),
-        Kind::Roe => BarFocus::Text("Records of Eminence", "View your Records of Eminence objectives and progress.".into()),
+        Kind::Roe => {
+            BarFocus::Text("Records of Eminence", "View your Records of Eminence objectives and progress.".into())
+        }
         Kind::Gm => BarFocus::Text("Game Master", format!("GM commands for your level ({}).", w.gm.level)),
         Kind::Sub(s) => BarFocus::Text(e.label, s.iter().map(|r| label(w, r)).collect::<Vec<_>>().join(", ") + "."),
     }
@@ -206,11 +212,29 @@ fn pick(w: &mut World, e: &Entry) {
 }
 
 /// One list of rows; the row clicked.
-fn rows(ui: &mut egui::Ui, m: &super::Modern, w: &World, list: &[&Entry], cursor: Option<usize>, open: Option<usize>, left: bool) -> Option<usize> {
+fn rows(
+    ui: &mut egui::Ui,
+    m: &super::Modern,
+    w: &World,
+    list: &[&Entry],
+    cursor: Option<usize>,
+    open: Option<usize>,
+    left: bool,
+) -> Option<usize> {
     let mut clicked = None;
     for (k, e) in list.iter().enumerate() {
         let on = cursor == Some(k) || open == Some(k);
-        let resp = super::rows::menu_row(ui, m, e.icon, label(w, e), on, disabled(w, e), matches!(e.kind, Kind::Sub(_)), left, false);
+        let resp = super::rows::menu_row(
+            ui,
+            m,
+            e.icon,
+            label(w, e),
+            on,
+            disabled(w, e),
+            matches!(e.kind, Kind::Sub(_)),
+            left,
+            false,
+        );
         if resp.clicked() {
             clicked = Some(k);
         }
@@ -258,9 +282,15 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let Some(sub) = c.sub else { return };
     let x = if c.left { r.min.x - SUB_GAP - SUB_WIDTH } else { r.max.x + SUB_GAP };
     let mut sub_click = None;
-    p.panel_at("command sub", Some(Title { icon: Some(list_top[c.top].icon), text: list_top[c.top].label, note: None, name: false }), SUB_WIDTH, egui::pos2(x, r.min.y), |ui| {
-        sub_click = rows(ui, m, w, &list.iter().collect::<Vec<_>>(), Some(sub), None, false);
-    });
+    p.panel_at(
+        "command sub",
+        Some(Title { icon: Some(list_top[c.top].icon), text: list_top[c.top].label, note: None, name: false }),
+        SUB_WIDTH,
+        egui::pos2(x, r.min.y),
+        |ui| {
+            sub_click = rows(ui, m, w, &list.iter().collect::<Vec<_>>(), Some(sub), None, false);
+        },
+    );
     if let Some(k) = sub_click
         && let Some(e) = list.get(k)
     {

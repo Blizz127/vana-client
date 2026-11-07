@@ -60,10 +60,7 @@ impl KeepAwake {
         }
         // macOS: the assertions persist, so only the edges (and a retry after a failed create) need work.
         #[cfg(target_os = "macos")]
-        if on != self.on
-            || (on
-                && self.held.is_none()
-                && self.sent.is_none_or(|t| now - t >= Duration::from_secs(60)))
+        if on != self.on || (on && self.held.is_none() && self.sent.is_none_or(|t| now - t >= Duration::from_secs(60)))
         {
             self.sent = Some(now);
             self.held = if on { macos::Hold::acquire() } else { None };
@@ -74,13 +71,8 @@ impl KeepAwake {
     /// Windows: one call resets the display and sleep timers, as a key would; every 10 s through the hold is plenty.
     #[cfg(windows)]
     fn poke(&mut self, now: Instant) {
-        use windows_sys::Win32::System::Power::{
-            ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState,
-        };
-        if self
-            .poked
-            .is_none_or(|t| now - t >= Duration::from_secs(10))
-        {
+        use windows_sys::Win32::System::Power::{ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
+        if self.poked.is_none_or(|t| now - t >= Duration::from_secs(10)) {
             self.poked = Some(now);
             // SAFETY: plain flags in, the previous state out.
             unsafe { SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) };
@@ -92,8 +84,7 @@ impl KeepAwake {
 mod macos {
     use objc2_core_foundation::CFString;
     use objc2_io_kit::{
-        IOPMAssertionCreateWithName, IOPMAssertionID, IOPMAssertionRelease, kIOPMAssertionLevelOn,
-        kIOReturnSuccess,
+        IOPMAssertionCreateWithName, IOPMAssertionID, IOPMAssertionRelease, kIOPMAssertionLevelOn, kIOReturnSuccess,
     };
 
     const REASON: &str = "Vana Client: Playing with a game controller";
@@ -130,9 +121,7 @@ mod macos {
         let name = CFString::from_static_str(REASON);
         let mut id = 0;
         // SAFETY: `ty` and `name` are valid CFStrings, and `id` is a valid out-pointer.
-        let r = unsafe {
-            IOPMAssertionCreateWithName(Some(&*ty), kIOPMAssertionLevelOn, Some(&*name), &mut id)
-        };
+        let r = unsafe { IOPMAssertionCreateWithName(Some(&*ty), kIOPMAssertionLevelOn, Some(&*name), &mut id) };
         if r == kIOReturnSuccess {
             Some(id)
         } else {
@@ -168,31 +157,27 @@ mod linux {
     /// The bus calls run on a thread of their own, so a slow or missing bus never stalls a frame.
     pub fn spawn() -> mpsc::Sender<bool> {
         let (tx, rx) = mpsc::channel::<bool>();
-        let spawned = std::thread::Builder::new()
-            .name("keep-awake".into())
-            .spawn(move || {
-                let conn = match Builder::session()
-                    .and_then(|b| b.method_timeout(Duration::from_secs(5)).build())
-                {
-                    Ok(c) => c,
-                    Err(e) => return log::warn!("keep awake: no session bus: {e}"),
-                };
-                let mut held = None;
-                for on in rx {
-                    if on && held.is_none() {
-                        held = inhibit(&conn);
-                        // Hang up so the next use starts over on a fresh connection (the bus may have gone away).
-                        if held.is_none() {
-                            return;
-                        }
-                    } else if !on && let Some(h) = held.take() {
-                        release(&conn, h);
+        let spawned = std::thread::Builder::new().name("keep-awake".into()).spawn(move || {
+            let conn = match Builder::session().and_then(|b| b.method_timeout(Duration::from_secs(5)).build()) {
+                Ok(c) => c,
+                Err(e) => return log::warn!("keep awake: no session bus: {e}"),
+            };
+            let mut held = None;
+            for on in rx {
+                if on && held.is_none() {
+                    held = inhibit(&conn);
+                    // Hang up so the next use starts over on a fresh connection (the bus may have gone away).
+                    if held.is_none() {
+                        return;
                     }
-                }
-                if let Some(h) = held {
+                } else if !on && let Some(h) = held.take() {
                     release(&conn, h);
                 }
-            });
+            }
+            if let Some(h) = held {
+                release(&conn, h);
+            }
+        });
         if let Err(e) = spawned {
             log::warn!("keep awake: {e}");
         }

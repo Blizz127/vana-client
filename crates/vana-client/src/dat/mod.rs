@@ -32,7 +32,11 @@ impl DatIndex {
     pub fn open(ffxi_dir: &Path) -> Result<Self> {
         let mut entries: Vec<(u8, u16)> = Vec::new();
         for rom in 1..=9u8 {
-            let (dir, suffix) = if rom == 1 { (ffxi_dir.to_path_buf(), String::new()) } else { (ffxi_dir.join(format!("ROM{rom}")), rom.to_string()) };
+            let (dir, suffix) = if rom == 1 {
+                (ffxi_dir.to_path_buf(), String::new())
+            } else {
+                (ffxi_dir.join(format!("ROM{rom}")), rom.to_string())
+            };
             let vpath = dir.join(format!("VTABLE{suffix}.DAT"));
             if !vpath.exists() {
                 continue;
@@ -71,7 +75,8 @@ impl DatIndex {
         {
             return Some(o.clone());
         }
-        let ids: std::collections::HashMap<(u8, u16), u32> = entries.iter().enumerate().filter(|(_, e)| e.0 != 0).map(|(i, &e)| (e, i as u32)).collect();
+        let ids: std::collections::HashMap<(u8, u16), u32> =
+            entries.iter().enumerate().filter(|(_, e)| e.0 != 0).map(|(i, &e)| (e, i as u32)).collect();
         let o = Arc::new(overlay::Overlays::scan(&dirs, &ids, crate::config::merged_dir()));
         *s = Some((dirs, o.clone()));
         Some(o)
@@ -168,52 +173,57 @@ pub fn chunks(file: &[u8]) -> Result<Vec<Chunk<'_>>> {
         if size < 16 || at + size > file.len() {
             bail!("bad chunk size {size} at offset {at:#x}");
         }
-        out.push(Chunk { name: file[at..at + 4].try_into().unwrap(), kind: (word & 0x7F) as u8, data: &file[at + 16..at + size], offset: at });
+        out.push(Chunk {
+            name: file[at..at + 4].try_into().unwrap(),
+            kind: (word & 0x7F) as u8,
+            data: &file[at + 16..at + size],
+            offset: at,
+        });
         at += size;
     }
     Ok(out)
 }
 
-pub mod overlay;
-pub mod cursor;
-pub mod statusinfo;
-pub mod tables;
-pub mod bump;
-pub mod zone;
-pub mod collision;
-pub mod character;
-pub mod npc;
-pub mod font;
-pub mod ui;
-pub mod dancer;
-pub mod msg;
-pub mod msgfmt;
-pub mod dialog;
-pub mod msgshift;
-pub mod skillchains;
-pub mod recasts;
-pub mod resists;
-pub mod items;
-pub mod maze;
-pub mod names;
-pub mod merits;
-pub mod roe;
+pub mod actions;
+pub mod animpack;
+pub mod autotrans;
+pub mod battle;
 pub mod blumagic;
-pub mod journal;
+pub mod bump;
+pub mod character;
+pub mod collision;
+pub mod cursor;
+pub mod dancer;
+pub mod dialog;
 pub mod event;
 pub mod event_ops;
-pub mod title;
-pub mod weather;
-pub mod battle;
-pub mod sched;
-pub mod motionfile;
-pub mod texmip;
-pub mod animpack;
-pub mod generator;
-pub mod actions;
-pub mod autotrans;
+pub mod font;
 pub mod furniture;
+pub mod generator;
+pub mod items;
+pub mod journal;
+pub mod maze;
+pub mod merits;
+pub mod motionfile;
+pub mod msg;
+pub mod msgfmt;
+pub mod msgshift;
+pub mod names;
+pub mod npc;
+pub mod overlay;
+pub mod recasts;
+pub mod resists;
+pub mod roe;
+pub mod sched;
+pub mod skillchains;
+pub mod statusinfo;
+pub mod tables;
+pub mod texmip;
+pub mod title;
 pub mod tpoints;
+pub mod ui;
+pub mod weather;
+pub mod zone;
 
 #[cfg(test)]
 mod fuzz;

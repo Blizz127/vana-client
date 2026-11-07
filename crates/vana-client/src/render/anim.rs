@@ -3,11 +3,11 @@
 //! render/character.rs `pose_blend`) straight into the pose regions vs_skinned reads.
 
 use super::Gpu;
+use super::Put;
 use crate::dat::character::{Animation, Character};
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
-use super::Put;
 
 /// Bones a pose region holds (render/mod.rs MAX_BONES) and the per-animation bone table size.
 const TABLE: usize = crate::dat::animpack::TABLE;
@@ -370,7 +370,18 @@ mod tests {
     #[test]
     fn drawn_weapons_ride_the_grips() {
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
-        let look = Look { race: 7, face: 10, head: 0, body: 110, hands: 110, legs: 110, feet: 11, main: 430, sub: 379, range: 62 };
+        let look = Look {
+            race: 7,
+            face: 10,
+            head: 0,
+            body: 110,
+            hands: 110,
+            legs: 110,
+            feet: 11,
+            main: 430,
+            sub: 379,
+            range: 62,
+        };
         let Ok(mut ch) = load_character(&index, &look) else { return };
         let Ok(d) = index.read(47223) else { return };
         let f = crate::dat::character::load_file(&d).unwrap();
@@ -378,7 +389,8 @@ mod tests {
         let ch = Arc::new(ch);
         let grips: Vec<(u16, u16)> = ch.grips.iter().flatten().copied().collect();
         assert_eq!(grips.len(), 2, "{:?}", ch.grips);
-        let mut to: Vec<(&Animation, f32)> = ch.find_animations("run").into_iter().filter(|a| a.name != "run1").map(|a| (a, 4.0)).collect();
+        let mut to: Vec<(&Animation, f32)> =
+            ch.find_animations("run").into_iter().filter(|a| a.name != "run1").map(|a| (a, 4.0)).collect();
         to.push((ch.animations.last().unwrap(), 4.0));
         let loose = pose(&ch.skeleton, &to);
         let held = crate::dat::character::pose_held(&ch.skeleton, &to, &grips);
@@ -398,8 +410,18 @@ mod tests {
         ga.begin();
         ga.job(ch, &[], to, &[], 0.0, 0, look, None, &[]);
         let size = (n * 48) as u64;
-        let out = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
-        let rb = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let out = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let rb = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let mut enc = gpu.device.create_command_encoder(&Default::default());
         ga.dispatch(gpu, &mut enc, &out, true);
         enc.copy_buffer_to_buffer(&out, 0, &rb, 0, size);
@@ -418,37 +440,72 @@ mod tests {
         let Ok(index) = crate::dat::DatIndex::open(&crate::config::Config::load().ffxi_dir()) else { return };
         let Ok(gpu) = Gpu::headless() else { return };
         for race in 1..=8u8 {
-        let look = Look { race, face: 0, head: 0, body: 8, hands: 8, legs: 8, feet: 8, main: 0, sub: 0, range: 0 };
-        let Ok(ch) = load_character(&index, &look) else { return };
-        let ch = Arc::new(ch);
-        let idle: Vec<(&Animation, f32)> = ch.find_animations("idl").into_iter().map(|a| (a, 0.0)).collect();
-        let pt = |k: usize| ch.skeleton.points[k];
-        let hl = |point: glam::Vec3| HeadLook { bones: [Some(pt(3).0), Some(pt(7).0)], two: true, weight: 1.0, point, p3: pt(3).1, p4: pt(4), drop: 0.0, limits: ch.skeleton.look_limits };
-        let base = posed(&gpu, &ch, &idle, None);
-        let side = posed(&gpu, &ch, &idle, Some(hl(glam::Vec3::new(0.0, -1.6, 20.0))));
-        let ahead = posed(&gpu, &ch, &idle, Some(hl(glam::Vec3::new(20.0, -1.6, 0.0))));
-        let turn = |a: &[glam::Quat], b: usize| (a[b] * base[b].inverse()).to_axis_angle().1.to_degrees();
-        let (head, neck) = (pt(3).0 as usize, pt(7).0 as usize);
-        println!("race {race} side: head {:.1} neck {:.1}; ahead: head {:.1} neck {:.1}", turn(&side, head), turn(&side, neck), turn(&ahead, head), turn(&ahead, neck));
-        assert!((turn(&side, neck) - 17.7).abs() < 3.0, "race {race}");
-        assert!((turn(&side, head) - 43.3).abs() < 5.0, "race {race}");
-        assert!(turn(&ahead, head) < 15.0, "race {race}");
+            let look = Look { race, face: 0, head: 0, body: 8, hands: 8, legs: 8, feet: 8, main: 0, sub: 0, range: 0 };
+            let Ok(ch) = load_character(&index, &look) else { return };
+            let ch = Arc::new(ch);
+            let idle: Vec<(&Animation, f32)> = ch.find_animations("idl").into_iter().map(|a| (a, 0.0)).collect();
+            let pt = |k: usize| ch.skeleton.points[k];
+            let hl = |point: glam::Vec3| HeadLook {
+                bones: [Some(pt(3).0), Some(pt(7).0)],
+                two: true,
+                weight: 1.0,
+                point,
+                p3: pt(3).1,
+                p4: pt(4),
+                drop: 0.0,
+                limits: ch.skeleton.look_limits,
+            };
+            let base = posed(&gpu, &ch, &idle, None);
+            let side = posed(&gpu, &ch, &idle, Some(hl(glam::Vec3::new(0.0, -1.6, 20.0))));
+            let ahead = posed(&gpu, &ch, &idle, Some(hl(glam::Vec3::new(20.0, -1.6, 0.0))));
+            let turn = |a: &[glam::Quat], b: usize| (a[b] * base[b].inverse()).to_axis_angle().1.to_degrees();
+            let (head, neck) = (pt(3).0 as usize, pt(7).0 as usize);
+            println!(
+                "race {race} side: head {:.1} neck {:.1}; ahead: head {:.1} neck {:.1}",
+                turn(&side, head),
+                turn(&side, neck),
+                turn(&ahead, head),
+                turn(&ahead, neck)
+            );
+            assert!((turn(&side, neck) - 17.7).abs() < 3.0, "race {race}");
+            assert!((turn(&side, head) - 43.3).abs() < 5.0, "race {race}");
+            assert!(turn(&ahead, head) < 15.0, "race {race}");
         }
     }
 
-    fn check(gpu: &Gpu, ch: &Arc<Character>, to: &[(&Animation, f32)], from: &[(&Animation, f32)], grips: &[(u16, u16)]) {
+    fn check(
+        gpu: &Gpu,
+        ch: &Arc<Character>,
+        to: &[(&Animation, f32)],
+        from: &[(&Animation, f32)],
+        grips: &[(u16, u16)],
+    ) {
         for (f, t) in [(from, 0.3f32), (&[][..], 0.0)] {
             if f.is_empty() && t != 0.0 {
                 continue;
             }
-            let cpu = if f.is_empty() { crate::dat::character::pose_held(&ch.skeleton, &to, grips) } else { crate::render::character::pose_blend(&ch, f, &to, t, grips) };
+            let cpu = if f.is_empty() {
+                crate::dat::character::pose_held(&ch.skeleton, &to, grips)
+            } else {
+                crate::render::character::pose_blend(&ch, f, &to, t, grips)
+            };
             let mut ga = GpuAnim::new(&gpu);
             ga.begin();
             ga.job(&ch, &[], &to, f, t, 0, None, None, grips);
             let n = cpu.len().min(TABLE - 1);
             let size = (n * 48) as u64;
-            let out = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
-            let rb = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size, usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let out = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: None,
+                size,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            });
+            let rb = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: None,
+                size,
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             let mut enc = gpu.device.create_command_encoder(&Default::default());
             ga.dispatch(&gpu, &mut enc, &out, true);
             enc.copy_buffer_to_buffer(&out, 0, &rb, 0, size);
@@ -493,17 +550,43 @@ pub struct GpuAnim {
 /// The posing pipeline and its layout (made once per device, render::PipeCache).
 pub fn pipeline(device: &wgpu::Device) -> (wgpu::ComputePipeline, wgpu::BindGroupLayout) {
     {
-        let src = WGSL.replace("JOB_WORDSu", &format!("{JOB_WORDS}u")).replace("SCRATCHu", &format!("{SCRATCH}u")).replace("MAX_SETu", &format!("{MAX_SET}u")).replace("HEADu", &format!("{HEAD}u")).replace("NO_BONEu", &format!("{NO_BONE}u"));
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("pose actors"), source: wgpu::ShaderSource::Wgsl(src.into()) });
+        let src = WGSL
+            .replace("JOB_WORDSu", &format!("{JOB_WORDS}u"))
+            .replace("SCRATCHu", &format!("{SCRATCH}u"))
+            .replace("MAX_SETu", &format!("{MAX_SET}u"))
+            .replace("HEADu", &format!("{HEAD}u"))
+            .replace("NO_BONEu", &format!("{NO_BONE}u"));
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("pose actors"),
+            source: wgpu::ShaderSource::Wgsl(src.into()),
+        });
         let entry = |binding, read_only| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only }, has_dynamic_offset: false, min_binding_size: None },
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
             count: None,
         };
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("pose actors"), entries: &[entry(0, true), entry(1, true), entry(2, false), entry(3, false)] });
-        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("pose actors"), bind_group_layouts: &[Some(&layout)], immediate_size: 0 });
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: Some("pose actors"), layout: Some(&pl), module: &module, entry_point: Some("pose_actors"), compilation_options: Default::default(), cache: None });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("pose actors"),
+            entries: &[entry(0, true), entry(1, true), entry(2, false), entry(3, false)],
+        });
+        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("pose actors"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("pose actors"),
+            layout: Some(&pl),
+            module: &module,
+            entry_point: Some("pose_actors"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
         (pipeline, layout)
     }
 }
@@ -511,12 +594,30 @@ pub fn pipeline(device: &wgpu::Device) -> (wgpu::ComputePipeline, wgpu::BindGrou
 impl GpuAnim {
     pub fn new(gpu: &Gpu) -> Self {
         let (pipeline, layout) = gpu.pipes.anim().clone();
-        Self { pipeline, layout, data: Vec::new(), uploaded: 0, data_buf: None, sources: HashMap::new(), blocks: HashMap::new(), jobs: Vec::new(), job_buf: None, scratch: None }
+        Self {
+            pipeline,
+            layout,
+            data: Vec::new(),
+            uploaded: 0,
+            data_buf: None,
+            sources: HashMap::new(),
+            blocks: HashMap::new(),
+            jobs: Vec::new(),
+            job_buf: None,
+            scratch: None,
+        }
     }
 
     /// Offsets of a source's skeleton (if any) and animations, uploading them the first time. The loader
     /// threads pack them (`packed`); packing here is only for sources that skipped that.
-    fn source(&mut self, key: usize, keep: Arc<dyn Any + Send + Sync>, skel: Option<&crate::dat::character::Skeleton>, anims: &[Animation], packed: Option<&crate::dat::animpack::Packed>) -> (Option<u32>, &[u32]) {
+    fn source(
+        &mut self,
+        key: usize,
+        keep: Arc<dyn Any + Send + Sync>,
+        skel: Option<&crate::dat::character::Skeleton>,
+        anims: &[Animation],
+        packed: Option<&crate::dat::animpack::Packed>,
+    ) -> (Option<u32>, &[u32]) {
         if !self.sources.contains_key(&key) {
             let at = |d: &Vec<u32>, up: usize| (up + d.len()) as u32;
             let s = skel.map(|sk| {
@@ -574,8 +675,23 @@ impl GpuAnim {
     /// Queues one actor: its model, the motion files on it, the pose (and the one it blends from at `t`),
     /// written to pose vec4 index `out`. Animations are found in the model or its files by address.
     #[allow(clippy::too_many_arguments)]
-    pub fn job(&mut self, ch: &Arc<Character>, extra: &[Arc<crate::dat::motionfile::MotionFile>], to: &[(&Animation, f32)], from: &[(&Animation, f32)], t: f32, out: u32, look: Option<HeadLook>, overlay: Option<(&Animation, f32, f32)>, grips: &[(u16, u16)]) {
-        let (Some(skel), _) = self.source(Arc::as_ptr(ch) as usize, ch.clone(), Some(&ch.skeleton), &ch.animations, ch.packed.as_deref()) else { return };
+    pub fn job(
+        &mut self,
+        ch: &Arc<Character>,
+        extra: &[Arc<crate::dat::motionfile::MotionFile>],
+        to: &[(&Animation, f32)],
+        from: &[(&Animation, f32)],
+        t: f32,
+        out: u32,
+        look: Option<HeadLook>,
+        overlay: Option<(&Animation, f32, f32)>,
+        grips: &[(u16, u16)],
+    ) {
+        let (Some(skel), _) =
+            self.source(Arc::as_ptr(ch) as usize, ch.clone(), Some(&ch.skeleton), &ch.animations, ch.packed.as_deref())
+        else {
+            return;
+        };
         let mut lookup = |a: &Animation| -> Option<u32> {
             let find = |list: &[Animation]| list.iter().position(|x| std::ptr::eq(x, a));
             if let Some(i) = find(&ch.animations) {
@@ -651,7 +767,12 @@ impl GpuAnim {
             if self.data_buf.as_ref().is_none_or(|b| b.size() < need) {
                 let size = need.next_power_of_two().max(1 << 20);
                 crate::client::perf::note(|| format!("anim keys buffer {size} bytes"));
-                let buf = device.create_buffer(&wgpu::BufferDescriptor { label: Some("anim keys"), size, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false });
+                let buf = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("anim keys"),
+                    size,
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+                    mapped_at_creation: false,
+                });
                 if let Some(old) = &self.data_buf
                     && self.uploaded > 0
                 {
@@ -662,7 +783,13 @@ impl GpuAnim {
             // As much of the tail as the frame's copy budget allows (render/upload.rs).
             if !self.data.is_empty() && (all || gpu.upload_room() > 0) {
                 let n = if all { self.data.len() } else { (gpu.piece(self.data.len() as u64 * 4, 4) / 4) as usize };
-                gpu.upload(n as u64 * 4, || gpu.queue.put(self.data_buf.as_ref().unwrap(), (self.uploaded * 4) as u64, bytemuck::cast_slice(&self.data[..n])));
+                gpu.upload(n as u64 * 4, || {
+                    gpu.queue.put(
+                        self.data_buf.as_ref().unwrap(),
+                        (self.uploaded * 4) as u64,
+                        bytemuck::cast_slice(&self.data[..n]),
+                    )
+                });
                 self.uploaded += n;
                 self.data.drain(..n);
             }
@@ -681,12 +808,28 @@ impl GpuAnim {
         let jsize = (self.jobs.len() * 4) as u64;
         if self.job_buf.as_ref().is_none_or(|(_, c)| *c < jsize) {
             let c = jsize.next_power_of_two().max(4096);
-            self.job_buf = Some((device.create_buffer(&wgpu::BufferDescriptor { label: Some("anim jobs"), size: c, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false }), c));
+            self.job_buf = Some((
+                device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("anim jobs"),
+                    size: c,
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }),
+                c,
+            ));
         }
         let ssize = (n * SCRATCH * 16) as u64;
         if self.scratch.as_ref().is_none_or(|(_, c)| *c < ssize) {
             let c = ssize.next_power_of_two();
-            self.scratch = Some((device.create_buffer(&wgpu::BufferDescriptor { label: Some("anim scratch"), size: c, usage: wgpu::BufferUsages::STORAGE, mapped_at_creation: false }), c));
+            self.scratch = Some((
+                device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("anim scratch"),
+                    size: c,
+                    usage: wgpu::BufferUsages::STORAGE,
+                    mapped_at_creation: false,
+                }),
+                c,
+            ));
         }
         let (jb, _) = self.job_buf.as_ref().unwrap();
         gpu.queue.put(jb, 0, bytemuck::cast_slice(&self.jobs));
@@ -700,7 +843,8 @@ impl GpuAnim {
                 wgpu::BindGroupEntry { binding: 3, resource: self.scratch.as_ref().unwrap().0.as_entire_binding() },
             ],
         });
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("pose actors"), timestamp_writes: None });
+        let mut pass = encoder
+            .begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("pose actors"), timestamp_writes: None });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &group, &[]);
         pass.dispatch_workgroups(n as u32, 1, 1);

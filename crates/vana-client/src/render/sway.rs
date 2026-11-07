@@ -113,12 +113,18 @@ pub struct Sway {
 impl Sway {
     /// `insts`: the animated instances; `curves` the zone's curves per weather tag (dat::zone::SWAY_TAGS order);
     /// `instances` the geometry's instance buffer (STORAGE).
-    pub fn new(gpu: &Gpu, insts: &[u32], curves: &crate::dat::zone::SwayCurves, instances: &wgpu::Buffer) -> Option<Self> {
+    pub fn new(
+        gpu: &Gpu,
+        insts: &[u32],
+        curves: &crate::dat::zone::SwayCurves,
+        instances: &wgpu::Buffer,
+    ) -> Option<Self> {
         if insts.is_empty() {
             return None;
         }
         let device = &gpu.device;
-        let (mut heads, mut pairs, mut tags): (Vec<[u32; 2]>, Vec<[f32; 2]>, Vec<[u32; 2]>) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut heads, mut pairs, mut tags): (Vec<[u32; 2]>, Vec<[f32; 2]>, Vec<[u32; 2]>) =
+            (Vec::new(), Vec::new(), Vec::new());
         for list in &curves.by_tag {
             tags.push([heads.len() as u32, list.len() as u32]);
             for c in list {
@@ -141,7 +147,12 @@ impl Sway {
             })
             .collect();
         let storage = |label, bytes: &[u8]| {
-            let b = device.create_buffer(&wgpu::BufferDescriptor { label: Some(label), size: (bytes.len() as u64).max(16), usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+            let b = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: (bytes.len() as u64).max(16),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
             gpu.queue.put(&b, 0, bytes);
             b
         };
@@ -150,13 +161,34 @@ impl Sway {
         let heads = storage("sway curve heads", bytemuck::cast_slice(&heads));
         let pairs = storage("sway curve pairs", bytemuck::cast_slice(&pairs));
         let tags = storage("sway weather tags", bytemuck::cast_slice(&tags));
-        let params = device.create_buffer(&wgpu::BufferDescriptor { label: Some("sway params"), size: std::mem::size_of::<Params>() as u64, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
-        let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::COMPUTE, ty, count: None };
-        let st = |read_only| wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only }, has_dynamic_offset: false, min_binding_size: None };
+        let params = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("sway params"),
+            size: std::mem::size_of::<Params>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let entry = |binding, ty| wgpu::BindGroupLayoutEntry {
+            binding,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty,
+            count: None,
+        };
+        let st = |read_only| wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("sway"),
             entries: &[
-                entry(0, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }),
+                entry(
+                    0,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                ),
                 entry(1, st(true)),
                 entry(2, st(false)),
                 entry(3, st(true)),
@@ -165,10 +197,17 @@ impl Sway {
                 entry(6, st(false)),
             ],
         });
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("sway"), source: wgpu::ShaderSource::Wgsl(WGSL.into()) });
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("sway"),
+            source: wgpu::ShaderSource::Wgsl(WGSL.into()),
+        });
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("sway"),
-            layout: Some(&device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("sway"), bind_group_layouts: &[Some(&layout)], immediate_size: 0 })),
+            layout: Some(&device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("sway"),
+                bind_group_layouts: &[Some(&layout)],
+                immediate_size: 0,
+            })),
             module: &module,
             entry_point: Some("sway"),
             compilation_options: Default::default(),
@@ -194,8 +233,20 @@ impl Sway {
     pub fn run(&self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder) {
         let (ticks, steps, tag) = self.next;
         self.frame.set(self.frame.get().wrapping_add(1));
-        gpu.queue.put(&self.params, 0, bytemuck::bytes_of(&Params { ticks, steps: steps as f32, count: self.count, frame: self.frame.get(), tag, pad: [0; 3] }));
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("sway"), timestamp_writes: None });
+        gpu.queue.put(
+            &self.params,
+            0,
+            bytemuck::bytes_of(&Params {
+                ticks,
+                steps: steps as f32,
+                count: self.count,
+                frame: self.frame.get(),
+                tag,
+                pad: [0; 3],
+            }),
+        );
+        let mut pass =
+            encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("sway"), timestamp_writes: None });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.group, &[]);
         pass.dispatch_workgroups(self.count.div_ceil(64), 1, 1);

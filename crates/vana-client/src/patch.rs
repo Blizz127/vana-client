@@ -85,7 +85,11 @@ fn version_reply(b: &[u8]) -> Result<ServerVersion> {
     let n = u32::from_le_bytes(b[at..at + 4].try_into().unwrap()) as usize;
     let text = b.get(at + 4..at + 4 + n).ok_or_else(|| anyhow!("version string truncated"))?;
     let cstr = |s: &[u8]| String::from_utf8_lossy(s.split(|&c| c == 0).next().unwrap_or_default()).into_owned();
-    Ok(ServerVersion { released: u32::from_le_bytes(b[..4].try_into().unwrap()), label: cstr(&b[8..at]), version: cstr(text) })
+    Ok(ServerVersion {
+        released: u32::from_le_bytes(b[..4].try_into().unwrap()),
+        label: cstr(&b[8..at]),
+        version: cstr(text),
+    })
 }
 
 pub struct Session(TcpStream);
@@ -144,7 +148,9 @@ impl Session {
             let b = &f[HEADER..];
             let u = |i: usize| b.get(i..i + 4).map(|s| u32::from_le_bytes(s.try_into().unwrap()));
             let (Some(got), Some(n), Some(extra)) = (u(0), u(4), u(8)) else { bail!("{path}: short chunk") };
-            let data = b.get(12 + extra as usize..12 + extra as usize + n as usize).ok_or_else(|| anyhow!("{path}: chunk overruns its frame"))?;
+            let data = b
+                .get(12 + extra as usize..12 + extra as usize + n as usize)
+                .ok_or_else(|| anyhow!("{path}: chunk overruns its frame"))?;
             if got != offset || data.is_empty() {
                 bail!("{path}: asked for offset {offset}, got {} bytes at {got}", data.len());
             }
@@ -163,7 +169,9 @@ struct Bits<'a> {
 
 impl<'a> Bits<'a> {
     fn new(coded: &'a [u8]) -> Result<Self> {
-        let end = u32::from_le_bytes(coded.get(..4).ok_or_else(|| anyhow!("coded stream too short"))?.try_into().unwrap()) as usize;
+        let end =
+            u32::from_le_bytes(coded.get(..4).ok_or_else(|| anyhow!("coded stream too short"))?.try_into().unwrap())
+                as usize;
         let d = &coded[4..];
         if end > d.len() * 8 {
             bail!("coded stream declares {end} bits, holds {}", d.len() * 8);
@@ -230,7 +238,10 @@ pub fn olc(coded: &[u8], base: &[u8]) -> Result<Vec<u8>> {
             let off = r.take(16)? as u16 as i16 as isize;
             let n = r.take(8)? as usize;
             let at = out.len() as isize + off;
-            let src = usize::try_from(at).ok().and_then(|a| base.get(a..a + n)).ok_or_else(|| anyhow!("base reference {at} outside {} bytes", base.len()))?;
+            let src = usize::try_from(at)
+                .ok()
+                .and_then(|a| base.get(a..a + n))
+                .ok_or_else(|| anyhow!("base reference {at} outside {} bytes", base.len()))?;
             out.extend_from_slice(src);
         }
     }
@@ -299,7 +310,9 @@ pub fn check_path(p: &str) -> Result<()> {
             return bad("has a name ending in a dot or space");
         }
         let stem = c.split('.').next().unwrap_or_default().trim_end().to_ascii_uppercase();
-        let numbered = stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.as_bytes()[3].is_ascii_digit();
+        let numbered = stem.len() == 4
+            && (stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.as_bytes()[3].is_ascii_digit();
         if numbered || matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$") {
             return bad("names a Windows device");
         }
@@ -344,7 +357,8 @@ pub fn parse_manifest(text: &str) -> Result<Vec<Entry>> {
     }
     let line_version = |l: &str| -> Option<Version> {
         let mut it = l.splitn(5, ' ');
-        let (stamp, len, sum, md5, rest) = (it.next()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?);
+        let (stamp, len, sum, md5, rest) =
+            (it.next()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?.parse().ok()?, it.next()?);
         let (dp, dl, rest) = path_len(rest, ".slc")?;
         let delta = if rest.is_empty() {
             None
@@ -367,7 +381,10 @@ pub fn parse_manifest(text: &str) -> Result<Vec<Entry>> {
         match open.as_mut() {
             None if l == "end" => break,
             None => {
-                let p = l.strip_prefix("file ").and_then(|s| s.strip_suffix(" {")).ok_or_else(|| anyhow!("manifest line {}: {l:?}", i + 1))?;
+                let p = l
+                    .strip_prefix("file ")
+                    .and_then(|s| s.strip_suffix(" {"))
+                    .ok_or_else(|| anyhow!("manifest line {}: {l:?}", i + 1))?;
                 check_path(p).with_context(|| format!("manifest line {}", i + 1))?;
                 open = Some(Entry { path: p.into(), versions: Vec::new() });
             }
@@ -454,7 +471,10 @@ fn adopt(old: &Path, root: &Path) -> Result<bool> {
     }
     let Ok(text) = std::fs::read_to_string(root.join(STAMP_FILE)) else { return Ok(false) };
     let entries = parse_manifest(&text)?;
-    let Some(want) = entries.iter().find(|e| is_ffximain(&e.path)).and_then(|e| e.versions.last()).map(|v| v.sig) else { return Ok(false) };
+    let Some(want) = entries.iter().find(|e| is_ffximain(&e.path)).and_then(|e| e.versions.last()).map(|v| v.sig)
+    else {
+        return Ok(false);
+    };
     if meta.len() != want.len {
         return Ok(false);
     }
@@ -504,8 +524,17 @@ pub fn plan_against(root: &Path, server: ServerVersion) -> Result<Plan> {
 
 /// The FFXiMain.dll the client reads matches the stamped manifest's.
 fn code_current(root: &Path) -> bool {
-    let Some(entries) = std::fs::read_to_string(root.join(STAMP_FILE)).ok().and_then(|t| parse_manifest(&t).ok()) else { return false };
-    entries.iter().filter(|e| is_ffximain(&e.path)).all(|e| source(root, &e.path).and_then(|p| sig_of_path(&p)).ok().flatten().is_some_and(|l| decide(e, Some(l)).0 == Action::Current))
+    let Some(entries) = std::fs::read_to_string(root.join(STAMP_FILE)).ok().and_then(|t| parse_manifest(&t).ok())
+    else {
+        return false;
+    };
+    entries.iter().filter(|e| is_ffximain(&e.path)).all(|e| {
+        source(root, &e.path)
+            .and_then(|p| sig_of_path(&p))
+            .ok()
+            .flatten()
+            .is_some_and(|l| decide(e, Some(l)).0 == Action::Current)
+    })
 }
 
 /// Asks the server for its version and manifest and checks every listed file under `root` (in parallel). Code files
@@ -582,7 +611,10 @@ fn produce(s: &mut Session, root: &Path, e: &Entry, a: Action) -> Result<Vec<u8>
 pub fn fetch_one(path: &str, dir: &Path) -> Result<(PathBuf, String)> {
     let manifest = Session::connect()?.manifest()?;
     let entries = parse_manifest(&String::from_utf8_lossy(&manifest))?;
-    let e = entries.iter().find(|e| e.path.eq_ignore_ascii_case(path)).ok_or_else(|| anyhow!("{path} is not in the manifest"))?;
+    let e = entries
+        .iter()
+        .find(|e| e.path.eq_ignore_ascii_case(path))
+        .ok_or_else(|| anyhow!("{path} is not in the manifest"))?;
     let data = produce(&mut Session::connect()?, dir, e, Action::Direct)?;
     let out = writable(dir, &e.path)?;
     write_atomic(&out, &data)?;
@@ -665,7 +697,10 @@ mod tests {
     fn manifest_and_decisions() {
         let text = "file Tools/a b.chm {\n1_0 3 0 0 1_0/Direct/Tools/a b.chm.slc 9\n2_0 4 1 2 2_0/Direct/Tools/a b.chm.slc 10 2_0/Indirect/Tools/a b.chm.olc 3\n}\nfile x.dll {\n1_0 1 1 1 1_0/Direct/x.dll.slc 5\n}\nend\n";
         let m = parse_manifest(text).unwrap();
-        assert_eq!((m.len(), m[0].path.as_str(), m[0].versions[1].delta.clone()), (2, "Tools/a b.chm", Some(("2_0/Indirect/Tools/a b.chm.olc".into(), 3))));
+        assert_eq!(
+            (m.len(), m[0].path.as_str(), m[0].versions[1].delta.clone()),
+            (2, "Tools/a b.chm", Some(("2_0/Indirect/Tools/a b.chm.olc".into(), 3)))
+        );
         let old = m[0].versions[0].sig;
         assert_eq!(decide(&m[0], Some(old)), (Action::Deltas(1), 3));
         assert_eq!(decide(&m[0], Some(m[0].versions[1].sig)), (Action::Current, 0));
@@ -692,7 +727,12 @@ mod tests {
         let (a, b, old) = (base.join("a"), base.join("b"), base.join("data/FFXiMain.dll"));
         let dll = b"MZ the current one".to_vec();
         let s = Sig::of(&dll);
-        let stamp = |sig: Sig| format!("file FFXiMain.dll {{\n1_0 {} {} {} 1_0/Direct/FFXiMain.dll.slc 9\n}}\nend\n", sig.len, sig.sum, sig.md5);
+        let stamp = |sig: Sig| {
+            format!(
+                "file FFXiMain.dll {{\n1_0 {} {} {} 1_0/Direct/FFXiMain.dll.slc 9\n}}\nend\n",
+                sig.len, sig.sum, sig.md5
+            )
+        };
         std::fs::create_dir_all(old.parent().unwrap()).unwrap();
         std::fs::create_dir_all(&a).unwrap();
         std::fs::create_dir_all(&b).unwrap();
@@ -723,8 +763,24 @@ mod tests {
             assert!(check_path(ok).is_ok(), "{ok}");
         }
         for bad in [
-            "", "/etc/passwd", "\\Windows\\x.dll", "\\\\host\\share\\x", "C:\\x.exe", "C:x.exe", "ROM/../../x", "..\\x", "ROM/./0.DAT",
-            "ROM//0.DAT", "ROM/", "a.DAT:stream", "ROM/.. /x", "ROM/x.", "ROM/NUL", "con.txt", "ROM/COM1.DAT", "a\0b",
+            "",
+            "/etc/passwd",
+            "\\Windows\\x.dll",
+            "\\\\host\\share\\x",
+            "C:\\x.exe",
+            "C:x.exe",
+            "ROM/../../x",
+            "..\\x",
+            "ROM/./0.DAT",
+            "ROM//0.DAT",
+            "ROM/",
+            "a.DAT:stream",
+            "ROM/.. /x",
+            "ROM/x.",
+            "ROM/NUL",
+            "con.txt",
+            "ROM/COM1.DAT",
+            "a\0b",
         ] {
             assert!(check_path(bad).is_err(), "{bad:?}");
         }

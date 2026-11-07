@@ -40,7 +40,15 @@ struct Atlas {
 
 fn atlas() -> &'static Mutex<Atlas> {
     static A: OnceLock<Mutex<Atlas>> = OnceLock::new();
-    A.get_or_init(|| Mutex::new(Atlas { rgba: vec![0; 1024 * 1024 * 4], side: 1024, pen: (1, 1, 0), glyphs: HashMap::new(), dirty: true }))
+    A.get_or_init(|| {
+        Mutex::new(Atlas {
+            rgba: vec![0; 1024 * 1024 * 4],
+            side: 1024,
+            pen: (1, 1, 0),
+            glyphs: HashMap::new(),
+            dirty: true,
+        })
+    })
 }
 
 fn face(f: Face) -> FontRef<'static> {

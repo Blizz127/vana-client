@@ -102,7 +102,15 @@ impl ChatLog {
     }
 
     /// A chat line with its mode, the sender's GM flag and the name its record carries.
-    pub fn push_mode(&mut self, s: String, colour: [u8; 4], indent: bool, mode: u8, gm: bool, who: Option<(String, u8)>) {
+    pub fn push_mode(
+        &mut self,
+        s: String,
+        colour: [u8; 4],
+        indent: bool,
+        mode: u8,
+        gm: bool,
+        who: Option<(String, u8)>,
+    ) {
         self.push_line(s, colour, true, indent, mode as u16);
         if let Some(g) = self.gm.last_mut() {
             *g = gm;
@@ -272,7 +280,15 @@ impl ChatLog {
     pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
         let from = self.lines.len().saturating_sub(HISTORY).max(self.restored);
         let saved: Vec<SavedLine> = (from..self.lines.len())
-            .map(|k| SavedLine { text: self.lines[k].0.clone(), colour: self.lines[k].1, mode: self.modes[k], time: self.times[k].0, chat: self.times[k].1, indent: self.times[k].2, gm: self.gm[k] })
+            .map(|k| SavedLine {
+                text: self.lines[k].0.clone(),
+                colour: self.lines[k].1,
+                mode: self.modes[k],
+                time: self.times[k].0,
+                chat: self.times[k].1,
+                indent: self.times[k].2,
+                gm: self.gm[k],
+            })
             .collect();
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
@@ -343,10 +359,22 @@ fn keys(w: &World) -> Option<crate::dat::battle::Keys> {
 pub(super) fn who(w: &World, id: u32) -> Option<Who> {
     if id == w.my_id {
         // Our own gender from the race (inf: retail reads 0x40db0): 2, 4, 6 and 7 are female.
-        return Some(Who { name: super::monstrosity::my_name(w).to_string(), pc: true, female: matches!(w.my_race, 2 | 4 | 6 | 7), ..Default::default() });
+        return Some(Who {
+            name: super::monstrosity::my_name(w).to_string(),
+            pc: true,
+            female: matches!(w.my_race, 2 | 4 | 6 | 7),
+            ..Default::default()
+        });
     }
     // A Monipulator's shown name (FUN_100c1190 slots 0 / 1); still a PC id: no article.
-    w.entities.get(&id).map(|e| Who { name: super::monstrosity::name(e).to_string(), pc: id < 0x0100_0000, named: e.named, plural: e.plural, female: e.female, ..Default::default() })
+    w.entities.get(&id).map(|e| Who {
+        name: super::monstrosity::name(e).to_string(),
+        pc: id < 0x0100_0000,
+        named: e.named,
+        plural: e.plural,
+        female: e.female,
+        ..Default::default()
+    })
 }
 
 /// s2c 0x05A (LAB_100a06e0): dropped for emote 0x61+ or a caster / target not here. The caster plays it (FUN_100a0b90)
@@ -356,15 +384,21 @@ pub(super) fn who(w: &World, id: u32) -> Option<Who> {
 /// copying the motion, trusts copying it.
 pub(super) fn on_emote(w: &mut World, caster: u32, target: u32, emote: u16, param: u16, mode: u8) {
     let here = |id: u32| id == w.my_id || w.entities.contains_key(&id);
-    if emote >= 0x61 || !here(caster) || (target != 0 && !here(target)) || super::partyreq::sender_blocked(w, caster, emote, 2) {
+    if emote >= 0x61
+        || !here(caster)
+        || (target != 0 && !here(target))
+        || super::partyreq::sender_blocked(w, caster, emote, 2)
+    {
         return;
     }
-    let status = if caster == w.my_id { w.my_motion.status } else { w.entities.get(&caster).map_or(0, |e| e.motion.status) };
+    let status =
+        if caster == w.my_id { w.my_motion.status } else { w.entities.get(&caster).map_or(0, |e| e.motion.status) };
     let class = if caster == w.my_id { main_weapon_class(w) } else { 6 };
     let mut failed = false;
     if mode != 1
         && matches!(status, 0 | 4 | 0x2f | 0x30 | 0x3f..=0x53)
-        && let Some(a) = w.actors.get_mut(&caster).filter(|a| !actmotion::emoting(a) && a.pending.is_none() && a.character.is_some())
+        && let Some(a) =
+            w.actors.get_mut(&caster).filter(|a| !actmotion::emoting(a) && a.pending.is_none() && a.character.is_some())
     {
         failed = actmotion::emote(a, emote as u32, param, status, class).is_err();
     }
@@ -377,7 +411,14 @@ pub(super) fn on_emote(w: &mut World, caster: u32, target: u32, emote: u16, para
     if mode > 1 || w.game.get(0x32) & 8 != 0 {
         return;
     }
-    let ctx = Ctx { actor: who(w, caster), target: (target != 0).then(|| who(w, target)).flatten(), me: w.name.clone(), work: [0; 5], keys: keys(w), ..Default::default() };
+    let ctx = Ctx {
+        actor: who(w, caster),
+        target: (target != 0).then(|| who(w, target)).flatten(),
+        me: w.name.clone(),
+        work: [0; 5],
+        keys: keys(w),
+        ..Default::default()
+    };
     let entry = emote as u32 * 2 + (target == 0) as u32;
     let Some(line) = bt.emote(entry, &ctx) else { return };
     let colour = bt.colour_in(if target == 0 && caster == w.my_id { 7 } else { 0x0f }, &w.game);
@@ -399,7 +440,13 @@ fn relation(w: &World, actor: u32, target: u32) -> Relation {
     relation_in(w.my_id, |id| w.entities.contains_key(&id), &w.party, actor, target)
 }
 
-fn relation_in(me: u32, known: impl Fn(u32) -> bool, roster: &super::party::Roster, actor: u32, target: u32) -> Relation {
+fn relation_in(
+    me: u32,
+    known: impl Fn(u32) -> bool,
+    roster: &super::party::Roster,
+    actor: u32,
+    target: u32,
+) -> Relation {
     let present = |id: u32| id == me || known(id);
     let party = |id: u32| id != me && roster.party().any(|m| m.id == id);
     let alliance = |id: u32| id != me && roster.members().any(|m| m.id == id);
@@ -428,9 +475,9 @@ fn relation_in(me: u32, known: impl Fn(u32) -> bool, roster: &super::party::Rost
 fn filter_relation(w: &World, actor: u32, target: u32) -> usize {
     let present = |id: u32| id == w.my_id || w.entities.contains_key(&id);
     let ours = |id: u32| {
-        w.entities.get(&id).is_some_and(|e| {
-            e.mob && e.claim != 0 && (e.claim == w.my_id || w.party.party().any(|m| m.id == e.claim))
-        })
+        w.entities
+            .get(&id)
+            .is_some_and(|e| e.mob && e.claim != 0 && (e.claim == w.my_id || w.party.party().any(|m| m.id == e.claim)))
     };
     let pc = |id: u32| id < 0x0100_0000;
     let me = |id: u32| id == w.my_id || (w.my_pet != 0 && w.entities.get(&id).is_some_and(|e| e.index == w.my_pet));
@@ -470,7 +517,13 @@ fn line_mode(bt: &battle::BattleText, id: u16, rel: Relation, ctx: &Ctx) -> u8 {
     bt.expand(id, ctx).and_then(|l| l.mode).unwrap_or_else(|| bt.mode(id, rel))
 }
 
-pub fn render(bt: &battle::BattleText, id: u16, rel: Relation, ctx: &Ctx, cfg: &crate::gamecfg::Values) -> Vec<(String, [u8; 4])> {
+pub fn render(
+    bt: &battle::BattleText,
+    id: u16,
+    rel: Relation,
+    ctx: &Ctx,
+    cfg: &crate::gamecfg::Values,
+) -> Vec<(String, [u8; 4])> {
     let mode = bt.mode(id, rel);
     if mode == battle::HIDDEN {
         return Vec::new();
@@ -530,7 +583,11 @@ fn targets_text(g: &Targets) -> String {
 
 /// A target as a merged line names it: "the" before a common noun, as the messages do (in its colour, when it has one).
 fn target_name(t: &Who) -> String {
-    let name = if t.colour == 0 { t.name.clone() } else { format!("{}{}{}", crate::dat::font::colour_code(t.colour), t.name, crate::dat::font::colour_code(1)) };
+    let name = if t.colour == 0 {
+        t.name.clone()
+    } else {
+        format!("{}{}{}", crate::dat::font::colour_code(t.colour), t.name, crate::dat::font::colour_code(1))
+    };
     if t.pc || t.named { name } else { format!("the {name}") }
 }
 
@@ -570,8 +627,19 @@ fn condense_targets(w: &mut World, bt: &battle::BattleText, m: &Msg, lines: &[(S
         (single.len() == lines.len() && lines[k].0 == own).then(|| (tc, k, single[k].0.clone()))
     });
     let Some((mut tc, k, single)) = found else { return false };
-    tc.target = Some(Who { name: NAME.into(), pc: true, named: true, plural: true, colour: target.colour, ..Default::default() });
-    let Some(mut template) = render(bt, m.id, rel, &tc, &w.game).get(k).map(|l| l.0.clone()).filter(|t| t.contains(NAME)) else { return false };
+    tc.target = Some(Who {
+        name: NAME.into(),
+        pc: true,
+        named: true,
+        plural: true,
+        colour: target.colour,
+        ..Default::default()
+    });
+    let Some(mut template) =
+        render(bt, m.id, rel, &tc, &w.game).get(k).map(|l| l.0.clone()).filter(|t| t.contains(NAME))
+    else {
+        return false;
+    };
     // A possessive ("X's attacks"): each name keeps its own ("Lnxcsfix's and Aurelie's"), not the plural's "X'".
     let mut name = target_name(&target);
     if template.contains(&format!("{NAME}'")) {
@@ -597,7 +665,15 @@ fn condense_targets(w: &mut World, bt: &battle::BattleText, m: &Msg, lines: &[(S
 }
 
 /// A record's line as its template: the text with work[`slot`] as SLOT, when the number is all that differs.
-fn template_of(bt: &battle::BattleText, id: u16, rel: Relation, ctx: &Ctx, slot: usize, line: &str, cfg: &crate::gamecfg::Values) -> Option<String> {
+fn template_of(
+    bt: &battle::BattleText,
+    id: u16,
+    rel: Relation,
+    ctx: &Ctx,
+    slot: usize,
+    line: &str,
+    cfg: &crate::gamecfg::Values,
+) -> Option<String> {
     let mut tc = ctx.clone();
     tc.work[slot] = SLOT;
     let template = render(bt, id, rel, &tc, cfg).into_iter().next()?.0;
@@ -615,7 +691,8 @@ fn condensed_text(template: &str, values: &[(i32, bool)]) -> String {
         if values.len() < 2 {
             return line;
         }
-        let parts: Vec<String> = values.iter().map(|(v, crit)| format!("{v}{}", if *crit { "!" } else { "" })).collect();
+        let parts: Vec<String> =
+            values.iter().map(|(v, crit)| format!("{v}{}", if *crit { "!" } else { "" })).collect();
         let (body, stop) = match line.strip_suffix(['.', '!']) {
             Some(b) => (b, &line[b.len()..]),
             None => (line.as_str(), ""),
@@ -643,8 +720,17 @@ fn condense_crit(w: &mut World, bt: &battle::BattleText, m: &Msg, ctx: &Ctx) -> 
     let Some(hit) = crit_of(m.id) else { return false };
     let mut tc = ctx.clone();
     tc.work[1] = SLOT;
-    let Some(template) = render(bt, hit, relation(w, m.actor, m.target), &tc, &w.game).into_iter().next().map(|l| l.0).filter(|t| t.contains(&SLOT.to_string())) else { return false };
-    let Some(g) = w.condensed.iter_mut().find(|g| g.seq == m.seq && g.id == hit && g.template == template) else { return false };
+    let Some(template) = render(bt, hit, relation(w, m.actor, m.target), &tc, &w.game)
+        .into_iter()
+        .next()
+        .map(|l| l.0)
+        .filter(|t| t.contains(&SLOT.to_string()))
+    else {
+        return false;
+    };
+    let Some(g) = w.condensed.iter_mut().find(|g| g.seq == m.seq && g.id == hit && g.template == template) else {
+        return false;
+    };
     g.values.push((m.work[1], true));
     w.chat.set_text(g.line, condensed_text(&g.template, &g.values));
     true
@@ -654,7 +740,9 @@ fn condense_crit(w: &mut World, bt: &battle::BattleText, m: &Msg, ctx: &Ctx) -> 
 /// points of damage"); a line with no number into its twin ("misses the Hare. (x2)"). True when it merged.
 fn condense(w: &mut World, bt: &battle::BattleText, m: &Msg, which: u8, line: &str, ctx: &Ctx) -> bool {
     let slot = 1 + which.min(2) as usize;
-    let Some(template) = template_of(bt, m.id, relation(w, m.actor, m.target), ctx, slot, line, &w.game) else { return false };
+    let Some(template) = template_of(bt, m.id, relation(w, m.actor, m.target), ctx, slot, line, &w.game) else {
+        return false;
+    };
     let value = m.work[slot];
     if let Some(g) = w.condensed.iter_mut().find(|g| g.seq == m.seq && g.id == m.id && g.template == template) {
         g.values.push((value, false));
@@ -674,9 +762,23 @@ fn print(w: &mut World, m: Msg) {
         return;
     };
     // Ours (pending.rs): a message of ours while an action waits is its answer, whatever the filters show.
-    if m.which.is_none() && m.actor == w.my_id && w.asked.as_ref().is_some_and(|p| p.state == super::pending::State::Waiting) {
-        let ctx = Ctx { actor: who(w, m.actor), target: who(w, m.target), me: w.name.clone(), work: m.work, keys: keys(w), ..Default::default() };
-        let text = render(&bt, m.id, relation(w, m.actor, m.target), &ctx, &w.game).into_iter().map(|l| l.0).collect::<Vec<_>>().join(" ");
+    if m.which.is_none()
+        && m.actor == w.my_id
+        && w.asked.as_ref().is_some_and(|p| p.state == super::pending::State::Waiting)
+    {
+        let ctx = Ctx {
+            actor: who(w, m.actor),
+            target: who(w, m.target),
+            me: w.name.clone(),
+            work: m.work,
+            keys: keys(w),
+            ..Default::default()
+        };
+        let text = render(&bt, m.id, relation(w, m.actor, m.target), &ctx, &w.game)
+            .into_iter()
+            .map(|l| l.0)
+            .collect::<Vec<_>>()
+            .join(" ");
         super::pending::message(w, m.id, &text);
     }
     // Ours: a damage number's message (main and proc records), whatever the filters show, for the mods' `damage`
@@ -704,11 +806,29 @@ fn print(w: &mut World, m: Msg) {
     if bt.off_channel(m.id, 0, &w.game) {
         return;
     }
-    let coloured = |w: &World, id: u32| who(w, id).map(|x| Who { colour: if w.name_colours { name_colour(w, id) } else { 0 }, ..x });
-    let ctx = Ctx { actor: coloured(w, m.actor), target: coloured(w, m.target), me: w.name.clone(), work: m.work, keys: keys(w), ..Default::default() };
+    let coloured = |w: &World, id: u32| {
+        who(w, id).map(|x| Who { colour: if w.name_colours { name_colour(w, id) } else { 0 }, ..x })
+    };
+    let ctx = Ctx {
+        actor: coloured(w, m.actor),
+        target: coloured(w, m.target),
+        me: w.name.clone(),
+        work: m.work,
+        keys: keys(w),
+        ..Default::default()
+    };
     let mut lines = render(&bt, m.id, relation(w, m.actor, m.target), &ctx, &w.game);
     // Extras' Battle Text: Short replaces the message with its short line; such lines are not condensed.
-    let short = w.short_battle.then(|| super::battlemod::shorten(&lines.iter().map(|l| l.0.clone()).collect::<Vec<_>>(), ctx.actor.as_ref(), ctx.target.as_ref())).flatten();
+    let short = w
+        .short_battle
+        .then(|| {
+            super::battlemod::shorten(
+                &lines.iter().map(|l| l.0.clone()).collect::<Vec<_>>(),
+                ctx.actor.as_ref(),
+                ctx.target.as_ref(),
+            )
+        })
+        .flatten();
     let condense_on = w.modern && w.condense && short.is_none();
     if let (Some(s), Some(c)) = (short, lines.first().map(|l| l.1)) {
         lines = vec![(s, c)];
@@ -750,11 +870,25 @@ fn damage_number(w: &mut World, bt: &battle::BattleText, m: &Msg, which: u8) {
 fn record_messages(a: &Action) -> Vec<Msg> {
     let mut out = Vec::new();
     for (target, r) in a.records() {
-        let work = [a.arg as i32, r.value as i32, r.proc.as_ref().map_or(0, |p| p.value as i32), r.react.as_ref().map_or(0, |p| p.value as i32), r.bit as i32];
+        let work = [
+            a.arg as i32,
+            r.value as i32,
+            r.proc.as_ref().map_or(0, |p| p.value as i32),
+            r.react.as_ref().map_or(0, |p| p.value as i32),
+            r.bit as i32,
+        ];
         let ids = [Some(r.message), r.proc.as_ref().map(|p| p.message), r.react.as_ref().map(|p| p.message)];
         for (which, id) in ids.into_iter().enumerate() {
             if let Some(id) = id.filter(|&id| id != 0) {
-                out.push(Msg { id, actor: a.actor, target, work, which: Some(which as u8), seq: a.seq, multi: a.targets.len() > 1 });
+                out.push(Msg {
+                    id,
+                    actor: a.actor,
+                    target,
+                    work,
+                    which: Some(which as u8),
+                    seq: a.seq,
+                    multi: a.targets.len() > 1,
+                });
             }
         }
     }
@@ -765,7 +899,13 @@ fn record_messages(a: &Action) -> Vec<Msg> {
 pub fn action_messages(a: &Action) -> Vec<(u16, u32, [i32; 5])> {
     let mut out = Vec::new();
     for (target, r) in a.records() {
-        let work = [a.arg as i32, r.value as i32, r.proc.as_ref().map_or(0, |p| p.value as i32), r.react.as_ref().map_or(0, |p| p.value as i32), r.bit as i32];
+        let work = [
+            a.arg as i32,
+            r.value as i32,
+            r.proc.as_ref().map_or(0, |p| p.value as i32),
+            r.react.as_ref().map_or(0, |p| p.value as i32),
+            r.bit as i32,
+        ];
         let ids = [Some(r.message), r.proc.as_ref().map(|p| p.message), r.react.as_ref().map(|p| p.message)];
         out.extend(ids.into_iter().flatten().filter(|&id| id != 0).map(|id| (id, target, work)));
     }
@@ -777,7 +917,14 @@ pub fn action_messages(a: &Action) -> Vec<(u16, u32, [i32; 5])> {
 pub(super) fn on_system_message(w: &mut World, id: u16, work: [i32; 2]) {
     let Some(bt) = w.battle.clone() else { return };
     let me = w.my_id;
-    let ctx = Ctx { actor: who(w, me), target: who(w, me), me: w.name.clone(), work: [work[0], work[1], 0, 0, 0], keys: keys(w), ..Default::default() };
+    let ctx = Ctx {
+        actor: who(w, me),
+        target: who(w, me),
+        me: w.name.clone(),
+        work: [work[0], work[1], 0, 0, 0],
+        keys: keys(w),
+        ..Default::default()
+    };
     match bt.system(id, &ctx) {
         Some(line) => {
             let colour = bt.colour_in(line.mode.unwrap_or(0), &w.game);
@@ -794,7 +941,9 @@ pub(super) fn on_system_message(w: &mut World, id: u16, work: [i32; 2]) {
 /// A PC's messages 0x59 / 0x5a / 0x64..0x67 go by the block list; SysMesFilterLevel drops some (textcmd::sys_filtered).
 /// Not done: the Mode key's event window.
 pub(super) fn on_message_std(w: &mut World, id: u16, cas: u32, para: [i32; 4], strings: [String; 2]) {
-    if cas != 0 && cas >> 24 == 0 && super::partyreq::sender_blocked(w, cas, id, 0) || super::textcmd::sys_filtered(w, id) {
+    if cas != 0 && cas >> 24 == 0 && super::partyreq::sender_blocked(w, cas, id, 0)
+        || super::textcmd::sys_filtered(w, id)
+    {
         return;
     }
     // Message 89 "X examines you." (a /check on us) for the mods.
@@ -803,7 +952,14 @@ pub(super) fn on_message_std(w: &mut World, id: u16, cas: u32, para: [i32; 4], s
         w.lua.raise("examined", vec![cas.into(), name.into()]);
     }
     let Some(bt) = w.battle.clone() else { return };
-    let ctx = Ctx { actor: if cas != 0 { who(w, cas) } else { None }, target: None, me: w.name.clone(), work: [para[0], para[1], para[2], para[3], 0], strings, keys: keys(w) };
+    let ctx = Ctx {
+        actor: if cas != 0 { who(w, cas) } else { None },
+        target: None,
+        me: w.name.clone(),
+        work: [para[0], para[1], para[2], para[3], 0],
+        strings,
+        keys: keys(w),
+    };
     match bt.system(id, &ctx) {
         Some(line) => {
             let colour = bt.colour_in(line.mode.unwrap_or(0), &w.game);
@@ -829,14 +985,16 @@ pub(super) fn area_line(w: &mut World) {
     let (Some(names), Some(bt)) = (w.names.clone(), w.battle.clone()) else { return };
     w.area_line = None;
     let line = match a {
-        super::net::AreaLine::Zone(z) => match crate::dat::names::NameSource::place(&*names, z as u32).filter(|n| !n.is_empty()) {
-            // Group 10 0x62 "=== Area: %s ===" (0x10356a44 "=== Area: %d ===" without a name).
-            Some(n) => format!("=== Area: {n} ==="),
-            None => {
-                log::error!("no place name (group 5) for zone {z}");
-                format!("=== Area: {z} ===")
+        super::net::AreaLine::Zone(z) => {
+            match crate::dat::names::NameSource::place(&*names, z as u32).filter(|n| !n.is_empty()) {
+                // Group 10 0x62 "=== Area: %s ===" (0x10356a44 "=== Area: %d ===" without a name).
+                Some(n) => format!("=== Area: {n} ==="),
+                None => {
+                    log::error!("no place name (group 5) for zone {z}");
+                    format!("=== Area: {z} ===")
+                }
             }
-        },
+        }
         super::net::AreaLine::MogHouse(floor) => bt.group9(0x126 + floor as usize).unwrap_or_default(),
     };
     if !line.is_empty() {
@@ -947,7 +1105,11 @@ pub(super) fn message_queue(w: &mut World, dt: f32) {
         }
     }
     for m in due {
-        let mon = if m.actor == w.my_id { w.my_plate.monstrosity != 0 } else { w.entities.get(&m.actor).is_some_and(|e| e.monstrosity != 0) };
+        let mon = if m.actor == w.my_id {
+            w.my_plate.monstrosity != 0
+        } else {
+            w.entities.get(&m.actor).is_some_and(|e| e.monstrosity != 0)
+        };
         if let Some(id) = effect_id(m.queued, mon)
             && w.actors.get(&m.actor).is_some_and(|a| a.character.is_some())
         {
@@ -955,7 +1117,18 @@ pub(super) fn message_queue(w: &mut World, dt: f32) {
             log::info!("battle message {}: effect DAT {} on {:#x}", m.message, 0xaf0 + id, m.actor);
             w.effects.on_event_scheduler(0xaf0 + id, u32::from_le_bytes(*b"main"), who, who);
         }
-        print(w, Msg { id: m.message, actor: m.actor, target: m.target, work: [m.data[0], m.data[1], 0, 0, 0], which: None, seq: 0, multi: false });
+        print(
+            w,
+            Msg {
+                id: m.message,
+                actor: m.actor,
+                target: m.target,
+                work: [m.data[0], m.data[1], 0, 0, 0],
+                which: None,
+                seq: 0,
+                multi: false,
+            },
+        );
     }
 }
 
@@ -977,7 +1150,14 @@ pub(super) fn on_action(w: &mut World, a: &Action) {
         one_action(w, a);
         return;
     }
-    let mut subs: std::collections::VecDeque<Action> = a.records().into_iter().map(|(id, r)| Action { targets: vec![crate::net::action::ActionTarget { id, results: vec![r.clone()] }], ..a.clone() }).collect();
+    let mut subs: std::collections::VecDeque<Action> = a
+        .records()
+        .into_iter()
+        .map(|(id, r)| Action {
+            targets: vec![crate::net::action::ActionTarget { id, results: vec![r.clone()] }],
+            ..a.clone()
+        })
+        .collect();
     let first = subs.pop_front().unwrap();
     one_action(w, &first);
     w.rounds.insert(a.actor, (Instant::now() + swing_left(w, a.actor), subs));
@@ -1007,10 +1187,17 @@ fn track_cast(w: &mut World, a: &Action) {
     match a.category {
         category::MAGIC_START | category::SKILL_START if start => {
             let skill = a.category == category::SKILL_START;
-            let secs = (!skill).then(|| w.actions.as_ref().and_then(|x| x.spell(value)).map(|r| r.cast as f32 / 3.0)).flatten().filter(|&s| s > 0.0);
+            let secs = (!skill)
+                .then(|| w.actions.as_ref().and_then(|x| x.spell(value)).map(|r| r.cast as f32 / 3.0))
+                .flatten()
+                .filter(|&s| s > 0.0);
             w.casts.insert(a.actor, Casting { skill, id: value, start: Instant::now(), secs });
         }
-        category::MAGIC_START | category::SKILL_START | category::MAGIC_FINISH | category::SKILL_FINISH | category::MOB_SKILL_FINISH => {
+        category::MAGIC_START
+        | category::SKILL_START
+        | category::MAGIC_FINISH
+        | category::SKILL_FINISH
+        | category::MOB_SKILL_FINISH => {
             w.casts.remove(&a.actor);
         }
         _ => {}
@@ -1039,7 +1226,10 @@ fn one_action(w: &mut World, a: &Action) {
     let mut messages = record_messages(a);
     // Ours (the Ready Lines extra): a start line (weapon skill, spell, item, ranged) only for us and monsters.
     if w.hide_ready_lines
-        && matches!(a.category, category::SKILL_START | category::MAGIC_START | category::ITEM_START | category::RANGED_START)
+        && matches!(
+            a.category,
+            category::SKILL_START | category::MAGIC_START | category::ITEM_START | category::RANGED_START
+        )
         && a.actor != w.my_id
         && (ours(w, a.actor) || !w.entities.get(&a.actor).is_some_and(|e| e.mob))
     {
@@ -1050,7 +1240,16 @@ fn one_action(w: &mut World, a: &Action) {
         messages.retain(|m| m.which == Some(0));
     }
     if a.actor == w.my_id || a.targets.iter().any(|t| t.id == w.my_id) {
-        let recs: Vec<String> = a.records().iter().map(|(t, r)| format!("{t:#x} miss {} kind {} anim {} info {} scale {} value {} msg {}", r.miss, r.kind, r.animation, r.info, r.scale, r.value, r.message)).collect();
+        let recs: Vec<String> = a
+            .records()
+            .iter()
+            .map(|(t, r)| {
+                format!(
+                    "{t:#x} miss {} kind {} anim {} info {} scale {} value {} msg {}",
+                    r.miss, r.kind, r.animation, r.info, r.scale, r.value, r.message
+                )
+            })
+            .collect();
         log::debug!(target: "motion", "0x028 category {} arg {:#x} from {:#x}: {recs:?}", a.category, a.arg, a.actor);
     }
     // Hit, guard, parry and block reactions come from the files (dam0 -> damg / gurd / pary / gur1: ops 0x21 / 0x5a).
@@ -1101,7 +1300,13 @@ fn one_action(w: &mut World, a: &Action) {
 /// FUN_1009e090: record `k`'s message `which` (0 main from op 0x2b / the action's end, 1 proc / 2 react from op 0x71).
 pub(super) fn print_record(w: &mut World, a: &Action, k: usize, which: u8) {
     let Some((target, r)) = a.records().get(k).map(|(id, r)| (*id, (*r).clone())) else { return };
-    let work = [a.arg as i32, r.value as i32, r.proc.as_ref().map_or(0, |p| p.value as i32), r.react.as_ref().map_or(0, |p| p.value as i32), r.bit as i32];
+    let work = [
+        a.arg as i32,
+        r.value as i32,
+        r.proc.as_ref().map_or(0, |p| p.value as i32),
+        r.react.as_ref().map_or(0, |p| p.value as i32),
+        r.bit as i32,
+    ];
     let id = match which {
         0 => Some(r.message),
         1 => r.proc.as_ref().map(|p| p.message),
@@ -1143,7 +1348,11 @@ fn knock_shows(status: u8) -> bool {
 /// FUN_100aa940: a push starts (or replaces the running one) unless the reactor is dead, riding or in an event pose;
 /// its no-reaction and busy counters hold while it runs (held()).
 pub(super) fn knock(w: &mut World, k: &crate::fx::Knock) {
-    let status = if k.reactor == w.my_id { w.my_motion.status } else { w.entities.get(&k.reactor).map_or(0, |e| e.motion.status) };
+    let status = if k.reactor == w.my_id {
+        w.my_motion.status
+    } else {
+        w.entities.get(&k.reactor).map_or(0, |e| e.motion.status)
+    };
     if matches!(status, 2 | 3 | 5 | 6 | 0x26..=0x2b | 0x32..=0x35 | 0x38..=0x3e | 0x55) {
         return;
     }
@@ -1151,9 +1360,16 @@ pub(super) fn knock(w: &mut World, k: &crate::fx::Knock) {
     let vel = (pos - k.from).normalize_or_zero() * k.speed;
     let left = if k.ticks == 0.0 { 1.0 } else { k.ticks };
     log::debug!(target: "motion", "actor {:#x}: knockback {} speed {} decay {} ticks {left}", k.reactor, k.motion, k.speed, k.decay);
-    w.knocks.insert(k.reactor, KnockState { vel, speed: k.speed, decay: k.decay, left, origin: k.from, motion: k.motion.clone(), carry: 0.0 });
+    w.knocks.insert(
+        k.reactor,
+        KnockState { vel, speed: k.speed, decay: k.decay, left, origin: k.from, motion: k.motion.clone(), carry: 0.0 },
+    );
     if knock_shows(status) {
-        actmotion::play_op(w, k.reactor, Some(sched::Motion { name: k.motion.clone(), at: 0, speed: 1.0, ticks: 0, count: k.count, blend: 12 }));
+        actmotion::play_op(
+            w,
+            k.reactor,
+            Some(sched::Motion { name: k.motion.clone(), at: 0, speed: 1.0, ticks: 0, count: k.count, blend: 12 }),
+        );
     }
 }
 
@@ -1189,7 +1405,11 @@ pub(super) fn knock_recover(w: &mut World, id: u32) {
     let Some(a) = w.actors.get(&id) else { return };
     let Some(ch) = a.character.clone() else { return };
     let len = actmotion::motion_len(a, &ch, &name, 1.0);
-    actmotion::play_op(w, id, Some(sched::Motion { name, at: 0, speed: 1.0, ticks: len.ceil() as u16, count: 1, blend: 12 }));
+    actmotion::play_op(
+        w,
+        id,
+        Some(sched::Motion { name, at: 0, speed: 1.0, ticks: len.ceil() as u16, count: 1, blend: 12 }),
+    );
 }
 
 /// FUN_100a4140 for a skill action's load (busy +1; 1800-tick safety, +0x11e).
@@ -1226,9 +1446,17 @@ pub(super) fn fx_release(w: &mut World, id: u32) {
 /// is 0; standing "dfi?" / "dbi?" (side 0 by where the other actor stands, 1 front, 2 back), moving "dfm?" unless side
 /// 2 ("dbm?"); an overlay at amount x {0.25, 0.5, 1.0}[level] with the op's rate, count, blend-in and fade.
 pub(super) fn react_op(w: &mut World, r: &crate::fx::React) {
-    let status = if r.reactor == w.my_id { w.my_motion.status } else { w.entities.get(&r.reactor).map_or(0, |e| e.motion.status) };
+    let status = if r.reactor == w.my_id {
+        w.my_motion.status
+    } else {
+        w.entities.get(&r.reactor).map_or(0, |e| e.motion.status)
+    };
     // FUN_1005e5f0: none while the reactor is being knocked back.
-    if r.level == 0 || w.noreact.get(&r.reactor).is_some_and(|t| *t > Instant::now()) || w.knocks.contains_key(&r.reactor) || matches!(status, 2 | 3 | 5 | 0x55) {
+    if r.level == 0
+        || w.noreact.get(&r.reactor).is_some_and(|t| *t > Instant::now())
+        || w.knocks.contains_key(&r.reactor)
+        || matches!(status, 2 | 3 | 5 | 0x55)
+    {
         return;
     }
     let front = match r.side {
@@ -1240,18 +1468,33 @@ pub(super) fn react_op(w: &mut World, r: &crate::fx::React) {
         },
     };
     let name = match (moving(w, r.reactor), front) {
-        (true, _) => if r.side == 2 { "dbm" } else { "dfm" },
+        (true, _) => {
+            if r.side == 2 {
+                "dbm"
+            } else {
+                "dfm"
+            }
+        }
         (false, true) => "dfi",
         (false, false) => "dbi",
     };
     let Some(a) = w.actors.get_mut(&r.reactor) else { return };
     let Some(ch) = a.character.clone() else { return };
-    if a.oneshot.as_ref().is_some_and(|o| o.name.starts_with("ded")) || actmotion::find(&a.extra, &ch, name).is_empty() {
+    if a.oneshot.as_ref().is_some_and(|o| o.name.starts_with("ded")) || actmotion::find(&a.extra, &ch, name).is_empty()
+    {
         return;
     }
     let weight = r.amount * [0.0, 0.25, 0.5, 1.0][r.level.min(3) as usize];
     log::debug!(target: "motion", "actor {:#x}: op reaction {name} weight {weight} count {} blend {} fade {} side {}", r.reactor, r.count, r.blend_in, r.fade, r.side);
-    a.overlay = Some(actmotion::Overlay { name: name.to_string(), ticks: 0.0, weight, cycles: r.count.clamp(1, 255) as u8, fade: r.fade, rate: if r.rate > 0.0 { r.rate } else { 1.0 }, blend_in: r.blend_in });
+    a.overlay = Some(actmotion::Overlay {
+        name: name.to_string(),
+        ticks: 0.0,
+        weight,
+        cycles: r.count.clamp(1, 255) as u8,
+        fade: r.fade,
+        rate: if r.rate > 0.0 { r.rate } else { 1.0 },
+        blend_in: r.blend_in,
+    });
 }
 
 /// FUN_1008c6c0: `sdep` for a trust (+0x12c bit 22) or with entity +0x12f bit 0, else table 0x1032d5f0 by entity
@@ -1270,7 +1513,14 @@ pub(super) fn sdep(w: &World, id: u32) -> bool {
 /// FUN_1008c6c0: the scheduler an applied status change runs: a model-id actor leaving battle `bton`, engaging
 /// `ntob`; a death the pick's (death_scheduler; its ded? / cor? are die()'s, so the task's motions are off), or
 /// `sdep` with its own motions (vtable +0x298). Not done: fishing.
-pub(super) fn status_schedulers(fx: &mut crate::fx::Effects, actors: &std::collections::HashMap<u32, Actor>, id: u32, old: u8, new: u8, sdep: bool) {
+pub(super) fn status_schedulers(
+    fx: &mut crate::fx::Effects,
+    actors: &std::collections::HashMap<u32, Actor>,
+    id: u32,
+    old: u8,
+    new: u8,
+    sdep: bool,
+) {
     if old == new {
         return;
     }
@@ -1325,14 +1575,22 @@ pub(super) fn tick(w: &mut World) {
         }
     }
     w.loads.retain(|_, l| l.1 > now);
-    let released: Vec<(u32, u8)> = w.held_status.iter().filter(|(id, s)| !held(w, **id) && !super::fishrod::walking_hold(w, **id, **s) && !super::chair::holding(w, **id)).map(|(id, s)| (*id, *s)).collect();
+    let released: Vec<(u32, u8)> = w
+        .held_status
+        .iter()
+        .filter(|(id, s)| {
+            !held(w, **id) && !super::fishrod::walking_hold(w, **id, **s) && !super::chair::holding(w, **id)
+        })
+        .map(|(id, s)| (*id, *s))
+        .collect();
     for (id, s) in released {
         w.held_status.remove(&id);
         apply_status(w, id, s);
     }
     w.holds.retain(|_, t| *t > now);
     w.noreact.retain(|_, t| *t > now);
-    let (due, rest): (Vec<Pending>, Vec<Pending>) = std::mem::take(&mut w.pending).into_iter().partition(|p| p.at <= now);
+    let (due, rest): (Vec<Pending>, Vec<Pending>) =
+        std::mem::take(&mut w.pending).into_iter().partition(|p| p.at <= now);
     w.pending = rest;
     for p in due {
         for m in p.messages {
@@ -1350,7 +1608,10 @@ fn position(w: &World, id: u32) -> Option<(Vec3, u8)> {
 
 /// Ticks a motion takes at `speed`: frames / (speed * 0.5) (motion player 0x10019ab0).
 fn motion_ticks(a: &Actor, ch: &Character, name: &str, speed: f32) -> f32 {
-    actmotion::find(&a.extra, ch, name).iter().map(|x| x.frames as f32 / (x.speed * speed * 0.5).max(1e-3)).fold(0.0, f32::max)
+    actmotion::find(&a.extra, ch, name)
+        .iter()
+        .map(|x| x.frames as f32 / (x.speed * speed * 0.5).max(1e-3))
+        .fold(0.0, f32::max)
 }
 
 /// Actor +0xf8: set when it moved more than a threshold this frame (0x100a4248); picks the moving
@@ -1385,7 +1646,12 @@ pub(super) fn swing_hand(record: Option<(u8, u16)>) -> Option<char> {
     }
 }
 
-pub(super) fn start_attack(w: &mut World, actor: u32, _target: Option<u32>, record: Option<(u8, u16)>) -> Option<(Duration, String, Option<u32>, Option<u32>)> {
+pub(super) fn start_attack(
+    w: &mut World,
+    actor: u32,
+    _target: Option<u32>,
+    record: Option<(u8, u16)>,
+) -> Option<(Duration, String, Option<u32>, Option<u32>)> {
     let moving = moving(w, actor);
     let sub = w.entities.get(&actor).map_or(0, |e| e.sub[2]);
     let seed = Instant::now().duration_since(w.started).subsec_nanos() as usize;
@@ -1417,15 +1683,27 @@ pub(super) fn start_attack(w: &mut World, actor: u32, _target: Option<u32>, reco
     let len = if m.ticks > 0 { m.ticks as f32 } else { motion_ticks(a, &ch, &m.name, 1.0) };
     let rate = actmotion::op_rate(actmotion::find(&a.extra, &ch, &m.name).first().copied(), len);
     play(a, &m.name, len, rate);
-    Some((Duration::from_secs_f32(plan.hit_at.unwrap_or(0) as f32 / 60.0), a.last_attack.clone(), plan.attacker_hold, plan.target_hold))
+    Some((
+        Duration::from_secs_f32(plan.hit_at.unwrap_or(0) as f32 / 60.0),
+        a.last_attack.clone(),
+        plan.attacker_hold,
+        plan.target_hold,
+    ))
 }
 
 /// FUN_100cde70 / FUN_100cdf00 for ops 0x5a / 0x5b: none while the reactor is in its own no-reaction hold or riding;
 /// standing `gdi?` / `pyi?`, moving `gdm?` / `pym?`, no fallback between them; an overlay at amount 1.0 with the op's
 /// rate, count, blend-in and fade (no level, no direction, no dead check).
 pub(super) fn guard_op(w: &mut World, g: &crate::fx::Guard) {
-    let status = if g.reactor == w.my_id { w.my_motion.status } else { w.entities.get(&g.reactor).map_or(0, |e| e.motion.status) };
-    if w.noreact.get(&g.reactor).is_some_and(|t| *t > Instant::now()) || w.knocks.contains_key(&g.reactor) || matches!(status, 5 | 0x55) {
+    let status = if g.reactor == w.my_id {
+        w.my_motion.status
+    } else {
+        w.entities.get(&g.reactor).map_or(0, |e| e.motion.status)
+    };
+    if w.noreact.get(&g.reactor).is_some_and(|t| *t > Instant::now())
+        || w.knocks.contains_key(&g.reactor)
+        || matches!(status, 5 | 0x55)
+    {
         return;
     }
     let name = match (g.parry, moving(w, g.reactor)) {
@@ -1440,7 +1718,15 @@ pub(super) fn guard_op(w: &mut World, g: &crate::fx::Guard) {
         return;
     }
     log::debug!(target: "motion", "actor {:#x}: {name} count {} fade {}", g.reactor, g.count, g.fade);
-    a.overlay = Some(actmotion::Overlay { name: name.to_string(), ticks: 0.0, weight: 1.0, cycles: g.count.clamp(1, 255) as u8, fade: g.fade, rate: if g.rate > 0.0 { g.rate } else { 1.0 }, blend_in: g.blend_in });
+    a.overlay = Some(actmotion::Overlay {
+        name: name.to_string(),
+        ticks: 0.0,
+        weight: 1.0,
+        cycles: g.count.clamp(1, 255) as u8,
+        fade: g.fade,
+        rate: if g.rate > 0.0 { g.rate } else { 1.0 },
+        blend_in: g.blend_in,
+    });
 }
 
 /// Death: the actor's death scheduler (dead, or the op 0xac pick's) plays "ded?" for its op length, then the corpse
@@ -1454,7 +1740,11 @@ pub(super) fn die(actor: &mut Actor, sdep: bool) {
     let which = death_scheduler(actor.death_pick, false);
     let plan = actmotion::scheduler(&actor.extra, &ch, which).map(|d| sched::plan(d, &[]));
     let (name, len, speed) = match plan.as_ref().and_then(|p| p.motions.first()) {
-        Some(m) => (m.name.clone(), m.ticks as f32, actmotion::op_rate(actmotion::find(&actor.extra, &ch, &m.name).first().copied(), m.ticks as f32)),
+        Some(m) => (
+            m.name.clone(),
+            m.ticks as f32,
+            actmotion::op_rate(actmotion::find(&actor.extra, &ch, &m.name).first().copied(), m.ticks as f32),
+        ),
         None if actor.death_pick != 0 => return,
         None => ("ded".to_string(), motion_ticks(actor, &ch, "ded", 1.0), 1.0),
     };
@@ -1488,7 +1778,12 @@ pub(super) fn action_file(w: &mut World, kind: u8, id: u32, a: u32, b: u32) {
         _ => return,
     };
     let result = ActionResult { animation: id as u16, ..Default::default() };
-    let act = Action { actor: a, category, targets: vec![ActionTarget { id: b, results: vec![result] }], ..Default::default() };
+    let act = Action {
+        actor: a,
+        category,
+        targets: vec![ActionTarget { id: b, results: vec![result] }],
+        ..Default::default()
+    };
     if category == 1 {
         // FUN_100d67b0 (characters only): a swing unless one is already playing (+0x2a4) *(inf: not checked)*.
         if let Some((_, swing, _, _)) = start_attack(w, a, Some(b), None) {
@@ -1508,7 +1803,8 @@ pub(super) fn on_magic_scheduler(w: &mut World, ids: (u32, u32), indices: (u16, 
     const KINDS: [u8; 13] = [1, 0, 2, 3, 4, 5, 0x10, 0x11, 6, 0x12, 7, 8, 9];
     let Some(&k) = KINDS.get(kind as usize) else { return };
     let ok = |id: u32, index: u16| {
-        let known = if id == w.my_id { w.my_index == index } else { w.entities.get(&id).is_some_and(|e| e.index == index) };
+        let known =
+            if id == w.my_id { w.my_index == index } else { w.entities.get(&id).is_some_and(|e| e.index == index) };
         known && w.actors.get(&id).is_some_and(|a| a.character.is_some())
     };
     if !(ok(ids.0, indices.0) && ok(ids.1, indices.1)) {
@@ -1538,11 +1834,17 @@ pub(super) fn run_map_schedulers(w: &mut World) {
             continue;
         }
         let ok = |id: u32, index: u16| {
-            let known = if id == w.my_id { w.my_index == index } else { w.entities.get(&id).is_some_and(|e| e.index == index) };
+            let known =
+                if id == w.my_id { w.my_index == index } else { w.entities.get(&id).is_some_and(|e| e.index == index) };
             known && w.actors.get(&id).is_some_and(|a| a.character.is_some())
         };
         if ok(ids.0, indices.0) && ok(ids.1, indices.1) {
-            w.effects.on_event_scheduler(file, n, crate::fx::sched::Who::Actor(ids.0), crate::fx::sched::Who::Actor(ids.1));
+            w.effects.on_event_scheduler(
+                file,
+                n,
+                crate::fx::sched::Who::Actor(ids.0),
+                crate::fx::sched::Who::Actor(ids.1),
+            );
         } else {
             log::debug!("0x039 {}: actors not ready, dropped", String::from_utf8_lossy(&name));
         }
@@ -1566,8 +1868,34 @@ const LAYOUTS: [&[u8]; 8] = [
 /// Command labels at 0x103634f8 + 12 * cmd: (sprite, library 0 = keytops3 / 1 = windowps; FUN_101270a0
 /// stores FUN_101bf3a0(2) and (1) at +0x14 / +0x18).
 const LABELS: [(u16, u8); 0x1c] = [
-    (0, 0), (0x10, 0), (0x17, 0), (0x16, 0), (1, 0), (1, 0), (0x16b, 1), (4, 0), (7, 0), (0xa, 0), (0x13, 0), (0x13, 0), (0x19, 0), (0xd, 0),
-    (0x26, 0), (0x27, 0), (0x4f, 1), (0x16a, 1), (6, 0), (0x1c, 1), (0x1c, 1), (0x29, 0), (0x164, 0), (0x165, 0), (0x166, 0), (0x1f9, 0), (0x29c, 1), (0x30f, 1),
+    (0, 0),
+    (0x10, 0),
+    (0x17, 0),
+    (0x16, 0),
+    (1, 0),
+    (1, 0),
+    (0x16b, 1),
+    (4, 0),
+    (7, 0),
+    (0xa, 0),
+    (0x13, 0),
+    (0x13, 0),
+    (0x19, 0),
+    (0xd, 0),
+    (0x26, 0),
+    (0x27, 0),
+    (0x4f, 1),
+    (0x16a, 1),
+    (6, 0),
+    (0x1c, 1),
+    (0x1c, 1),
+    (0x29, 0),
+    (0x164, 0),
+    (0x165, 0),
+    (0x166, 0),
+    (0x1f9, 0),
+    (0x29c, 1),
+    (0x30f, 1),
 ];
 
 /// mp_pmode (Monstrosity): command n of table 0x103701e8 {help, Enter, Right} is 0x40 + n here.
@@ -1797,7 +2125,8 @@ fn facts(w: &World, l: usize) -> Facts {
         our_trust: e.is_some_and(|e| e.marks.trust && e.master != 0 && e.master == w.my_index),
         treasure: super::treasure::count(w) > 0,
         team: w.my_team,
-        water: w.zone != Some(0xd3) && w.ground.as_ref().is_some_and(|g| g.water_ahead(w.pos, super::fishing::forward(w))),
+        water: w.zone != Some(0xd3)
+            && w.ground.as_ref().is_some_and(|g| g.water_ahead(w.pos, super::fishing::forward(w))),
         mounted: w.my_motion.status == 0x55,
         trusts_only: w.party.slots().trusts_only(),
     }
@@ -1916,7 +2245,22 @@ pub(super) fn battle_frame(w: &mut World) {
 /// lists (Magic, Abilities, Trust, Items) close it and, engaged, bring it back when they are done; Chat, Tell, Talk
 /// close it.
 pub(super) fn keeps_menu(c: u8) -> bool {
-    matches!(c, cmd::ATTACK | cmd::CALL_HELP | cmd::DISENGAGE | 0xa | cmd::CHECK | cmd::SWITCH_TARGET | cmd::TREASURE | cmd::RELEASE | 0xd | 0x10 | 0x11 | 0x1b | 0x16..=0x18 | mon::ATTACK | mon::SWITCH | mon::DISENGAGE | mon::CHECK | mon::TREASURE)
+    matches!(
+        c,
+        cmd::ATTACK
+            | cmd::CALL_HELP
+            | cmd::DISENGAGE
+            | 0xa
+            | cmd::CHECK
+            | cmd::SWITCH_TARGET
+            | cmd::TREASURE
+            | cmd::RELEASE
+            | 0xd
+            | 0x10
+            | 0x11
+            | 0x1b
+            | 0x16..=0x18 | mon::ATTACK | mon::SWITCH | mon::DISENGAGE | mon::CHECK | mon::TREASURE
+    )
 }
 
 /// Window name per row count (table 0x103636b0: actionm1 .. actiom10).
@@ -1962,10 +2306,19 @@ pub(super) fn choose(w: &mut World, c: u8) -> bool {
             super::target::open_sub(w, 0x20, super::target::SubThen::Check, None, String::new(), 0);
         }
         (0xa | cmd::CHECK, _) if w.target.is_some() => check(w, None, 0, false),
-        (0x16..=0x18, _) => super::textcmd::run(w, ["/quarry", "/scout", "/sprint"][(c - 0x16) as usize], super::textcmd::Mode::Internal),
+        (0x16..=0x18, _) => super::textcmd::run(
+            w,
+            ["/quarry", "/scout", "/sprint"][(c - 0x16) as usize],
+            super::textcmd::Mode::Internal,
+        ),
         // FUN_1012b880 cases 3 / 4: the chat line, "/tell <target> " on a target (string 0x1036f5c8).
         (cmd::CHAT | cmd::TELL, _) => {
-            w.chat_input = match w.target.and_then(|t| w.entities.get(&t)).map(|e| super::monstrosity::name(e).to_string()).filter(|n| !n.is_empty() && c == cmd::TELL) {
+            w.chat_input = match w
+                .target
+                .and_then(|t| w.entities.get(&t))
+                .map(|e| super::monstrosity::name(e).to_string())
+                .filter(|n| !n.is_empty() && c == cmd::TELL)
+            {
                 Some(n) => format!("/tell {n} "),
                 None => String::new(),
             };
@@ -2012,7 +2365,9 @@ pub(super) fn choose(w: &mut World, c: u8) -> bool {
         // mp_pmode (FUN_101414b0 .. FUN_101416e0): Chat "/tell <shown name> " on any target, then closed; Magic in cast
         // mode with every type; Abilities mp_abisc; Check as playermo's; Treasure only with items.
         (mon::CHAT, _) => {
-            w.chat_input = super::monstrosity::name_of(w, w.target.unwrap_or(0)).filter(|_| w.target.is_some()).map_or(String::new(), |n| format!("/tell {n} "));
+            w.chat_input = super::monstrosity::name_of(w, w.target.unwrap_or(0))
+                .filter(|_| w.target.is_some())
+                .map_or(String::new(), |n| format!("/tell {n} "));
             w.chat_caret = None;
             w.typing = true;
         }
@@ -2074,7 +2429,8 @@ mod tests {
         let mut r = Roster::default();
         r.refresh_self(ME, 0x400, "Me", 230);
         r.table(&[(ME, 0x400, 4, 230), (0x200, 0x401, 0, 230), (0x300, 0x402, 0, 230)]);
-        let list = |id, index, flags| ListUpdate { id, index, flags, zone: 230, name: "X".into(), ..Default::default() };
+        let list =
+            |id, index, flags| ListUpdate { id, index, flags, zone: 230, name: "X".into(), ..Default::default() };
         r.list(&list(ME, 0x400, 4), ME, false);
         r.list(&list(0x200, 0x401, 0), ME, false);
         // Party number 1 (flags & 3): an alliance member.
@@ -2104,7 +2460,15 @@ mod tests {
         for dt in [1.0f32, 0.2] {
             for (level, total, dist, recover) in [(1, 47.0, 1.41, 5.0), (7, 123.0, 10.61, 45.0)] {
                 let row = t[level];
-                let mut k = KnockState { vel: Vec3::X * row[0], speed: row[0], decay: row[1], left: row[2], origin: Vec3::ZERO, motion: "bf0".into(), carry: 0.0 };
+                let mut k = KnockState {
+                    vel: Vec3::X * row[0],
+                    speed: row[0],
+                    decay: row[1],
+                    left: row[2],
+                    origin: Vec3::ZERO,
+                    motion: "bf0".into(),
+                    carry: 0.0,
+                };
                 let (mut p, mut ticks, mut at) = (Vec3::ZERO, 0.0f32, None);
                 loop {
                     ticks += dt;
@@ -2117,7 +2481,11 @@ mod tests {
                         break;
                     }
                 }
-                assert!((ticks - total).abs() <= 1.0 && (p.x - dist).abs() < 0.02, "level {level} dt {dt}: {ticks} ticks, {}", p.x);
+                assert!(
+                    (ticks - total).abs() <= 1.0 && (p.x - dist).abs() < 0.02,
+                    "level {level} dt {dt}: {ticks} ticks, {}",
+                    p.x
+                );
                 assert!(at.is_some_and(|a| (a - recover).abs() <= dt + 1e-3), "level {level} dt {dt}: bf1 at {at:?}");
             }
         }
@@ -2165,7 +2533,13 @@ mod tests {
     }
 
     fn rel(actor: u32, target: u32) -> Relation {
-        if target == ME { Relation::TargetIsMe } else if actor == ME { Relation::CasterIsMe } else { Relation::Other }
+        if target == ME {
+            Relation::TargetIsMe
+        } else if actor == ME {
+            Relation::CasterIsMe
+        } else {
+            Relation::Other
+        }
     }
 
     /// Area hits merged: the plural text from the message table, the targets joined with their articles.
@@ -2173,17 +2547,36 @@ mod tests {
     fn targets_merged() {
         let Some(bt) = load() else { return };
         let plural = Who { name: NAME.into(), pc: true, named: true, plural: true, ..Default::default() };
-        let ctx = Ctx { actor: who(ME), target: Some(plural), me: "Tuxedo".into(), work: [0, SLOT, 0, 0, 0], ..Default::default() };
+        let ctx = Ctx {
+            actor: who(ME),
+            target: Some(plural),
+            me: "Tuxedo".into(),
+            work: [0, SLOT, 0, 0, 0],
+            ..Default::default()
+        };
         let t = render(&bt, 264, Relation::Other, &ctx, &Default::default())[0].0.clone();
         assert_eq!(t, format!("{NAME} take {SLOT} points of damage."));
         // Magic's first record: its second line is the same target line.
         assert_eq!(render(&bt, 2, Relation::Other, &ctx, &Default::default())[1].0, t);
-        let g = Targets { seq: 1, template: t, line: 0, first: true, entries: vec![("the Wild Rabbit".into(), 50), ("the Orc".into(), 48), ("Raven".into(), 45)] };
+        let g = Targets {
+            seq: 1,
+            template: t,
+            line: 0,
+            first: true,
+            entries: vec![("the Wild Rabbit".into(), 50), ("the Orc".into(), 48), ("Raven".into(), 45)],
+        };
         assert_eq!(targets_text(&g), "The Wild Rabbit, the Orc, and Raven take 50, 48, and 45 points of damage.");
         // A status by id: no number in the line; a possessive keeps each name's own.
         let ctx = Ctx { work: [0, 68, 0, 0, 0], ..ctx };
-        let t = render(&bt, 285, Relation::Other, &ctx, &Default::default())[0].0.replacen(&format!("{NAME}'"), NAME, 1);
-        let g = Targets { seq: 1, template: t, line: 0, first: true, entries: vec![("Lnxcsfix's".into(), 68), ("Aurelie's".into(), 68)] };
+        let t =
+            render(&bt, 285, Relation::Other, &ctx, &Default::default())[0].0.replacen(&format!("{NAME}'"), NAME, 1);
+        let g = Targets {
+            seq: 1,
+            template: t,
+            line: 0,
+            first: true,
+            entries: vec![("Lnxcsfix's".into(), 68), ("Aurelie's".into(), 68)],
+        };
         assert_eq!(targets_text(&g), "Lnxcsfix's and Aurelie's attacks are enhanced.");
     }
 
@@ -2191,40 +2584,91 @@ mod tests {
     #[test]
     fn replayed_packets() {
         let Some(bt) = load() else { return };
-        let say = |id: u16, actor: u32, target: u32, work: [i32; 5]| render(&bt, id, rel(actor, target), &Ctx { actor: who(actor), target: who(target), me: "Tuxedo".into(), work, ..Default::default() }, &Default::default());
+        let say = |id: u16, actor: u32, target: u32, work: [i32; 5]| {
+            render(
+                &bt,
+                id,
+                rel(actor, target),
+                &Ctx { actor: who(actor), target: who(target), me: "Tuxedo".into(), work, ..Default::default() },
+                &Default::default(),
+            )
+        };
         let cfg = crate::gamecfg::Values::default();
         let (red, white) = (bt.colour_in(0x1c, &cfg), bt.colour_in(0x14, &cfg));
 
         let m = battle_message(&lsb_message(0x29, ME, RABBIT, [0, 0], [0x400, 0x011], 6));
         assert_eq!((m.actor_index, m.target_index, m.message), (0x400, 0x011, 6));
-        assert_eq!(say(m.message, m.actor, m.target, [m.data[0], m.data[1], 0, 0, 0]), [("Tuxedo defeats the Wild Rabbit.".to_string(), bt.colour_in(bt.mode(6, Relation::CasterIsMe), &cfg))]);
+        assert_eq!(
+            say(m.message, m.actor, m.target, [m.data[0], m.data[1], 0, 0, 0]),
+            [("Tuxedo defeats the Wild Rabbit.".to_string(), bt.colour_in(bt.mode(6, Relation::CasterIsMe), &cfg))]
+        );
 
         let m = battle_message2(&lsb_message(0x2d, ME, ME, [50, 0], [0x400, 0x400], 8));
-        assert_eq!(say(m.message, m.actor, m.target, [m.data[0], m.data[1], 0, 0, 0])[0].0, "Tuxedo gains 50 experience points.");
+        assert_eq!(
+            say(m.message, m.actor, m.target, [m.data[0], m.data[1], 0, 0, 0])[0].0,
+            "Tuxedo gains 50 experience points."
+        );
 
         // The rabbit hits for 7 with a 3-point additional effect, then misses.
-        let hit = ActionResult { kind: 1, scale: 1, value: 7, message: 1, proc: Some(Side { kind: 1, info: 0, value: 3, message: 163 }), ..Default::default() };
+        let hit = ActionResult {
+            kind: 1,
+            scale: 1,
+            value: 7,
+            message: 1,
+            proc: Some(Side { kind: 1, info: 0, value: 3, message: 163 }),
+            ..Default::default()
+        };
         let miss = ActionResult { miss: 1, kind: 1, message: 15, ..Default::default() };
-        let a = Action { actor: RABBIT, category: category::BASIC_ATTACK, arg: u32::from_le_bytes(*b"atk0"), info: 0, targets: vec![ActionTarget { id: ME, results: vec![hit, miss] }], seq: 0 };
+        let a = Action {
+            actor: RABBIT,
+            category: category::BASIC_ATTACK,
+            arg: u32::from_le_bytes(*b"atk0"),
+            info: 0,
+            targets: vec![ActionTarget { id: ME, results: vec![hit, miss] }],
+            seq: 0,
+        };
         let decoded = parse(&sub(pack(&a)).data);
-        let lines: Vec<(String, [u8; 4])> = action_messages(&decoded).into_iter().flat_map(|(id, t, work)| say(id, decoded.actor, t, work)).collect();
+        let lines: Vec<(String, [u8; 4])> =
+            action_messages(&decoded).into_iter().flat_map(|(id, t, work)| say(id, decoded.actor, t, work)).collect();
         assert_eq!(lines[0], ("The Wild Rabbit hits Tuxedo for 7 points of damage.".to_string(), red));
         assert_eq!(lines[1].0, "Additional effect: 3 points of damage.");
         assert_eq!(lines[2].0, "The Wild Rabbit misses Tuxedo.");
 
         // Our hit on it is drawn in the "you hit" colour.
-        let a = Action { actor: ME, targets: vec![ActionTarget { id: RABBIT, results: vec![ActionResult { message: 1, value: 12, ..Default::default() }] }], ..a };
+        let a = Action {
+            actor: ME,
+            targets: vec![ActionTarget {
+                id: RABBIT,
+                results: vec![ActionResult { message: 1, value: 12, ..Default::default() }],
+            }],
+            ..a
+        };
         let d = parse(&pack(&a));
         let (id, t, work) = action_messages(&d)[0];
-        assert_eq!(say(id, d.actor, t, work), [("Tuxedo hits the Wild Rabbit for 12 points of damage.".to_string(), white)]);
+        assert_eq!(
+            say(id, d.actor, t, work),
+            [("Tuxedo hits the Wild Rabbit for 12 points of damage.".to_string(), white)]
+        );
 
         // Condensed (modern chat): the hits of a round as one line, misses counted.
-        let ctx = |work: [i32; 5]| Ctx { actor: who(ME), target: who(RABBIT), me: "Tuxedo".into(), work, ..Default::default() };
+        let ctx = |work: [i32; 5]| Ctx {
+            actor: who(ME),
+            target: who(RABBIT),
+            me: "Tuxedo".into(),
+            work,
+            ..Default::default()
+        };
         let line = say(1, ME, RABBIT, [0, 12, 0, 0, 0])[0].0.clone();
         let t = template_of(&bt, 1, rel(ME, RABBIT), &ctx([0, 12, 0, 0, 0]), 1, &line, &cfg).unwrap();
-        assert_eq!(condensed_text(&t, &[(12, false), (15, false), (9, false)]), "Tuxedo hits the Wild Rabbit for 36 points of damage (12 + 15 + 9).");
+        assert_eq!(
+            condensed_text(&t, &[(12, false), (15, false), (9, false)]),
+            "Tuxedo hits the Wild Rabbit for 36 points of damage (12 + 15 + 9)."
+        );
         assert_eq!(condensed_text(&t, &[(12, false)]), "Tuxedo hits the Wild Rabbit for 12 points of damage.");
-        assert_eq!(condensed_text(&t, &[(12, false), (30, true)]), "Tuxedo hits the Wild Rabbit for 42 points of damage (12 + 30!).");
+        assert_eq!(
+            condensed_text(&t, &[(12, false), (30, true)]),
+            "Tuxedo hits the Wild Rabbit for 42 points of damage (12 + 30!)."
+        );
         let miss = say(15, ME, RABBIT, [0; 5])[0].0.clone();
         let t = template_of(&bt, 15, rel(ME, RABBIT), &ctx([0; 5]), 1, &miss, &cfg).unwrap();
         assert_eq!(condensed_text(&t, &[(0, false), (0, false)]), "Tuxedo misses the Wild Rabbit. (x2)");
@@ -2236,7 +2680,10 @@ mod tests {
         }
         log.push_chat("Raven : rdy?".into(), [0x80; 4], false);
         log.push_chat("Raven : rdy?".into(), [0x80; 4], false);
-        assert_eq!(log.lines().iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), ["Target out of range. (x3)", "Raven : rdy?", "Raven : rdy?"]);
+        assert_eq!(
+            log.lines().iter().map(|l| l.0.as_str()).collect::<Vec<_>>(),
+            ["Target out of range. (x3)", "Raven : rdy?", "Raven : rdy?"]
+        );
         // A line whose text is not the template with its number in is left alone.
         assert_eq!(template_of(&bt, 1, rel(ME, RABBIT), &ctx([0, 12, 0, 0, 0]), 1, "something else", &cfg), None);
     }
@@ -2294,7 +2741,10 @@ mod queue_tests {
         assert_eq!((effect_id(9, false), effect_id(9, true)), (Some(0x1fe), Some(0x388)));
         assert_eq!((effect_id(0xb, false), effect_id(0xb, true)), (Some(0x1fd), Some(0x1fd)));
         assert_eq!((effect_id(0x2d, true), effect_id(0x2d, false)), (Some(0x389), None));
-        assert_eq!((effect_id(50, false), effect_id(719, false), effect_id(811, false), effect_id(813, true)), (Some(0x2fe), Some(0x3a0), Some(0x3f8), Some(0x3f9)));
+        assert_eq!(
+            (effect_id(50, false), effect_id(719, false), effect_id(811, false), effect_id(813, true)),
+            (Some(0x2fe), Some(0x3a0), Some(0x3f8), Some(0x3f9))
+        );
         assert_eq!((effect_id(8, true), effect_id(1, false)), (None, None));
     }
 

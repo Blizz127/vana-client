@@ -143,7 +143,17 @@ pub fn open(w: &mut World, index: u8, id: u16) -> bool {
         From::Items
     };
     w.win = None;
-    w.synth.win = Some(Win { crystal: (index, id), slots: [(0, 0, 0); 10], cursor: 1, focus: Focus::Slots, list: (0, 0), qty: None, from, found: true, missing: [false; 10] });
+    w.synth.win = Some(Win {
+        crystal: (index, id),
+        slots: [(0, 0, 0); 10],
+        cursor: 1,
+        focus: Focus::Slots,
+        list: (0, 0),
+        qty: None,
+        from,
+        found: true,
+        missing: [false; 10],
+    });
     true
 }
 
@@ -290,7 +300,17 @@ fn menu_key(w: &mut World, gu: &GameUi, key: egui::Key) {
             w.sounds.push(Ui::Select as u32);
             m.history = Some((1, None));
             w.synth.menu = Some(m);
-            w.synth.win = Some(Win { crystal: (0, 0), slots: [(0, 0, 0); 10], cursor: 9, focus: Focus::Away, list: (0, 0), qty: None, from: From::History, found: false, missing: [false; 10] });
+            w.synth.win = Some(Win {
+                crystal: (0, 0),
+                slots: [(0, 0, 0); 10],
+                cursor: 9,
+                focus: Focus::Away,
+                list: (0, 0),
+                qty: None,
+                from: From::History,
+                found: false,
+                missing: [false; 10],
+            });
             refresh(w);
             return;
         }
@@ -322,13 +342,25 @@ fn refresh(w: &mut World) {
     let Some(r) = w.synth.history.get(cur as usize - 1).copied() else { return };
     let unlocked = |i: u8| w.inv.locks.get(&(0, i)).copied().unwrap_or(0) == 0;
     let crystal_id = r.crystal & 0x7fff;
-    let crystal = w.inv.slots.iter().find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == crystal_id && *n > 0 && unlocked(*i)).map(|(&(_, i), _)| i);
+    let crystal = w
+        .inv
+        .slots
+        .iter()
+        .find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == crystal_id && *n > 0 && unlocked(*i))
+        .map(|(&(_, i), _)| i);
     let mut slots = [(0u8, 0u16, 0u32); 10];
     let mut missing = [false; 10];
     let mut k = 0;
     for m in r.materials.iter().copied().filter(|m| *m != 0) {
         let used = |slots: &[(u8, u16, u32); 10], i: u8| slots.iter().find(|s| s.0 == i).map_or(0, |s| s.2);
-        let at = w.inv.slots.iter().find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == m && unlocked(*i) && Some(*i) != crystal && used(&slots, *i) < *n).map(|(&(_, i), _)| i);
+        let at = w
+            .inv
+            .slots
+            .iter()
+            .find(|((c, i), (id, n))| {
+                *c == 0 && *i != 0 && *id == m && unlocked(*i) && Some(*i) != crystal && used(&slots, *i) < *n
+            })
+            .map(|(&(_, i), _)| i);
         match at {
             Some(i) if slots.iter().any(|s| s.0 == i) => {
                 if let Some(s) = slots.iter_mut().find(|s| s.0 == i) {
@@ -347,7 +379,8 @@ fn refresh(w: &mut World) {
         }
     }
     if let Some(s) = w.synth.win.as_mut() {
-        (s.crystal, s.found, s.slots, s.missing) = ((crystal.unwrap_or(0), crystal_id), crystal.is_some(), slots, missing);
+        (s.crystal, s.found, s.slots, s.missing) =
+            ((crystal.unwrap_or(0), crystal_id), crystal.is_some(), slots, missing);
     }
 }
 
@@ -367,8 +400,16 @@ pub fn load_history(w: &mut World, dir: &std::path::Path) {
             continue;
         }
         let u16_at = |o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
-        let r = Record { result: b[4], grade: b[5] as i8, item: u16_at(6), crystal: u16_at(8), materials: std::array::from_fn(|i| u16_at(0xa + 2 * i)) };
-        if !w.synth.history.iter().any(|x| x.crystal & 0x7fff == r.crystal & 0x7fff && x.materials == r.materials) && w.synth.history.len() < 10 {
+        let r = Record {
+            result: b[4],
+            grade: b[5] as i8,
+            item: u16_at(6),
+            crystal: u16_at(8),
+            materials: std::array::from_fn(|i| u16_at(0xa + 2 * i)),
+        };
+        if !w.synth.history.iter().any(|x| x.crystal & 0x7fff == r.crystal & 0x7fff && x.materials == r.materials)
+            && w.synth.history.len() < 10
+        {
             w.synth.history.push(r);
         }
     }
@@ -397,7 +438,8 @@ pub fn save_history(w: &World, dir: &std::path::Path) {
 /// their record (a failure does not replace a success; the favourite stays); a full list loses its oldest record
 /// that is not a favourite.
 fn add_history(w: &mut World, a: &Answer) {
-    let mut r = Record { result: a.result, grade: a.grade, item: a.item, crystal: a.crystal & 0x7fff, materials: a.materials };
+    let mut r =
+        Record { result: a.result, grade: a.grade, item: a.item, crystal: a.crystal & 0x7fff, materials: a.materials };
     let h = &mut w.synth.history;
     if let Some(k) = h.iter().position(|x| x.crystal & 0x7fff == r.crystal && x.materials == r.materials) {
         let old = h.remove(k);
@@ -466,11 +508,18 @@ pub fn lastsynth(w: &mut World, args: &[&str]) -> std::result::Result<(), ()> {
 fn find_units(w: &World, r: &Record) -> Option<((u8, u16), [(u8, u16, u32); 10])> {
     let unlocked = |i: u8| w.inv.locks.get(&(0, i)).copied().unwrap_or(0) == 0;
     let crystal_id = r.crystal & 0x7fff;
-    let crystal = w.inv.slots.iter().find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == crystal_id && *n > 0 && unlocked(*i)).map(|(&(_, i), _)| i)?;
+    let crystal = w
+        .inv
+        .slots
+        .iter()
+        .find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == crystal_id && *n > 0 && unlocked(*i))
+        .map(|(&(_, i), _)| i)?;
     let mut slots = [(0u8, 0u16, 0u32); 10];
     for m in r.materials.iter().copied().filter(|m| *m != 0) {
         let used = |i: u8| slots.iter().find(|s| s.0 == i).map_or(0, |s| s.2);
-        let (&(_, i), _) = w.inv.slots.iter().find(|((c, i), (id, n))| *c == 0 && *i != 0 && *id == m && unlocked(*i) && (*i != crystal || *id != crystal_id) && used(*i) < *n)?;
+        let (&(_, i), _) = w.inv.slots.iter().find(|((c, i), (id, n))| {
+            *c == 0 && *i != 0 && *id == m && unlocked(*i) && (*i != crystal || *id != crystal_id) && used(*i) < *n
+        })?;
         match slots.iter_mut().find(|s| s.0 == i) {
             Some(s) => s.2 += 1,
             None => *slots.iter_mut().find(|s| s.0 == 0)? = (i, m, 1),
@@ -525,7 +574,8 @@ fn place(s: &mut Win, index: u8, id: u16, count: u32) {
 /// counts.
 fn still_held(w: &World, s: &Win) -> bool {
     let held = |index: u8, id: u16, count: u32| {
-        w.inv.slots.get(&(0, index)).is_some_and(|e| (id == 0 || e.0 == id) && e.1 != 0 && e.1 >= count) && w.inv.locks.get(&(0, index)).copied().unwrap_or(0) == 0
+        w.inv.slots.get(&(0, index)).is_some_and(|e| (id == 0 || e.0 == id) && e.1 != 0 && e.1 >= count)
+            && w.inv.locks.get(&(0, index)).copied().unwrap_or(0) == 0
     };
     if s.crystal.0 == 0 || !held(s.crystal.0, s.crystal.1, 1) {
         return false;
@@ -613,7 +663,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
         Focus::Away => {}
         Focus::Slots => match key {
             K::ArrowUp | K::ArrowDown | K::ArrowRight | K::ArrowLeft => {
-                let to = if w.modern { super::trade::modern_link(s.cursor, key, false) } else { link(gu, TSKILL1, s.cursor, key) };
+                let to = if w.modern {
+                    super::trade::modern_link(s.cursor, key, false)
+                } else {
+                    link(gu, TSKILL1, s.cursor, key)
+                };
                 if to != s.cursor && to != 0 {
                     s.cursor = to;
                     w.sounds.push(Ui::Cursor as u32);
@@ -666,10 +720,10 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
             let (mut sc, mut cu) = s.list;
             match key {
                 K::ArrowUp | K::ArrowDown => {
-                if super::items::list_keys(&mut sc, &mut cu, rows.len(), key) {
-                    w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    if super::items::list_keys(&mut sc, &mut cu, rows.len(), key) {
+                        w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    }
                 }
-            }
                 K::ArrowRight | K::ArrowLeft => {
                     if super::items::page_keys(&mut sc, &mut cu, rows.len(), key == K::ArrowRight) {
                         w.sounds.push(Ui::Cursor as u32);
@@ -808,11 +862,23 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
         }
     };
     match w.synth.win.as_ref().map(|s| (s.focus, s.cursor, s.list)) {
-        Some((Focus::Slots, cursor, _)) => generic(w, gu, TSKILL1, cursor, 1..=10, p, moved, clicked, right, |w, id| {
-            if let Some(s) = w.synth.win.as_mut() {
-                s.cursor = id;
-            }
-        }, keys),
+        Some((Focus::Slots, cursor, _)) => generic(
+            w,
+            gu,
+            TSKILL1,
+            cursor,
+            1..=10,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(s) = w.synth.win.as_mut() {
+                    s.cursor = id;
+                }
+            },
+            keys,
+        ),
         Some((Focus::List, _, at)) => {
             let n = picker_rows(w).len();
             list(w, at, n, |w, r| {
@@ -826,17 +892,41 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
             let Some(m) = w.synth.menu.as_ref() else { return };
             let n = w.synth.history.len() as u16;
             match (m.history, m.crystals) {
-                (Some((cur, Some(f))), _) => generic(w, gu, CMBHWIN, f, 1..=2, p, moved, clicked, right, |w, id| {
-                    if let Some(m) = w.synth.menu.as_mut() {
-                        m.history = Some((cur, Some(id)));
-                    }
-                }, keys),
-                (Some((cur, None)), _) => generic(w, gu, CMBHLST, cur, 1..=n.max(1), p, moved, clicked, right, |w, id| {
-                    if let Some(m) = w.synth.menu.as_mut() {
-                        m.history = Some((id, None));
-                    }
-                    refresh(w);
-                }, keys),
+                (Some((cur, Some(f))), _) => generic(
+                    w,
+                    gu,
+                    CMBHWIN,
+                    f,
+                    1..=2,
+                    p,
+                    moved,
+                    clicked,
+                    right,
+                    |w, id| {
+                        if let Some(m) = w.synth.menu.as_mut() {
+                            m.history = Some((cur, Some(id)));
+                        }
+                    },
+                    keys,
+                ),
+                (Some((cur, None)), _) => generic(
+                    w,
+                    gu,
+                    CMBHLST,
+                    cur,
+                    1..=n.max(1),
+                    p,
+                    moved,
+                    clicked,
+                    right,
+                    |w, id| {
+                        if let Some(m) = w.synth.menu.as_mut() {
+                            m.history = Some((id, None));
+                        }
+                        refresh(w);
+                    },
+                    keys,
+                ),
                 (None, Some(at)) => {
                     let n = crystal_rows(w).len();
                     list(w, at, n, |w, r| {
@@ -847,11 +937,23 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
                 }
                 (None, None) if w.synth.win.is_none() => {
                     let sel = m.sel;
-                    generic(w, gu, CMBMENU, sel, 1..=2, p, moved, clicked, right, |w, id| {
-                        if let Some(m) = w.synth.menu.as_mut() {
-                            m.sel = id;
-                        }
-                    }, keys);
+                    generic(
+                        w,
+                        gu,
+                        CMBMENU,
+                        sel,
+                        1..=2,
+                        p,
+                        moved,
+                        clicked,
+                        right,
+                        |w, id| {
+                            if let Some(m) = w.synth.menu.as_mut() {
+                                m.sel = id;
+                            }
+                        },
+                        keys,
+                    );
                 }
                 _ => {}
             }
@@ -861,7 +963,16 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
 
 /// Ours: how many complete sets (the crystal and every material at its count) the unlocked stacks hold, 1..99.
 fn sets_held(w: &World, s: &Win) -> u32 {
-    let held = |id: u16| -> u32 { w.inv.slots.iter().filter(|((c, i), (x, _))| *c == 0 && *i != 0 && *x == id && w.inv.locks.get(&(0, *i)).copied().unwrap_or(0) == 0).map(|(_, (_, n))| *n).sum() };
+    let held = |id: u16| -> u32 {
+        w.inv
+            .slots
+            .iter()
+            .filter(|((c, i), (x, _))| {
+                *c == 0 && *i != 0 && *x == id && w.inv.locks.get(&(0, *i)).copied().unwrap_or(0) == 0
+            })
+            .map(|(_, (_, n))| *n)
+            .sum()
+    };
     let mut need: Vec<(u16, u32)> = vec![(s.crystal.1, 1)];
     for &(index, id, count) in s.slots.iter().filter(|x| x.0 != 0 && x.2 != 0) {
         let _ = index;
@@ -896,7 +1007,10 @@ fn repeat_frame(w: &mut World) {
         w.synth.repeat = None;
         return;
     }
-    let busy = w.synth.request.is_some() || w.synth.anims.contains_key(&w.my_id) || w.my_motion.status == 0x2c || w.synth.win.is_some();
+    let busy = w.synth.request.is_some()
+        || w.synth.anims.contains_key(&w.my_id)
+        || w.my_motion.status == 0x2c
+        || w.synth.win.is_some();
     if busy {
         return;
     }
@@ -927,7 +1041,15 @@ pub fn on_result(w: &mut World, a: Answer) {
                 line9(w, 0xa);
             }
             add_history(w, &a);
-            w.synth.shown = Some(Shown { result: a.result, grade: a.grade, count: a.count, item: a.item, breaks: a.breaks, timer: 300.0, line: 0 });
+            w.synth.shown = Some(Shown {
+                result: a.result,
+                grade: a.grade,
+                count: a.count,
+                item: a.item,
+                breaks: a.breaks,
+                timer: 300.0,
+                line: 0,
+            });
         }
         2 | 0xe => line9(w, 0xc),
         3 => line9(w, 9),
@@ -999,7 +1121,12 @@ fn shown_frame(w: &mut World, ticks: f32) {
     };
     if !done {
         match s.result {
-            0 => system_line(w, 0xa0 + s.grade.clamp(0, 3) as u16, [s.item as i32, s.count as i32, 0, 0, 0], String::new()),
+            0 => system_line(
+                w,
+                0xa0 + s.grade.clamp(0, 3) as u16,
+                [s.item as i32, s.count as i32, 0, 0, 0],
+                String::new(),
+            ),
             0xc => system_line(w, 0xa9, [s.item as i32, s.count as i32, 0, 0, 0], String::new()),
             _ => {
                 if s.breaks[s.line] != 0 {
@@ -1109,7 +1236,13 @@ pub fn bars(gu: &GameUi, w: &World, bars: &mut super::hudtop::BarText) {
             if let Some((cur, fav)) = w.synth.menu.as_ref().and_then(|m| m.history) {
                 match fav {
                     Some(f) => {
-                        let name = w.synth.history.get(cur as usize - 1).and_then(|r| w.item_info.as_ref()?.item(r.item)).map(|it| it.name.clone()).unwrap_or_default();
+                        let name = w
+                            .synth
+                            .history
+                            .get(cur as usize - 1)
+                            .and_then(|r| w.item_info.as_ref()?.item(r.item))
+                            .map(|it| it.name.clone())
+                            .unwrap_or_default();
                         focus(CMBHWIN, f, bars);
                         bars.help[1] = bars.help[1].replacen("%s", &name, 1);
                     }
@@ -1182,8 +1315,13 @@ pub(super) fn view(w: &World) -> View {
     let s = &w.synth;
     let free = w.confirm.is_none();
     let m = s.menu.as_ref();
-    let menu = m.filter(|m| s.win.is_none() && m.history.is_none()).map(|m| (m.sel, menu_off(w), m.crystals.is_none() && free));
-    let crystals = m.filter(|m| s.win.is_none() && m.history.is_none()).and_then(|m| m.crystals).map(|(sc, cu)| (crystal_rows(w), sc + cu));
+    let menu = m
+        .filter(|m| s.win.is_none() && m.history.is_none())
+        .map(|m| (m.sel, menu_off(w), m.crystals.is_none() && free));
+    let crystals = m
+        .filter(|m| s.win.is_none() && m.history.is_none())
+        .and_then(|m| m.crystals)
+        .map(|(sc, cu)| (crystal_rows(w), sc + cu));
     let away = s.win.as_ref().is_some_and(|x| x.focus == Focus::Away) && free;
     let history = m.and_then(|m| m.history).map(|(cur, fav)| (s.history.clone(), cur, fav, away));
     let win = s.win.as_ref().map(|x| {
@@ -1207,7 +1345,13 @@ pub(super) fn view(w: &World) -> View {
             crystal: x.crystal.1,
             element,
             found: x.found,
-            slots: std::array::from_fn(|i| if x.slots[i].0 != 0 || x.missing[i] { (x.slots[i].1, x.slots[i].2, x.missing[i]) } else { (0, 0, false) }),
+            slots: std::array::from_fn(|i| {
+                if x.slots[i].0 != 0 || x.missing[i] {
+                    (x.slots[i].1, x.slots[i].2, x.missing[i])
+                } else {
+                    (0, 0, false)
+                }
+            }),
             cursor: x.cursor,
             on_slots: x.focus == Focus::Slots && free,
             on_list: x.focus == Focus::List && free,
@@ -1273,7 +1417,11 @@ pub(super) fn set_slot(w: &mut World, c: u16) -> bool {
 /// The picker's cursor onto row `k`, the picker taking the focus for the cursor's slot (the first empty one when the
 /// cursor is on Synthesize or Cancel).
 pub(super) fn set_row(w: &mut World, k: usize) -> bool {
-    let Some(s) = w.synth.win.as_mut().filter(|s| s.from != From::History && matches!(s.focus, Focus::Slots | Focus::List)) else { return false };
+    let Some(s) =
+        w.synth.win.as_mut().filter(|s| s.from != From::History && matches!(s.focus, Focus::Slots | Focus::List))
+    else {
+        return false;
+    };
     if !(1..=8).contains(&s.cursor) {
         s.cursor = s.slots[..8].iter().position(|x| x.0 == 0).map_or(1, |i| i as u16 + 1);
     }
@@ -1286,14 +1434,24 @@ pub(super) fn set_row(w: &mut World, k: usize) -> bool {
 /// name in the game font at (+21, +5 + 18k), the favourite (keytops3 101) at (+166, +5 + 18k); the bar keytops3 428 at
 /// (0, +6) on the cursor row while focused. cmbhwin at (384, 48), its rows disabled with no record.
 #[allow(clippy::too_many_arguments)]
-fn draw_history(gu: &mut GameUi, w: &World, info: &super::items::ItemCache, cur: u16, fav: Option<u16>, sw: f32, sh: f32) -> Vec<[f32; 4]> {
+fn draw_history(
+    gu: &mut GameUi,
+    w: &World,
+    info: &super::items::ItemCache,
+    cur: u16,
+    fav: Option<u16>,
+    sw: f32,
+    sh: f32,
+) -> Vec<[f32; 4]> {
     let mut rects = Vec::new();
     let away = w.synth.win.as_ref().is_some_and(|s| s.focus == Focus::Away) && w.confirm.is_none();
     let list_focus = away && fav.is_none();
     if let Some(win) = gu.lobby_window_off(CMBHLST, sw, sh, (184.0, 0.0), list_focus.then_some(cur), list_focus, &[]) {
         let [x, y, fw, fh] = win.frame;
         // The rows are drawn by code: 18 apart from (0, 4).
-        let rows = (0..w.synth.history.len()).map(|k| (k as u16 + 1, [x, y + 4.0 + 18.0 * k as f32, fw - 8.0, 18.0])).collect();
+        let rows = (0..w.synth.history.len())
+            .map(|k| (k as u16 + 1, [x, y + 4.0 + 18.0 * k as f32, fw - 8.0, 18.0]))
+            .collect();
         super::winhits::record_rects(w, CMBHLST, win.frame, rows);
         // 11 rows (FUN_101e2b60); placed, so at x1 - 6; ours never scrolls the history.
         gu.scroll_bar(x + fw - 6.0, y, fh, w.synth.history.len(), 11, 0);
@@ -1362,7 +1520,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         let tints: Vec<u32> = rows.iter().map(|r| tint(w, s, r)).collect();
         rects.extend(draw_list(gu, w, &info, s.list, focused(Focus::List), Some(&tints), sw, sh));
     }
-    if let Some(win) = gu.lobby_window_off(TSKILL1, sw, sh, (0.0, 0.0), focused(Focus::Slots).then_some(s.cursor), focused(Focus::Slots), &[]) {
+    if let Some(win) = gu.lobby_window_off(
+        TSKILL1,
+        sw,
+        sh,
+        (0.0, 0.0),
+        focused(Focus::Slots).then_some(s.cursor),
+        focused(Focus::Slots),
+        &[],
+    ) {
         super::winhits::record(w, TSKILL1, &win);
         let [x, y, ..] = win.frame;
         let hist = s.from == From::History;
@@ -1375,7 +1541,13 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         if let Some(e) = element {
             // Mode 2 with the crystal not held: the element dims, a red cross (keytops3 515) at 0.3 over it.
             let dim = hist && !s.found;
-            gu.sprite("menu    keytops3", 0xb9 + e as usize, x + 36.0, y + 4.0, if dim { 0x8058_5858 } else { 0x8080_8080 });
+            gu.sprite(
+                "menu    keytops3",
+                0xb9 + e as usize,
+                x + 36.0,
+                y + 4.0,
+                if dim { 0x8058_5858 } else { 0x8080_8080 },
+            );
             super::items::upload_icons(gu, &info, std::iter::once(s.crystal.1));
             let icon = crate::render::invwin::icon_texture(s.crystal.1);
             if gu.has_image(&icon) {
@@ -1385,11 +1557,22 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         if hist && !s.found && s.crystal.1 != 0 {
             gu.sprite_scaled("menu    keytops3", 515, x + 29.0, y + 10.0, 0.3, 0.3, 0x8080_8080);
         }
-        let slots: Vec<(u16, u32, bool)> = (0..8).map(|i| (s.slots[i].1, s.slots[i].2, s.slots[i].0 != 0 || s.missing[i])).collect();
-        draw_slots(gu, &info, TSKILL1, win.frame, &slots, None, focused(Focus::Slots).then_some(s.cursor), |_| [1.0; 4]);
+        let slots: Vec<(u16, u32, bool)> =
+            (0..8).map(|i| (s.slots[i].1, s.slots[i].2, s.slots[i].0 != 0 || s.missing[i])).collect();
+        draw_slots(gu, &info, TSKILL1, win.frame, &slots, None, focused(Focus::Slots).then_some(s.cursor), |_| {
+            [1.0; 4]
+        });
         if let Some(l) = gu.layout(TSKILL1).cloned() {
             for e in l.elements.iter().filter(|e| (1..=8).contains(&e.id) && s.missing[e.id as usize - 1]) {
-                gu.sprite_scaled("menu    keytops3", 515, x + e.x as f32 + 20.0, y + e.y as f32 + 20.0, 0.32, 0.32, 0x8080_8080);
+                gu.sprite_scaled(
+                    "menu    keytops3",
+                    515,
+                    x + e.x as f32 + 20.0,
+                    y + e.y as f32 + 20.0,
+                    0.32,
+                    0.32,
+                    0x8080_8080,
+                );
             }
         }
         if !complete(s) {

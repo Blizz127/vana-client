@@ -7,11 +7,26 @@ use glam::{Mat4, Vec3};
 #[derive(Clone, Debug, PartialEq)]
 pub enum SoundCmd {
     /// `stream`: the scheduler's stream voice (op 0x60), outside the world-effect volume.
-    Play { handle: u32, se: u32, vol: i32, pan: u8, stream: bool },
-    Level { handle: u32, vol: i32 },
-    Pan { handle: u32, pan: u8 },
+    Play {
+        handle: u32,
+        se: u32,
+        vol: i32,
+        pan: u8,
+        stream: bool,
+    },
+    Level {
+        handle: u32,
+        vol: i32,
+    },
+    Pan {
+        handle: u32,
+        pan: u8,
+    },
     /// Stop now (0) or fade over ticks.
-    Stop { handle: u32, ticks: i32 },
+    Stop {
+        handle: u32,
+        ticks: i32,
+    },
 }
 
 /// +0x1e4: 3 manager passes (FUN_100356c0) at retail's 2-tick frames, in 1/60 s ticks.
@@ -63,7 +78,29 @@ pub const ONE_AT_A_TIME: [u32; 2] = [2239, 2063];
 
 impl Sound {
     pub fn new(se: u32, loops: bool) -> Self {
-        Self { se, loops, elem: None, gen_persistent: false, pos: Vec3::ZERO, near: 0.0, far: 0.0, keep: false, ymode: 0, vol: 127, pan_in: 64.0, vol_key: None, sph: None, fade: 0.0, stream: false, handle: 0, last_vol: 0, last_pan: 64, grace: 0.0, res: (usize::MAX, se as usize), slot: None }
+        Self {
+            se,
+            loops,
+            elem: None,
+            gen_persistent: false,
+            pos: Vec3::ZERO,
+            near: 0.0,
+            far: 0.0,
+            keep: false,
+            ymode: 0,
+            vol: 127,
+            pan_in: 64.0,
+            vol_key: None,
+            sph: None,
+            fade: 0.0,
+            stream: false,
+            handle: 0,
+            last_vol: 0,
+            last_pan: 64,
+            grace: 0.0,
+            res: (usize::MAX, se as usize),
+            slot: None,
+        }
     }
 
     /// vt+0x40 = FUN_10035950.
@@ -125,7 +162,18 @@ pub fn nearest(caps: &[(Vec3, f32, Vec3, f32)], l: Vec3) -> Vec3 {
 
 /// FUN_10035e50: volume and pan of a source at `pos` for the listener at the eye. None = silent (stop).
 #[allow(clippy::too_many_arguments)]
-pub fn attenuate(pan_in: f32, vol: i32, pos: Vec3, eye: Vec3, view: Mat4, near: f32, far: f32, keep: bool, ymode: u8, focal: f32) -> Option<(i32, u8)> {
+pub fn attenuate(
+    pan_in: f32,
+    vol: i32,
+    pos: Vec3,
+    eye: Vec3,
+    view: Mat4,
+    near: f32,
+    far: f32,
+    keep: bool,
+    ymode: u8,
+    focal: f32,
+) -> Option<(i32, u8)> {
     let far = if far == 0.0 { 30.0 } else { far };
     let near = if near == 0.0 { 3.0 } else { near };
     let scale = 512.0;
@@ -179,11 +227,26 @@ mod tests {
     }
 
     fn frame(dt: f32) -> crate::fx::Frame {
-        crate::fx::Frame { dt, seconds: dt / 60.0, dayfrac: 0.5, view: glam::Mat4::IDENTITY, view_rot: glam::Mat4::IDENTITY, eye: Vec3::ZERO, draw_distance: 2000.0, area_light: Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 }
+        crate::fx::Frame {
+            dt,
+            seconds: dt / 60.0,
+            dayfrac: 0.5,
+            view: glam::Mat4::IDENTITY,
+            view_rot: glam::Mat4::IDENTITY,
+            eye: Vec3::ZERO,
+            draw_distance: 2000.0,
+            area_light: Vec3::ONE,
+            focal: 350.0,
+            moon_phase: 0,
+            weekday: 0,
+        }
     }
 
     fn plays(fx: &mut crate::fx::Effects) -> Vec<u32> {
-        std::mem::take(&mut fx.sound_cmds).into_iter().filter_map(|c| if let SoundCmd::Play { se, .. } = c { Some(se) } else { None }).collect()
+        std::mem::take(&mut fx.sound_cmds)
+            .into_iter()
+            .filter_map(|c| if let SoundCmd::Play { se, .. } = c { Some(se) } else { None })
+            .collect()
     }
 
     /// FUN_10036460: 20 SeSep resources a 2-tick pass; once full a repeat waits too.
@@ -191,10 +254,12 @@ mod tests {
     fn start_cap_per_pass() {
         let mut fx = crate::fx::Effects::new();
         fx.sounds.extend((0..25).map(|k| stream(1000 + k, k as usize)));
-        let n: Vec<usize> = (0..5).map(|_| {
-            fx.tick(&frame(0.5), &crate::fx::NoActors);
-            plays(&mut fx).len()
-        }).collect();
+        let n: Vec<usize> = (0..5)
+            .map(|_| {
+                fx.tick(&frame(0.5), &crate::fx::NoActors);
+                plays(&mut fx).len()
+            })
+            .collect();
         assert_eq!(n, [20, 0, 0, 0, 5]);
         let mut fx = crate::fx::Effects::new();
         fx.sounds.extend((0..20).map(|k| stream(1000 + k, k as usize)));
@@ -252,12 +317,28 @@ mod tests {
         fx.load_zone(crate::fx::lib::Library::load(332, index.read(332).unwrap()).unwrap());
         let eye = Vec3::new(10.0, -6.0, 20.0);
         let view = glam::camera::rh::view::look_at_mat4(eye, Vec3::new(0.0, -6.0, 20.0), Vec3::NEG_Y);
-        let f = crate::fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: 0.5, view, view_rot: view, eye, draw_distance: 2000.0, area_light: Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 };
+        let f = crate::fx::Frame {
+            dt: 1.0,
+            seconds: 1.0 / 60.0,
+            dayfrac: 0.5,
+            view,
+            view_rot: view,
+            eye,
+            draw_distance: 2000.0,
+            area_light: Vec3::ONE,
+            focal: 350.0,
+            moon_phase: 0,
+            weekday: 0,
+        };
         fx.tick(&f, &crate::fx::NoActors);
-        let plays: Vec<(u32, i32)> = fx.sound_cmds.iter().filter_map(|c| match c {
-            SoundCmd::Play { se, vol, .. } => Some((*se, *vol)),
-            _ => None,
-        }).collect();
+        let plays: Vec<(u32, i32)> = fx
+            .sound_cmds
+            .iter()
+            .filter_map(|c| match c {
+                SoundCmd::Play { se, vol, .. } => Some((*se, *vol)),
+                _ => None,
+            })
+            .collect();
         let sea = plays.iter().find(|p| p.0 == 2009).copied();
         assert!(sea.is_some_and(|(_, v)| (119..=121).contains(&v)), "{plays:?}");
     }
@@ -275,7 +356,19 @@ mod tests {
             fx.set_global(crate::fx::lib::Library::load(0, index.read(0).unwrap()).unwrap());
             fx.load_zone(crate::fx::lib::Library::load(201, index.read(201).unwrap()).unwrap());
             let view = glam::camera::rh::view::look_at_mat4(eye, eye + Vec3::X, Vec3::NEG_Y);
-            let f = crate::fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: 0.5, view, view_rot: view, eye, draw_distance: 2000.0, area_light: Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 };
+            let f = crate::fx::Frame {
+                dt: 1.0,
+                seconds: 1.0 / 60.0,
+                dayfrac: 0.5,
+                view,
+                view_rot: view,
+                eye,
+                draw_distance: 2000.0,
+                area_light: Vec3::ONE,
+                focal: 350.0,
+                moon_phase: 0,
+                weekday: 0,
+            };
             fx.tick(&f, &crate::fx::NoActors);
             fx.sound_cmds
                 .iter()

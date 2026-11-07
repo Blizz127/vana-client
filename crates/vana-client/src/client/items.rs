@@ -25,7 +25,10 @@ const BIN: u8 = 17;
 /// The inventory list's x beside the bin (the partner source's position kind 1, FUN_101f1fe0).
 const BIN_LIST_X: i16 = 200;
 
-pub(super) const JOBS: [&str; 23] = ["", "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP", "DNC", "SCH", "GEO", "RUN"];
+pub(super) const JOBS: [&str; 23] = [
+    "", "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU",
+    "COR", "PUP", "DNC", "SCH", "GEO", "RUN",
+];
 
 /// s2c 0x061 (GP_SERV_COMMAND_CLISTATUS) fields the status panel shows.
 #[derive(Clone, Debug, Default)]
@@ -134,7 +137,13 @@ impl Inventory {
             .range((container, 0)..=(container, 255))
             .map(|(&(c, i), &(id, count))| {
                 let equipped = self.equip.contains(&Some((c, i)));
-                Slot { index: i, id, count, equipped, equipped_ex: equipped && self.ext.get(&(c, i)).is_some_and(charged_ready) }
+                Slot {
+                    index: i,
+                    id,
+                    count,
+                    equipped,
+                    equipped_ex: equipped && self.ext.get(&(c, i)).is_some_and(charged_ready),
+                }
             })
             .collect()
     }
@@ -156,7 +165,14 @@ pub struct ItemCache {
 
 impl ItemCache {
     pub fn new(names: Arc<crate::dat::names::Names>) -> Self {
-        ItemCache { names, cache: RefCell::new(HashMap::new()), objectives: RefCell::default(), categories: RefCell::default(), points: Default::default(), catalogues: Default::default() }
+        ItemCache {
+            names,
+            cache: RefCell::new(HashMap::new()),
+            objectives: RefCell::default(),
+            categories: RefCell::default(),
+            points: Default::default(),
+            catalogues: Default::default(),
+        }
     }
 
     pub fn item(&self, id: u16) -> Option<Arc<Item>> {
@@ -166,13 +182,21 @@ impl ItemCache {
     /// A Records of Eminence objective record (0xe000 + n).
     pub fn objective(&self, id: u16) -> Option<Arc<crate::dat::roe::Objective>> {
         let items = &self.names.items;
-        self.objectives.borrow_mut().entry(id).or_insert_with(|| crate::dat::roe::objective(items, id).map(Arc::new)).clone()
+        self.objectives
+            .borrow_mut()
+            .entry(id)
+            .or_insert_with(|| crate::dat::roe::objective(items, id).map(Arc::new))
+            .clone()
     }
 
     /// A Records of Eminence category record (0xf200..).
     pub fn category(&self, id: u16) -> Option<Arc<crate::dat::roe::Category>> {
         let items = &self.names.items;
-        self.categories.borrow_mut().entry(id).or_insert_with(|| crate::dat::roe::category(items, id).map(Arc::new)).clone()
+        self.categories
+            .borrow_mut()
+            .entry(id)
+            .or_insert_with(|| crate::dat::roe::category(items, id).map(Arc::new))
+            .clone()
     }
 
     /// A Primer category (0xf620 + k): its name and topic ids.
@@ -183,7 +207,9 @@ impl ItemCache {
 
     /// The Monstrosity instinct catalogues 0xeff8..0xeffe in order: {item 0x7400 + n, cost}, read once.
     pub fn catalogues(&self) -> Arc<Vec<(u16, u16)>> {
-        self.catalogues.get_or_init(|| Arc::new((0xeff8..0xefff).flat_map(|id| self.names.items.catalogue(id)).collect())).clone()
+        self.catalogues
+            .get_or_init(|| Arc::new((0xeff8..0xefff).flat_map(|id| self.names.items.catalogue(id)).collect()))
+            .clone()
     }
 
     /// FUN_10141ed0: an instinct's cost (record +0x1c), 0xff without its record.
@@ -220,7 +246,15 @@ impl ItemInfo for ItemCache {
 pub enum Win {
     /// Main menu Items: the inventory list, and iuse / sortyn over it. `direct`: the action menu's list of usable items,
     /// where Enter uses at once (FUN_1012b880 case 8, FUN_101f0a10).
-    Items { scroll: usize, cursor: usize, sub: Option<Sub>, direct: bool, sort: Option<SortWin>, manual: Option<Option<u8>>, store: Option<Storage> },
+    Items {
+        scroll: usize,
+        cursor: usize,
+        sub: Option<Sub>,
+        direct: bool,
+        sort: Option<SortWin>,
+        manual: Option<Option<u8>>,
+        store: Option<Storage>,
+    },
     /// The Equipment screen (client/equipwin.rs).
     Equip(Box<super::equipwin::EquipWin>),
 }
@@ -353,7 +387,9 @@ fn bag_rows(w: &World, c: u8, direct: bool) -> Vec<Slot> {
         .filter(|s| {
             !direct
                 || info.and_then(|c| c.item(s.id)).is_some_and(|it| {
-                    matches!(it.item_type, 8 | 0x16 | 0x17) || (!matches!(it.item_type, 4 | 5) && it.flags & 0x400 != 0) || (matches!(it.item_type, 4 | 5) && it.max_charges != 0 && s.equipped)
+                    matches!(it.item_type, 8 | 0x16 | 0x17)
+                        || (!matches!(it.item_type, 4 | 5) && it.flags & 0x400 != 0)
+                        || (matches!(it.item_type, 4 | 5) && it.max_charges != 0 && s.equipped)
                 })
         })
         .collect()
@@ -379,7 +415,9 @@ pub fn focus(w: &World) -> Option<(&'static str, u16)> {
     match w.win.as_ref()? {
         Win::Items { sub: Some(Sub::Use { child, .. }), .. } => Some(("menu    iuse", *child)),
         Win::Items { sub: Some(Sub::Drop { yes, .. }), .. } => Some(("menu    sortyn", if *yes { 1 } else { 2 })),
-        Win::Items { sort: Some(SortWin { ask: Some(yes), .. }), .. } => Some(("menu    sortyn", if *yes { 1 } else { 2 })),
+        Win::Items { sort: Some(SortWin { ask: Some(yes), .. }), .. } => {
+            Some(("menu    sortyn", if *yes { 1 } else { 2 }))
+        }
         Win::Items { sort: Some(s), .. } => Some(("menu    itmsort2", s.cursor)),
         Win::Items { store: Some(b), cursor, .. } => Some(match (b.qty, b.sortw, b.on_bank) {
             (Some(_), ..) => ("menu    itemctrl", 1),
@@ -447,8 +485,13 @@ pub(super) fn bar(w: &mut World, owner: Owner, m: Msg) -> bool {
         _ => return false,
     };
     match (&mut w.win, owner) {
-        (Some(Win::Items { scroll, cursor, store: None, .. }), Owner::Items) | (Some(Win::Items { scroll, cursor, store: Some(_), .. }), Owner::StoreInv) => rows(m, scroll, cursor, n, VISIBLE_ROWS),
-        (Some(Win::Items { store: Some(b), .. }), Owner::Bank) => rows(m, &mut b.scroll, &mut b.cursor, n, VISIBLE_ROWS),
+        (Some(Win::Items { scroll, cursor, store: None, .. }), Owner::Items)
+        | (Some(Win::Items { scroll, cursor, store: Some(_), .. }), Owner::StoreInv) => {
+            rows(m, scroll, cursor, n, VISIBLE_ROWS)
+        }
+        (Some(Win::Items { store: Some(b), .. }), Owner::Bank) => {
+            rows(m, &mut b.scroll, &mut b.cursor, n, VISIBLE_ROWS)
+        }
         _ => false,
     }
 }
@@ -478,7 +521,8 @@ pub fn key(w: &mut World, key: egui::Key, page: bool, alt: bool, shift: bool) ->
     // Modern: the sort strip stands above the list as a row, so Up from the first item goes to it, Left / Right move
     // along it (and between Yes / No), Down comes back to the list and Up wraps to the last item.
     if w.modern
-        && let Some(Win::Items { scroll, cursor, sub: None, sort, manual: None, store: None, direct: false }) = w.win.as_mut()
+        && let Some(Win::Items { scroll, cursor, sub: None, sort, manual: None, store: None, direct: false }) =
+            w.win.as_mut()
     {
         use crate::audio::Ui;
         use egui::Key as K;
@@ -494,7 +538,13 @@ pub fn key(w: &mut World, key: egui::Key, page: bool, alt: bool, shift: bool) ->
                 return true;
             }
             (Some(s @ SortWin { ask: None, .. }), K::ArrowLeft | K::ArrowRight) => {
-                s.cursor = if key == K::ArrowRight { s.cursor % 3 + 1 } else if s.cursor <= 1 { 3 } else { s.cursor - 1 };
+                s.cursor = if key == K::ArrowRight {
+                    s.cursor % 3 + 1
+                } else if s.cursor <= 1 {
+                    3
+                } else {
+                    s.cursor - 1
+                };
                 w.sounds.push(Ui::Cursor as u32);
                 return true;
             }
@@ -523,7 +573,8 @@ pub fn key(w: &mut World, key: egui::Key, page: bool, alt: bool, shift: bool) ->
         // list. sortyn (FUN_102228b0): Yes / No, Enter or Escape answers. Modern draws both as rows: Left / Right too.
         Some(Win::Items { sub: sub @ Some(_), .. }) => {
             use crate::audio::Ui;
-            let step = matches!(key, egui::Key::ArrowUp | egui::Key::ArrowDown) || w.modern && matches!(key, egui::Key::ArrowLeft | egui::Key::ArrowRight);
+            let step = matches!(key, egui::Key::ArrowUp | egui::Key::ArrowDown)
+                || w.modern && matches!(key, egui::Key::ArrowLeft | egui::Key::ArrowRight);
             match sub.unwrap() {
                 Sub::Use { child, c, index, id } => match key {
                     _ if step => {
@@ -661,10 +712,10 @@ pub fn key(w: &mut World, key: egui::Key, page: bool, alt: bool, shift: bool) ->
                     }
                 }
                 k => {
-                if list_keys(scroll, cursor, rows, k) {
-                    w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    if list_keys(scroll, cursor, rows, k) {
+                        w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    }
                 }
-            }
             }
         }
         Some(Win::Items { scroll, cursor, sub, direct, .. }) => match key {
@@ -763,8 +814,12 @@ pub fn info_source(w: &World) -> Option<(u16, Option<[u8; 24]>, u8, u8, bool, u8
         // FUN_101f2740: the list and iteminfo are hidden while the item's target prompt is up.
         Win::Items { .. } if item_prompt(w) => return None,
         // FUN_101dca80: the bin side shows its cursor row; mode 1 (130, 240) clears itemctrl.
-        Win::Items { store: Some(b), .. } if b.on_bank || b.read_only => (store_rows(w, b.bank).get(b.scroll + b.cursor)?.clone(), b.bank, if b.qty.is_some() { 1 } else { 0 }),
-        Win::Items { store: Some(b), scroll, cursor, .. } => (store_rows(w, b.side).get(scroll + cursor)?.clone(), b.side, if b.qty.is_some() { 1 } else { 0 }),
+        Win::Items { store: Some(b), .. } if b.on_bank || b.read_only => {
+            (store_rows(w, b.bank).get(b.scroll + b.cursor)?.clone(), b.bank, if b.qty.is_some() { 1 } else { 0 })
+        }
+        Win::Items { store: Some(b), scroll, cursor, .. } => {
+            (store_rows(w, b.side).get(scroll + cursor)?.clone(), b.side, if b.qty.is_some() { 1 } else { 0 })
+        }
         Win::Items { scroll, cursor, direct, .. } => {
             let (c, s) = listed_at(w, *direct).get(scroll + cursor)?.clone();
             (s, c, 0)
@@ -779,7 +834,9 @@ pub fn info_source(w: &World) -> Option<(u16, Option<[u8; 24]>, u8, u8, bool, u8
 pub(in crate::client) fn native_list(w: &World) -> Option<(Vec<(u8, Slot)>, usize, usize)> {
     let of = |bag: u8| store_rows(w, bag).into_iter().map(|s| (bag, s)).collect();
     match w.win.as_ref()? {
-        Win::Items { store: Some(b), .. } if b.on_bank || b.read_only => Some((of(b.bank), b.scroll + b.cursor, b.scroll)),
+        Win::Items { store: Some(b), .. } if b.on_bank || b.read_only => {
+            Some((of(b.bank), b.scroll + b.cursor, b.scroll))
+        }
         Win::Items { store: Some(b), scroll, cursor, .. } => Some((of(b.side), scroll + cursor, *scroll)),
         Win::Items { scroll, cursor, direct, .. } => Some((listed_at(w, *direct), scroll + cursor, *scroll)),
         Win::Equip(_) => None,
@@ -806,7 +863,9 @@ pub(super) fn list_rows(w: &World, info: &ItemCache, shown: &[(u8, Slot)], direc
     // FUN_101f06e0 rule 4: the equipped linkshell / linkshell 2 from this slot of this bag is green, after the
     // equipped rules and before the yellow / white ones.
     for (r, (c, s)) in rows.iter_mut().zip(shown) {
-        if matches!(r.tint, crate::inventory::TINT_FLAGGED | crate::inventory::TINT_WHITE) && linkshell_row(w, *c, s.index) {
+        if matches!(r.tint, crate::inventory::TINT_FLAGGED | crate::inventory::TINT_WHITE)
+            && linkshell_row(w, *c, s.index)
+        {
             r.tint = crate::inventory::TINT_EQUIPPED;
         }
     }
@@ -836,7 +895,10 @@ pub(super) fn iuse_states(w: &World, c: u8, index: u8, id: u16) -> [bool; 2] {
     let equipped = w.inv.equip.contains(&Some((c, index)));
     let usable = matches!(it.item_type, 8 | 0x16 | 0x17)
         || (!matches!(it.item_type, 4 | 5) && it.flags & 0x400 != 0)
-        || (matches!(it.item_type, 4 | 5) && it.max_charges != 0 && equipped && ext.is_some_and(|e| e[0] == 1 && u16::from_le_bytes([e[2], e[3]]) & 0x4000 != 0));
+        || (matches!(it.item_type, 4 | 5)
+            && it.max_charges != 0
+            && equipped
+            && ext.is_some_and(|e| e[0] == 1 && u16::from_le_bytes([e[2], e[3]]) & 0x4000 != 0));
     // FUN_101f2de0 / FUN_101f2ec0: Use is off in Monstrosity.
     let monster = super::monstrosity::active(w);
     [usable && !monster, w.inv.locks.get(&(c, index)).copied().unwrap_or(0) == 0 && id != 0xffff]
@@ -857,7 +919,8 @@ fn draw_iuse(gu: &mut GameUi, w: &World, s: Sub, sw: f32, sh: f32) -> Vec<[f32; 
         rects.push(win.frame);
     }
     if let Some(yes) = ask
-        && let Some(win) = gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), true, &[])
+        && let Some(win) =
+            gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), true, &[])
     {
         rects.push(win.frame);
     }
@@ -894,10 +957,19 @@ fn use_entry(w: &mut World, c: u8, index: u8, id: u16) {
         }
         _ => {
             use super::textcmd::{gate_line, status_gate};
-            let garden = it.as_ref().is_some_and(|i| i.flags & 0x0008 != 0) && gate_line(w, 0x80).is_some() && gate_line(w, 0x77).is_none();
+            let garden = it.as_ref().is_some_and(|i| i.flags & 0x0008 != 0)
+                && gate_line(w, 0x80).is_some()
+                && gate_line(w, 0x77).is_none();
             if garden || status_gate(w, 0x7f) {
                 let targets = it.map_or(0x7f, |i| i.targets as u32);
-                super::target::open_sub(w, targets, super::target::SubThen::Item { container: c, index }, None, String::new(), 4);
+                super::target::open_sub(
+                    w,
+                    targets,
+                    super::target::SubThen::Item { container: c, index },
+                    None,
+                    String::new(),
+                    4,
+                );
             }
         }
     }
@@ -906,7 +978,15 @@ fn use_entry(w: &mut World, c: u8, index: u8, id: u16) {
 /// Ours: while iuse or the drop question is up, the cursor stays on its item as the list changes under it (a new item,
 /// the kept-sorted sort); the question closes when the item is gone from its slot.
 pub(super) fn follow_held(w: &mut World) {
-    let Some(Win::Items { sub: Some(Sub::Use { c, index, id, .. } | Sub::Drop { c, index, id, .. }), store: None, direct, .. }) = &w.win else { return };
+    let Some(Win::Items {
+        sub: Some(Sub::Use { c, index, id, .. } | Sub::Drop { c, index, id, .. }),
+        store: None,
+        direct,
+        ..
+    }) = &w.win
+    else {
+        return;
+    };
     let (c, index, id, direct) = (*c, *index, *id, *direct);
     let rows = listed_at(w, direct);
     let at = rows.iter().position(|(rc, s)| *rc == c && s.index == index).filter(|_| w.inv.item(c, index) == Some(id));
@@ -1088,12 +1168,17 @@ pub fn use_slot(w: &mut World, container: u8, index: u8, target: u32) {
         }
     } else {
         let ext = w.inv.ext.get(&(container, index));
-        let ready = w.inv.equip.contains(&Some((container, index))) && ext.is_some_and(|e| e[0] == 1 && u16::from_le_bytes([e[2], e[3]]) & 0x4000 != 0);
+        let ready = w.inv.equip.contains(&Some((container, index)))
+            && ext.is_some_and(|e| e[0] == 1 && u16::from_le_bytes([e[2], e[3]]) & 0x4000 != 0);
         if !ready {
             return;
         }
     }
-    let use_time = if matches!(it.item_type, 4 | 5) { it.cast_time as u32 } else { it.extra.iter().find(|e| e.0 == 0xd08).map_or(0, |e| e.1) };
+    let use_time = if matches!(it.item_type, 4 | 5) {
+        it.cast_time as u32
+    } else {
+        it.extra.iter().find(|e| e.0 == 0xd08).map_or(0, |e| e.1)
+    };
     if use_time > 0 {
         let total = use_time as f32 * 20.0;
         (w.cast_bar, w.cast_event) = (Some((total, total)), false);
@@ -1145,7 +1230,9 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let frame = gu.cursor_frame();
     match win {
         Win::Items { .. } if item_prompt(w) => {}
-        Win::Items { scroll, cursor, store: Some(b), .. } => rects.extend(draw_storage(gu, w, info, *scroll, *cursor, b, sw, sh, frame)),
+        Win::Items { scroll, cursor, store: Some(b), .. } => {
+            rects.extend(draw_storage(gu, w, info, *scroll, *cursor, b, sw, sh, frame))
+        }
         Win::Items { scroll, cursor, sub, direct, sort, manual, .. } => {
             let shown = listed_at(w, *direct);
             let rows = list_rows(w, info, &shown, *direct);
@@ -1156,7 +1243,10 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             upload_icons(gu, info, list.visible().iter().map(|r| r.id));
             let open = gu.gate_layout("menu    inventor", sw, sh, None);
             let (b, ui, style, font) = gu.parts();
-            let bar = ui.menu("menu    inventor").filter(|_| open).map(|m| push_inventory(b, ui, style, font, GameUi::ATLAS, m, &list, sw, sh, frame));
+            let bar = ui
+                .menu("menu    inventor")
+                .filter(|_| open)
+                .map(|m| push_inventory(b, ui, style, font, GameUi::ATLAS, m, &list, sw, sh, frame));
             if let Some([x, y, h]) = bar.filter(|_| sub.is_none() && sort.is_none()) {
                 gu.bar_site(Owner::Items, x, y, h, list.rows.len(), VISIBLE_ROWS, list.scroll);
             }
@@ -1164,9 +1254,23 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             // itmsort2 beside the list (FUN_101f0600), focused or not; iuse sits on top of it.
             if !*direct && sub.is_none() {
                 let sel = sort.map(|s| s.cursor);
-                rects.extend(gu.lobby_window_off("menu    itmsort2", sw, sh, (0.0, 0.0), sel, sel.is_some(), &[]).map(|w| w.frame));
+                rects.extend(
+                    gu.lobby_window_off("menu    itmsort2", sw, sh, (0.0, 0.0), sel, sel.is_some(), &[])
+                        .map(|w| w.frame),
+                );
                 if let Some(yes) = sort.and_then(|s| s.ask) {
-                    rects.extend(gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), true, &[]).map(|w| w.frame));
+                    rects.extend(
+                        gu.lobby_window_off(
+                            "menu    sortyn",
+                            sw,
+                            sh,
+                            (0.0, 0.0),
+                            Some(if yes { 1 } else { 2 }),
+                            true,
+                            &[],
+                        )
+                        .map(|w| w.frame),
+                    );
                 }
             }
             let _ = manual;
@@ -1242,14 +1346,38 @@ fn open_view(w: &mut World, bank: u8, at_moogle: bool, read_only: bool, from_men
 }
 
 fn open_view_n(w: &mut World, bank: u8, at_moogle: bool, nomad: bool, read_only: bool, from_menu: bool) {
-    let st = Storage { bank, side: INVENTORY, scroll: 0, cursor: 0, on_bank: true, qty: None, from_menu, at_moogle, nomad, read_only, sortw: None, manual: None, stora: None, pending: None, note: None };
+    let st = Storage {
+        bank,
+        side: INVENTORY,
+        scroll: 0,
+        cursor: 0,
+        on_bank: true,
+        qty: None,
+        from_menu,
+        at_moogle,
+        nomad,
+        read_only,
+        sortw: None,
+        manual: None,
+        stora: None,
+        pending: None,
+        note: None,
+    };
     match &mut w.win {
         Some(Win::Items { store, sort, direct: false, .. }) if from_menu => {
             *store = Some(st);
             *sort = None;
         }
         _ => {
-            w.win = Some(Win::Items { scroll: 0, cursor: 0, sub: None, direct: false, sort: None, manual: None, store: Some(st) });
+            w.win = Some(Win::Items {
+                scroll: 0,
+                cursor: 0,
+                sub: None,
+                direct: false,
+                sort: None,
+                manual: None,
+                store: Some(st),
+            });
             w.menu = None;
             w.action_menu = None;
         }
@@ -1273,7 +1401,8 @@ pub fn open_daf70(w: &mut World, c: u8, need_satchel: bool, nomad: bool) -> bool
     if c == BIN {
         return open_bin(w, false);
     }
-    if !super::textcmd::status_gate(w, 0x44) || super::moogle::job_cooling(w) || (need_satchel && w.inv.sizes[5] < 0x1e) {
+    if !super::textcmd::status_gate(w, 0x44) || super::moogle::job_cooling(w) || (need_satchel && w.inv.sizes[5] < 0x1e)
+    {
         return false;
     }
     if w.myroom.is_some() && w.zone.is_some_and(moogle_zone) && w.mh_owner == 0 {
@@ -1333,7 +1462,13 @@ pub(super) fn tint(w: &World, info: &ItemCache, st: &Storage, bank_side: bool, s
 
 /// tint's colour with the reason for a row that may not move (modern's explanation, not retail's: retail only
 /// colours the row and plays the error sound). Installed furniture on another floor is coloured dark red and refused.
-pub(super) fn judge(w: &World, info: &ItemCache, st: &Storage, bank_side: bool, s: &Slot) -> (u32, Option<&'static str>) {
+pub(super) fn judge(
+    w: &World,
+    info: &ItemCache,
+    st: &Storage,
+    bank_side: bool,
+    s: &Slot,
+) -> (u32, Option<&'static str>) {
     use crate::inventory::{TINT_DIM, TINT_WHITE};
     let (own, dest) = if bank_side { (st.bank, st.side) } else { (st.side, st.bank) };
     let it = info.item(s.id);
@@ -1345,7 +1480,8 @@ pub(super) fn judge(w: &World, info: &ItemCache, st: &Storage, bank_side: bool, 
         return (TINT_DIM, Some("No room on the other side."));
     }
     if own == BIN {
-        let rare = it.as_ref().is_some_and(|it| it.flags & 0x8000 != 0) && w.inv.slots.iter().any(|(&(c, _), &(id, _))| id == s.id && c != 3 && c != BIN);
+        let rare = it.as_ref().is_some_and(|it| it.flags & 0x8000 != 0)
+            && w.inv.slots.iter().any(|(&(c, _), &(id, _))| id == s.id && c != 3 && c != BIN);
         if s.id == 0 || rare {
             return (TINT_DIM, Some("Rare: you already hold one."));
         }
@@ -1396,7 +1532,8 @@ pub(super) fn judge(w: &World, info: &ItemCache, st: &Storage, bank_side: bool, 
 /// FUN_101dbdb0, Manual's colours: the held row orange, equipped gear green (still movable), a Storage piece a
 /// mannequin wears grey, installed furniture grey on this floor and dark red on another, else white.
 fn manual_tint(w: &World, c: u8, held: Option<u8>, s: &Slot) -> u32 {
-    let furniture = w.item_info.as_ref().and_then(|i| i.item(s.id)).is_some_and(|it| matches!(it.item_type, 10 | 12 | 14));
+    let furniture =
+        w.item_info.as_ref().and_then(|i| i.item(s.id)).is_some_and(|it| matches!(it.item_type, 10 | 12 | 14));
     let installed = w.inv.ext.get(&(c, s.index)).filter(|e| matches!(c, 1 | 9) && furniture && e[1] & 0x40 != 0);
     if held == Some(s.index) {
         0x8080_4020
@@ -1479,7 +1616,13 @@ fn store_key(w: &mut World, info: &ItemCache, key: egui::Key, page: bool, alt: b
         let step = |r: u16, up: bool| -> u16 {
             let mut r = r;
             for _ in 0..16 {
-                r = if up { if r <= 1 { 16 } else { r - 1 } } else if r >= 16 { 1 } else { r + 1 };
+                r = if up {
+                    if r <= 1 { 16 } else { r - 1 }
+                } else if r >= 16 {
+                    1
+                } else {
+                    r + 1
+                };
                 if !off.contains(&r) {
                     break;
                 }
@@ -1522,7 +1665,10 @@ fn store_key(w: &mut World, info: &ItemCache, key: egui::Key, page: bool, alt: b
                     w.sounds.push(if yes { Ui::Select } else { Ui::Cancel } as u32);
                     if yes {
                         if c != INVENTORY {
-                            let _ = w.net.commands.send(NetCommand::Packet { id: 0x03A, body: (c as u32).to_le_bytes().to_vec() });
+                            let _ = w
+                                .net
+                                .commands
+                                .send(NetCommand::Packet { id: 0x03A, body: (c as u32).to_le_bytes().to_vec() });
                         }
                         auto_sort_c(w, c);
                         keep_sorted(w, c, true);
@@ -1651,7 +1797,11 @@ fn store_key(w: &mut World, info: &ItemCache, key: egui::Key, page: bool, alt: b
             // Both sources' +0x1c is 0: Right / Left page only with 0xa8 held.
             K::ArrowRight | K::ArrowLeft if page => {
                 let right = key == K::ArrowRight;
-                let moved = if b.on_bank { page_keys(&mut b.scroll, &mut b.cursor, banks.len(), right) } else { page_keys(&mut scroll, &mut cursor, inv.len(), right) };
+                let moved = if b.on_bank {
+                    page_keys(&mut b.scroll, &mut b.cursor, banks.len(), right)
+                } else {
+                    page_keys(&mut scroll, &mut cursor, inv.len(), right)
+                };
                 if moved {
                     w.sounds.push(Ui::Cursor as u32);
                 }
@@ -1668,7 +1818,8 @@ fn store_key(w: &mut World, info: &ItemCache, key: egui::Key, page: bool, alt: b
                 w.sounds.push(Ui::Close as u32);
             }
             K::Enter => {
-                let (s, bank_side) = if b.on_bank { (banks.get(b.scroll + b.cursor), true) } else { (inv.get(scroll + cursor), false) };
+                let (s, bank_side) =
+                    if b.on_bank { (banks.get(b.scroll + b.cursor), true) } else { (inv.get(scroll + cursor), false) };
                 if let Some(s) = s.cloned() {
                     let t = tint(w, info, &b, bank_side, &s);
                     let locked = !bank_side && w.inv.locks.get(&(b.side, s.index)).copied().unwrap_or(0) == 0x19;
@@ -1799,7 +1950,17 @@ fn store_bars(gu: &GameUi, b: &Storage, bars: &mut super::hudtop::BarText) {
 /// cursor on the focused one; itmsortw at (384, 48) (not for the bin) with sortyn; itemctrl over them for a stack
 /// ("%2d" right-aligned at (+0x34, +0x16), "/%2d" at (+0x3a, +0x16), FUN_1013a520). Read-only: the item list alone.
 #[allow(clippy::too_many_arguments)]
-fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cursor: usize, b: &Storage, sw: f32, sh: f32, frame: usize) -> Vec<[f32; 4]> {
+fn draw_storage(
+    gu: &mut GameUi,
+    w: &World,
+    info: &ItemCache,
+    scroll: usize,
+    cursor: usize,
+    b: &Storage,
+    sw: f32,
+    sh: f32,
+    frame: usize,
+) -> Vec<[f32; 4]> {
     let mut rects = Vec::new();
     let banks = store_rows(w, b.bank);
     if b.read_only {
@@ -1807,7 +1968,21 @@ fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cur
         upload_icons(gu, info, list.visible().iter().map(|r| r.id));
         let (bt, ui, style, font) = gu.parts();
         if let Some(m) = ui.menu("menu    inventor") {
-            let [x, y, h] = push_item_list(bt, ui, style, font, GameUi::ATLAS, m, &list, sw, sh, frame, 3.0, true, crate::render::invwin::INVENTOR_BAR);
+            let [x, y, h] = push_item_list(
+                bt,
+                ui,
+                style,
+                font,
+                GameUi::ATLAS,
+                m,
+                &list,
+                sw,
+                sh,
+                frame,
+                3.0,
+                true,
+                crate::render::invwin::INVENTOR_BAR,
+            );
             gu.bar_site(Owner::Bank, x, y, h, list.rows.len(), VISIBLE_ROWS, list.scroll);
         }
         rects.extend(gu.window_rect("menu    inventor", sw, sh));
@@ -1838,7 +2013,21 @@ fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cur
     let (bt, ui, style, font) = gu.parts();
     let mut bars = Vec::new();
     if let Some(m) = ui.menu("menu    bank") {
-        let r = push_item_list(bt, ui, style, font, GameUi::ATLAS, m, &blist, sw, sh, frame, 4.0, free && b.on_bank, crate::render::invwin::LIST_BAR);
+        let r = push_item_list(
+            bt,
+            ui,
+            style,
+            font,
+            GameUi::ATLAS,
+            m,
+            &blist,
+            sw,
+            sh,
+            frame,
+            4.0,
+            free && b.on_bank,
+            crate::render::invwin::LIST_BAR,
+        );
         bars.push((Owner::Bank, r, &blist, b.on_bank));
     }
     if let Some(m) = ui.menu("menu    inventor") {
@@ -1846,7 +2035,21 @@ fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cur
         if let Some(e) = m.elements.first_mut() {
             e.x = BIN_LIST_X;
         }
-        let r = push_item_list(bt, ui, style, font, GameUi::ATLAS, &m, &ilist, sw, sh, frame, 3.0, free && !b.on_bank, crate::render::invwin::INVENTOR_BAR);
+        let r = push_item_list(
+            bt,
+            ui,
+            style,
+            font,
+            GameUi::ATLAS,
+            &m,
+            &ilist,
+            sw,
+            sh,
+            frame,
+            3.0,
+            free && !b.on_bank,
+            crate::render::invwin::INVENTOR_BAR,
+        );
         bars.push((Owner::StoreInv, r, &ilist, !b.on_bank));
     }
     for (owner, [x, y, h], l, on) in bars {
@@ -1870,9 +2073,14 @@ fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cur
             }
         } else {
             let sel = b.sortw.map(|s| s.cursor);
-            rects.extend(gu.lobby_window_off("menu    itmsortw", sw, sh, (0.0, 0.0), sel, sel.is_some(), &[]).map(|x| x.frame));
+            rects.extend(
+                gu.lobby_window_off("menu    itmsortw", sw, sh, (0.0, 0.0), sel, sel.is_some(), &[]).map(|x| x.frame),
+            );
             if let Some(yes) = b.sortw.and_then(|s| s.ask) {
-                rects.extend(gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), true, &[]).map(|x| x.frame));
+                rects.extend(
+                    gu.lobby_window_off("menu    sortyn", sw, sh, (0.0, 0.0), Some(if yes { 1 } else { 2 }), true, &[])
+                        .map(|x| x.frame),
+                );
             }
         }
     }
@@ -1884,8 +2092,22 @@ fn draw_storage(gu: &mut GameUi, w: &World, info: &ItemCache, scroll: usize, cur
         let (bt, ui, _, _) = gu.parts();
         if let Some(m) = ui.menu("menu    itemctrl") {
             let (x, y) = crate::render::screens::window_pos(m, sw, sh, 1.0, 1.0);
-            crate::render::screens::push_shape_text_right(bt, ui, format!("{:2}", q.value).as_bytes(), x + 52.0, y + 22.0, 0x8080_8080);
-            crate::render::screens::push_shape_text(bt, ui, format!("/{:2}", q.max).as_bytes(), x + 58.0, y + 22.0, 0x8080_8080);
+            crate::render::screens::push_shape_text_right(
+                bt,
+                ui,
+                format!("{:2}", q.value).as_bytes(),
+                x + 52.0,
+                y + 22.0,
+                0x8080_8080,
+            );
+            crate::render::screens::push_shape_text(
+                bt,
+                ui,
+                format!("/{:2}", q.max).as_bytes(),
+                x + 58.0,
+                y + 22.0,
+                0x8080_8080,
+            );
         }
     }
     rects
@@ -1922,7 +2144,12 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     }
     let Some(r) = gu.window_rect("menu    inventor", sw, sh) else { return };
     let row = ((p.1 - r[1] - 4.0) / ROW_PITCH).floor();
-    let inside = p.0 >= r[0] && p.0 < r[0] + r[2] && p.1 >= r[1] && p.1 < r[1] + r[3] && row >= 0.0 && (row as usize) < VISIBLE_ROWS;
+    let inside = p.0 >= r[0]
+        && p.0 < r[0] + r[2]
+        && p.1 >= r[1]
+        && p.1 < r[1] + r[3]
+        && row >= 0.0
+        && (row as usize) < VISIBLE_ROWS;
     if inside && matches!(w.win, Some(Win::Items { .. })) {
         gu.hover.set(true);
     }

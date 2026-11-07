@@ -43,7 +43,9 @@ fn play(w: &mut World, id: u32, name: &str) -> bool {
 /// FUN_100d12d0 and the `waot` check (vt+0x2a0): the actor's model is in and no `waot` waits or runs on it.
 fn ready(w: &World, id: u32) -> bool {
     let waot = u32::from_le_bytes(*b"waot");
-    w.actors.get(&id).is_some_and(|a| a.character.is_some() && !a.play.as_ref().is_some_and(|p| p.name == "waot" && p.busy()))
+    w.actors
+        .get(&id)
+        .is_some_and(|a| a.character.is_some() && !a.play.as_ref().is_some_and(|p| p.name == "waot" && p.busy()))
         && !w.effects.actor_scheduler_running(id, waot)
 }
 
@@ -70,7 +72,8 @@ fn transition(phase: Phase, healing: bool, now: Instant) -> Step {
 /// Per frame, after the statuses are applied and before the motions: new rests, `res0` once ready, `res2` on leaving.
 pub fn update(w: &mut World) {
     let now = Instant::now();
-    let mut ids: Vec<u32> = w.entities.iter().filter(|(id, e)| **id != w.my_id && healing(e.motion.status)).map(|(id, _)| *id).collect();
+    let mut ids: Vec<u32> =
+        w.entities.iter().filter(|(id, e)| **id != w.my_id && healing(e.motion.status)).map(|(id, _)| *id).collect();
     if healing(w.my_motion.status) {
         ids.push(w.my_id);
     }

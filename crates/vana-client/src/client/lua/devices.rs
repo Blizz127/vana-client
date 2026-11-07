@@ -35,7 +35,9 @@ fn list() -> Vec<Dev> {
             vendor: hex(1),
             product: hex(2),
             name: get("HID_NAME=").unwrap_or_default(),
-            interface: std::fs::read_to_string(e.path().join("device/../bInterfaceNumber")).ok().and_then(|s| i32::from_str_radix(s.trim(), 16).ok()),
+            interface: std::fs::read_to_string(e.path().join("device/../bInterfaceNumber"))
+                .ok()
+                .and_then(|s| i32::from_str_radix(s.trim(), 16).ok()),
             descriptor: std::fs::read(e.path().join("device/report_descriptor")).unwrap_or_default(),
         });
     }
@@ -56,7 +58,8 @@ fn list() -> Vec<Dev> {
     unsafe {
         let mut guid = std::mem::zeroed();
         HidD_GetHidGuid(&mut guid);
-        let set = SetupDiGetClassDevsW(&guid, std::ptr::null(), std::ptr::null_mut(), DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+        let set =
+            SetupDiGetClassDevsW(&guid, std::ptr::null(), std::ptr::null_mut(), DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
         if set == INVALID_HANDLE_VALUE as HDEVINFO {
             return out;
         }
@@ -74,15 +77,26 @@ fn list() -> Vec<Dev> {
             let mut buf = vec![0u64; (need as usize).div_ceil(8)];
             let detail = buf.as_mut_ptr() as *mut SP_DEVICE_INTERFACE_DETAIL_DATA_W;
             (*detail).cbSize = std::mem::size_of::<SP_DEVICE_INTERFACE_DETAIL_DATA_W>() as u32;
-            if SetupDiGetDeviceInterfaceDetailW(set, &data, detail, need, std::ptr::null_mut(), std::ptr::null_mut()) == 0 {
+            if SetupDiGetDeviceInterfaceDetailW(set, &data, detail, need, std::ptr::null_mut(), std::ptr::null_mut())
+                == 0
+            {
                 continue;
             }
             let p = std::ptr::addr_of!((*detail).DevicePath) as *const u16;
             let len = (0..).take_while(|&k| *p.add(k) != 0).count();
             let wide = std::slice::from_raw_parts(p, len + 1);
             let path = String::from_utf16_lossy(&wide[..len]);
-            let mut dev = Dev { path, vendor: 0, product: 0, name: String::new(), interface: None, descriptor: Vec::new() };
-            let h = CreateFileW(wide.as_ptr(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, std::ptr::null(), OPEN_EXISTING, 0, std::ptr::null_mut());
+            let mut dev =
+                Dev { path, vendor: 0, product: 0, name: String::new(), interface: None, descriptor: Vec::new() };
+            let h = CreateFileW(
+                wide.as_ptr(),
+                0,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                std::ptr::null(),
+                OPEN_EXISTING,
+                0,
+                std::ptr::null_mut(),
+            );
             if h != INVALID_HANDLE_VALUE {
                 let mut attrs: HIDD_ATTRIBUTES = std::mem::zeroed();
                 attrs.Size = std::mem::size_of::<HIDD_ATTRIBUTES>() as u32;
@@ -91,11 +105,17 @@ fn list() -> Vec<Dev> {
                 }
                 let mut name = [0u16; 128];
                 if HidD_GetProductString(h, name.as_mut_ptr() as *mut _, (name.len() * 2) as u32) {
-                    dev.name = String::from_utf16_lossy(&name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())]);
+                    dev.name =
+                        String::from_utf16_lossy(&name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())]);
                 }
                 CloseHandle(h);
             }
-            dev.interface = dev.path.to_ascii_lowercase().split("&mi_").nth(1).and_then(|s| i32::from_str_radix(s.get(..2)?, 16).ok());
+            dev.interface = dev
+                .path
+                .to_ascii_lowercase()
+                .split("&mi_")
+                .nth(1)
+                .and_then(|s| i32::from_str_radix(s.get(..2)?, 16).ok());
             out.push(dev);
         }
         SetupDiDestroyDeviceInfoList(set);
@@ -122,7 +142,13 @@ fn ready(_: &std::fs::File) -> bool {
 }
 
 /// The device's reader and writer threads: one report a read, until it fails or the mod closes it; the reader's handle.
-fn run(id: u64, path: &str, report: Sender<Msg>, out: Receiver<Vec<u8>>, stop: Arc<AtomicBool>) -> std::io::Result<std::thread::JoinHandle<()>> {
+fn run(
+    id: u64,
+    path: &str,
+    report: Sender<Msg>,
+    out: Receiver<Vec<u8>>,
+    stop: Arc<AtomicBool>,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
     let mut f = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
     let mut w = f.try_clone()?;
     std::thread::Builder::new().name("lua-hid-w".into()).spawn(move || {
@@ -163,7 +189,12 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
             let out = lua.create_table()?;
             for d in list() {
                 let e = lua.create_table()?;
-                (e.set("path", d.path)?, e.set("vendor", d.vendor)?, e.set("product", d.product)?, e.set("name", d.name)?);
+                (
+                    e.set("path", d.path)?,
+                    e.set("vendor", d.vendor)?,
+                    e.set("product", d.product)?,
+                    e.set("name", d.name)?,
+                );
                 (e.set("interface", d.interface)?, e.set("descriptor", lua.create_string(&d.descriptor)?)?);
                 out.push(e)?;
             }
@@ -210,7 +241,9 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
             let st = state(lua);
             let s = st.borrow();
             match s.socks.iter().find(|x| x.id == id).map(|x| &x.kind) {
-                Some(Kind::Tcp { tx, .. }) => tx.send(data.as_bytes().to_vec()).map_err(|_| mlua::Error::runtime("the device is closed")),
+                Some(Kind::Tcp { tx, .. }) => {
+                    tx.send(data.as_bytes().to_vec()).map_err(|_| mlua::Error::runtime("the device is closed"))
+                }
                 _ => Err(mlua::Error::runtime(format!("no device {id}"))),
             }
         })?,

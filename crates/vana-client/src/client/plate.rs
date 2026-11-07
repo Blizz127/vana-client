@@ -91,7 +91,13 @@ fn team(p: &Plate) -> Option<Option<u8>> {
         return None;
     }
     let a = p.marks.alleg;
-    let i = if p.extra.ballista != 0 { p.extra.ballista } else if a < 7 { a - 1 } else { 0 };
+    let i = if p.extra.ballista != 0 {
+        p.extra.ballista
+    } else if a < 7 {
+        a - 1
+    } else {
+        0
+    };
     let g = match a {
         0x20 | 0x22 | 0x24 | 0x26 => Some(0xa6),
         0x21 | 0x23 | 0x25 | 0x27 => Some(0xa7),
@@ -214,7 +220,12 @@ mod tests {
         let p = Plate { pc: true, marks: Marks { alleg: 1, ..Marks::default() }, sync: 2 | 4, ..Plate::default() };
         assert_eq!(prefix(&p).0, [0x94, 0xa8, b' ']);
         // Belligerency gladiator rank 2: the rank glyph, no main glyph, no space.
-        let p = Plate { pc: true, marks: Marks { alleg: 8, ..Marks::default() }, extra: PlateExtra { ranks: 2, ..PlateExtra::default() }, ..Plate::default() };
+        let p = Plate {
+            pc: true,
+            marks: Marks { alleg: 8, ..Marks::default() },
+            extra: PlateExtra { ranks: 2, ..PlateExtra::default() },
+            ..Plate::default()
+        };
         assert_eq!(prefix(&p).0, [0xcd]);
         assert_eq!(target_glyph(&p), Some(0xa9));
     }

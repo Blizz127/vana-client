@@ -65,7 +65,8 @@ fn unpack_rar(first_volume: &Path, staging: &Path, progress: &Progress) -> Resul
         archive = if entry.is_file() && entry.filename.starts_with(&wanted) {
             let (name, size) = (entry.filename.clone(), entry.unpacked_size);
             log::info!("unpacking {}", name.display());
-            *progress.phase.lock().unwrap() = format!("Unpacking {}", name.file_name().unwrap_or_default().to_string_lossy());
+            *progress.phase.lock().unwrap() =
+                format!("Unpacking {}", name.file_name().unwrap_or_default().to_string_lossy());
             let next = header.extract_with_base(staging)?;
             progress.done.fetch_add(size, Ordering::Relaxed);
             next
@@ -114,9 +115,13 @@ pub fn install(opts: &Options, progress: Arc<Progress>) -> Result<()> {
                 let (targets, progress, cab) = (&targets, &progress, cab_dir.join(&media.cabinet));
                 s.spawn(move || {
                     let file = std::fs::File::open(&cab).with_context(|| format!("opening {}", cab.display()))?;
-                    cabx::extract_all(file, |name| targets.get(name).map(|(p, _)| p.clone()), |n| {
-                        progress.done.fetch_add(n, Ordering::Relaxed);
-                    })
+                    cabx::extract_all(
+                        file,
+                        |name| targets.get(name).map(|(p, _)| p.clone()),
+                        |n| {
+                            progress.done.fetch_add(n, Ordering::Relaxed);
+                        },
+                    )
                     .with_context(|| format!("extracting {}", cab.display()))
                 })
             })

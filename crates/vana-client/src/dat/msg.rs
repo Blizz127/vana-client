@@ -5,13 +5,30 @@ use super::DatIndex;
 use super::font::decode_sjis;
 use anyhow::{Context, Result, bail};
 
-
 /// Group -> language-table slot: the group table at 0x10365f50 names a message object, and
 /// FUN_1014d350 loads each object from FUN_10250e50(slot). Groups 8 and 10 read their slot directly.
 const GROUP_SLOT: [(u8, usize); 22] = [
-    (0x01, 0x03), (0x03, 0x04), (0x06, 0x02), (0x07, 0x07), (0x08, 0x08), (0x09, 0x09), (0x0a, 0x0a),
-    (0x0b, 0x0b), (0x0c, 0x0e), (0x0d, 0x0d), (0x0e, 0x0c), (0x0f, 0x16), (0x10, 0x15), (0x11, 0x17),
-    (0x12, 0x13), (0x13, 0x0f), (0x14, 0x10), (0x15, 0x11), (0x16, 0x12), (0x17, 0x19), (0x1a, 0x3b),
+    (0x01, 0x03),
+    (0x03, 0x04),
+    (0x06, 0x02),
+    (0x07, 0x07),
+    (0x08, 0x08),
+    (0x09, 0x09),
+    (0x0a, 0x0a),
+    (0x0b, 0x0b),
+    (0x0c, 0x0e),
+    (0x0d, 0x0d),
+    (0x0e, 0x0c),
+    (0x0f, 0x16),
+    (0x10, 0x15),
+    (0x11, 0x17),
+    (0x12, 0x13),
+    (0x13, 0x0f),
+    (0x14, 0x10),
+    (0x15, 0x11),
+    (0x16, 0x12),
+    (0x17, 0x19),
+    (0x1a, 0x3b),
     (0x1b, 0x06),
 ];
 
@@ -54,11 +71,15 @@ impl Messages {
             let base = 0x38 + count * 12;
             for i in 0..count {
                 // The length is the low half; the high half (i16 @+6) is the string's int argument count (FUN_10153100).
-                let (off, len) = (u32_at(data, 0x38 + i * 12).context("table")? as usize, (u32_at(data, 0x3c + i * 12).context("table")? & 0xffff) as usize);
+                let (off, len) = (
+                    u32_at(data, 0x38 + i * 12).context("table")? as usize,
+                    (u32_at(data, 0x3c + i * 12).context("table")? & 0xffff) as usize,
+                );
                 entries.push(data.get(base + off..base + off + len).context("string out of range")?.to_vec());
             }
         } else if data.starts_with(b"d_msg") {
-            let (hsize, tsize) = (u32_at(data, 0x18).context("header")? as usize, u32_at(data, 0x1c).context("header")? as usize);
+            let (hsize, tsize) =
+                (u32_at(data, 0x18).context("header")? as usize, u32_at(data, 0x1c).context("header")? as usize);
             // XOR flag u16 @0x0a: set in 55651 / 55725, clear in the plain spell and ability files.
             let count = u32_at(data, 0x28).context("header")? as usize;
             let xor = if data.get(0x0a) == Some(&1) { 0xFF } else { 0 };

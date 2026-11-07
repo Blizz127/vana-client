@@ -95,62 +95,315 @@ type Parser = Box<dyn Fn(&[u8])>;
 #[test]
 fn parsers_survive_malformed_input() {
     let parsers: Vec<(&str, Parser)> = vec![
-        ("chunks", Box::new(|b| { let _ = chunks(b); })),
-        ("autotrans::Dictionary::parse", Box::new(|b| { let _ = autotrans::Dictionary::parse(b); })),
-        ("bump::parse", Box::new(|b| { let _ = bump::parse(b); })),
-        ("character::load_file", Box::new(|b| { let _ = character::load_file(b); })),
-        ("character::parse_skeleton", Box::new(|b| { let _ = character::parse_skeleton(String::new(), b); })),
-        ("character::parse_mesh", Box::new(|b| { let _ = character::parse_mesh("", b); })),
-        ("character::parse_animation", Box::new(|b| { let _ = character::parse_animation(String::new(), b); })),
-        ("collision::parse", Box::new(|b| { let _ = collision::parse(b); })),
-        ("cursor::parse", Box::new(|b| { let _ = cursor::parse(b); })),
-        ("cursor::parse_cur", Box::new(|b| { let _ = cursor::parse_cur(b); })),
-        ("dancer::parse_channels", Box::new(|b| { let _ = dancer::parse_channels(b); })),
-        ("dialog::Dialog::parse", Box::new(|b| { let _ = dialog::Dialog::parse(b); })),
-        ("dialog::readable", Box::new(|b| { let _ = dialog::readable(b); })),
-        ("dialog::expand", Box::new(|b| { let _ = dialog::expand(b, &dialog::Ctx::default()); })),
-        ("event::parse", Box::new(|b| { let _ = event::parse(b); })),
-        ("furniture::FurnTable::parse", Box::new(|b| { let _ = furniture::FurnTable::parse(b); })),
-        ("generator::Tree::build", Box::new(|b| { let _ = generator::Tree::build(b); })),
-        ("generator::parse_ops", Box::new(|b| { let _ = generator::parse_ops(b, 0); })),
-        ("generator::KeyFrame::parse", Box::new(|b| { let _ = generator::KeyFrame::parse(b); })),
-        ("generator::D3m::parse", Box::new(|b| { let _ = generator::D3m::parse(b); })),
-        ("items::string_table", Box::new(|b| { let _ = items::string_table(b); })),
-        ("msg::Messages::parse", Box::new(|b| { let _ = msg::Messages::parse(b); })),
-        ("names::DMsg::parse", Box::new(|b| { let _ = names::DMsg::parse(b); })),
-        ("npc::parse_look", Box::new(|b| { let _ = npc::parse_look(b); })),
-        ("npc::init_scheduler", Box::new(|b| { let _ = npc::init_scheduler(b); })),
-        ("sched::ops", Box::new(|b| { let _ = sched::ops(b); })),
-        ("sched::loops", Box::new(|b| { let _ = sched::loops(b); })),
-        ("sched::auto_start", Box::new(|b| { let _ = sched::auto_start(b); })),
-        ("sched::span", Box::new(|b| { let _ = sched::span(b); })),
-        ("sched::length", Box::new(|b| { let _ = sched::length(b); })),
-        ("sched::plan", Box::new(|b| { let _ = sched::plan(b, &["x"]); })),
-        ("sched::hand_calls", Box::new(|b| { let _ = sched::hand_calls(b); })),
-        ("statusinfo::entry", Box::new(|b| { let _ = statusinfo::entry(b, 1); })),
-        ("statusinfo::icon", Box::new(|b| { let _ = statusinfo::icon(b, 1); })),
-        ("title::parse_ops", Box::new(|b| { let _ = title::parse_ops(b); })),
-        ("title::Title::parse", Box::new(|b| { let _ = title::Title::parse(b); })),
-        ("ui::parse_sprite_lib", Box::new(|b| { let _ = ui::parse_sprite_lib(b); })),
-        ("ui::parse_menu", Box::new(|b| { let _ = ui::parse_menu(b); })),
-        ("ui::UiFile::parse", Box::new(|b| { let _ = ui::UiFile::parse(b); })),
-        ("weather::Env::parse", Box::new(|b| { let _ = weather::Env::parse(b); })),
-        ("weather::ZoneWeather::parse", Box::new(|b| { let _ = weather::ZoneWeather::parse(b); })),
-        ("zone::parse_mmb", Box::new(|b| { let _ = zone::parse_mmb(b); })),
-        ("zone::sway_curves", Box::new(|b| { let _ = zone::sway_curves(b); })),
-        ("zone::camera_lists", Box::new(|b| { let _ = zone::camera_lists(b); })),
-        ("zone::light_list", Box::new(|b| { let _ = zone::light_list(b); })),
-        ("zone::load_scene", Box::new(|b| { let _ = zone::load_scene(&zone::Keys::for_tests(), b); })),
-        ("zone::decode_mzb", Box::new(|b| { let _ = zone::decode_mzb(&zone::Keys::for_tests(), &mut b.to_vec()); })),
+        (
+            "chunks",
+            Box::new(|b| {
+                let _ = chunks(b);
+            }),
+        ),
+        (
+            "autotrans::Dictionary::parse",
+            Box::new(|b| {
+                let _ = autotrans::Dictionary::parse(b);
+            }),
+        ),
+        (
+            "bump::parse",
+            Box::new(|b| {
+                let _ = bump::parse(b);
+            }),
+        ),
+        (
+            "character::load_file",
+            Box::new(|b| {
+                let _ = character::load_file(b);
+            }),
+        ),
+        (
+            "character::parse_skeleton",
+            Box::new(|b| {
+                let _ = character::parse_skeleton(String::new(), b);
+            }),
+        ),
+        (
+            "character::parse_mesh",
+            Box::new(|b| {
+                let _ = character::parse_mesh("", b);
+            }),
+        ),
+        (
+            "character::parse_animation",
+            Box::new(|b| {
+                let _ = character::parse_animation(String::new(), b);
+            }),
+        ),
+        (
+            "collision::parse",
+            Box::new(|b| {
+                let _ = collision::parse(b);
+            }),
+        ),
+        (
+            "cursor::parse",
+            Box::new(|b| {
+                let _ = cursor::parse(b);
+            }),
+        ),
+        (
+            "cursor::parse_cur",
+            Box::new(|b| {
+                let _ = cursor::parse_cur(b);
+            }),
+        ),
+        (
+            "dancer::parse_channels",
+            Box::new(|b| {
+                let _ = dancer::parse_channels(b);
+            }),
+        ),
+        (
+            "dialog::Dialog::parse",
+            Box::new(|b| {
+                let _ = dialog::Dialog::parse(b);
+            }),
+        ),
+        (
+            "dialog::readable",
+            Box::new(|b| {
+                let _ = dialog::readable(b);
+            }),
+        ),
+        (
+            "dialog::expand",
+            Box::new(|b| {
+                let _ = dialog::expand(b, &dialog::Ctx::default());
+            }),
+        ),
+        (
+            "event::parse",
+            Box::new(|b| {
+                let _ = event::parse(b);
+            }),
+        ),
+        (
+            "furniture::FurnTable::parse",
+            Box::new(|b| {
+                let _ = furniture::FurnTable::parse(b);
+            }),
+        ),
+        (
+            "generator::Tree::build",
+            Box::new(|b| {
+                let _ = generator::Tree::build(b);
+            }),
+        ),
+        (
+            "generator::parse_ops",
+            Box::new(|b| {
+                let _ = generator::parse_ops(b, 0);
+            }),
+        ),
+        (
+            "generator::KeyFrame::parse",
+            Box::new(|b| {
+                let _ = generator::KeyFrame::parse(b);
+            }),
+        ),
+        (
+            "generator::D3m::parse",
+            Box::new(|b| {
+                let _ = generator::D3m::parse(b);
+            }),
+        ),
+        (
+            "items::string_table",
+            Box::new(|b| {
+                let _ = items::string_table(b);
+            }),
+        ),
+        (
+            "msg::Messages::parse",
+            Box::new(|b| {
+                let _ = msg::Messages::parse(b);
+            }),
+        ),
+        (
+            "names::DMsg::parse",
+            Box::new(|b| {
+                let _ = names::DMsg::parse(b);
+            }),
+        ),
+        (
+            "npc::parse_look",
+            Box::new(|b| {
+                let _ = npc::parse_look(b);
+            }),
+        ),
+        (
+            "npc::init_scheduler",
+            Box::new(|b| {
+                let _ = npc::init_scheduler(b);
+            }),
+        ),
+        (
+            "sched::ops",
+            Box::new(|b| {
+                let _ = sched::ops(b);
+            }),
+        ),
+        (
+            "sched::loops",
+            Box::new(|b| {
+                let _ = sched::loops(b);
+            }),
+        ),
+        (
+            "sched::auto_start",
+            Box::new(|b| {
+                let _ = sched::auto_start(b);
+            }),
+        ),
+        (
+            "sched::span",
+            Box::new(|b| {
+                let _ = sched::span(b);
+            }),
+        ),
+        (
+            "sched::length",
+            Box::new(|b| {
+                let _ = sched::length(b);
+            }),
+        ),
+        (
+            "sched::plan",
+            Box::new(|b| {
+                let _ = sched::plan(b, &["x"]);
+            }),
+        ),
+        (
+            "sched::hand_calls",
+            Box::new(|b| {
+                let _ = sched::hand_calls(b);
+            }),
+        ),
+        (
+            "statusinfo::entry",
+            Box::new(|b| {
+                let _ = statusinfo::entry(b, 1);
+            }),
+        ),
+        (
+            "statusinfo::icon",
+            Box::new(|b| {
+                let _ = statusinfo::icon(b, 1);
+            }),
+        ),
+        (
+            "title::parse_ops",
+            Box::new(|b| {
+                let _ = title::parse_ops(b);
+            }),
+        ),
+        (
+            "title::Title::parse",
+            Box::new(|b| {
+                let _ = title::Title::parse(b);
+            }),
+        ),
+        (
+            "ui::parse_sprite_lib",
+            Box::new(|b| {
+                let _ = ui::parse_sprite_lib(b);
+            }),
+        ),
+        (
+            "ui::parse_menu",
+            Box::new(|b| {
+                let _ = ui::parse_menu(b);
+            }),
+        ),
+        (
+            "ui::UiFile::parse",
+            Box::new(|b| {
+                let _ = ui::UiFile::parse(b);
+            }),
+        ),
+        (
+            "weather::Env::parse",
+            Box::new(|b| {
+                let _ = weather::Env::parse(b);
+            }),
+        ),
+        (
+            "weather::ZoneWeather::parse",
+            Box::new(|b| {
+                let _ = weather::ZoneWeather::parse(b);
+            }),
+        ),
+        (
+            "zone::parse_mmb",
+            Box::new(|b| {
+                let _ = zone::parse_mmb(b);
+            }),
+        ),
+        (
+            "zone::sway_curves",
+            Box::new(|b| {
+                let _ = zone::sway_curves(b);
+            }),
+        ),
+        (
+            "zone::camera_lists",
+            Box::new(|b| {
+                let _ = zone::camera_lists(b);
+            }),
+        ),
+        (
+            "zone::light_list",
+            Box::new(|b| {
+                let _ = zone::light_list(b);
+            }),
+        ),
+        (
+            "zone::load_scene",
+            Box::new(|b| {
+                let _ = zone::load_scene(&zone::Keys::for_tests(), b);
+            }),
+        ),
+        (
+            "zone::decode_mzb",
+            Box::new(|b| {
+                let _ = zone::decode_mzb(&zone::Keys::for_tests(), &mut b.to_vec());
+            }),
+        ),
         ("zone::decode_mmb", Box::new(|b| zone::decode_mmb(&zone::Keys::for_tests(), &mut b.to_vec()))),
-        ("zone::parse_mzb", Box::new(|b| { let _ = zone::parse_mzb(&mut b.to_vec()); })),
-        ("zone::parse_img", Box::new(|b| { let _ = zone::parse_img(b); })),
-        ("zone::parse_rid", Box::new(|b| { let _ = zone::parse_rid(b); })),
+        (
+            "zone::parse_mzb",
+            Box::new(|b| {
+                let _ = zone::parse_mzb(&mut b.to_vec());
+            }),
+        ),
+        (
+            "zone::parse_img",
+            Box::new(|b| {
+                let _ = zone::parse_img(b);
+            }),
+        ),
+        (
+            "zone::parse_rid",
+            Box::new(|b| {
+                let _ = zone::parse_rid(b);
+            }),
+        ),
     ];
     let failed: Vec<String> = parsers
         .iter()
         .enumerate()
-        .filter_map(|(i, (name, f))| first_panic(0x9e37_79b9_7f4a_7c15 ^ i as u64, f.as_ref()).map(|b| format!("{name}: {:02x?}", &b[..b.len().min(96)])))
+        .filter_map(|(i, (name, f))| {
+            first_panic(0x9e37_79b9_7f4a_7c15 ^ i as u64, f.as_ref())
+                .map(|b| format!("{name}: {:02x?}", &b[..b.len().min(96)]))
+        })
         .collect();
     assert!(failed.is_empty(), "{} parser(s) panicked:\n{}", failed.len(), failed.join("\n"));
 }
@@ -163,8 +416,14 @@ fn empty_chunks_of_every_kind() {
             let mut file = vec![0u8; size];
             file[4..8].copy_from_slice(&(kind | ((size / 16) as u32) << 7).to_le_bytes());
             let keys = zone::Keys::for_tests();
-            for (name, f) in [("load_scene", &(|b: &[u8]| drop(zone::load_scene(&keys, b))) as &dyn Fn(&[u8])), ("Title::parse", &|b: &[u8]| drop(title::Title::parse(b)))] {
-                assert!(catch_unwind(AssertUnwindSafe(|| f(&file))).is_ok(), "{name} panicked on an empty chunk of kind {kind:#x}, size {size}");
+            for (name, f) in [
+                ("load_scene", &(|b: &[u8]| drop(zone::load_scene(&keys, b))) as &dyn Fn(&[u8])),
+                ("Title::parse", &|b: &[u8]| drop(title::Title::parse(b))),
+            ] {
+                assert!(
+                    catch_unwind(AssertUnwindSafe(|| f(&file))).is_ok(),
+                    "{name} panicked on an empty chunk of kind {kind:#x}, size {size}"
+                );
             }
         }
     }

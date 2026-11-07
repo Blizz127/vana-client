@@ -57,7 +57,12 @@ pub(super) fn search_rows(w: &World) -> Vec<super::super::listsearch::Entry> {
         Some(Found::Books) => macroedit::search_books(w).unwrap_or_default().into_iter().map(Entry::named).collect(),
         Some(Found::Sets) => esmenu::view(w).map_or(Vec::new(), |v| v.names.into_iter().map(Entry::named).collect()),
         Some(Found::Storage) => esmenu::view(w).and_then(|v| v.editor).map_or(Vec::new(), |e| {
-            e.rows.into_iter().map(|(id, name, count, _)| Entry { item: (id != 0).then_some(id), ..Entry::named(name) }.note(count_note(count))).collect()
+            e.rows
+                .into_iter()
+                .map(|(id, name, count, _)| {
+                    Entry { item: (id != 0).then_some(id), ..Entry::named(name) }.note(count_note(count))
+                })
+                .collect()
         }),
         None => Vec::new(),
     }
@@ -98,22 +103,34 @@ pub fn draw(p: &mut Panels, w: &mut World) {
         social::width(1)
     };
     let mut found = super::lists::found(p, w, "macros");
-    p.panel("window", Some(Title { icon: Some("icons/macro"), text: "Macros", note: None, name: false }), width, |ui| {
-        if super::lists::rows_or(ui, m, &mut found) {
-            return;
-        }
-        if let Some(e) = &v.editor {
-            editor(ui, m, gu, e, &mut mouse);
-        } else if let Some(pv) = &v.palettes {
-            palettes(ui, m, gu, pv, &mut mouse);
-        } else if let Some(b) = &v.books {
-            books(ui, m, gu, b, &mut mouse);
-        } else {
-            let (sel, monstrosity, focused) = v.menu;
-            let mw = MenuWin { name: macroedit::MENU, sel, off: if monstrosity { vec![2] } else { Vec::new() }, labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
-            mouse.menu = social::stack(ui, m, gu, std::slice::from_ref(&mw), focused);
-        }
-    });
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/macro"), text: "Macros", note: None, name: false }),
+        width,
+        |ui| {
+            if super::lists::rows_or(ui, m, &mut found) {
+                return;
+            }
+            if let Some(e) = &v.editor {
+                editor(ui, m, gu, e, &mut mouse);
+            } else if let Some(pv) = &v.palettes {
+                palettes(ui, m, gu, pv, &mut mouse);
+            } else if let Some(b) = &v.books {
+                books(ui, m, gu, b, &mut mouse);
+            } else {
+                let (sel, monstrosity, focused) = v.menu;
+                let mw = MenuWin {
+                    name: macroedit::MENU,
+                    sel,
+                    off: if monstrosity { vec![2] } else { Vec::new() },
+                    labels: Vec::new(),
+                    marked: Vec::new(),
+                    values: Vec::new(),
+                };
+                mouse.menu = social::stack(ui, m, gu, std::slice::from_ref(&mw), focused);
+            }
+        },
+    );
     if let Some(f) = found {
         f.pick(w, Some(gu));
         return;
@@ -156,14 +173,22 @@ fn act(w: &mut World, gu: &GameUi, mouse: Mouse) {
 /// lines, then Copy / Paste / Delete Line, which Tab or Down from the last line reach. True when taken.
 pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, shift: bool) -> bool {
     use egui::Key as K;
-    if !w.modern || w.confirm.is_some() || !matches!(key, K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight | K::Enter | K::Escape | K::Tab) {
+    if !w.modern
+        || w.confirm.is_some()
+        || !matches!(key, K::ArrowUp | K::ArrowDown | K::ArrowLeft | K::ArrowRight | K::Enter | K::Escape | K::Tab)
+    {
         return false;
     }
     let Some(v) = macroedit::view(w, gu) else { return false };
     let enter = |w: &mut World| macroedit::key(w, gu, K::Enter);
     let sound = |w: &mut World, a: kit::Act| w.sounds.extend(a.sound().map(|s| s as u32));
     if let Some(pv) = &v.palettes {
-        let stops = [Stop::Tabs { n: 10, at: pv.set }, Stop::Buttons { n: 10, off: 0, pair: None }, Stop::Buttons { n: 10, off: 0, pair: None }, Stop::Buttons { n: 3, off: (!pv.paste_ok as u64) << 1, pair: None }];
+        let stops = [
+            Stop::Tabs { n: 10, at: pv.set },
+            Stop::Buttons { n: 10, off: 0, pair: None },
+            Stop::Buttons { n: 10, off: 0, pair: None },
+            Stop::Buttons { n: 3, off: (!pv.paste_ok as u64) << 1, pair: None },
+        ];
         let mut at = match pv.bopt {
             _ if pv.tabs => At::new(0, 0),
             Some(o) => At::new(3, o as usize - 1),
@@ -212,7 +237,11 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key, shift: bool) -> bool {
         w.sounds.push(crate::audio::Ui::Cursor as u32);
         return true;
     }
-    let stops = [Stop::Buttons { n: 2, off: 0, pair: None }, Stop::List { n: 7, page: 7 }, Stop::Buttons { n: 3, off: if line { (!e.paste_ok as u64) << 1 } else { 0b111 }, pair: None }];
+    let stops = [
+        Stop::Buttons { n: 2, off: 0, pair: None },
+        Stop::List { n: 7, page: 7 },
+        Stop::Buttons { n: 3, off: if line { (!e.paste_ok as u64) << 1 } else { 0b111 }, pair: None },
+    ];
     let mut at = match e.lopt {
         Some(o) => At::new(2, o as usize - 1),
         None if e.sel <= 2 => At::new(0, e.sel as usize - 1),
@@ -282,41 +311,70 @@ fn books(ui: &mut Ui, m: &super::Modern, gu: &GameUi, b: &macroedit::Books, mous
             let follow = ui.ctx().data(|d| d.get_temp::<usize>(seen)) != Some(b.cur);
             ui.ctx().data_mut(|d| d.insert_temp(seen, b.cur));
             let tall = 14.0 * (ROW + 2.0);
-            egui::ScrollArea::vertical().id_salt("macro books").max_height(tall).min_scrolled_height(tall).auto_shrink([false, true]).show(ui, |ui| {
-                for (k, name) in b.names.iter().enumerate() {
-                    let (r, resp) = ui.allocate_exact_size(vec2(BOOK_W - 14.0, ROW), Sense::click());
-                    row_face(ui, m, r, k == b.cur, b.focused, resp.hovered());
-                    let font = FontId::proportional(m.theme.small);
-                    ui.painter().text(pos2(r.min.x + 40.0, r.center().y), Align2::RIGHT_CENTER, format!("{}", k + 1), font.clone(), m.theme.color("muted"));
-                    let at = pos2(r.min.x + 52.0, r.center().y);
-                    match &b.rename {
-                        Some(t) if k == b.cur => kit::caret_text(ui, m, at, t, Some(b.rename_caret), font, r.max.x),
-                        _ => _ = ui.painter().text(at, Align2::LEFT_CENTER, name, font, m.theme.color("text")),
+            egui::ScrollArea::vertical()
+                .id_salt("macro books")
+                .max_height(tall)
+                .min_scrolled_height(tall)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    for (k, name) in b.names.iter().enumerate() {
+                        let (r, resp) = ui.allocate_exact_size(vec2(BOOK_W - 14.0, ROW), Sense::click());
+                        row_face(ui, m, r, k == b.cur, b.focused, resp.hovered());
+                        let font = FontId::proportional(m.theme.small);
+                        ui.painter().text(
+                            pos2(r.min.x + 40.0, r.center().y),
+                            Align2::RIGHT_CENTER,
+                            format!("{}", k + 1),
+                            font.clone(),
+                            m.theme.color("muted"),
+                        );
+                        let at = pos2(r.min.x + 52.0, r.center().y);
+                        match &b.rename {
+                            Some(t) if k == b.cur => kit::caret_text(ui, m, at, t, Some(b.rename_caret), font, r.max.x),
+                            _ => _ = ui.painter().text(at, Align2::LEFT_CENTER, name, font, m.theme.color("text")),
+                        }
+                        if k == b.active {
+                            ui.painter().add(paint::star(
+                                pos2(r.max.x - 18.0, r.center().y),
+                                6.5,
+                                m.theme.color("gold"),
+                            ));
+                        }
+                        if k == b.cur && follow {
+                            ui.scroll_to_rect(r, None);
+                        }
+                        if b.focused && resp.clicked() {
+                            mouse.book = Some(k);
+                        }
+                        ui.add_space(2.0);
                     }
-                    if k == b.active {
-                        ui.painter().add(paint::star(pos2(r.max.x - 18.0, r.center().y), 6.5, m.theme.color("gold")));
-                    }
-                    if k == b.cur && follow {
-                        ui.scroll_to_rect(r, None);
-                    }
-                    if b.focused && resp.clicked() {
-                        mouse.book = Some(k);
-                    }
-                    ui.add_space(2.0);
-                }
-            });
+                });
         });
         if let Some(o) = b.opt {
             ui.add_space(12.0);
             let off = if b.paste_ok { Vec::new() } else { vec![4] };
-            let mw = MenuWin { name: macroedit::SELOP, sel: o, off, labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
+            let mw = MenuWin {
+                name: macroedit::SELOP,
+                sel: o,
+                off,
+                labels: Vec::new(),
+                marked: Vec::new(),
+                values: Vec::new(),
+            };
             mouse.opt = social::stack(ui, m, gu, std::slice::from_ref(&mw), true);
         }
     });
 }
 
 /// A keycap: its key's digit, the macro's title, the cursor's ring; dimmed when `off` (nothing in it can be used now).
-fn keycap(ui: &mut Ui, m: &super::Modern, digit: usize, title: &str, cursor: Option<bool>, off: bool) -> egui::Response {
+fn keycap(
+    ui: &mut Ui,
+    m: &super::Modern,
+    digit: usize,
+    title: &str,
+    cursor: Option<bool>,
+    off: bool,
+) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(vec2(KEY_W, KEY_H), Sense::click());
     // A plain key: no corner ornaments (user, 2026-10-30), lighter under the pointer, ringed for the cursor.
     let fill = if resp.hovered() { m.theme.color("surface") } else { m.theme.color("charcoal") };
@@ -326,12 +384,30 @@ fn keycap(ui: &mut Ui, m: &super::Modern, digit: usize, title: &str, cursor: Opt
         Some(false) => m.theme.color("gold").gamma_multiply(0.7),
         None => m.theme.color("bronze").gamma_multiply(0.8),
     };
-    ui.painter().rect(r.shrink(1.0), 6.0, fill, egui::Stroke::new(if cursor.is_some() { 2.5 } else { 1.5 }, edge), egui::StrokeKind::Inside);
+    ui.painter().rect(
+        r.shrink(1.0),
+        6.0,
+        fill,
+        egui::Stroke::new(if cursor.is_some() { 2.5 } else { 1.5 }, edge),
+        egui::StrokeKind::Inside,
+    );
     // Its key's number in the top right corner.
-    ui.painter().text(pos2(r.max.x - 8.0, r.min.y + 5.0), Align2::RIGHT_TOP, format!("{}", (digit + 1) % 10), FontId::monospace(m.theme.small), Color32::WHITE);
+    ui.painter().text(
+        pos2(r.max.x - 8.0, r.min.y + 5.0),
+        Align2::RIGHT_TOP,
+        format!("{}", (digit + 1) % 10),
+        FontId::monospace(m.theme.small),
+        Color32::WHITE,
+    );
     let clip = r.shrink(4.0);
     let colour = m.theme.color(if off { "muted" } else { "text" });
-    ui.painter().with_clip_rect(clip).text(pos2(r.center().x, r.center().y + 6.0), Align2::CENTER_CENTER, title, FontId::proportional(m.theme.small), colour);
+    ui.painter().with_clip_rect(clip).text(
+        pos2(r.center().x, r.center().y + 6.0),
+        Align2::CENTER_CENTER,
+        title,
+        FontId::proportional(m.theme.small),
+        colour,
+    );
     resp
 }
 
@@ -344,10 +420,14 @@ fn palettes(ui: &mut Ui, m: &super::Modern, gu: &GameUi, pv: &macroedit::Palette
     if let Some(s) = kit::tab_strip(ui, m, "macro sets", &labels, pv.set, pv.tabs) {
         mouse.set = Some(s);
     }
-    for (pal, label) in [(1u8, caption(gu, "menu    mcr1edit", 1, "Ctrl")), (2, caption(gu, "menu    mcr2edit", 1, "Alt"))] {
+    for (pal, label) in
+        [(1u8, caption(gu, "menu    mcr1edit", 1, "Ctrl")), (2, caption(gu, "menu    mcr2edit", 1, "Alt"))]
+    {
         ui.horizontal(|ui| {
             ui.allocate_ui(vec2(40.0, KEY_H), |ui| {
-                ui.centered_and_justified(|ui| ui.label(egui::RichText::new(&label).size(m.theme.small).color(m.theme.color("gold"))));
+                ui.centered_and_justified(|ui| {
+                    ui.label(egui::RichText::new(&label).size(m.theme.small).color(m.theme.color("gold")))
+                });
             });
             for col in 0..10u16 {
                 let i = col as usize + 10 * (pal as usize - 1);
@@ -363,7 +443,13 @@ fn palettes(ui: &mut Ui, m: &super::Modern, gu: &GameUi, pv: &macroedit::Palette
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         for (o, fallback) in [(1u16, "Copy"), (2, "Paste"), (3, "Delete")] {
-            if button(ui, m, &caption(gu, macroedit::BEDIT, o, fallback), 110.0, Btn { cursor: pv.bopt == Some(o), off: o == 2 && !pv.paste_ok, ..Default::default() }) {
+            if button(
+                ui,
+                m,
+                &caption(gu, macroedit::BEDIT, o, fallback),
+                110.0,
+                Btn { cursor: pv.bopt == Some(o), off: o == 2 && !pv.paste_ok, ..Default::default() },
+            ) {
                 mouse.bopt = Some(o);
             }
         }
@@ -376,7 +462,13 @@ fn editor(ui: &mut Ui, m: &super::Modern, gu: &GameUi, e: &macroedit::EditorView
         ui.label(egui::RichText::new(&e.label).size(m.theme.ui).color(m.theme.color("gold")));
         ui.add_space(12.0);
         for (c, fallback) in [(1u16, "Prev"), (2, "Next")] {
-            if button(ui, m, &caption(gu, macroedit::MACRO, c, fallback), 80.0, Btn { cursor: e.sel == c && e.focused, ..Default::default() }) {
+            if button(
+                ui,
+                m,
+                &caption(gu, macroedit::MACRO, c, fallback),
+                80.0,
+                Btn { cursor: e.sel == c && e.focused, ..Default::default() },
+            ) {
                 mouse.field = Some(c);
             }
         }
@@ -387,12 +479,19 @@ fn editor(ui: &mut Ui, m: &super::Modern, gu: &GameUi, e: &macroedit::EditorView
         let (r, resp) = ui.allocate_exact_size(vec2(LINE_W, ROW), Sense::click());
         row_face(ui, m, r, e.sel == child, e.focused || e.editing == Some(f), resp.hovered());
         let label = if f == 0 { "Title".to_string() } else { format!("{f}") };
-        ui.painter().text(pos2(r.min.x + 50.0, r.center().y), Align2::RIGHT_CENTER, label, FontId::proportional(m.theme.small), m.theme.color("muted"));
+        ui.painter().text(
+            pos2(r.min.x + 50.0, r.center().y),
+            Align2::RIGHT_CENTER,
+            label,
+            FontId::proportional(m.theme.small),
+            m.theme.color("muted"),
+        );
         let (at, font) = (pos2(r.min.x + 60.0, r.center().y), FontId::monospace(m.theme.small));
         if e.editing == Some(f) {
             kit::caret_text(ui, m, at, text, Some(e.caret), font.clone(), r.max.x - 8.0);
             if let Some((cands, sel)) = &e.fep {
-                let dx = ui.painter().layout_no_wrap(text.chars().take(e.caret).collect(), font, Color32::WHITE).size().x;
+                let dx =
+                    ui.painter().layout_no_wrap(text.chars().take(e.caret).collect(), font, Color32::WHITE).size().x;
                 super::chat::candidates(ui, m, cands, *sel, pos2((at.x + dx - 8.0).min(r.max.x - 160.0), r.min.y));
             }
         } else {
@@ -408,7 +507,13 @@ fn editor(ui: &mut Ui, m: &super::Modern, gu: &GameUi, e: &macroedit::EditorView
     let on_line = (4..=9).contains(&e.sel) && e.editing.is_none();
     ui.horizontal(|ui| {
         for (o, fallback) in [(1u16, "Copy Line"), (2, "Paste Line"), (3, "Delete Line")] {
-            if button(ui, m, &caption(gu, macroedit::LEDIT, o, fallback), 120.0, Btn { cursor: e.lopt == Some(o), off: !on_line || (o == 2 && !e.paste_ok), ..Default::default() }) {
+            if button(
+                ui,
+                m,
+                &caption(gu, macroedit::LEDIT, o, fallback),
+                120.0,
+                Btn { cursor: e.lopt == Some(o), off: !on_line || (o == 2 && !e.paste_ok), ..Default::default() },
+            ) {
                 mouse.lopt = Some(o);
             }
         }
@@ -431,19 +536,45 @@ fn held_palette(p: &mut Panels, w: &World) {
     let titles: Vec<String> = (0..10).map(|k| mac.recs[k + 10 * (pal - 1)].title()).collect();
     let off: Vec<bool> = (0..10).map(|k| m.macro_off(w, &mac.recs[k + 10 * (pal - 1)])).collect();
     let cur = w.palette.3[pal - 1];
-    p.panel_at("macro palette", Some(Title { icon: Some("icons/macro"), text: label, note: Some(&note), name: false }), width, at, |ui| {
-        ui.horizontal(|ui| {
-            for (k, t) in titles.iter().enumerate() {
-                keycap(ui, m, k, t, (k == cur).then_some(true), off[k]);
-            }
-        });
-    });
+    p.panel_at(
+        "macro palette",
+        Some(Title { icon: Some("icons/macro"), text: label, note: Some(&note), name: false }),
+        width,
+        at,
+        |ui| {
+            ui.horizontal(|ui| {
+                for (k, t) in titles.iter().enumerate() {
+                    keycap(ui, m, k, t, (k == cur).then_some(true), off[k]);
+                }
+            });
+        },
+    );
 }
 
 /// The storage the slot editor lists (mcrmogc's rows: child 1 -> container 0, 2 -> 1, 3 -> 2, the others their own).
-const STORES: [(u16, u8); 16] = [(1, 0), (2, 1), (3, 2), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12), (13, 13), (14, 14), (15, 15), (16, 16)];
+const STORES: [(u16, u8); 16] = [
+    (1, 0),
+    (2, 1),
+    (3, 2),
+    (4, 4),
+    (5, 5),
+    (6, 6),
+    (7, 7),
+    (8, 8),
+    (9, 9),
+    (10, 10),
+    (11, 11),
+    (12, 12),
+    (13, 13),
+    (14, 14),
+    (15, 15),
+    (16, 16),
+];
 /// The grid's slots by child (column by column, as the equipment window).
-const SLOT_NAMES: [&str; 16] = ["Main", "Head", "Body", "Back", "Sub", "Neck", "Hands", "Waist", "Range", "Ear 1", "Ring 1", "Legs", "Ammo", "Ear 2", "Ring 2", "Feet"];
+const SLOT_NAMES: [&str; 16] = [
+    "Main", "Head", "Body", "Back", "Sub", "Neck", "Hands", "Waist", "Range", "Ear 1", "Ring 1", "Legs", "Ammo",
+    "Ear 2", "Ring 2", "Feet",
+];
 const TILE: f32 = 52.0;
 
 /// Edit Equip. Set: the page as tabs and its twenty sets with mcresmn beside them; the slot editor: the grid of sixteen
@@ -458,97 +589,161 @@ fn equip_sets(p: &mut Panels, w: &mut World, gu: &GameUi, v: &esmenu::View) {
         let (mut tile_click, mut row) = (None, None);
         let mut store = None;
         let mut done = false;
-        p.panel("window", Some(Title { icon: Some("icons/equip_set"), text: &title, note: v.names.get(v.row).map(|s| s.as_str()), name: false }), 4.0 * (TILE + 8.0) + 380.0 + 60.0, |ui| {
-            ui.horizontal_top(|ui| {
-                ui.vertical(|ui| {
-                    let (area, _) = ui.allocate_exact_size(vec2(4.0 * (TILE + 8.0), 4.0 * (TILE + 8.0)), Sense::hover());
-                    for c in 1..=16u16 {
-                        let (col, rw) = ((c - 1) / 4, (c - 1) % 4);
-                        let r = Rect::from_min_size(area.min + vec2(col as f32 * (TILE + 8.0), rw as f32 * (TILE + 8.0)), vec2(TILE, TILE));
-                        let resp = ui.interact(r, egui::Id::unique(("set slot", c)), Sense::click());
-                        let allowed = e.allowed[c as usize - 1];
-                        let face = match () {
-                            _ if e.grid == c => "controls/item_slot_selected",
-                            _ if !allowed => "controls/item_slot_locked",
-                            _ if resp.hovered() => "controls/item_slot_hover",
-                            _ => "controls/item_slot_normal",
-                        };
-                        if let Some(sp) = m.art.sprite(face) {
-                            ui.painter().add(paint::nine_slice(&sp, r, 0.5, Color32::WHITE));
-                        }
-                        if e.grid == c {
-                            let col = if e.on_list { m.theme.color("bronze") } else { m.theme.color("focus") };
-                            ui.painter().rect_stroke(r.shrink(1.0), 6.0, egui::Stroke::new(2.5, col), egui::StrokeKind::Inside);
-                        }
-                        let (state, id) = e.slots[c as usize - 1];
-                        match state {
-                            1 => {
-                                if let Some(t) = m.item_icon(ctx, &info, id) {
-                                    ui.painter().image(t, r.shrink(10.0), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+        p.panel(
+            "window",
+            Some(Title {
+                icon: Some("icons/equip_set"),
+                text: &title,
+                note: v.names.get(v.row).map(|s| s.as_str()),
+                name: false,
+            }),
+            4.0 * (TILE + 8.0) + 380.0 + 60.0,
+            |ui| {
+                ui.horizontal_top(|ui| {
+                    ui.vertical(|ui| {
+                        let (area, _) =
+                            ui.allocate_exact_size(vec2(4.0 * (TILE + 8.0), 4.0 * (TILE + 8.0)), Sense::hover());
+                        for c in 1..=16u16 {
+                            let (col, rw) = ((c - 1) / 4, (c - 1) % 4);
+                            let r = Rect::from_min_size(
+                                area.min + vec2(col as f32 * (TILE + 8.0), rw as f32 * (TILE + 8.0)),
+                                vec2(TILE, TILE),
+                            );
+                            let resp = ui.interact(r, egui::Id::unique(("set slot", c)), Sense::click());
+                            let allowed = e.allowed[c as usize - 1];
+                            let face = match () {
+                                _ if e.grid == c => "controls/item_slot_selected",
+                                _ if !allowed => "controls/item_slot_locked",
+                                _ if resp.hovered() => "controls/item_slot_hover",
+                                _ => "controls/item_slot_normal",
+                            };
+                            if let Some(sp) = m.art.sprite(face) {
+                                ui.painter().add(paint::nine_slice(&sp, r, 0.5, Color32::WHITE));
+                            }
+                            if e.grid == c {
+                                let col = if e.on_list { m.theme.color("bronze") } else { m.theme.color("focus") };
+                                ui.painter().rect_stroke(
+                                    r.shrink(1.0),
+                                    6.0,
+                                    egui::Stroke::new(2.5, col),
+                                    egui::StrokeKind::Inside,
+                                );
+                            }
+                            let (state, id) = e.slots[c as usize - 1];
+                            match state {
+                                1 => {
+                                    if let Some(t) = m.item_icon(ctx, &info, id) {
+                                        ui.painter().image(
+                                            t,
+                                            r.shrink(10.0),
+                                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                                            Color32::WHITE,
+                                        );
+                                    }
+                                }
+                                2 => {
+                                    let x = r.shrink(16.0);
+                                    let st = egui::Stroke::new(2.5, m.theme.color("hp"));
+                                    ui.painter().line_segment([x.left_top(), x.right_bottom()], st);
+                                    ui.painter().line_segment([x.right_top(), x.left_bottom()], st);
+                                }
+                                _ => {
+                                    ui.painter().text(
+                                        r.center(),
+                                        Align2::CENTER_CENTER,
+                                        SLOT_NAMES[c as usize - 1],
+                                        FontId::proportional(m.theme.small * 0.85),
+                                        m.theme.color("muted"),
+                                    );
                                 }
                             }
-                            2 => {
-                                let x = r.shrink(16.0);
-                                let st = egui::Stroke::new(2.5, m.theme.color("hp"));
-                                ui.painter().line_segment([x.left_top(), x.right_bottom()], st);
-                                ui.painter().line_segment([x.right_top(), x.left_bottom()], st);
-                            }
-                            _ => {
-                                ui.painter().text(r.center(), Align2::CENTER_CENTER, SLOT_NAMES[c as usize - 1], FontId::proportional(m.theme.small * 0.85), m.theme.color("muted"));
-                            }
-                        }
-                        if resp.clicked() {
-                            tile_click = Some(c);
-                        }
-                    }
-                    ui.add_space(8.0);
-                    if button(ui, m, "Done", 120.0, Btn::default()) {
-                        done = true;
-                    }
-                });
-                ui.add_space(12.0);
-                ui.vertical(|ui| {
-                    ui.set_width(380.0);
-                    let stores: Vec<(String, u8)> = STORES.iter().filter_map(|&(child, c)| Some((gu.child_caption("menu    mcrmogc", child)?, c))).collect();
-                    let labels: Vec<&str> = stores.iter().map(|(n, _)| n.as_str()).collect();
-                    let open = stores.iter().position(|(_, c)| *c == e.container);
-                    for (k, resp) in super::tabs::strip(ui, m, "equip set storage", &labels, open, None).into_iter().enumerate() {
-                        if resp.clicked() {
-                            store = Some(stores[k].1);
-                        }
-                    }
-                    ui.add_space(6.0);
-                    if super::lists::rows_or(ui, m, &mut found) {
-                        return;
-                    }
-                    let tall = 10.0 * (ROW + 4.0);
-                    let follow = m.moved("equip set list", e.cur.unwrap_or(usize::MAX));
-                    egui::ScrollArea::vertical().id_salt("set list").max_height(tall).min_scrolled_height(tall).auto_shrink([false, true]).show(ui, |ui| {
-                        for (k, (id, name, count, tint)) in e.rows.iter().enumerate() {
-                            let (r, resp) = ui.allocate_exact_size(vec2(366.0, ROW + 2.0), Sense::click());
-                            if e.cur == Some(k) && follow {
-                                ui.scroll_to_rect(r, None);
-                            }
-                            row_face(ui, m, r, e.cur == Some(k), e.on_list, resp.hovered());
-                            if *id != 0
-                                && let Some(t) = m.item_icon(ctx, &info, *id)
-                            {
-                                ui.painter().image(t, Rect::from_min_size(pos2(r.min.x + 10.0, r.center().y - 11.0), vec2(22.0, 22.0)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-                            }
-                            let c = if *tint == 0x8080_8080 { m.theme.color("text") } else { super::chat::colour(tint.to_le_bytes()) };
-                            ui.painter().text(pos2(r.min.x + 40.0, r.center().y), Align2::LEFT_CENTER, name, FontId::proportional(m.theme.small), c);
-                            if *count > 1 {
-                                ui.painter().text(pos2(r.max.x - 12.0, r.center().y), Align2::RIGHT_CENTER, count.to_string(), FontId::proportional(m.theme.small), m.theme.color("text"));
-                            }
                             if resp.clicked() {
-                                row = Some(k);
+                                tile_click = Some(c);
                             }
-                            ui.add_space(2.0);
+                        }
+                        ui.add_space(8.0);
+                        if button(ui, m, "Done", 120.0, Btn::default()) {
+                            done = true;
                         }
                     });
+                    ui.add_space(12.0);
+                    ui.vertical(|ui| {
+                        ui.set_width(380.0);
+                        let stores: Vec<(String, u8)> = STORES
+                            .iter()
+                            .filter_map(|&(child, c)| Some((gu.child_caption("menu    mcrmogc", child)?, c)))
+                            .collect();
+                        let labels: Vec<&str> = stores.iter().map(|(n, _)| n.as_str()).collect();
+                        let open = stores.iter().position(|(_, c)| *c == e.container);
+                        for (k, resp) in
+                            super::tabs::strip(ui, m, "equip set storage", &labels, open, None).into_iter().enumerate()
+                        {
+                            if resp.clicked() {
+                                store = Some(stores[k].1);
+                            }
+                        }
+                        ui.add_space(6.0);
+                        if super::lists::rows_or(ui, m, &mut found) {
+                            return;
+                        }
+                        let tall = 10.0 * (ROW + 4.0);
+                        let follow = m.moved("equip set list", e.cur.unwrap_or(usize::MAX));
+                        egui::ScrollArea::vertical()
+                            .id_salt("set list")
+                            .max_height(tall)
+                            .min_scrolled_height(tall)
+                            .auto_shrink([false, true])
+                            .show(ui, |ui| {
+                                for (k, (id, name, count, tint)) in e.rows.iter().enumerate() {
+                                    let (r, resp) = ui.allocate_exact_size(vec2(366.0, ROW + 2.0), Sense::click());
+                                    if e.cur == Some(k) && follow {
+                                        ui.scroll_to_rect(r, None);
+                                    }
+                                    row_face(ui, m, r, e.cur == Some(k), e.on_list, resp.hovered());
+                                    if *id != 0
+                                        && let Some(t) = m.item_icon(ctx, &info, *id)
+                                    {
+                                        ui.painter().image(
+                                            t,
+                                            Rect::from_min_size(
+                                                pos2(r.min.x + 10.0, r.center().y - 11.0),
+                                                vec2(22.0, 22.0),
+                                            ),
+                                            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                                            Color32::WHITE,
+                                        );
+                                    }
+                                    let c = if *tint == 0x8080_8080 {
+                                        m.theme.color("text")
+                                    } else {
+                                        super::chat::colour(tint.to_le_bytes())
+                                    };
+                                    ui.painter().text(
+                                        pos2(r.min.x + 40.0, r.center().y),
+                                        Align2::LEFT_CENTER,
+                                        name,
+                                        FontId::proportional(m.theme.small),
+                                        c,
+                                    );
+                                    if *count > 1 {
+                                        ui.painter().text(
+                                            pos2(r.max.x - 12.0, r.center().y),
+                                            Align2::RIGHT_CENTER,
+                                            count.to_string(),
+                                            FontId::proportional(m.theme.small),
+                                            m.theme.color("text"),
+                                        );
+                                    }
+                                    if resp.clicked() {
+                                        row = Some(k);
+                                    }
+                                    ui.add_space(2.0);
+                                }
+                            });
+                    });
                 });
-            });
-        });
+            },
+        );
         if let Some(f) = found {
             f.pick(w, Some(gu));
             return;
@@ -573,44 +768,71 @@ fn equip_sets(p: &mut Panels, w: &mut World, gu: &GameUi, v: &esmenu::View) {
         return;
     }
     let (mut page, mut row, mut opt) = (None, None, None);
-    p.panel("window", Some(Title { icon: Some("icons/equip_set"), text: &title, note: None, name: false }), BOOK_W + social::width(1) + 12.0, |ui| {
-        let pages: Vec<String> = (1..=10).map(|k| k.to_string()).collect();
-        let labels: Vec<&str> = pages.iter().map(String::as_str).collect();
-        for (k, resp) in super::tabs::strip(ui, m, "equip set pages", &labels, Some(v.page), None).into_iter().enumerate() {
-            if resp.clicked() {
-                page = Some(k);
-            }
-        }
-        ui.add_space(6.0);
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(BOOK_W);
-                if super::lists::rows_or(ui, m, &mut found) {
-                    return;
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/equip_set"), text: &title, note: None, name: false }),
+        BOOK_W + social::width(1) + 12.0,
+        |ui| {
+            let pages: Vec<String> = (1..=10).map(|k| k.to_string()).collect();
+            let labels: Vec<&str> = pages.iter().map(String::as_str).collect();
+            for (k, resp) in
+                super::tabs::strip(ui, m, "equip set pages", &labels, Some(v.page), None).into_iter().enumerate()
+            {
+                if resp.clicked() {
+                    page = Some(k);
                 }
-                for (k, name) in v.names.iter().enumerate() {
-                    let (r, resp) = ui.allocate_exact_size(vec2(BOOK_W - 14.0, ROW), Sense::click());
-                    row_face(ui, m, r, v.cur == Some(k) || (v.opt.is_some() && v.row == k), v.focused, resp.hovered());
-                    let font = FontId::proportional(m.theme.small);
-                    ui.painter().text(pos2(r.min.x + 40.0, r.center().y), Align2::RIGHT_CENTER, format!("{}", v.page * 20 + k + 1), font.clone(), m.theme.color("muted"));
-                    let at = pos2(r.min.x + 52.0, r.center().y);
-                    match &v.rename {
-                        Some(t) if k == v.row => kit::caret_text(ui, m, at, t, Some(v.rename_caret), font, r.max.x),
-                        _ => _ = ui.painter().text(at, Align2::LEFT_CENTER, name, font, m.theme.color("text")),
+            }
+            ui.add_space(6.0);
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(BOOK_W);
+                    if super::lists::rows_or(ui, m, &mut found) {
+                        return;
                     }
-                    if v.focused && resp.clicked() {
-                        row = Some(k);
+                    for (k, name) in v.names.iter().enumerate() {
+                        let (r, resp) = ui.allocate_exact_size(vec2(BOOK_W - 14.0, ROW), Sense::click());
+                        row_face(
+                            ui,
+                            m,
+                            r,
+                            v.cur == Some(k) || (v.opt.is_some() && v.row == k),
+                            v.focused,
+                            resp.hovered(),
+                        );
+                        let font = FontId::proportional(m.theme.small);
+                        ui.painter().text(
+                            pos2(r.min.x + 40.0, r.center().y),
+                            Align2::RIGHT_CENTER,
+                            format!("{}", v.page * 20 + k + 1),
+                            font.clone(),
+                            m.theme.color("muted"),
+                        );
+                        let at = pos2(r.min.x + 52.0, r.center().y);
+                        match &v.rename {
+                            Some(t) if k == v.row => kit::caret_text(ui, m, at, t, Some(v.rename_caret), font, r.max.x),
+                            _ => _ = ui.painter().text(at, Align2::LEFT_CENTER, name, font, m.theme.color("text")),
+                        }
+                        if v.focused && resp.clicked() {
+                            row = Some(k);
+                        }
+                        ui.add_space(2.0);
                     }
-                    ui.add_space(2.0);
+                });
+                if let Some(o) = v.opt {
+                    ui.add_space(12.0);
+                    let mw = MenuWin {
+                        name: "menu    mcresmn",
+                        sel: o,
+                        off: v.off.clone(),
+                        labels: Vec::new(),
+                        marked: Vec::new(),
+                        values: Vec::new(),
+                    };
+                    opt = social::stack(ui, m, gu, std::slice::from_ref(&mw), true);
                 }
             });
-            if let Some(o) = v.opt {
-                ui.add_space(12.0);
-                let mw = MenuWin { name: "menu    mcresmn", sel: o, off: v.off.clone(), labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
-                opt = social::stack(ui, m, gu, std::slice::from_ref(&mw), true);
-            }
-        });
-    });
+        },
+    );
     if let Some(f) = found {
         f.pick(w, Some(gu));
         return;

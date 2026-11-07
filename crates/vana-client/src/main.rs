@@ -3,21 +3,21 @@
 
 mod audio;
 mod cabx;
-mod mpeg1;
 mod client;
+mod clothshot;
 mod combatshot;
 mod config;
-mod eventdump;
-mod gamecfg;
-mod flashshot;
-mod clothshot;
-mod fx;
-mod event_vm;
-mod itemshot;
 mod creatorshot;
-mod dialogshot;
 mod dat;
+mod dialogshot;
+mod event_vm;
+mod eventdump;
+mod flashshot;
+mod fx;
+mod gamecfg;
 mod install;
+mod itemshot;
+mod mpeg1;
 mod patch;
 
 /// unrar_sys's build script picks its sources by the host (`cfg!(windows)`), so a MinGW cross build from Linux
@@ -36,8 +36,11 @@ mod unrar_isnt {
         false
     }
 }
-mod motion;
+mod inventory;
+mod invitems;
+mod invshot;
 mod modpack;
+mod motion;
 mod msi_db;
 mod net;
 mod render;
@@ -46,9 +49,6 @@ mod sounddump;
 mod texpack;
 mod uishot;
 mod voice;
-mod inventory;
-mod invshot;
-mod invitems;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -157,11 +157,7 @@ enum Cmd {
         closed: Option<String>,
     },
     /// Where the floors of two sub-map keys meet (the walks between a zone's maps), each with its square on both maps.
-    MapBorders {
-        zone: u32,
-        a: u8,
-        b: u8,
-    },
+    MapBorders { zone: u32, a: u8, b: u8 },
     /// Each ground position's map (the sub-map key under it, its map number) and grid square, as the location panel
     /// shows it (FUN_101f7600).
     MapGrid {
@@ -1032,7 +1028,13 @@ fn zone_in(cfg: &config::Config, m: &net::lobby::MapLogin, account: &str, stay: 
                         map.zoned_in(&p);
                         println!(
                             "0x00A zone-in: {} zone {} pos ({:.2}, {:.2}, {:.2}) dir {} index {}",
-                            p.str(132, 16), p.u32(48), p.f32(12), p.f32(16), p.f32(20), p.u8(11) as i8, p.u16(8)
+                            p.str(132, 16),
+                            p.u32(48),
+                            p.f32(12),
+                            p.f32(16),
+                            p.f32(20),
+                            p.u8(11) as i8,
+                            p.u16(8)
                         );
                         pos = Some(p.data[12..24].try_into().unwrap());
                         queue.push(build(0x00C, &[0u8; 8]));
@@ -1040,7 +1042,10 @@ fn zone_in(cfg: &config::Config, m: &net::lobby::MapLogin, account: &str, stay: 
                         let (event_num, event_para) = (p.u16(98), p.u16(100));
                         if event_para != 0 {
                             // A login cutscene (e.g. a new character's intro); finish it so the session is usable.
-                            println!("login event {event_para} (EventNum {event_num}, mode {}) - skipping it", p.u16(102));
+                            println!(
+                                "login event {event_para} (EventNum {event_num}, mode {}) - skipping it",
+                                p.u16(102)
+                            );
                             let mut end = Vec::with_capacity(16);
                             end.extend_from_slice(&p.u32(4).to_le_bytes());
                             end.extend_from_slice(&0u32.to_le_bytes());
@@ -1053,7 +1058,10 @@ fn zone_in(cfg: &config::Config, m: &net::lobby::MapLogin, account: &str, stay: 
                     }
                     0x00B => {
                         println!("0x00B logout/zone (state {}) after {:.1}s", p.u32(4), start.elapsed().as_secs_f32());
-                        println!("received: {}", counts.iter().map(|(id, n)| format!("{id:03X}x{n}")).collect::<Vec<_>>().join(" "));
+                        println!(
+                            "received: {}",
+                            counts.iter().map(|(id, n)| format!("{id:03X}x{n}")).collect::<Vec<_>>().join(" ")
+                        );
                         return Ok(());
                     }
                     _ => {}
@@ -1111,13 +1119,25 @@ fn parse_mask(s: &str) -> Result<u32, String> {
 fn login(cfg: &config::Config, creds: &Credentials) -> Result<net::lobby::Lobby> {
     use net::auth::{self, Command, Reply, Request};
     let req = Request { username: &creds.username, password: &creds.password, ..Default::default() };
-    let Reply::LoggedIn { account_id, session_hash, .. } = auth::send(&cfg.server, cfg.auth_port, Command::Login, &req)? else {
+    let Reply::LoggedIn { account_id, session_hash, .. } =
+        auth::send(&cfg.server, cfg.auth_port, Command::Login, &req)?
+    else {
         anyhow::bail!("unexpected login reply");
     };
     println!("Logged in: account {account_id}");
     let session = net::lobby::Session::Lsb { account_id, hash: session_hash };
     let dll = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap_or_default();
-    let lobby = net::lobby::Lobby::connect(&cfg.server, cfg.view_port, cfg.data_port, session, &dll, &cfg.client_version, 5, dat::installed(&cfg.ffxi_dir()), Default::default())?;
+    let lobby = net::lobby::Lobby::connect(
+        &cfg.server,
+        cfg.view_port,
+        cfg.data_port,
+        session,
+        &dll,
+        &cfg.client_version,
+        5,
+        dat::installed(&cfg.ffxi_dir()),
+        Default::default(),
+    )?;
     println!("Lobby: expansions 0x{:08X}, features 0x{:08X}", lobby.expansions, lobby.features);
     Ok(lobby)
 }
@@ -1147,7 +1167,11 @@ fn main() -> Result<()> {
     // The client also logs to a file (the last run's kept as .prev), its effect lines included for now; Windows logs
     // every command (a GUI exe started without a console loses stderr). The offscreen tools leave the file alone.
     let client = matches!(cli.cmd, None | Some(Cmd::Play { .. }));
-    let mut log = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(if client { "info,vana_client::fx=debug" } else { "info" }));
+    let mut log = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(if client {
+        "info,vana_client::fx=debug"
+    } else {
+        "info"
+    }));
     log.format_timestamp_millis();
     let path = config::log_path();
     if (client || cfg!(windows))
@@ -1172,7 +1196,9 @@ fn main() -> Result<()> {
             let goto: Vec<(f32, f32)> = goto
                 .unwrap_or_default()
                 .split(';')
-                .filter_map(|p| p.split_once(',').and_then(|(x, z)| Some((x.trim().parse().ok()?, z.trim().parse().ok()?))))
+                .filter_map(|p| {
+                    p.split_once(',').and_then(|(x, z)| Some((x.trim().parse().ok()?, z.trim().parse().ok()?)))
+                })
                 .collect();
             let login = match credentials {
                 Some(path) => {
@@ -1182,9 +1208,25 @@ fn main() -> Result<()> {
                 None => None,
             };
             // "@path" reads the script from a file.
-            let input = input.map(|s| match s.strip_prefix('@') { Some(p) => std::fs::read_to_string(p).map(|t| t.trim().to_string()), None => Ok(s) }).transpose()?;
+            let input = input
+                .map(|s| match s.strip_prefix('@') {
+                    Some(p) => std::fs::read_to_string(p).map(|t| t.trim().to_string()),
+                    None => Ok(s),
+                })
+                .transpose()?;
             let input = input.map(|s| client::script::Script::parse(&s, login.as_ref())).transpose()?;
-            let drive = client::Drive { login, character, walk_secs: walk, goto, screenshot, screenshot_after: after, quit, input, chase, ..Default::default() };
+            let drive = client::Drive {
+                login,
+                character,
+                walk_secs: walk,
+                goto,
+                screenshot,
+                screenshot_after: after,
+                quit,
+                input,
+                chase,
+                ..Default::default()
+            };
             client::run(config::Config::load(), drive)
         }
         Cmd::Update { dry_run, data_only, connections, file, to } => {
@@ -1197,10 +1239,25 @@ fn main() -> Result<()> {
             let root = config::Config::load().ffxi_dir();
             println!("checking {} against {}:{} ...", root.display(), patch::HOST, patch::PORT);
             let plan = patch::plan(&root, !data_only)?;
-            let local = std::fs::read_to_string(root.join(patch::STAMP_FILE)).ok().and_then(|t| patch::parse_manifest(&t).ok()).and_then(|m| m.iter().flat_map(|e| e.versions.iter().map(|v| v.stamp.clone())).max());
+            let local = std::fs::read_to_string(root.join(patch::STAMP_FILE))
+                .ok()
+                .and_then(|t| patch::parse_manifest(&t).ok())
+                .and_then(|m| m.iter().flat_map(|e| e.versions.iter().map(|v| v.stamp.clone())).max());
             let bytes: u64 = plan.todo.iter().map(|t| t.2).sum();
-            println!("server version {} ({}), last applied here {}", plan.server.version, plan.server.label, local.as_deref().unwrap_or("none"));
-            println!("{} files listed: {} current, {} to update ({:.1} MB to download), {} code files left as they are", plan.entries.len(), plan.current, plan.todo.len(), bytes as f64 / 1e6, plan.skipped_code);
+            println!(
+                "server version {} ({}), last applied here {}",
+                plan.server.version,
+                plan.server.label,
+                local.as_deref().unwrap_or("none")
+            );
+            println!(
+                "{} files listed: {} current, {} to update ({:.1} MB to download), {} code files left as they are",
+                plan.entries.len(),
+                plan.current,
+                plan.todo.len(),
+                bytes as f64 / 1e6,
+                plan.skipped_code
+            );
             for (i, a, n) in plan.todo.iter().take(20) {
                 println!("  {:?} {} ({n} bytes)", a, plan.entries[*i].path);
             }
@@ -1242,14 +1299,35 @@ fn main() -> Result<()> {
             Ok(())
         }
         Cmd::DumpMsi { msi, out } => dump_msi(&msi, &out),
-        Cmd::CharShot { race, face, head, body, hands, legs, feet, main, sub, range, anim, frame, yaw, motions, held, out } => {
+        Cmd::CharShot {
+            race,
+            face,
+            head,
+            body,
+            hands,
+            legs,
+            feet,
+            main,
+            sub,
+            range,
+            anim,
+            frame,
+            yaw,
+            motions,
+            held,
+            out,
+        } => {
             use dat::character::{Look, load_character};
             let index = dat::DatIndex::open(&config::Config::load().ffxi_dir())?;
             let mut ch = load_character(&index, &Look { race, face, head, body, hands, legs, feet, main, sub, range })?;
             println!("pc motion info: {:?}", ch.pc);
             for id in motions {
                 let f = dat::motionfile::MotionFile::load(&index, id)?;
-                println!("motion file {id}: {} animations, schedulers {}", f.animations.len(), f.schedulers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(" "));
+                println!(
+                    "motion file {id}: {} animations, schedulers {}",
+                    f.animations.len(),
+                    f.schedulers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(" ")
+                );
                 ch.animations.splice(0..0, f.animations);
             }
             for l in &ch.log {
@@ -1270,7 +1348,13 @@ fn main() -> Result<()> {
                 }
             };
             for (a, f) in &anims {
-                println!("animation {} frame {f} of {} ({} tracks, speed {})", a.name, a.frames, a.tracks.len(), a.speed);
+                println!(
+                    "animation {} frame {f} of {} ({} tracks, speed {})",
+                    a.name,
+                    a.frames,
+                    a.tracks.len(),
+                    a.speed
+                );
             }
             let grips: Vec<(u16, u16)> = if held { ch.grips.iter().flatten().copied().collect() } else { Vec::new() };
             let mesh = render::character::pose_character_held(&ch, &anims, &grips);
@@ -1283,24 +1367,110 @@ fn main() -> Result<()> {
             println!("bounds {} .. {}; wrote {}", mesh.min, mesh.max, out.display());
             Ok(())
         }
-        Cmd::ModernShot { width, height, scale, backdrop, out, chat_font, font, font_strong, rows, borders, opacity, kit, alliance, menus, favs, modes, titles, settings, gm } => {
+        Cmd::ModernShot {
+            width,
+            height,
+            scale,
+            backdrop,
+            out,
+            chat_font,
+            font,
+            font_strong,
+            rows,
+            borders,
+            opacity,
+            kit,
+            alliance,
+            menus,
+            favs,
+            modes,
+            titles,
+            settings,
+            gm,
+        } => {
             let list = font.is_some();
-            client::modern_shot(width, height, scale, backdrop.as_deref(), &out, &client::ModernShotOpts { chat_font, font: font.zip(font_strong), list, rows, borders, opacity, kit, alliance, menus, favs, modes, titles, settings, gm })
+            client::modern_shot(
+                width,
+                height,
+                scale,
+                backdrop.as_deref(),
+                &out,
+                &client::ModernShotOpts {
+                    chat_font,
+                    font: font.zip(font_strong),
+                    list,
+                    rows,
+                    borders,
+                    opacity,
+                    kit,
+                    alliance,
+                    menus,
+                    favs,
+                    modes,
+                    titles,
+                    settings,
+                    gm,
+                },
+            )
         }
-        Cmd::CreatorShot { screen: true, race, face, hair, frame, view, width, height, step, size, job, nation, name, world, help_time, bench, out, .. } => {
-            client::creator_screen_shot(&client::CreatorScreenShot { race, face, hair, size, job, nation, step, name, world, frame, view, help_time, width, height, bench }, &out)
-        }
+        Cmd::CreatorShot {
+            screen: true,
+            race,
+            face,
+            hair,
+            frame,
+            view,
+            width,
+            height,
+            step,
+            size,
+            job,
+            nation,
+            name,
+            world,
+            help_time,
+            bench,
+            out,
+            ..
+        } => client::creator_screen_shot(
+            &client::CreatorScreenShot {
+                race,
+                face,
+                hair,
+                size,
+                job,
+                nation,
+                step,
+                name,
+                world,
+                frame,
+                view,
+                help_time,
+                width,
+                height,
+                bench,
+            },
+            &out,
+        ),
         Cmd::CreatorShot { race, face, hair, frame, view, width, height, transparent, backdrop, flat, out, .. } => {
             let index = dat::DatIndex::open(&config::Config::load().ffxi_dir())?;
-            creatorshot::render(&index, &creatorshot::Shot { race, face, hair, frame, view, width, height, transparent, backdrop, flat }, &out)
+            creatorshot::render(
+                &index,
+                &creatorshot::Shot { race, face, hair, frame, view, width, height, transparent, backdrop, flat },
+                &out,
+            )
         }
         Cmd::EventDump { zone, actor, event } => {
             let index = dat::DatIndex::open(&config::Config::load().ffxi_dir())?;
             eventdump::run(&index, zone, actor, event.map(|e| e as u16))
         }
         Cmd::SoundDump { id, music, file, out, seconds } => sounddump::dump(id, music, file, &out, seconds),
-        Cmd::AudioTest { id, seconds, se, fade, device, list } => sounddump::audio_test(id, seconds, se, fade, device, list),
-        Cmd::VoiceProbe { name, seconds, mic, record, channel, peer } => voice::probe(&name, seconds, mic, record, channel, peer),
+        Cmd::AudioTest { id, seconds, se, fade, device, list } => {
+            sounddump::audio_test(id, seconds, se, fade, device, list)
+        }
+        Cmd::VoiceProbe { name, seconds, mic, record, channel, peer } => {
+            voice::probe(&name, seconds, mic, record, channel, peer)
+        }
         Cmd::EventSweep { zones } => event_vm::sweep(&zones),
         Cmd::EventRun { zone, event, target, choice, param, race } => {
             let mut p = [0u32; 8];
@@ -1334,11 +1504,46 @@ fn main() -> Result<()> {
             eventdump::ops();
             Ok(())
         }
-        Cmd::CsShot { zone, file, scheduler, out_dir, steps, width, height } => eventdump::cs_shot(zone, file, &scheduler, steps, &out_dir, width, height),
-        Cmd::NpcShot { model, look, anim, frame, yaw, motions, out } => npc_shot(model, look, &anim, frame, yaw, &motions, &out),
-        Cmd::TextShot { text, font, lang, color, bg, alpha, zoom, out } => text_shot(&text, &font, &lang, &color, &bg, alpha, zoom, &out),
-        Cmd::FxShot { zone, out, eye, caster, victim, category, anim, frames, every, hour, dust, file, walk, despawn } => fx_shot(zone, &out, &eye, &caster, &victim, (category, anim, dust, file), &walk, frames, every, hour, despawn),
-        Cmd::FxSweep { out, kinds, ticks, mob_models, only } => fx_sweep(&out, &kinds, ticks, mob_models.as_deref(), &only),
+        Cmd::CsShot { zone, file, scheduler, out_dir, steps, width, height } => {
+            eventdump::cs_shot(zone, file, &scheduler, steps, &out_dir, width, height)
+        }
+        Cmd::NpcShot { model, look, anim, frame, yaw, motions, out } => {
+            npc_shot(model, look, &anim, frame, yaw, &motions, &out)
+        }
+        Cmd::TextShot { text, font, lang, color, bg, alpha, zoom, out } => {
+            text_shot(&text, &font, &lang, &color, &bg, alpha, zoom, &out)
+        }
+        Cmd::FxShot {
+            zone,
+            out,
+            eye,
+            caster,
+            victim,
+            category,
+            anim,
+            frames,
+            every,
+            hour,
+            dust,
+            file,
+            walk,
+            despawn,
+        } => fx_shot(
+            zone,
+            &out,
+            &eye,
+            &caster,
+            &victim,
+            (category, anim, dust, file),
+            &walk,
+            frames,
+            every,
+            hour,
+            despawn,
+        ),
+        Cmd::FxSweep { out, kinds, ticks, mob_models, only } => {
+            fx_sweep(&out, &kinds, ticks, mob_models.as_deref(), &only)
+        }
         Cmd::FxSoak { out, cycles, ticks, settle, model } => fx_soak(&out, cycles, ticks, settle, model),
         Cmd::WeatherSweep { out, zones, ticks } => weather_sweep(&out, zones, ticks),
         Cmd::ZoneShot { zone, out, eye, target, hour, weather, effects, moon, start, sched, sub, voyage } => {
@@ -1357,7 +1562,8 @@ fn main() -> Result<()> {
             let lighting = match hour {
                 Some(h) => {
                     let w = dat::weather::ZoneWeather::parse(&file)?;
-                    let env = w.at(&weather, h * 60.0).ok_or_else(|| anyhow::anyhow!("zone {zone} has no weat keys"))?;
+                    let env =
+                        w.at(&weather, h * 60.0).ok_or_else(|| anyhow::anyhow!("zone {zone} has no weat keys"))?;
                     println!("weather {weather} at {h:.2} h: {env:?}");
                     Some(dat::weather::Lighting::from_env(&env, h * 60.0))
                 }
@@ -1369,9 +1575,16 @@ fn main() -> Result<()> {
                 hi = hi.max(Vec3::from(p.translate));
             }
             let centre = (lo + hi) / 2.0;
-            if let Some(near) = std::env::var("FFXI_NEAR").ok().and_then(|s| s.split_once(',').and_then(|(x, z)| Some((x.parse::<f32>().ok()?, z.parse::<f32>().ok()?)))) {
+            if let Some(near) = std::env::var("FFXI_NEAR").ok().and_then(|s| {
+                s.split_once(',').and_then(|(x, z)| Some((x.parse::<f32>().ok()?, z.parse::<f32>().ok()?)))
+            }) {
                 println!("placements {} from {lo} to {hi}", scene.placements.len());
-                for p in scene.placements.iter().filter(|p| (p.translate[0] - near.0).abs() < 80.0 && (p.translate[2] - near.1).abs() < 80.0).take(30) {
+                for p in scene
+                    .placements
+                    .iter()
+                    .filter(|p| (p.translate[0] - near.0).abs() < 80.0 && (p.translate[2] - near.1).abs() < 80.0)
+                    .take(30)
+                {
                     println!("  {} at {:?}", p.name, p.translate);
                 }
             }
@@ -1382,51 +1595,71 @@ fn main() -> Result<()> {
             };
             let camera = render::Camera { eye, target, up, fov_y: 60f32.to_radians() };
             let sub_file = sub.map(|id| index.read(dat::zone::file_id(id)).map(|f| (id, f))).transpose()?;
-                    let sub_scene = sub_file.as_ref().map(|(id, f)| dat::zone::load_scene(&keys, f).map(|s| (*id, s))).transpose()?;
-                    let weathers: Vec<dat::weather::ZoneWeather> = sub_file.iter().map(|(_, f)| f).chain([&file]).filter_map(|f| dat::weather::ZoneWeather::parse(f).ok()).collect();
-                    // --voyage T[r]: V of the zone's first path at T.
-                    let voyage_v = voyage.as_deref().and_then(|v| {
-                        let (t, rev) = v.strip_suffix('r').map_or((v, false), |t| (t, true));
-                        let m = fx::voyage::Path::parse(scene.paths[0].as_deref()?)?.matrix(t.parse().ok()?, rev);
-                        println!("voyage t {t} reversed {rev}: {m}");
-                        Some(m)
-                    });
-                    let setup = |gpu: &render::Gpu, r: &mut render::ZoneRenderer| {
-                        // Config 0011 at this weather; one frame, so the instances stand at their random start.
-                        r.set_sway(0.0, sway_steps(cfg.tool("0011")), dat::zone::SWAY_TAGS.iter().position(|t| *t == weather));
-                        r.bump_mode = bump;
-                        if let Some(v) = voyage_v {
-                            r.voyage = v;
-                        }
-                        // The draw distance at full Clipping and the camera list under the eye (FFXI_NO_CLIP: Unlimited,
-                        // the list within retail's distance; FFXI_NO_LISTS: no list, to compare).
-                        if let Some(l) = lighting {
-                            let (d, k) = dat::weather::clipping(l.draw_dist, 1.0, zone as u16);
-                            let unlimited = std::env::var_os("FFXI_NO_CLIP").is_some();
-                            r.clip = if unlimited { [0.0, k * 9.0] } else { [d, k] };
-                            let list = match scene.collision.as_ref().filter(|_| std::env::var_os("FFXI_NO_LISTS").is_none()) {
-                                Some(c) => client::ground::Ground::from_collision(c, &scene.light_keys).camera_list(camera.eye),
-                                None => 0,
-                            };
-                            println!("draw distance {d:.1}, K {k}, camera list {list:#x} ({} placements)", scene.camera_lists.get(&list).map_or(0, |l| l.len()));
-                            r.set_camera_list(gpu, list, unlimited.then_some(d));
-                        }
-                        if let Some((id, s)) = &sub_scene {
-                            let mut all = scene.light_keys.clone();
-                            all.extend(s.light_keys.iter().filter(|k| **k != 0 && !scene.light_keys.contains(k)));
-                            let names: Vec<String> = scene.textures.iter().map(|t| t.name.clone()).collect();
-                            let geo = render::ZoneGeometry::build_keyed(s, &all, r.area_keys(), &names);
-                            r.set_sub(gpu, *id, &geo, s.textures.clone(), all);
-                        }
-                        // Area lighting at the same hour and weather, the sub-area's areas first.
-                        if let Some(h) = hour.filter(|_| std::env::var_os("FFXI_NO_AREAS").is_none()) {
-                            let env = |k: &u32| weathers.iter().find_map(|w| w.areas.get(k)).and_then(|a| a.at(&weather, h * 60.0));
-                            let lights = r.area_keys().iter().map(|k| env(k).map(|e| dat::weather::Lighting::from_env(&e, h * 60.0))).collect();
-                            println!("areas {:?}", r.area_keys().iter().map(|k| String::from_utf8_lossy(&k.to_le_bytes()).into_owned()).collect::<Vec<_>>());
-                            r.set_area_lights(lights);
-                        }
-                        Vec::new()
+            let sub_scene =
+                sub_file.as_ref().map(|(id, f)| dat::zone::load_scene(&keys, f).map(|s| (*id, s))).transpose()?;
+            let weathers: Vec<dat::weather::ZoneWeather> = sub_file
+                .iter()
+                .map(|(_, f)| f)
+                .chain([&file])
+                .filter_map(|f| dat::weather::ZoneWeather::parse(f).ok())
+                .collect();
+            // --voyage T[r]: V of the zone's first path at T.
+            let voyage_v = voyage.as_deref().and_then(|v| {
+                let (t, rev) = v.strip_suffix('r').map_or((v, false), |t| (t, true));
+                let m = fx::voyage::Path::parse(scene.paths[0].as_deref()?)?.matrix(t.parse().ok()?, rev);
+                println!("voyage t {t} reversed {rev}: {m}");
+                Some(m)
+            });
+            let setup = |gpu: &render::Gpu, r: &mut render::ZoneRenderer| {
+                // Config 0011 at this weather; one frame, so the instances stand at their random start.
+                r.set_sway(0.0, sway_steps(cfg.tool("0011")), dat::zone::SWAY_TAGS.iter().position(|t| *t == weather));
+                r.bump_mode = bump;
+                if let Some(v) = voyage_v {
+                    r.voyage = v;
+                }
+                // The draw distance at full Clipping and the camera list under the eye (FFXI_NO_CLIP: Unlimited,
+                // the list within retail's distance; FFXI_NO_LISTS: no list, to compare).
+                if let Some(l) = lighting {
+                    let (d, k) = dat::weather::clipping(l.draw_dist, 1.0, zone as u16);
+                    let unlimited = std::env::var_os("FFXI_NO_CLIP").is_some();
+                    r.clip = if unlimited { [0.0, k * 9.0] } else { [d, k] };
+                    let list = match scene.collision.as_ref().filter(|_| std::env::var_os("FFXI_NO_LISTS").is_none()) {
+                        Some(c) => client::ground::Ground::from_collision(c, &scene.light_keys).camera_list(camera.eye),
+                        None => 0,
                     };
+                    println!(
+                        "draw distance {d:.1}, K {k}, camera list {list:#x} ({} placements)",
+                        scene.camera_lists.get(&list).map_or(0, |l| l.len())
+                    );
+                    r.set_camera_list(gpu, list, unlimited.then_some(d));
+                }
+                if let Some((id, s)) = &sub_scene {
+                    let mut all = scene.light_keys.clone();
+                    all.extend(s.light_keys.iter().filter(|k| **k != 0 && !scene.light_keys.contains(k)));
+                    let names: Vec<String> = scene.textures.iter().map(|t| t.name.clone()).collect();
+                    let geo = render::ZoneGeometry::build_keyed(s, &all, r.area_keys(), &names);
+                    r.set_sub(gpu, *id, &geo, s.textures.clone(), all);
+                }
+                // Area lighting at the same hour and weather, the sub-area's areas first.
+                if let Some(h) = hour.filter(|_| std::env::var_os("FFXI_NO_AREAS").is_none()) {
+                    let env =
+                        |k: &u32| weathers.iter().find_map(|w| w.areas.get(k)).and_then(|a| a.at(&weather, h * 60.0));
+                    let lights = r
+                        .area_keys()
+                        .iter()
+                        .map(|k| env(k).map(|e| dat::weather::Lighting::from_env(&e, h * 60.0)))
+                        .collect();
+                    println!(
+                        "areas {:?}",
+                        r.area_keys()
+                            .iter()
+                            .map(|k| String::from_utf8_lossy(&k.to_le_bytes()).into_owned())
+                            .collect::<Vec<_>>()
+                    );
+                    r.set_area_lights(lights);
+                }
+                Vec::new()
+            };
             let draws = match effects {
                 None => render::render_pngs_lit(&scene, &[(&camera, out.as_path(), lighting)], 1600, 900, &setup)?,
                 Some(ticks) => {
@@ -1443,14 +1676,20 @@ fn main() -> Result<()> {
                         fx.reg.audit = Some(fx::Audit::default());
                     }
                     // Names under 4 letters are NUL padded ("c37" is c37 NUL).
-                    let fourcc = |s: &str| (s.len() <= 4).then(|| std::array::from_fn::<u8, 4, _>(|i| s.as_bytes().get(i).copied().unwrap_or(0)));
+                    let fourcc = |s: &str| {
+                        (s.len() <= 4)
+                            .then(|| std::array::from_fn::<u8, 4, _>(|i| s.as_bytes().get(i).copied().unwrap_or(0)))
+                    };
                     if let Some(name) = start.as_deref().and_then(fourcc)
                         && let Some(l) = fx.reg.lib_of(dat::zone::file_id(zone))
-                        && let Some(n) = fx.reg.libs[l].find_global(dat::generator::kind::GENERATOR, u32::from_le_bytes(name))
+                        && let Some(n) =
+                            fx.reg.libs[l].find_global(dat::generator::kind::GENERATOR, u32::from_le_bytes(name))
                     {
                         fx.start((l, n), fx::Owner::Zone);
                     }
-                    let sched = sched.as_deref().and_then(|s| s.split_once(':')).and_then(|(f, t)| Some((f.parse::<u32>().ok()?, u32::from_le_bytes(<[u8; 4]>::try_from(t.as_bytes()).ok()?))));
+                    let sched = sched.as_deref().and_then(|s| s.split_once(':')).and_then(|(f, t)| {
+                        Some((f.parse::<u32>().ok()?, u32::from_le_bytes(<[u8; 4]>::try_from(t.as_bytes()).ok()?)))
+                    });
                     if let Some((file, name)) = sched {
                         fx.set_index(std::sync::Arc::new(dat::DatIndex::open(&config::Config::load().ffxi_dir())?));
                         fx.preload(&[file]);
@@ -1461,15 +1700,35 @@ fn main() -> Result<()> {
                     let mut eg_keep: Option<render::effects::EffectsGpu> = None;
                     let mut lamps = client::Lamps::default();
                     let ground = Some(client::ground::Ground::build(&scene));
-                    let mut post = |gpu: &render::Gpu, enc: &mut wgpu::CommandEncoder, (color, color_tex): (&wgpu::TextureView, &wgpu::Texture), depth: &wgpu::TextureView, cam: &render::Camera, l: Option<&dat::weather::Lighting>, zr: &mut render::ZoneRenderer| {
-                        let eg = eg_keep.get_or_insert_with(|| render::effects::EffectsGpu::new(gpu, wgpu::TextureFormat::Rgba8Unorm));
+                    let mut post = |gpu: &render::Gpu,
+                                    enc: &mut wgpu::CommandEncoder,
+                                    (color, color_tex): (&wgpu::TextureView, &wgpu::Texture),
+                                    depth: &wgpu::TextureView,
+                                    cam: &render::Camera,
+                                    l: Option<&dat::weather::Lighting>,
+                                    zr: &mut render::ZoneRenderer| {
+                        let eg = eg_keep.get_or_insert_with(|| {
+                            render::effects::EffectsGpu::new(gpu, wgpu::TextureFormat::Rgba8Unorm)
+                        });
                         eg.set_lights(&zr.lights);
                         eg.set_light(l.map(|l| (l.dir, l.diffuse, l.ambient)));
                         fx.reg.light_keys = zr.light_keys.clone();
                         let view = cam.view();
                         let mut view_rot = view;
                         view_rot.w_axis = glam::Vec4::W;
-                        let f = fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac, view, view_rot, eye: cam.eye, draw_distance: 2000.0, area_light: l.map_or(glam::Vec3::ONE, |l| l.area), focal: 350.0, moon_phase: moon, weekday: 0 };
+                        let f = fx::Frame {
+                            dt: 1.0,
+                            seconds: 1.0 / 60.0,
+                            dayfrac,
+                            view,
+                            view_rot,
+                            eye: cam.eye,
+                            draw_distance: 2000.0,
+                            area_light: l.map_or(glam::Vec3::ONE, |l| l.area),
+                            focal: 350.0,
+                            moon_phase: moon,
+                            weekday: 0,
+                        };
                         for _ in 0..ticks {
                             fx.tick(&f, &fx::NoActors);
                             let mut e = gpu.device.create_command_encoder(&Default::default());
@@ -1484,12 +1743,19 @@ fn main() -> Result<()> {
                             println!("audit: {au:?}");
                         }
                         // FFXI_FX_ONLY=a,b: only these generators' instances drawn (FFXI_FX_HIDE=a,b: all but these).
-                        let names = |v: &str| std::env::var(v).ok().map(|s| s.split(',').map(|n| fourcc(n.trim()).unwrap_or([0; 4])).collect::<Vec<_>>());
+                        let names = |v: &str| {
+                            std::env::var(v)
+                                .ok()
+                                .map(|s| s.split(',').map(|n| fourcc(n.trim()).unwrap_or([0; 4])).collect::<Vec<_>>())
+                        };
                         let (only, hide) = (names("FFXI_FX_ONLY"), names("FFXI_FX_HIDE"));
                         if only.is_some() || hide.is_some() {
                             for i in 0..fx.insts.len() {
                                 let name = fx.insts[i].as_ref().map(|x| x.name);
-                                if name.is_some_and(|n| only.as_ref().is_some_and(|o| !o.contains(&n)) || hide.as_ref().is_some_and(|h| h.contains(&n))) {
+                                if name.is_some_and(|n| {
+                                    only.as_ref().is_some_and(|o| !o.contains(&n))
+                                        || hide.as_ref().is_some_and(|h| h.contains(&n))
+                                }) {
                                     fx.kill(i);
                                 }
                             }
@@ -1500,10 +1766,16 @@ fn main() -> Result<()> {
                         }
                         let on = std::env::var_os("FFXI_NO_LAMPS").is_none();
                         // FFXI_LAMPS_DARK: the shells hidden but no lamp lights (to see what the lights add).
-                        if let Some(l) = lamps.update(&mut fx, ground.as_ref(), on).filter(|_| std::env::var_os("FFXI_LAMPS_DARK").is_none()) {
+                        if let Some(l) = lamps
+                            .update(&mut fx, ground.as_ref(), on)
+                            .filter(|_| std::env::var_os("FFXI_LAMPS_DARK").is_none())
+                        {
                             println!("lamps: {:?}", l);
                             zr.set_lamps(gpu, &l.iter().map(|l| (l.pos, l.slot)).collect::<Vec<_>>());
-                            eg.set_lamps(gpu, &l.iter().map(|l| (l.pos, l.slot, l.template, l.colour)).collect::<Vec<_>>());
+                            eg.set_lamps(
+                                gpu,
+                                &l.iter().map(|l| (l.pos, l.slot, l.template, l.colour)).collect::<Vec<_>>(),
+                            );
                             // One more update copies the lamps' slots before the next frame's scenery reads them.
                             let mut e = gpu.device.create_command_encoder(&Default::default());
                             eg.update(gpu, &mut e, &mut fx, &f);
@@ -1517,10 +1789,20 @@ fn main() -> Result<()> {
                                 let r = fx.reg.sprites[id];
                                 if let Some(t) = fx.reg.libs[r.0].sprites.get(&r.1).and_then(|s| s.texture) {
                                     let tex = &fx.reg.libs[t.0].textures[t.1];
-                                    let alphas: std::collections::BTreeSet<u8> = tex.rgba.chunks(4).map(|p| p[3]).collect();
-                                    println!("  sprite {id} texture {} {}x{} format {} dxt {:?} alphas {:?}", tex.name, tex.width, tex.height, tex.format, tex.dxt.as_ref().map(|d| d.0), alphas);
+                                    let alphas: std::collections::BTreeSet<u8> =
+                                        tex.rgba.chunks(4).map(|p| p[3]).collect();
+                                    println!(
+                                        "  sprite {id} texture {} {}x{} format {} dxt {:?} alphas {:?}",
+                                        tex.name,
+                                        tex.width,
+                                        tex.height,
+                                        tex.format,
+                                        tex.dxt.as_ref().map(|d| d.0),
+                                        alphas
+                                    );
                                     if let Ok(f) = std::fs::File::create(out.with_extension("tex.png")) {
-                                        let mut enc = png::Encoder::new(std::io::BufWriter::new(f), tex.width, tex.height);
+                                        let mut enc =
+                                            png::Encoder::new(std::io::BufWriter::new(f), tex.width, tex.height);
                                         enc.set_color(png::ColorType::Rgba);
                                         let _ = enc.write_header().and_then(|mut w| w.write_image_data(&tex.rgba));
                                     }
@@ -1534,28 +1816,74 @@ fn main() -> Result<()> {
                                     {
                                         let r = fx.reg.meshes[id as usize];
                                         if let Some(m) = fx.reg.libs[r.0].meshes.get(&r.1) {
-                                            let g: Vec<String> = m.groups.iter().map(|g| format!("{:?}->{:?} {}", g.name.as_deref().map(str::trim), g.texture, g.range.len())).collect();
-                                            println!("  mesh {id} {}:{} mmb {} {}", fx.reg.libs[r.0].file_id, fx.reg.libs[r.0].tree.nodes[r.1].name(), m.mmb, g.join(", "));
+                                            let g: Vec<String> = m
+                                                .groups
+                                                .iter()
+                                                .map(|g| {
+                                                    format!(
+                                                        "{:?}->{:?} {}",
+                                                        g.name.as_deref().map(str::trim),
+                                                        g.texture,
+                                                        g.range.len()
+                                                    )
+                                                })
+                                                .collect();
+                                            println!(
+                                                "  mesh {id} {}:{} mmb {} {}",
+                                                fx.reg.libs[r.0].file_id,
+                                                fx.reg.libs[r.0].tree.nodes[r.1].name(),
+                                                m.mmb,
+                                                g.join(", ")
+                                            );
                                         }
                                     }
                                 }
                             }
                             if let Ok(want) = std::env::var("FFXI_FX_OPS") {
-                                for inst in fx.insts.iter().flatten().filter(|x| x.name == want.as_bytes()[..4]).take(1) {
+                                for inst in fx.insts.iter().flatten().filter(|x| x.name == want.as_bytes()[..4]).take(1)
+                                {
                                     for (k, s) in inst.streams.iter().enumerate() {
                                         for op in s {
-                                            let w: Vec<String> = op.words.iter().skip(1).map(|w| format!("{w:#x}={:.3}", f32::from_bits(*w))).collect();
-                                            println!("  stream {k} op {:#04x} slot {} {}", op.code, op.slot, w.join(" "));
+                                            let w: Vec<String> = op
+                                                .words
+                                                .iter()
+                                                .skip(1)
+                                                .map(|w| format!("{w:#x}={:.3}", f32::from_bits(*w)))
+                                                .collect();
+                                            println!(
+                                                "  stream {k} op {:#04x} slot {} {}",
+                                                op.code,
+                                                op.slot,
+                                                w.join(" ")
+                                            );
                                         }
                                     }
                                 }
                             }
                         }
-                        let (fog_color, fog) = l.map_or(([0.0; 3], [150.0, 600.0]), |l| (l.fog.to_array(), [l.fog_start, l.fog_end]));
-                        eg.draw(gpu, enc, (color, depth, [1600, 900]), Some(color_tex), &fx, (cam.proj(1600.0 / 900.0), cam.view(), cam.eye), [crate::render::NEAR, crate::render::FAR], fog_color, fog);
+                        let (fog_color, fog) =
+                            l.map_or(([0.0; 3], [150.0, 600.0]), |l| (l.fog.to_array(), [l.fog_start, l.fog_end]));
+                        eg.draw(
+                            gpu,
+                            enc,
+                            (color, depth, [1600, 900]),
+                            Some(color_tex),
+                            &fx,
+                            (cam.proj(1600.0 / 900.0), cam.view(), cam.eye),
+                            [crate::render::NEAR, crate::render::FAR],
+                            fog_color,
+                            fog,
+                        );
                     };
                     // Twice: the effects write the point lights the scenery reads on the next frame.
-                    render::render_pngs_post(&scene, &[(&camera, out.as_path(), lighting), (&camera, out.as_path(), lighting)], 1600, 900, &setup, &mut post)?
+                    render::render_pngs_post(
+                        &scene,
+                        &[(&camera, out.as_path(), lighting), (&camera, out.as_path(), lighting)],
+                        1600,
+                        900,
+                        &setup,
+                        &mut post,
+                    )?
                 }
             };
             println!("rendered {draws} draws from {eye} towards {target} into {}", out.display());
@@ -1576,7 +1904,16 @@ fn main() -> Result<()> {
                     continue;
                 }
                 let u32_at = |o: usize| u32::from_le_bytes(data[o..o + 4].try_into().unwrap());
-                println!("chunk {:#x} len {} head {:02x?} pieces {} first {:#x} bounds {:?}..{:?}", c.offset, data.len(), &data[..16], u32_at(32), u32_at(60), mesh.min, mesh.max);
+                println!(
+                    "chunk {:#x} len {} head {:02x?} pieces {} first {:#x} bounds {:?}..{:?}",
+                    c.offset,
+                    data.len(),
+                    &data[..16],
+                    u32_at(32),
+                    u32_at(60),
+                    mesh.min,
+                    mesh.max
+                );
                 println!("offset table: {:x?}", (0..8).map(|i| u32_at(64 + i * 4)).collect::<Vec<_>>());
                 for (i, m) in mesh.models.iter().enumerate() {
                     let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
@@ -1586,24 +1923,47 @@ fn main() -> Result<()> {
                             hi[k] = hi[k].max(v.pos[k]);
                         }
                     }
-                    println!("  model {i}: tex {:<16} verts {:4} idx {:4} strip {} blending {:#06x} bounds {:?}..{:?}", m.texture, m.vertices.len(), m.indices.len(), m.strip, m.blending, lo, hi);
+                    println!(
+                        "  model {i}: tex {:<16} verts {:4} idx {:4} strip {} blending {:#06x} bounds {:?}..{:?}",
+                        m.texture,
+                        m.vertices.len(),
+                        m.indices.len(),
+                        m.strip,
+                        m.blending,
+                        lo,
+                        hi
+                    );
                     // Vertex colours (BGRA as stored): mean, min and max per channel.
                     let ch = |k: u32| m.vertices.iter().map(move |v| (v.color >> (8 * k)) as u8);
                     let n = m.vertices.len().max(1) as f32;
-                    let stats: Vec<String> = (0..4).map(|k| format!("{:.0} [{}..{}]", ch(k).map(f32::from).sum::<f32>() / n, ch(k).min().unwrap_or(0), ch(k).max().unwrap_or(0))).collect();
+                    let stats: Vec<String> = (0..4)
+                        .map(|k| {
+                            format!(
+                                "{:.0} [{}..{}]",
+                                ch(k).map(f32::from).sum::<f32>() / n,
+                                ch(k).min().unwrap_or(0),
+                                ch(k).max().unwrap_or(0)
+                            )
+                        })
+                        .collect();
                     println!("    colour B {} G {} R {} A {}", stats[0], stats[1], stats[2], stats[3]);
                 }
             }
             Ok(())
         }
-        Cmd::ZonePath { zone, from, to, open_doors, closed } => zone_path(zone, &from, &to, open_doors, closed.as_deref()),
+        Cmd::ZonePath { zone, from, to, open_doors, closed } => {
+            zone_path(zone, &from, &to, open_doors, closed.as_deref())
+        }
         Cmd::MapBorders { zone, a, b } => client::map_borders(zone, a, b),
         Cmd::MapGrid { zone, points } => {
-            let pts: Vec<[f32; 3]> = points.iter().map(|s| -> Result<[f32; 3]> {
-                let v: Vec<f32> = s.split(',').map(|v| Ok(v.trim().parse::<f32>()?)).collect::<Result<_>>()?;
-                anyhow::ensure!(v.len() == 3, "want x,y,z: {s}");
-                Ok([v[0], v[1], v[2]])
-            }).collect::<Result<_>>()?;
+            let pts: Vec<[f32; 3]> = points
+                .iter()
+                .map(|s| -> Result<[f32; 3]> {
+                    let v: Vec<f32> = s.split(',').map(|v| Ok(v.trim().parse::<f32>()?)).collect::<Result<_>>()?;
+                    anyhow::ensure!(v.len() == 3, "want x,y,z: {s}");
+                    Ok([v[0], v[1], v[2]])
+                })
+                .collect::<Result<_>>()?;
             client::map_grid(zone, &pts)
         }
         Cmd::ZoneProbe { zone, x, z } => {
@@ -1612,7 +1972,8 @@ fn main() -> Result<()> {
             let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
             let keys = dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?)?;
             let scene = dat::zone::load_scene(&keys, &index.read(dat::zone::file_id(zone))?)?;
-            let textures: std::collections::HashMap<&str, &dat::zone::Texture> = scene.textures.iter().map(|t| (t.name.as_str(), t)).collect();
+            let textures: std::collections::HashMap<&str, &dat::zone::Texture> =
+                scene.textures.iter().map(|t| (t.name.as_str(), t)).collect();
             for p in &scene.placements {
                 let Some(mesh) = scene.meshes.iter().find(|m| m.name == p.name) else {
                     if (p.translate[0] - x).hypot(p.translate[2] - z) < 40.0 {
@@ -1639,14 +2000,29 @@ fn main() -> Result<()> {
                         (u >= 0.0 && v >= 0.0 && u + v <= 1.0).then(|| a.y + u * (b.y - a.y) + v * (c.y - a.y))
                     });
                     let Some(y) = hit else { continue };
-                    let va = model.vertices.iter().map(|v| (v.color >> 24) as f32).sum::<f32>() / model.vertices.len() as f32;
+                    let va = model.vertices.iter().map(|v| (v.color >> 24) as f32).sum::<f32>()
+                        / model.vertices.len() as f32;
                     let tex = textures.get(model.texture.as_str()).map(|t| {
                         let a = t.rgba.chunks_exact(4).map(|p| p[3] as f32).sum::<f32>() / (t.rgba.len() / 4) as f32;
                         format!("fmt {:#04x} {}x{} texel alpha {:.0}", t.format, t.width, t.height, a)
                     });
                     println!(
                         "y {:7.2}  {} model {} tex {:<16} {}  verts {} strip {} blend {:#06x} vertex alpha {:.0} scale {:?} id {:#x} link {} area {:#x} lod {:?} drawn {}",
-                        y, p.name, mi, model.texture, tex.unwrap_or_else(|| "MISSING".into()), model.vertices.len(), model.strip, model.blending, va, p.scale, p.id, p.link, p.area, p.lod, p.drawn()
+                        y,
+                        p.name,
+                        mi,
+                        model.texture,
+                        tex.unwrap_or_else(|| "MISSING".into()),
+                        model.vertices.len(),
+                        model.strip,
+                        model.blending,
+                        va,
+                        p.scale,
+                        p.id,
+                        p.link,
+                        p.area,
+                        p.lod,
+                        p.drawn()
                     );
                     let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
                     for v in mesh.models.iter().flat_map(|m| &m.vertices) {
@@ -1656,7 +2032,10 @@ fn main() -> Result<()> {
                         }
                     }
                     let same = scene.meshes.iter().filter(|m| m.name == p.name).count();
-                    println!("    header bounds {:?} .. {:?}, vertices {:?} .. {:?}, meshes of this name {same}, translate {:?} rotate {:?} own_dist {:?} world {}", mesh.min, mesh.max, lo, hi, p.translate, p.rotate, p.own_dist, p.world);
+                    println!(
+                        "    header bounds {:?} .. {:?}, vertices {:?} .. {:?}, meshes of this name {same}, translate {:?} rotate {:?} own_dist {:?} world {}",
+                        mesh.min, mesh.max, lo, hi, p.translate, p.rotate, p.own_dist, p.world
+                    );
                 }
             }
             Ok(())
@@ -1671,7 +2050,8 @@ fn main() -> Result<()> {
             let placed = scene.placements.iter().filter(|p| names.contains(p.name.as_str())).count();
             let models: Vec<_> = scene.meshes.iter().flat_map(|m| &m.models).collect();
             let textured = models.iter().filter(|m| tex.contains(m.texture.as_str())).count();
-            let (verts, idx): (usize, usize) = models.iter().fold((0, 0), |a, m| (a.0 + m.vertices.len(), a.1 + m.indices.len()));
+            let (verts, idx): (usize, usize) =
+                models.iter().fold((0, 0), |a, m| (a.0 + m.vertices.len(), a.1 + m.indices.len()));
             let bad_idx = models.iter().filter(|m| m.indices.iter().any(|&i| i as usize >= m.vertices.len())).count();
             let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
             for p in &scene.placements {
@@ -1680,18 +2060,34 @@ fn main() -> Result<()> {
                     hi[k] = hi[k].max(p.translate[k]);
                 }
             }
-            println!("placements {} ({} resolve to a mesh), meshes {}, models {} ({} with their texture), textures {}", scene.placements.len(), placed, scene.meshes.len(), models.len(), textured, scene.textures.len());
+            println!(
+                "placements {} ({} resolve to a mesh), meshes {}, models {} ({} with their texture), textures {}",
+                scene.placements.len(),
+                placed,
+                scene.meshes.len(),
+                models.len(),
+                textured,
+                scene.textures.len()
+            );
             println!("vertices {verts}, indices {idx}, models with out-of-range indices {bad_idx}");
             for r in scene.regions.iter().filter(|r| r.name.starts_with(['z', 'Z'])) {
-                println!("zone line {:<8} at ({:.2}, {:.2}, {:.2}) rot {:.2} size {:?}", r.name, r.pos[0], r.pos[1], r.pos[2], r.rot[1], r.scale);
+                println!(
+                    "zone line {:<8} at ({:.2}, {:.2}, {:.2}) rot {:.2} size {:?}",
+                    r.name, r.pos[0], r.pos[1], r.pos[2], r.rot[1], r.scale
+                );
             }
             println!("{} RID regions", scene.regions.len());
             for r in scene.regions.iter().filter(|r| r.is_sub_area()) {
-                println!("sub-area trigger {:<8} class {} param {} at ({:.2}, {:.2}, {:.2}) rot {:.2} size {:?}", r.name, r.class, r.param, r.pos[0], r.pos[1], r.pos[2], r.rot[1], r.scale);
+                println!(
+                    "sub-area trigger {:<8} class {} param {} at ({:.2}, {:.2}, {:.2}) rot {:.2} size {:?}",
+                    r.name, r.class, r.param, r.pos[0], r.pos[1], r.pos[2], r.rot[1], r.scale
+                );
             }
             let mut areas: std::collections::BTreeMap<String, (usize, glam::Vec3)> = Default::default();
             for p in scene.placements.iter().filter(|p| p.area != 0) {
-                let e = areas.entry(String::from_utf8_lossy(&p.area.to_le_bytes()).into_owned()).or_insert((0, glam::Vec3::from(p.translate)));
+                let e = areas
+                    .entry(String::from_utf8_lossy(&p.area.to_le_bytes()).into_owned())
+                    .or_insert((0, glam::Vec3::from(p.translate)));
                 e.0 += 1;
             }
             for (a, (n, at)) in &areas {
@@ -1706,7 +2102,11 @@ fn main() -> Result<()> {
                     }
                 }
                 let flags: std::collections::BTreeSet<u16> = c.flags.iter().copied().collect();
-                println!("collision: grid {:?}, {} triangles, bounds {lo} .. {hi}, flags {flags:x?}", c.grid, c.tris.len());
+                println!(
+                    "collision: grid {:?}, {} triangles, bounds {lo} .. {hi}, flags {flags:x?}",
+                    c.grid,
+                    c.tris.len()
+                );
             }
             println!("placement bounds {lo:?} .. {hi:?}");
             for p in scene.placements.iter().take(3) {
@@ -1724,7 +2124,11 @@ fn main() -> Result<()> {
                 e.2 += low;
             }
             for (f, (n, mean, low)) in &by_format {
-                println!("IMG format {f:#04x}: {n} textures, mean alpha {:.0}, {:.0}% of texels under 77", mean / *n as f64, low / *n as f64 * 100.0);
+                println!(
+                    "IMG format {f:#04x}: {n} textures, mean alpha {:.0}, {:.0}% of texels under 77",
+                    mean / *n as f64,
+                    low / *n as f64 * 100.0
+                );
             }
             let mut vcol = [0u64; 4];
             let mut vn = 0u64;
@@ -1764,7 +2168,37 @@ fn main() -> Result<()> {
         }
         Cmd::TitleShot { out, width, height } => uishot::title_shot(&out, width, height),
         Cmd::UiShot { out, width, height } => uishot::ui_shot(&out, width, height),
-        Cmd::TopbarShot { out, fade, menu, menu_swap, target, hpp, map, downloading, window, config, cfgset, installed, width, height } => client::topbar_shot(&out, &fade, menu, menu_swap.as_deref(), target.as_deref(), hpp, map.as_deref(), downloading, window.as_deref(), config.as_deref(), cfgset.as_deref(), installed, width, height),
+        Cmd::TopbarShot {
+            out,
+            fade,
+            menu,
+            menu_swap,
+            target,
+            hpp,
+            map,
+            downloading,
+            window,
+            config,
+            cfgset,
+            installed,
+            width,
+            height,
+        } => client::topbar_shot(
+            &out,
+            &fade,
+            menu,
+            menu_swap.as_deref(),
+            target.as_deref(),
+            hpp,
+            map.as_deref(),
+            downloading,
+            window.as_deref(),
+            config.as_deref(),
+            cfgset.as_deref(),
+            installed,
+            width,
+            height,
+        ),
         Cmd::FlashShot { zone, hour, pos, out_dir } => {
             let v: Vec<f32> = pos.split(',').filter_map(|s| s.trim().parse().ok()).collect();
             anyhow::ensure!(v.len() == 3, "--pos wants x,y,z");
@@ -1775,21 +2209,60 @@ fn main() -> Result<()> {
             anyhow::ensure!(v.len() == 3, "--pos wants x,y,z");
             clothshot::run(file, zone, hour, [v[0], v[1], v[2]], steps, &out_dir)
         }
-        Cmd::CombatShot { out, mob, layout, width, height } => combatshot::combat_shot(&out, &mob, layout, width, height),
-        Cmd::InventoryShot { out, scroll, cursor, frame, width, height } => invshot::inventory_shot(&out, scroll, cursor, frame, width, height),
-        Cmd::EquipmentShot { out, cursor, frame, width, height } => invshot::equipment_shot(&out, cursor, frame, width, height),
-        Cmd::DialogueShot { out, zone, id, speaker, choice, frame, width, height } => dialogshot::dialogue_shot(&out, zone, id, &speaker, choice, frame, width, height),
-        Cmd::FlyoverShot { scheduler, out_dir, steps, flat, width, height } => flyover_shot(&scheduler, &out_dir, steps, flat, width, height),
-        Cmd::SelectShot { out, slot, chars, hold, frames, close, ui, delete, rename, unusable, zone, hour, width, height } => {
+        Cmd::CombatShot { out, mob, layout, width, height } => {
+            combatshot::combat_shot(&out, &mob, layout, width, height)
+        }
+        Cmd::InventoryShot { out, scroll, cursor, frame, width, height } => {
+            invshot::inventory_shot(&out, scroll, cursor, frame, width, height)
+        }
+        Cmd::EquipmentShot { out, cursor, frame, width, height } => {
+            invshot::equipment_shot(&out, cursor, frame, width, height)
+        }
+        Cmd::DialogueShot { out, zone, id, speaker, choice, frame, width, height } => {
+            dialogshot::dialogue_shot(&out, zone, id, &speaker, choice, frame, width, height)
+        }
+        Cmd::FlyoverShot { scheduler, out_dir, steps, flat, width, height } => {
+            flyover_shot(&scheduler, &out_dir, steps, flat, width, height)
+        }
+        Cmd::SelectShot {
+            out,
+            slot,
+            chars,
+            hold,
+            frames,
+            close,
+            ui,
+            delete,
+            rename,
+            unusable,
+            zone,
+            hour,
+            width,
+            height,
+        } => {
             let frames = if close { frames.max(60) } else { frames };
-            let shot = client::select::ScreenShot { chars, cursor: slot, hold, frames, ui, deleting: delete, rename, unusable, zone, hour, width, height };
+            let shot = client::select::ScreenShot {
+                chars,
+                cursor: slot,
+                hold,
+                frames,
+                ui,
+                deleting: delete,
+                rename,
+                unusable,
+                zone,
+                hour,
+                width,
+                height,
+            };
             client::select::screen_shot(&shot, &out)
         }
         Cmd::MsgDump { group, ids } => {
             let cfg = config::Config::load();
             let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
             let dll = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?;
-            let file = dat::msg::group_file(&dll, 1, group).ok_or_else(|| anyhow::anyhow!("no file for group {group:#x}"))?;
+            let file =
+                dat::msg::group_file(&dll, 1, group).ok_or_else(|| anyhow::anyhow!("no file for group {group:#x}"))?;
             let m = dat::msg::Messages::load(&index, file)?;
             println!("group {group:#x}: file {file}");
             let ids = if ids.is_empty() { (0..4096).take_while(|&i| m.raw(i).is_some()).collect() } else { ids };
@@ -1803,7 +2276,12 @@ fn main() -> Result<()> {
             let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
             let dll = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?;
             // A value past the slot range is a file id (0x86 grammar blocks read file 0xd8b2 directly).
-            let file = if slot >= 0x1000 { slot as u32 } else { dat::msg::current_slot_file(&dll, 1, slot as usize).ok_or_else(|| anyhow::anyhow!("no file for slot {slot:#x}"))? };
+            let file = if slot >= 0x1000 {
+                slot as u32
+            } else {
+                dat::msg::current_slot_file(&dll, 1, slot as usize)
+                    .ok_or_else(|| anyhow::anyhow!("no file for slot {slot:#x}"))?
+            };
             // Message tables in the event text format (FUN_10095430's slots) print their readable text.
             let Ok(m) = dat::names::DMsg::load(&index, file) else {
                 let d = dat::dialog::Dialog::parse(&index.read(file)?)?;
@@ -1850,9 +2328,16 @@ fn main() -> Result<()> {
             let cfg = config::Config::load();
             let v: serde_json::Value = serde_json::from_slice(&std::fs::read(&credentials)?)?;
             let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
-            let creds = net::pol::Credentials { pol_id: s("pol_id"), pol_password: s("pol_password"), se_id: s("se_id"), se_password: s("se_password"), otp: v["otp"].as_str().map(str::to_string) };
+            let creds = net::pol::Credentials {
+                pol_id: s("pol_id"),
+                pol_password: s("pol_password"),
+                se_id: s("se_id"),
+                se_password: s("se_password"),
+                otp: v["otp"].as_str().map(str::to_string),
+            };
             let (host, port) = chat.rsplit_once(':').ok_or_else(|| anyhow::anyhow!("--chat HOST:PORT"))?;
-            let servers = net::pol::Servers { chat: (host.to_string(), port.parse()?), profile: Some(profile.parse()?) };
+            let servers =
+                net::pol::Servers { chat: (host.to_string(), port.parse()?), profile: Some(profile.parse()?) };
             let (session, pol) = net::pol::sign_in_at(&creds, &servers)?;
             if let net::lobby::Session::PlayOnline { auth_code, k16 } = &session {
                 println!("signed in: value {} authCode {}", hex::encode(k16), hex::encode(&auth_code[..0x34]));
@@ -1860,7 +2345,17 @@ fn main() -> Result<()> {
             if let Some(l) = lobby {
                 let (host, port) = l.rsplit_once(':').ok_or_else(|| anyhow::anyhow!("--lobby HOST:PORT"))?;
                 let dll = std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir())).unwrap_or_default();
-                let mut lobby = net::lobby::Lobby::connect(host, port.parse()?, 0, session, &dll, &cfg.client_version, 5, dat::installed(&cfg.ffxi_dir()), Default::default())?;
+                let mut lobby = net::lobby::Lobby::connect(
+                    host,
+                    port.parse()?,
+                    0,
+                    session,
+                    &dll,
+                    &cfg.client_version,
+                    5,
+                    dat::installed(&cfg.ffxi_dir()),
+                    Default::default(),
+                )?;
                 lobby.pol = Some(pol);
                 for c in lobby.characters()?.iter().filter(|c| !c.is_empty_slot()) {
                     println!("  {} ({})", c.name, c.world);
@@ -1885,15 +2380,34 @@ fn main() -> Result<()> {
             for c in chars.iter().filter(|c| !c.is_empty_slot()) {
                 println!(
                     "  {:<15} id {:>6}  race {} job {}{} lv{} zone {} nation {} looks {:?}",
-                    c.name, c.content_id, c.race, c.main_job, if c.sub_job > 0 { format!("/{}", c.sub_job) } else { String::new() },
-                    c.main_level, c.zone, c.nation, c.looks
+                    c.name,
+                    c.content_id,
+                    c.race,
+                    c.main_job,
+                    if c.sub_job > 0 { format!("/{}", c.sub_job) } else { String::new() },
+                    c.main_level,
+                    c.zone,
+                    c.nation,
+                    c.looks
                 );
             }
             println!("  ({} empty slots)", chars.iter().filter(|c| c.is_empty_slot()).count());
             if let Some(name) = select {
-                let ch = chars.iter().find(|c| c.name.eq_ignore_ascii_case(&name)).ok_or_else(|| anyhow::anyhow!("no character {name}"))?;
+                let ch = chars
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(&name))
+                    .ok_or_else(|| anyhow::anyhow!("no character {name}"))?;
                 let m = lobby.select(ch)?;
-                println!("Map server {}:{}, search {}:{}, char {} ({}), key {}", m.map.0, m.map.1, m.search.0, m.search.1, m.char_id, m.name, hex::encode(m.key));
+                println!(
+                    "Map server {}:{}, search {}:{}, char {} ({}), key {}",
+                    m.map.0,
+                    m.map.1,
+                    m.search.0,
+                    m.search.1,
+                    m.char_id,
+                    m.name,
+                    hex::encode(m.key)
+                );
                 if let Some(secs) = stay {
                     zone_in(&cfg, &m, &creds.username, secs)?;
                 }
@@ -1903,13 +2417,23 @@ fn main() -> Result<()> {
     }
 }
 
-fn npc_shot(model: Option<u16>, look: Option<String>, anim: &str, frame: f32, yaw: f32, motions: &[u32], out: &std::path::Path) -> Result<()> {
+fn npc_shot(
+    model: Option<u16>,
+    look: Option<String>,
+    anim: &str,
+    frame: f32,
+    yaw: f32,
+    motions: &[u32],
+    out: &std::path::Path,
+) -> Result<()> {
     use dat::npc::{NpcLook, load_npc, parse_look};
     let look = match (model, look) {
         (Some(m), None) => NpcLook::Model(m),
         (None, Some(h)) => {
             let h = h.trim_start_matches("0x");
-            let bytes = (0..h.len() / 2).map(|i| u8::from_str_radix(&h[i * 2..i * 2 + 2], 16)).collect::<Result<Vec<_>, _>>()?;
+            let bytes = (0..h.len() / 2)
+                .map(|i| u8::from_str_radix(&h[i * 2..i * 2 + 2], 16))
+                .collect::<Result<Vec<_>, _>>()?;
             parse_look(&bytes)?
         }
         _ => anyhow::bail!("give exactly one of --model and --look"),
@@ -1919,7 +2443,11 @@ fn npc_shot(model: Option<u16>, look: Option<String>, anim: &str, frame: f32, ya
     let mut ch = load_npc(&index, &look)?;
     for &id in motions {
         let f = dat::motionfile::MotionFile::load(&index, id)?;
-        println!("motion file {id}: {} animations, schedulers {}", f.animations.len(), f.schedulers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(" "));
+        println!(
+            "motion file {id}: {} animations, schedulers {}",
+            f.animations.len(),
+            f.schedulers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(" ")
+        );
         ch.animations.splice(0..0, f.animations);
     }
     for l in &ch.log {
@@ -1927,7 +2455,9 @@ fn npc_shot(model: Option<u16>, look: Option<String>, anim: &str, frame: f32, ya
     }
     let found: Vec<_> = match anim.parse::<usize>() {
         Ok(i) => ch.animations.get(i).into_iter().collect(),
-        Err(_) if anim.contains(',') => anim.split(',').flat_map(|a| ch.animations.iter().filter(move |x| x.name.trim_end() == a)).collect(),
+        Err(_) if anim.contains(',') => {
+            anim.split(',').flat_map(|a| ch.animations.iter().filter(move |x| x.name.trim_end() == a)).collect()
+        }
         Err(_) => ch.find_animations(anim),
     };
     if found.is_empty() {
@@ -2004,7 +2534,8 @@ fn tex_dump(ids: &[u32], random: Option<usize>, files: &[PathBuf], out: &std::pa
     }
     // A file by path is named by its last three parts (ROM2/16/84.DAT -> ROM2_16_84).
     for f in files {
-        let parts: Vec<String> = f.with_extension("").iter().rev().take(3).map(|c| c.to_string_lossy().into_owned()).collect();
+        let parts: Vec<String> =
+            f.with_extension("").iter().rev().take(3).map(|c| c.to_string_lossy().into_owned()).collect();
         let id: Vec<&str> = parts.iter().rev().map(String::as_str).collect();
         let imgs = decode(&std::fs::read(f).map_err(|e| anyhow::anyhow!("reading {}: {e}", f.display()))?);
         if imgs.is_empty() {
@@ -2062,7 +2593,16 @@ fn sjis_with_escapes(s: &str) -> Result<Vec<u8>> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn text_shot(text: &[String], font: &str, lang: &str, color: &str, bg: &str, alpha: bool, zoom: u32, out: &std::path::Path) -> Result<()> {
+fn text_shot(
+    text: &[String],
+    font: &str,
+    lang: &str,
+    color: &str,
+    bg: &str,
+    alpha: bool,
+    zoom: u32,
+    out: &std::path::Path,
+) -> Result<()> {
     use dat::font::{Font, Quality};
     let quality = match font {
         "compressed" | "moji" | "0" => Quality::Compressed,
@@ -2070,20 +2610,35 @@ fn text_shot(text: &[String], font: &str, lang: &str, color: &str, bg: &str, alp
         "high" | "2" => Quality::High,
         other => anyhow::bail!("unknown font {other}; use compressed, uncompressed or high"),
     };
-    let lang = ["ja", "en", "fr", "de"].iter().position(|&l| l == lang).ok_or_else(|| anyhow::anyhow!("lang must be ja, en, fr or de"))? as u8;
+    let lang = ["ja", "en", "fr", "de"]
+        .iter()
+        .position(|&l| l == lang)
+        .ok_or_else(|| anyhow::anyhow!("lang must be ja, en, fr or de"))? as u8;
     let hex4 = |s: &str| -> Result<[u8; 4]> { Ok(u32::from_str_radix(s, 16)?.to_be_bytes()) };
     let color = hex4(color)?;
     let bg = hex4(&format!("{bg}00"))?;
     let cfg = config::Config::load();
     let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
     let font = Font::load(&index, &std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?, lang, quality)?;
-    println!("atlas {}x{} ({} px cells), {} gaiji shapes, {} shape textures", font.atlas.width, font.atlas.height, font.cell_px, font.gaiji.len(), font.textures.len());
+    println!(
+        "atlas {}x{} ({} px cells), {} gaiji shapes, {} shape textures",
+        font.atlas.width,
+        font.atlas.height,
+        font.cell_px,
+        font.gaiji.len(),
+        font.textures.len()
+    );
     let mut quads = Vec::new();
     let (pad, mut w, mut h) = (8, 0, 0);
     for line in text {
         let sjis = sjis_with_escapes(line)?;
         let (lw, lh) = font.layout(&sjis, pad, pad + h, color, &mut quads);
-        println!("{:<40} sjis {} width {lw} ({})", dat::font::decode_sjis(&sjis), hex::encode(&sjis), font.text_width(&sjis));
+        println!(
+            "{:<40} sjis {} width {lw} ({})",
+            dat::font::decode_sjis(&sjis),
+            hex::encode(&sjis),
+            font.text_width(&sjis)
+        );
         w = w.max(lw);
         h += lh;
     }
@@ -2091,7 +2646,10 @@ fn text_shot(text: &[String], font: &str, lang: &str, color: &str, bg: &str, alp
     let mut img: Vec<u8> = (0..width * height).flat_map(|_| [bg[0], bg[1], bg[2], 255]).collect();
     font.draw(&quads, &mut img, width, height, alpha);
     let (zw, zh) = (width * zoom, height * zoom);
-    let zoomed: Vec<u8> = (0..zh).flat_map(|y| (0..zw).map(move |x| ((y / zoom) * width + x / zoom) as usize)).flat_map(|i| img[i * 4..i * 4 + 4].to_vec()).collect();
+    let zoomed: Vec<u8> = (0..zh)
+        .flat_map(|y| (0..zw).map(move |x| ((y / zoom) * width + x / zoom) as usize))
+        .flat_map(|i| img[i * 4..i * 4 + 4].to_vec())
+        .collect();
     let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(out)?), zw, zh);
     enc.set_color(png::ColorType::Rgba);
     enc.write_header()?.write_image_data(&zoomed)?;
@@ -2111,17 +2669,31 @@ fn load_zone_weather(zone: u32) -> Result<dat::weather::ZoneWeather> {
     dat::weather::ZoneWeather::parse(&index.read(dat::zone::file_id(zone))?)
 }
 
-fn flyover_shot(scheduler: &str, out_dir: &std::path::Path, steps: u32, flat: bool, width: u32, height: u32) -> Result<()> {
+fn flyover_shot(
+    scheduler: &str,
+    out_dir: &std::path::Path,
+    steps: u32,
+    flat: bool,
+    width: u32,
+    height: u32,
+) -> Result<()> {
     use dat::title::{Op, TITLE_FILE, Title, fov_y, hour_of, sample};
     use dat::weather::{Env, Lighting};
     let index = dat::DatIndex::open(&config::Config::load().ffxi_dir())?;
     let file = index.read(TITLE_FILE)?;
     let title = Title::parse(&file)?;
     // Type 0x2f environment blocks of file 23, set by op 0x7e (FUN_10183ff0).
-    let envs: Vec<(String, Env)> = dat::chunks(&file)?.into_iter().filter(|c| c.kind == 0x2f).filter_map(|c| Env::parse(c.data).map(|e| (c.name(), e))).collect();
+    let envs: Vec<(String, Env)> = dat::chunks(&file)?
+        .into_iter()
+        .filter(|c| c.kind == 0x2f)
+        .filter_map(|c| Env::parse(c.data).map(|e| (c.name(), e)))
+        .collect();
     let ops = title.scheduler(scheduler)?;
     std::fs::create_dir_all(out_dir)?;
-    let zone = ops.iter().find_map(|o| if let Op::Zone(z) = o { Some(*z) } else { None }).ok_or_else(|| anyhow::anyhow!("scheduler loads no zone"))?;
+    let zone = ops
+        .iter()
+        .find_map(|o| if let Op::Zone(z) = o { Some(*z) } else { None })
+        .ok_or_else(|| anyhow::anyhow!("scheduler loads no zone"))?;
     let scene = load_zone_scene(zone)?;
     let weather = load_zone_weather(zone)?;
     // Lobby clock before the title: 12:30 (FUN_1023b3f0(12, 30)).
@@ -2147,19 +2719,26 @@ fn flyover_shot(scheduler: &str, out_dir: &std::path::Path, steps: u32, flat: bo
                 let p = title.path(path)?;
                 let env = env_override.or_else(|| weather.at(&tag, minute));
                 let lighting = if flat { None } else { env.map(|e| Lighting::from_env(&e, minute)) };
-                println!("camera {path}: {} keys, ease {}, {ticks} ticks, next op after {wait}; light {}", p.keys.len(), p.ease, if lighting.is_some() { "retail" } else { "flat" });
+                println!(
+                    "camera {path}: {} keys, ease {}, {ticks} ticks, next op after {wait}; light {}",
+                    p.keys.len(),
+                    p.ease,
+                    if lighting.is_some() { "retail" } else { "flat" }
+                );
                 // A path with no keys has no camera to sample.
                 for i in 0..if p.keys.is_empty() { 0 } else { steps.max(1) } {
                     let t = if steps <= 1 { 0.0 } else { i as f32 / (steps - 1) as f32 };
                     let k = sample(p, t);
-                    let cam = render::Camera { eye: k.eye, target: k.target, up: glam::Vec3::NEG_Y, fov_y: fov_y(k.focal) };
+                    let cam =
+                        render::Camera { eye: k.eye, target: k.target, up: glam::Vec3::NEG_Y, fov_y: fov_y(k.focal) };
                     frames.push((cam, out_dir.join(format!("{scheduler}_{path}_{i}.png")), lighting));
                 }
             }
             _ => {}
         }
     }
-    let list: Vec<(&render::Camera, &std::path::Path, Option<Lighting>)> = frames.iter().map(|(c, n, l)| (c, n.as_path(), *l)).collect();
+    let list: Vec<(&render::Camera, &std::path::Path, Option<Lighting>)> =
+        frames.iter().map(|(c, n, l)| (c, n.as_path(), *l)).collect();
     render::render_pngs_lit(&scene, &list, width, height, &|_, _| Vec::new())?;
     println!("zone {zone}: wrote {} frames to {}", list.len(), out_dir.display());
     Ok(())
@@ -2186,7 +2765,12 @@ fn zone_path(zone: u32, from: &str, to: &str, open_doors: bool, closed: Option<&
     let keys = dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?)?;
     let ground = client::ground::Ground::build(&dat::zone::load_scene(&keys, &index.read(dat::zone::file_id(zone))?)?);
     if open_doors {
-        let keep: Vec<(f32, f32)> = closed.unwrap_or("").split(';').filter(|s| !s.is_empty()).map(|s| nums(s).map(|v| (v[0], v[1]))).collect::<Result<_>>()?;
+        let keep: Vec<(f32, f32)> = closed
+            .unwrap_or("")
+            .split(';')
+            .filter(|s| !s.is_empty())
+            .map(|s| nums(s).map(|v| (v[0], v[1])))
+            .collect::<Result<_>>()?;
         let kept = ground.open_doors_except(&keep, 3.0);
         println!("doors open; kept shut: {kept:?}");
         for (d, c) in ground.door_boxes() {
@@ -2281,8 +2865,17 @@ const SWEEP_MOB: u32 = 0x0100_0001;
 
 impl fx::Actors for SweepActors {
     fn matrix(&self, id: u32) -> Option<glam::Mat4> {
-        let (p, f) = if id == SWEEP_PC { (glam::Vec3::ZERO, glam::Vec3::Z) } else { (glam::Vec3::new(0.0, 0.0, 4.0), glam::Vec3::NEG_Z) };
-        Some(glam::Mat4::from_cols(f.extend(0.0), glam::Vec3::Y.extend(0.0), f.cross(glam::Vec3::Y).extend(0.0), p.extend(1.0)))
+        let (p, f) = if id == SWEEP_PC {
+            (glam::Vec3::ZERO, glam::Vec3::Z)
+        } else {
+            (glam::Vec3::new(0.0, 0.0, 4.0), glam::Vec3::NEG_Z)
+        };
+        Some(glam::Mat4::from_cols(
+            f.extend(0.0),
+            glam::Vec3::Y.extend(0.0),
+            f.cross(glam::Vec3::Y).extend(0.0),
+            p.extend(1.0),
+        ))
     }
     fn foot(&self, id: u32) -> Option<glam::Vec3> {
         self.matrix(id).map(|m| m.w_axis.truncate())
@@ -2316,7 +2909,9 @@ struct SoakActors {
 
 impl fx::Actors for SoakActors {
     fn matrix(&self, id: u32) -> Option<glam::Mat4> {
-        (id != SWEEP_MOB || self.present.get()).then(|| SweepActors { mob_files: Default::default(), fx_files: Default::default() }.matrix(id)).flatten()
+        (id != SWEEP_MOB || self.present.get())
+            .then(|| SweepActors { mob_files: Default::default(), fx_files: Default::default() }.matrix(id))
+            .flatten()
     }
     fn point(&self, _: u32, k: u16) -> Option<glam::Vec3> {
         Some(if k == 0 { glam::Vec3::ZERO } else { glam::Vec3::new(0.0, -1.2, 0.0) })
@@ -2331,7 +2926,11 @@ impl fx::Actors for SoakActors {
         false
     }
     fn models(&self) -> Vec<(u32, Vec<u32>)> {
-        if self.present.get() { vec![(SWEEP_MOB, self.files.1.iter().chain(&self.files.0).copied().collect())] } else { Vec::new() }
+        if self.present.get() {
+            vec![(SWEEP_MOB, self.files.1.iter().chain(&self.files.0).copied().collect())]
+        } else {
+            Vec::new()
+        }
     }
     fn sub_anim(&self, _: u32) -> u8 {
         self.sub.get()
@@ -2344,8 +2943,11 @@ fn weather_sweep(out: &std::path::Path, zones: u32, ticks: u32) -> Result<()> {
     use std::fmt::Write as _;
     let cfg = config::Config::load();
     let index = std::sync::Arc::new(dat::DatIndex::open(&cfg.ffxi_dir())?);
-    let keys = std::sync::Arc::new(dat::zone::Keys::from_ffximain(&std::fs::read(cfg.ffxi_dir().join("FFXiMain.dll"))?)?);
-    let mut rows = String::from("zone\ttag\tgens\tkinds\tgen_ops\temit_ops\telem_ops\tend_ops\tsched_ops\tskipped\tmissing\tno_attach\tleft\n");
+    let keys =
+        std::sync::Arc::new(dat::zone::Keys::from_ffximain(&std::fs::read(cfg.ffxi_dir().join("FFXiMain.dll"))?)?);
+    let mut rows = String::from(
+        "zone\ttag\tgens\tkinds\tgen_ops\temit_ops\telem_ops\tend_ops\tsched_ops\tskipped\tmissing\tno_attach\tleft\n",
+    );
     // Per op / kind: the zones that use it in a weather folder.
     let mut uses: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
     let mut gaps: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
@@ -2359,7 +2961,9 @@ fn weather_sweep(out: &std::path::Path, zones: u32, ticks: u32) -> Result<()> {
         let Ok(bytes) = index.read(id) else { continue };
         let Ok(lib) = fx::lib::Library::load(id, bytes.clone()) else { continue };
         let tree = &lib.tree;
-        let weat: Vec<usize> = (0..tree.nodes.len()).filter(|&i| tree.nodes[i].kind == kind::FOLDER && tree.nodes[i].name == fourcc("weat")).collect();
+        let weat: Vec<usize> = (0..tree.nodes.len())
+            .filter(|&i| tree.nodes[i].kind == kind::FOLDER && tree.nodes[i].name == fourcc("weat"))
+            .collect();
         if weat.is_empty() {
             continue;
         }
@@ -2379,7 +2983,8 @@ fn weather_sweep(out: &std::path::Path, zones: u32, ticks: u32) -> Result<()> {
                 }
             }
         }
-        let top_weat = weat.iter().copied().find(|&w| tree.nodes[w].parent.is_none_or(|p| tree.nodes[p].parent.is_none()));
+        let top_weat =
+            weat.iter().copied().find(|&w| tree.nodes[w].parent.is_none_or(|p| tree.nodes[p].parent.is_none()));
         for (tag, folders) in &tags {
             let tag_s = String::from_utf8_lossy(tag).trim_end_matches('\0').to_string();
             let mut ops: [BTreeMap<u8, u32>; 4] = Default::default();
@@ -2397,12 +3002,19 @@ fn weather_sweep(out: &std::path::Path, zones: u32, ticks: u32) -> Result<()> {
                     *kinds.entry(t.byte(0x21)).or_default() += 1;
                 }
             }
-            for n in (0..tree.nodes.len()).filter(|&n| tree.nodes[n].kind == kind::SCHEDULER && folders.iter().any(|&f| under(n, f))) {
+            for n in (0..tree.nodes.len())
+                .filter(|&n| tree.nodes[n].kind == kind::SCHEDULER && folders.iter().any(|&f| under(n, f)))
+            {
                 for op in fx::sched::parse(lib.data(n)) {
                     *sched.entry(op.code).or_default() += 1;
                 }
             }
-            for (s, name) in [(stream::GENERATOR, "gen"), (stream::EMISSION, "emit"), (stream::ELEMENT, "elem"), (stream::END, "end")] {
+            for (s, name) in [
+                (stream::GENERATOR, "gen"),
+                (stream::EMISSION, "emit"),
+                (stream::ELEMENT, "elem"),
+                (stream::END, "end"),
+            ] {
                 for k in ops[s].keys() {
                     uses.entry(format!("{name} op {k:#04x}")).or_default().insert(zone);
                 }
@@ -2475,7 +3087,8 @@ fn weather_sweep(out: &std::path::Path, zones: u32, ticks: u32) -> Result<()> {
                 }
                 runs += 1;
             }
-            let list = |m: &BTreeMap<u8, u32>| m.iter().map(|(k, v)| format!("{k:#04x}x{v}")).collect::<Vec<_>>().join(" ");
+            let list =
+                |m: &BTreeMap<u8, u32>| m.iter().map(|(k, v)| format!("{k:#04x}x{v}")).collect::<Vec<_>>().join(" ");
             let _ = writeln!(
                 rows,
                 "{zone}\t{tag_s}\t{ngen}\t{}\t{}\t{}\t{}\t{}\t{}\t{skipped}\t{missing}\t{no_attach}\t{left}",
@@ -2514,7 +3127,19 @@ fn fx_soak(out: &std::path::Path, cycles: u32, ticks: u32, settle: u32, only: Op
     fx.set_keys(std::sync::Arc::new(keys));
     fx.set_index(index.clone());
     fx.set_global(fx::lib::Library::load(0, index.read(0)?)?);
-    let frame = fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: 0.5, view: glam::Mat4::IDENTITY, view_rot: glam::Mat4::IDENTITY, eye: glam::Vec3::new(0.0, -2.0, -6.0), draw_distance: 2000.0, area_light: glam::Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 };
+    let frame = fx::Frame {
+        dt: 1.0,
+        seconds: 1.0 / 60.0,
+        dayfrac: 0.5,
+        view: glam::Mat4::IDENTITY,
+        view_rot: glam::Mat4::IDENTITY,
+        eye: glam::Vec3::new(0.0, -2.0, -6.0),
+        draw_distance: 2000.0,
+        area_light: glam::Vec3::ONE,
+        focal: 350.0,
+        moon_phase: 0,
+        weekday: 0,
+    };
     let mut rows = String::from("model\tfile\tsub\tstarted\tleft_tasks\tleft\n");
     let (mut runs, mut leaks) = (0, 0);
     let models: Vec<u16> = match only {
@@ -2529,7 +3154,11 @@ fn fx_soak(out: &std::path::Path, cycles: u32, ticks: u32, settle: u32, only: Op
         let Ok(ch) = dat::npc::load_npc(&index, &dat::npc::NpcLook::Model(m)) else { continue };
         let all: Vec<u32> = ch.files.iter().chain(&ch.part_files).copied().collect();
         for sub in [0u8, 1] {
-            let actors = SoakActors { files: (ch.part_files.clone(), ch.files.clone()), present: std::cell::Cell::new(true), sub: std::cell::Cell::new(sub) };
+            let actors = SoakActors {
+                files: (ch.part_files.clone(), ch.files.clone()),
+                present: std::cell::Cell::new(true),
+                sub: std::cell::Cell::new(sub),
+            };
             fx.preload(&all);
             let t0 = std::time::Instant::now();
             while fx.loading_count() > 0 && t0.elapsed().as_secs() < 5 {
@@ -2559,7 +3188,15 @@ fn fx_soak(out: &std::path::Path, cycles: u32, ticks: u32, settle: u32, only: Op
                 }
                 for (k, e) in fx.elems.iter().enumerate() {
                     if let Some(e) = e {
-                        println!("sub {sub}: elem {k} inst {} life {} max {} flags {:#x} child {:?} back {}", e.inst, e.life, e.max_life, e.flags, e.child, e.back.is_some());
+                        println!(
+                            "sub {sub}: elem {k} inst {} life {} max {} flags {:#x} child {:?} back {}",
+                            e.inst,
+                            e.life,
+                            e.max_life,
+                            e.flags,
+                            e.child,
+                            e.back.is_some()
+                        );
                     }
                 }
             }
@@ -2571,10 +3208,24 @@ fn fx_soak(out: &std::path::Path, cycles: u32, ticks: u32, settle: u32, only: Op
                 continue;
             }
             leaks += 1;
-            let mut names: Vec<String> = left.iter().map(|(n, f, clone, endless, by)| format!("{n}@{f}{}{}[{by}]", if *clone { "" } else { "(template)" }, if *endless { "(endless)" } else { "" })).collect();
+            let mut names: Vec<String> = left
+                .iter()
+                .map(|(n, f, clone, endless, by)| {
+                    format!(
+                        "{n}@{f}{}{}[{by}]",
+                        if *clone { "" } else { "(template)" },
+                        if *endless { "(endless)" } else { "" }
+                    )
+                })
+                .collect();
             names.sort();
             names.dedup();
-            let _ = writeln!(rows, "{m}\t{file}\t{sub}\t{}\t{left_tasks}\t{}", started.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","), names.join(" "));
+            let _ = writeln!(
+                rows,
+                "{m}\t{file}\t{sub}\t{}\t{left_tasks}\t{}",
+                started.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","),
+                names.join(" ")
+            );
         }
     }
     std::fs::write(out, rows)?;
@@ -2584,22 +3235,36 @@ fn fx_soak(out: &std::path::Path, cycles: u32, ticks: u32, settle: u32, only: Op
 
 /// The effect file of an action (fx/tasks.rs effect_base).
 fn sweep_file(category: u8, anim: u32) -> Option<u32> {
-    Some(match category {
-        3 => 0xd48,
-        4 => 0xaf0,
-        5 => if anim > 99 { 0xdca5 } else { 0x1330 },
-        6 => 0x113c,
-        11 => match anim {
-            0x800.. => 0x14b07,
-            0x600.. => 0xe739,
-            0x200.. => 0xc1ef,
-            _ => 0xf3c,
-        },
-        _ => return None,
-    } + anim)
+    Some(
+        match category {
+            3 => 0xd48,
+            4 => 0xaf0,
+            5 => {
+                if anim > 99 {
+                    0xdca5
+                } else {
+                    0x1330
+                }
+            }
+            6 => 0x113c,
+            11 => match anim {
+                0x800.. => 0x14b07,
+                0x600.. => 0xe739,
+                0x200.. => 0xc1ef,
+                _ => 0xf3c,
+            },
+            _ => return None,
+        } + anim,
+    )
 }
 
-fn fx_sweep(out: &std::path::Path, kinds: &str, ticks: u32, mob_models: Option<&std::path::Path>, only: &[u32]) -> Result<()> {
+fn fx_sweep(
+    out: &std::path::Path,
+    kinds: &str,
+    ticks: u32,
+    mob_models: Option<&std::path::Path>,
+    only: &[u32],
+) -> Result<()> {
     use std::collections::BTreeMap;
     use std::fmt::Write as _;
     let cfg = config::Config::load();
@@ -2620,12 +3285,32 @@ fn fx_sweep(out: &std::path::Path, kinds: &str, ticks: u32, mob_models: Option<&
     fx.set_index(index.clone());
     fx.set_global(fx::lib::Library::load(0, index.read(0)?)?);
     fx.load_zone(fx::lib::Library::load(dat::zone::file_id(230), index.read(dat::zone::file_id(230))?)?);
-    let frame = fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: 0.5, view: glam::Mat4::IDENTITY, view_rot: glam::Mat4::IDENTITY, eye: glam::Vec3::new(0.0, -2.0, -6.0), draw_distance: 2000.0, area_light: glam::Vec3::ONE, focal: 350.0, moon_phase: 0, weekday: 0 };
-    let ranges: Vec<(u8, std::ops::Range<u32>, &str)> = [(3u8, 0..0x100, "ws"), (11, 0..0x1000, "mob"), (4, 0..0x400, "spell"), (6, 0..0x300, "ja"), (5, 0..0x400, "item")]
-        .into_iter()
-        .filter(|r| kinds.split(',').any(|k| k == r.2))
-        .collect();
-    let mut rows = String::from("kind\tcategory\tanim\tfile\tcaster\tticks\tleft\tsched_ops\tstream_ops\tno_sched\tmissing\tno_attach\tattach\n");
+    let frame = fx::Frame {
+        dt: 1.0,
+        seconds: 1.0 / 60.0,
+        dayfrac: 0.5,
+        view: glam::Mat4::IDENTITY,
+        view_rot: glam::Mat4::IDENTITY,
+        eye: glam::Vec3::new(0.0, -2.0, -6.0),
+        draw_distance: 2000.0,
+        area_light: glam::Vec3::ONE,
+        focal: 350.0,
+        moon_phase: 0,
+        weekday: 0,
+    };
+    let ranges: Vec<(u8, std::ops::Range<u32>, &str)> = [
+        (3u8, 0..0x100, "ws"),
+        (11, 0..0x1000, "mob"),
+        (4, 0..0x400, "spell"),
+        (6, 0..0x300, "ja"),
+        (5, 0..0x400, "item"),
+    ]
+    .into_iter()
+    .filter(|r| kinds.split(',').any(|k| k == r.2))
+    .collect();
+    let mut rows = String::from(
+        "kind\tcategory\tanim\tfile\tcaster\tticks\tleft\tsched_ops\tstream_ops\tno_sched\tmissing\tno_attach\tattach\n",
+    );
     // Summary: per gap, the files it touches.
     let mut gaps: BTreeMap<String, Vec<u32>> = BTreeMap::new();
     let mut runs = 0;
@@ -2640,7 +3325,9 @@ fn fx_sweep(out: &std::path::Path, kinds: &str, ticks: u32, mob_models: Option<&
             }
             let (mob, caster) = match (category, models.get(&anim)) {
                 (11, Some(hex)) => {
-                    let bytes: Vec<u8> = (0..hex.len() / 2).filter_map(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()).collect();
+                    let bytes: Vec<u8> = (0..hex.len() / 2)
+                        .filter_map(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok())
+                        .collect();
                     match dat::npc::parse_look(&bytes).and_then(|l| dat::npc::load_npc(&index, &l)) {
                         Ok(ch) => ((ch.part_files.clone(), ch.files.clone()), hex.clone()),
                         Err(_) => ((Vec::new(), vec![1300]), "orc".into()),
@@ -2651,9 +3338,27 @@ fn fx_sweep(out: &std::path::Path, kinds: &str, ticks: u32, mob_models: Option<&
             let actors = SweepActors { mob_files: mob.clone(), fx_files: Default::default() };
             fx.preload(&mob.1);
             fx.reg.audit = Some(fx::Audit::default());
-            let (a, t) = if category == 11 { (SWEEP_MOB, SWEEP_PC) } else { (SWEEP_PC, if category == 5 { SWEEP_PC } else { SWEEP_MOB }) };
-            let result = net::action::ActionResult { kind: 1, scale: 1, value: 10, message: 1, animation: anim as u16, ..Default::default() };
-            let action = net::action::Action { actor: a, category, arg: anim, info: 0, targets: vec![net::action::ActionTarget { id: t, results: vec![result] }], seq: 0 };
+            let (a, t) = if category == 11 {
+                (SWEEP_MOB, SWEEP_PC)
+            } else {
+                (SWEEP_PC, if category == 5 { SWEEP_PC } else { SWEEP_MOB })
+            };
+            let result = net::action::ActionResult {
+                kind: 1,
+                scale: 1,
+                value: 10,
+                message: 1,
+                animation: anim as u16,
+                ..Default::default()
+            };
+            let action = net::action::Action {
+                actor: a,
+                category,
+                arg: anim,
+                info: 0,
+                targets: vec![net::action::ActionTarget { id: t, results: vec![result] }],
+                seq: 0,
+            };
             fx.on_action(&action, None);
             let (mut n, mut kicks, mut peak) = (0, 0usize, 0.0f32);
             let started = std::time::Instant::now();
@@ -2686,23 +3391,42 @@ fn fx_sweep(out: &std::path::Path, kinds: &str, ticks: u32, mob_models: Option<&
                 });
                 if let Some(l) = l {
                     let lib = &fx.reg.libs[l];
-                    for (i, node) in lib.tree.nodes.iter().enumerate().filter(|(_, n)| n.kind == dat::generator::kind::SCHEDULER) {
+                    for (i, node) in
+                        lib.tree.nodes.iter().enumerate().filter(|(_, n)| n.kind == dat::generator::kind::SCHEDULER)
+                    {
                         println!("scheduler {} (node {i})", node.name());
                         for op in fx::sched::parse(lib.data(i)) {
-                            println!("  {:#04x} wait {:4} dur {:4} {:02x?}", op.code, op.wait, op.dur, &op.raw[..op.raw.len().min(32)]);
+                            println!(
+                                "  {:#04x} wait {:4} dur {:4} {:02x?}",
+                                op.code,
+                                op.wait,
+                                op.dur,
+                                &op.raw[..op.raw.len().min(32)]
+                            );
                         }
                     }
                 }
             }
             fx.reset_runs();
             let au = fx.reg.audit.take().unwrap_or_default();
-            let list = |m: &BTreeMap<u8, u32>| m.iter().map(|(k, v)| format!("{k:#04x}x{v}")).collect::<Vec<_>>().join(" ");
+            let list =
+                |m: &BTreeMap<u8, u32>| m.iter().map(|(k, v)| format!("{k:#04x}x{v}")).collect::<Vec<_>>().join(" ");
             let four = |n: u32| String::from_utf8_lossy(&n.to_le_bytes()).trim_end_matches('\0').to_string();
             let stream: Vec<String> = au.stream.iter().map(|((s, k), v)| format!("{s}/{k:#04x}x{v}")).collect();
             let no_sched: Vec<String> = au.no_sched.keys().map(|n| four(*n)).collect();
             let missing: Vec<String> = au.missing.keys().map(|(f, n, k)| format!("{f}:{}:{k:#x}", four(*n))).collect();
-            let attach: Vec<String> = au.attach.iter().map(|((m, a, b), v)| format!("m{m:#x}/{a:#x}/{b:#x}x{v}")).collect();
-            let _ = writeln!(rows, "{kind}\t{category}\t{anim}\t{file}\t{caster}\t{n}\t{left}\t{}\t{}\t{}\t{}\t{}\t{}", list(&au.sched), stream.join(" "), no_sched.join(" "), missing.join(" "), list(&au.no_attach), attach.join(" "));
+            let attach: Vec<String> =
+                au.attach.iter().map(|((m, a, b), v)| format!("m{m:#x}/{a:#x}/{b:#x}x{v}")).collect();
+            let _ = writeln!(
+                rows,
+                "{kind}\t{category}\t{anim}\t{file}\t{caster}\t{n}\t{left}\t{}\t{}\t{}\t{}\t{}\t{}",
+                list(&au.sched),
+                stream.join(" "),
+                no_sched.join(" "),
+                missing.join(" "),
+                list(&au.no_attach),
+                attach.join(" ")
+            );
             for k in au.sched.keys() {
                 gaps.entry(format!("task op {k:#04x}")).or_default().push(file);
             }
@@ -2769,7 +3493,12 @@ impl fx::Actors for ShotActors {
     fn matrix(&self, id: u32) -> Option<glam::Mat4> {
         let (_, _, fwd) = self.find(id)?;
         let f = fwd.normalize();
-        Some(glam::Mat4::from_cols(f.extend(0.0), glam::Vec3::Y.extend(0.0), f.cross(glam::Vec3::Y).extend(0.0), self.pos(id)?.extend(1.0)))
+        Some(glam::Mat4::from_cols(
+            f.extend(0.0),
+            glam::Vec3::Y.extend(0.0),
+            f.cross(glam::Vec3::Y).extend(0.0),
+            self.pos(id)?.extend(1.0),
+        ))
     }
     fn foot(&self, id: u32) -> Option<glam::Vec3> {
         self.pos(id)
@@ -2808,9 +3537,16 @@ impl fx::Actors for ShotActors {
 /// `movie-shot`: decodes the opening movie up to the last frame asked for, writing those frames (BT.601 to RGB).
 fn movie_shot(frames: &[u32], out: &std::path::Path, size: Option<&str>) -> Result<()> {
     let cfg = config::Config::load();
-    let mut d = mpeg1::open_pmv(&cfg.ffxi_dir().join("mov").join("mov999.pmv")).ok_or_else(|| anyhow::anyhow!("no mov/mov999.pmv"))?;
+    let mut d = mpeg1::open_pmv(&cfg.ffxi_dir().join("mov").join("mov999.pmv"))
+        .ok_or_else(|| anyhow::anyhow!("no mov/mov999.pmv"))?;
     std::fs::create_dir_all(out)?;
-    let window = size.map(|s| s.split_once('x').and_then(|(w, h)| Some([w.parse::<u32>().ok()?, h.parse::<u32>().ok()?])).ok_or_else(|| anyhow::anyhow!("--size WxH"))).transpose()?;
+    let window = size
+        .map(|s| {
+            s.split_once('x')
+                .and_then(|(w, h)| Some([w.parse::<u32>().ok()?, h.parse::<u32>().ok()?]))
+                .ok_or_else(|| anyhow::anyhow!("--size WxH"))
+        })
+        .transpose()?;
     let gpu = window.map(|_| render::Gpu::headless()).transpose()?;
     let mut pass = gpu.as_ref().map(|g| render::movie::Movie::new(g, wgpu::TextureFormat::Rgba8UnormSrgb));
     let last = frames.iter().copied().max().unwrap_or(0);
@@ -2836,19 +3572,42 @@ fn movie_shot(frames: &[u32], out: &std::path::Path, size: Option<&str>) -> Resu
                 view_formats: &[],
             });
             let row = (size[0] * 4).div_ceil(256) * 256;
-            let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor { label: None, size: (row * size[1]) as u64, usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, mapped_at_creation: false });
+            let buf = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+                label: None,
+                size: (row * size[1]) as u64,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            });
             let mut enc = gpu.device.create_command_encoder(&Default::default());
-            pass.draw(gpu, &mut enc, &tex.create_view(&Default::default()), size, client::opening::picture_rect(size, d.height), true);
+            pass.draw(
+                gpu,
+                &mut enc,
+                &tex.create_view(&Default::default()),
+                size,
+                client::opening::picture_rect(size, d.height),
+                true,
+            );
             enc.copy_texture_to_buffer(
                 tex.as_image_copy(),
-                wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(size[1]) } },
+                wgpu::TexelCopyBufferInfo {
+                    buffer: &buf,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(row),
+                        rows_per_image: Some(size[1]),
+                    },
+                },
                 wgpu::Extent3d { width: size[0], height: size[1], depth_or_array_layers: 1 },
             );
             gpu.queue.submit([enc.finish()]);
             buf.slice(..).map_async(wgpu::MapMode::Read, |_| {});
-            gpu.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: None }).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            gpu.device
+                .poll(wgpu::PollType::Wait { submission_index: None, timeout: None })
+                .map_err(|e| anyhow::anyhow!("{e:?}"))?;
             let mapped = buf.slice(..).get_mapped_range().map_err(|e| anyhow::anyhow!("{e:?}"))?;
-            let rgba: Vec<u8> = (0..size[1]).flat_map(|y| mapped[(y * row) as usize..(y * row + size[0] * 4) as usize].to_vec()).collect();
+            let rgba: Vec<u8> = (0..size[1])
+                .flat_map(|y| mapped[(y * row) as usize..(y * row + size[0] * 4) as usize].to_vec())
+                .collect();
             let path = out.join(format!("window{n:05}.png"));
             let mut enc = png::Encoder::new(std::io::BufWriter::new(std::fs::File::create(&path)?), size[0], size[1]);
             enc.set_color(png::ColorType::Rgba);
@@ -2862,7 +3621,9 @@ fn movie_shot(frames: &[u32], out: &std::path::Path, size: Option<&str>) -> Resu
                 let yy = (f.y[y * f.width + x] as f32 - 16.0) * 1.164;
                 let ci = (y / 2) * (f.width / 2) + x / 2;
                 let (cb, cr) = (f.cb[ci] as f32 - 128.0, f.cr[ci] as f32 - 128.0);
-                rgb.extend([yy + 1.596 * cr, yy - 0.392 * cb - 0.813 * cr, yy + 2.017 * cb].map(|v| v.clamp(0.0, 255.0) as u8));
+                rgb.extend(
+                    [yy + 1.596 * cr, yy - 0.392 * cb - 0.813 * cr, yy + 2.017 * cb].map(|v| v.clamp(0.0, 255.0) as u8),
+                );
             }
         }
         let path = out.join(format!("frame{n:05}.png"));
@@ -2870,7 +3631,14 @@ fn movie_shot(frames: &[u32], out: &std::path::Path, size: Option<&str>) -> Resu
         enc.set_color(png::ColorType::Rgb);
         enc.write_header()?.write_image_data(&rgb)?;
     }
-    println!("{} frames in {:.2} s ({}x{} at {:.2} fps)", last + 1, t.elapsed().as_secs_f32(), d.width, d.height, d.fps);
+    println!(
+        "{} frames in {:.2} s ({}x{} at {:.2} fps)",
+        last + 1,
+        t.elapsed().as_secs_f32(),
+        d.width,
+        d.height,
+        d.fps
+    );
     Ok(())
 }
 
@@ -2880,12 +3648,24 @@ fn battle_dump(ids: &[u32]) -> Result<()> {
     let index = dat::DatIndex::open(&cfg.ffxi_dir())?;
     let bt = dat::battle::BattleText::load(&index, &std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?)?;
     let who = |n: &str, pc| Some(dat::battle::Who { name: n.into(), pc, ..Default::default() });
-    let ctx = dat::battle::Ctx { actor: who("Actor", true), target: who("Wild Rabbit", false), me: "Actor".into(), work: [11, 12, 13, 14, 15], ..Default::default() };
+    let ctx = dat::battle::Ctx {
+        actor: who("Actor", true),
+        target: who("Wild Rabbit", false),
+        me: "Actor".into(),
+        work: [11, 12, 13, 14, 15],
+        ..Default::default()
+    };
     let all: Vec<u32> = if ids.is_empty() { (0..2000).collect() } else { ids.to_vec() };
     for id in all {
         let Some(raw) = bt.raw(id as u16).filter(|r| !r.is_empty()) else { continue };
-        let codes: String = raw.iter().map(|&b| if (0x20..0x7f).contains(&b) { (b as char).to_string() } else { format!("<{b:02x}>") }).collect();
-        let text = bt.expand(id as u16, &ctx).map(|l| l.lines.iter().map(|t| dat::font::strip_codes(t)).collect::<Vec<_>>().join(" / ")).unwrap_or_default();
+        let codes: String = raw
+            .iter()
+            .map(|&b| if (0x20..0x7f).contains(&b) { (b as char).to_string() } else { format!("<{b:02x}>") })
+            .collect();
+        let text = bt
+            .expand(id as u16, &ctx)
+            .map(|l| l.lines.iter().map(|t| dat::font::strip_codes(t)).collect::<Vec<_>>().join(" / "))
+            .unwrap_or_default();
         println!("{id}\t{text}\t{codes}");
     }
     Ok(())
@@ -2900,7 +3680,19 @@ fn sway_steps(v: u32) -> u32 {
     }
 }
 
-fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim: &[f32], (category, anim, dust, fx_file): (u8, u16, Option<String>, Option<u32>), walk: &[f32], frames: u32, every: u32, hour: f32, despawn: Option<u32>) -> Result<()> {
+fn fx_shot(
+    zone: u32,
+    out: &std::path::Path,
+    eye: &[f32],
+    caster: &[f32],
+    victim: &[f32],
+    (category, anim, dust, fx_file): (u8, u16, Option<String>, Option<u32>),
+    walk: &[f32],
+    frames: u32,
+    every: u32,
+    hour: f32,
+    despawn: Option<u32>,
+) -> Result<()> {
     use glam::Vec3;
     let cfg = config::Config::load();
     render::SHINE_WRAP.store(cfg.tool("0040") == 0, std::sync::atomic::Ordering::Relaxed);
@@ -2908,7 +3700,10 @@ fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim
     let keys = dat::zone::Keys::from_ffximain(&std::fs::read(crate::dat::ffximain(&cfg.ffxi_dir()))?)?;
     let file = index.read(dat::zone::file_id(zone))?;
     let scene = dat::zone::load_scene(&keys, &file)?;
-    let lighting = dat::weather::ZoneWeather::parse(&file).ok().and_then(|w| w.at("suny", hour * 60.0)).map(|e| dat::weather::Lighting::from_env(&e, hour * 60.0));
+    let lighting = dat::weather::ZoneWeather::parse(&file)
+        .ok()
+        .and_then(|w| w.at("suny", hour * 60.0))
+        .map(|e| dat::weather::Lighting::from_env(&e, hour * 60.0));
     let v3 = |v: &[f32]| Vec3::new(v[0], v[1], v[2]);
     let (mut c, mut t) = (v3(caster), v3(victim));
     let g = client::ground::Ground::build(&scene);
@@ -2919,7 +3714,14 @@ fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim
         println!("caster on {c} surface {:?}", g.surface(c));
     }
     let walk = if walk.len() == 3 { v3(walk) } else { Vec3::ZERO };
-    let actors = ShotActors { at: [(0x0001_0001, c, t - c), (0x0100_0001, t, c - t)], walk, ticks: std::cell::Cell::new(0.0), fx_files: Default::default(), ground: g, gone: Default::default() };
+    let actors = ShotActors {
+        at: [(0x0001_0001, c, t - c), (0x0100_0001, t, c - t)],
+        walk,
+        ticks: std::cell::Cell::new(0.0),
+        fx_files: Default::default(),
+        ground: g,
+        gone: Default::default(),
+    };
     let mut fx = fx::Effects::new();
     fx.set_keys(std::sync::Arc::new(keys));
     fx.set_index(index.clone());
@@ -2927,21 +3729,55 @@ fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim
     fx.load_zone(fx::lib::Library::load(dat::zone::file_id(zone), file.clone())?);
     let files = [8392u32, 9672, 7072, 1300];
     fx.preload(&files);
-    let result = net::action::ActionResult { kind: 1, scale: 1, value: 10, message: 1, animation: anim, ..Default::default() };
-    let action = net::action::Action { actor: 0x0001_0001, category, arg: if category == 1 { u32::from_le_bytes(*b"atk0") } else { anim as u32 }, info: 0, targets: vec![net::action::ActionTarget { id: 0x0100_0001, results: vec![result] }], seq: 0 };
-    let camera = render::Camera { eye: v3(eye), target: (c + t) / 2.0 + Vec3::new(0.0, -1.2, 0.0), up: Vec3::NEG_Y, fov_y: 50f32.to_radians() };
-    let paths: Vec<PathBuf> = (0..frames).map(|i| out.with_file_name(format!("{}_{i:02}.png", out.file_stem().unwrap().to_string_lossy()))).collect();
-    let list: Vec<(&render::Camera, &std::path::Path, Option<dat::weather::Lighting>)> = paths.iter().map(|p| (&camera, p.as_path(), lighting)).collect();
+    let result =
+        net::action::ActionResult { kind: 1, scale: 1, value: 10, message: 1, animation: anim, ..Default::default() };
+    let action = net::action::Action {
+        actor: 0x0001_0001,
+        category,
+        arg: if category == 1 { u32::from_le_bytes(*b"atk0") } else { anim as u32 },
+        info: 0,
+        targets: vec![net::action::ActionTarget { id: 0x0100_0001, results: vec![result] }],
+        seq: 0,
+    };
+    let camera = render::Camera {
+        eye: v3(eye),
+        target: (c + t) / 2.0 + Vec3::new(0.0, -1.2, 0.0),
+        up: Vec3::NEG_Y,
+        fov_y: 50f32.to_radians(),
+    };
+    let paths: Vec<PathBuf> = (0..frames)
+        .map(|i| out.with_file_name(format!("{}_{i:02}.png", out.file_stem().unwrap().to_string_lossy())))
+        .collect();
+    let list: Vec<(&render::Camera, &std::path::Path, Option<dat::weather::Lighting>)> =
+        paths.iter().map(|p| (&camera, p.as_path(), lighting)).collect();
     let mut eg: Option<render::effects::EffectsGpu> = None;
     let mut started = false;
-    let mut post = |gpu: &render::Gpu, enc: &mut wgpu::CommandEncoder, (color, color_tex): (&wgpu::TextureView, &wgpu::Texture), depth: &wgpu::TextureView, cam: &render::Camera, l: Option<&dat::weather::Lighting>, zr: &mut render::ZoneRenderer| {
+    let mut post = |gpu: &render::Gpu,
+                    enc: &mut wgpu::CommandEncoder,
+                    (color, color_tex): (&wgpu::TextureView, &wgpu::Texture),
+                    depth: &wgpu::TextureView,
+                    cam: &render::Camera,
+                    l: Option<&dat::weather::Lighting>,
+                    zr: &mut render::ZoneRenderer| {
         let eg = eg.get_or_insert_with(|| render::effects::EffectsGpu::new(gpu, wgpu::TextureFormat::Rgba8Unorm));
         eg.set_lights(&zr.lights);
         fx.reg.light_keys = zr.light_keys.clone();
         let view = cam.view();
         let mut view_rot = view;
         view_rot.w_axis = glam::Vec4::W;
-        let f = fx::Frame { dt: 1.0, seconds: 1.0 / 60.0, dayfrac: hour / 24.0, view, view_rot, eye: cam.eye, draw_distance: 2000.0, area_light: l.map_or(Vec3::ONE, |l| l.area), focal: 350.0, moon_phase: 0, weekday: 0 };
+        let f = fx::Frame {
+            dt: 1.0,
+            seconds: 1.0 / 60.0,
+            dayfrac: hour / 24.0,
+            view,
+            view_rot,
+            eye: cam.eye,
+            draw_distance: 2000.0,
+            area_light: l.map_or(Vec3::ONE, |l| l.area),
+            focal: 350.0,
+            moon_phase: 0,
+            weekday: 0,
+        };
         if !started {
             while files.iter().any(|f| fx.reg.lib_of(*f).is_none()) {
                 fx.tick(&f, &actors);
@@ -2950,7 +3786,16 @@ fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim
             match (&dust, fx_file) {
                 (Some(d), _) => {
                     let name = <[u8; 4]>::try_from(d.as_bytes()).ok();
-                    fx.footstep(0x0001_0001, None, c, Some(*b"0000"), name.filter(|n| n != b"fmrk"), name == Some(*b"fmrk"), false, 101);
+                    fx.footstep(
+                        0x0001_0001,
+                        None,
+                        c,
+                        Some(*b"0000"),
+                        name.filter(|n| n != b"fmrk"),
+                        name == Some(*b"fmrk"),
+                        false,
+                        101,
+                    );
                 }
                 (None, Some(n)) => {
                     let who = fx::sched::Who::Actor(0x0001_0001);
@@ -2975,10 +3820,21 @@ fn fx_shot(zone: u32, out: &std::path::Path, eye: &[f32], caster: &[f32], victim
             let _ = gpu.device.poll(wgpu::PollType::Wait { submission_index: None, timeout: None });
             eg.after_submit(gpu, &mut fx);
         }
-        let live: Vec<String> = fx.describe().into_iter().filter(|d| !d.contains(" t_") || d.contains("/fses/")).collect();
+        let live: Vec<String> =
+            fx.describe().into_iter().filter(|d| !d.contains(" t_") || d.contains("/fses/")).collect();
         println!("{} live, {} tasks: {live:?}", fx.live_count(), fx.task_count());
         let (fog_color, fog) = l.map_or(([0.0; 3], [150.0, 600.0]), |l| (l.fog.to_array(), [l.fog_start, l.fog_end]));
-        eg.draw(gpu, enc, (color, depth, [1600, 900]), Some(color_tex), &fx, (cam.proj(1600.0 / 900.0), cam.view(), cam.eye), [render::NEAR, render::FAR], fog_color, fog);
+        eg.draw(
+            gpu,
+            enc,
+            (color, depth, [1600, 900]),
+            Some(color_tex),
+            &fx,
+            (cam.proj(1600.0 / 900.0), cam.view(), cam.eye),
+            [render::NEAR, render::FAR],
+            fog_color,
+            fog,
+        );
     };
     render::render_pngs_post(&scene, &list, 1600, 900, &|_, _| Vec::new(), &mut post)?;
     println!("wrote {} frames", paths.len());

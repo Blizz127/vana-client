@@ -104,7 +104,10 @@ fn rows(w: &World, d: &Dress) -> Vec<Slot> {
         .slots_of(STORAGE)
         .into_iter()
         .filter(|s| s.index != 0 && s.id != 0)
-        .filter(|s| info.item(s.id).is_some_and(|it| it.level != 0 && it.races != 0 && it.slots & WEARABLE != 0 && it.slots & d.mask != 0))
+        .filter(|s| {
+            info.item(s.id)
+                .is_some_and(|it| it.level != 0 && it.races != 0 && it.slots & WEARABLE != 0 && it.slots & d.mask != 0)
+        })
         .collect();
     out.sort_by_key(|s| (info.item(s.id).map_or(0, |it| it.resource), s.id));
     out
@@ -151,7 +154,23 @@ fn send(w: &mut World, b: [u8; 28]) {
 /// every piece; mode 4.
 pub fn open(l: &mut Layout, c: u8, slot: u8) {
     log::info!("mannequin: dressing ({c}, {slot})");
-    l.dress = Some(Dress { c, slot, mode: 2, cursor: 1, col: 0, prev: 1, focus: Focus::Grid, scroll: 0, row: 0, mask: 0xffff, picked: None, allowed: 0, spin: 0.0, look: None, h: 0.0 });
+    l.dress = Some(Dress {
+        c,
+        slot,
+        mode: 2,
+        cursor: 1,
+        col: 0,
+        prev: 1,
+        focus: Focus::Grid,
+        scroll: 0,
+        row: 0,
+        mask: 0xffff,
+        picked: None,
+        allowed: 0,
+        spin: 0.0,
+        look: None,
+        h: 0.0,
+    });
 }
 
 /// FUN_10134760 and the close hook FUN_101336d0: back to mode 1 with the mannequin selected.
@@ -217,7 +236,9 @@ fn grid_key(w: &mut World, gu: &GameUi, key: egui::Key) {
         K::ArrowLeft | K::ArrowRight if mode == 1 && allowed != 0 => {
             let order = super::equipwin::ORDER;
             let at = order.iter().position(|&c| c == cursor).unwrap_or(0);
-            let next = (1..16).map(|k| if key == K::ArrowRight { order[(at + k) % 16] } else { order[(at + 16 - k) % 16] }).find(|&ch| slot_of(ch).is_some_and(|s| allowed & 1 << s != 0));
+            let next = (1..16)
+                .map(|k| if key == K::ArrowRight { order[(at + k) % 16] } else { order[(at + 16 - k) % 16] })
+                .find(|&ch| slot_of(ch).is_some_and(|s| allowed & 1 << s != 0));
             if let (Some(ch), Some(d)) = (next, dress_mut(w)) {
                 d.cursor = ch;
                 w.sounds.push(Ui::Cursor as u32);
@@ -267,7 +288,15 @@ fn grid_key(w: &mut World, gu: &GameUi, key: egui::Key) {
         }
         // Mode 1: the picked piece onto the cursor's slot; then the list again, unpicked.
         K::Enter => {
-            let entry = picked.and_then(|i| w.inv.slots.get(&(STORAGE, i)).map(|&(id, count)| Slot { index: i, id, count, equipped: false, equipped_ex: false }));
+            let entry = picked.and_then(|i| {
+                w.inv.slots.get(&(STORAGE, i)).map(|&(id, count)| Slot {
+                    index: i,
+                    id,
+                    count,
+                    equipped: false,
+                    equipped_ex: false,
+                })
+            });
             let ok = put(w, entry);
             w.sounds.push(if ok { Ui::Select } else { Ui::Error } as u32);
             if let Some(d) = dress_mut(w) {
@@ -325,7 +354,9 @@ fn list_key(w: &mut World, key: egui::Key) {
             let bits = w.item_info.as_ref().and_then(|i| i.item(s.id)).map_or(0, |it| it.slots);
             let Some(d) = dress_mut(w) else { return };
             (d.picked, d.allowed, d.focus) = (Some(s.index), bits, Focus::Grid);
-            if let Some(&first) = super::equipwin::ORDER.iter().find(|&&ch| slot_of(ch).is_some_and(|k| bits & 1 << k != 0)) {
+            if let Some(&first) =
+                super::equipwin::ORDER.iter().find(|&&ch| slot_of(ch).is_some_and(|k| bits & 1 << k != 0))
+            {
                 d.cursor = first;
             }
             w.sounds.push(Ui::Select as u32);
@@ -520,7 +551,16 @@ pub(super) fn look(w: &World) -> Option<Look> {
     }
     let rows = rows(w, d);
     let tints = rows.iter().map(|s| tint(w, d, s)).collect();
-    Some(Look { worn: by_child, off: off_children(), any_worn: ext.iter().any(|&s| s != 0), cursor: d.cursor, on_grid: d.focus == Focus::Grid, rows, tints, row: d.scroll + d.row })
+    Some(Look {
+        worn: by_child,
+        off: off_children(),
+        any_worn: ext.iter().any(|&s| s != 0),
+        cursor: d.cursor,
+        on_grid: d.focus == Focus::Grid,
+        rows,
+        tints,
+        row: d.scroll + d.row,
+    })
 }
 
 /// The mouse onto grid child `k` or list row `k`: the other side takes the focus first (as Num+, the retail
@@ -529,7 +569,10 @@ pub(super) fn set_grid(w: &mut World, k: u16) -> bool {
     if dress(w).is_some_and(|d| d.focus == Focus::List) {
         num_plus(w);
     }
-    let Some(d) = dress_mut(w).filter(|d| d.focus == Focus::Grid && d.cursor != k && (1..=REMOVE_ALL).contains(&k)) else { return false };
+    let Some(d) = dress_mut(w).filter(|d| d.focus == Focus::Grid && d.cursor != k && (1..=REMOVE_ALL).contains(&k))
+    else {
+        return false;
+    };
     (d.cursor, d.prev) = (k, k);
     if k != REMOVE_ALL {
         d.col = (k - 1) / 4;
@@ -542,7 +585,9 @@ pub(super) fn set_list(w: &mut World, k: usize) -> bool {
         num_plus(w);
     }
     let n = dress(w).map_or(0, |d| rows(w, d).len());
-    let Some(d) = dress_mut(w).filter(|d| d.focus == Focus::List && d.scroll + d.row != k && k < n) else { return false };
+    let Some(d) = dress_mut(w).filter(|d| d.focus == Focus::List && d.scroll + d.row != k && k < n) else {
+        return false;
+    };
     d.scroll = d.scroll.min(k).max((k + 1).saturating_sub(VISIBLE_ROWS));
     d.row = k - d.scroll;
     true
@@ -566,7 +611,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         hide.push(REMOVE_ALL);
     }
     let swaps = [(REMOVE_ALL, Some(WINDOWPS), 545usize)];
-    if let Some(lw) = gu.lobby_window_lib_swaps(GRID, sw, sh, (0.0, 0.0), on_grid.then_some(d.cursor), on_grid && d.cursor == REMOVE_ALL, &hide, &swaps) {
+    if let Some(lw) = gu.lobby_window_lib_swaps(
+        GRID,
+        sw,
+        sh,
+        (0.0, 0.0),
+        on_grid.then_some(d.cursor),
+        on_grid && d.cursor == REMOVE_ALL,
+        &hide,
+        &swaps,
+    ) {
         let [x0, y0, ..] = lw.frame;
         gu.disabled_children(GRID, x0, y0, &slots_off, None);
         // A dim Remove all: windowps 546 drawn as a kind-4 sprite (FUN_10119c00 keeps the swapped sprite).
@@ -599,7 +653,16 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     }
     let shown = rows(w, d);
     let tints: Vec<u32> = shown.iter().map(|s| tint(w, d, s)).collect();
-    rects.extend(super::post::draw_rows(gu, &shown, &info, (d.scroll, d.row), focused && d.focus == Focus::List, Some(&tints), sw, sh));
+    rects.extend(super::post::draw_rows(
+        gu,
+        &shown,
+        &info,
+        (d.scroll, d.row),
+        focused && d.focus == Focus::List,
+        Some(&tints),
+        sw,
+        sh,
+    ));
     rects
 }
 
@@ -621,7 +684,27 @@ mod tests {
     #[test]
     fn indices() {
         let got: Vec<Option<usize>> = (0..16).map(idx).collect();
-        assert_eq!(got, [Some(0), Some(1), Some(2), None, Some(3), Some(4), Some(5), Some(6), Some(7), None, None, None, None, None, None, None]);
+        assert_eq!(
+            got,
+            [
+                Some(0),
+                Some(1),
+                Some(2),
+                None,
+                Some(3),
+                Some(4),
+                Some(5),
+                Some(6),
+                Some(7),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            ]
+        );
         assert_eq!(off_children(), [13, 6, 8, 10, 14, 11, 15, 4]);
     }
 

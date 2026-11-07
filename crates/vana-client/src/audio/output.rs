@@ -67,7 +67,10 @@ pub fn open<R: Render>(device: Option<&str>, make: impl FnOnce(u32) -> R) -> Res
                     let d = host.device_by_id(&id).with_context(|| format!("no audio device {s}"))?;
                     (host, d)
                 }
-                Err(e) if e.kind() == cpal::ErrorKind::UnsupportedOperation || e.kind() == cpal::ErrorKind::HostUnavailable => {
+                Err(e)
+                    if e.kind() == cpal::ErrorKind::UnsupportedOperation
+                        || e.kind() == cpal::ErrorKind::HostUnavailable =>
+                {
                     log::warn!("audio device {s}: {e}; using the default output");
                     let host = cpal::default_host();
                     let d = host.default_output_device().context("no audio output device")?;
@@ -110,7 +113,9 @@ fn open_null<R: Render>(make: impl FnOnce(u32) -> R) -> Result<Output> {
         while !s.load(Ordering::Relaxed) {
             mixer.render(&mut buf);
             done += BLOCK as u64;
-            if let Some(d) = (start + Duration::from_micros(done * 1_000_000 / RATE as u64)).checked_duration_since(Instant::now()) {
+            if let Some(d) =
+                (start + Duration::from_micros(done * 1_000_000 / RATE as u64)).checked_duration_since(Instant::now())
+            {
                 std::thread::sleep(d);
             }
         }
@@ -118,7 +123,11 @@ fn open_null<R: Render>(make: impl FnOnce(u32) -> R) -> Result<Output> {
     Ok(Output { _stream: None, _null: Some(NullOut(stop)), host: "null".into(), rate: RATE })
 }
 
-fn build<T: SizedSample + FromSample<f32>, R: Render>(device: &cpal::Device, config: StreamConfig, mut mixer: R) -> Result<cpal::Stream> {
+fn build<T: SizedSample + FromSample<f32>, R: Render>(
+    device: &cpal::Device,
+    config: StreamConfig,
+    mut mixer: R,
+) -> Result<cpal::Stream> {
     let channels = config.channels as usize;
     let mut buf: Vec<f32> = Vec::new();
     let stream = device.build_output_stream(
@@ -145,4 +154,3 @@ fn build<T: SizedSample + FromSample<f32>, R: Render>(device: &cpal::Device, con
     )?;
     Ok(stream)
 }
-

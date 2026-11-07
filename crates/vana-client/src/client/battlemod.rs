@@ -27,13 +27,20 @@ fn name(w: &Who) -> String {
 
 /// How a name prints in the retail text, longest first ("The Wild Rabbit", "the Wild Rabbit", "Wild Rabbit").
 fn forms(w: &Who) -> Vec<String> {
-    if w.pc || w.named { vec![w.name.clone()] } else { vec![format!("The {}", w.name), format!("the {}", w.name), w.name.clone()] }
+    if w.pc || w.named {
+        vec![w.name.clone()]
+    } else {
+        vec![format!("The {}", w.name), format!("the {}", w.name), w.name.clone()]
+    }
 }
 
 /// `line` with the first printed form of `w` as `token`.
 fn mark(line: &str, w: Option<&Who>, token: &str) -> String {
     let Some(w) = w else { return line.to_string() };
-    forms(w).iter().find(|f| line.contains(f.as_str())).map_or_else(|| line.to_string(), |f| line.replacen(f.as_str(), token, 1))
+    forms(w)
+        .iter()
+        .find(|f| line.contains(f.as_str()))
+        .map_or_else(|| line.to_string(), |f| line.replacen(f.as_str(), token, 1))
 }
 
 /// A status name as the result shows it: its first letter capitalised ("weight" -> "Weight").
@@ -56,7 +63,11 @@ fn result(line: &str) -> Option<String> {
         format!("+{n} HP")
     } else if let Some(n) = line.strip_prefix("{T} recovers ").and_then(|l| l.strip_suffix(" MP.")) {
         format!("+{n} MP")
-    } else if let Some(e) = line.strip_prefix("{T} gains the effect of ").or_else(|| line.strip_prefix("{T} receives the effect of ")).and_then(|l| l.strip_suffix('.')) {
+    } else if let Some(e) = line
+        .strip_prefix("{T} gains the effect of ")
+        .or_else(|| line.strip_prefix("{T} receives the effect of "))
+        .and_then(|l| l.strip_suffix('.'))
+    {
         format!("+{}", cap(e))
     } else if let Some(e) = line.strip_prefix("{T}'s ").and_then(|l| l.strip_suffix(" effect wears off.")) {
         format!("-{}", cap(e))
@@ -78,7 +89,8 @@ fn result(line: &str) -> Option<String> {
 
 /// The message's retail lines (codes kept) as one short line, or None to print them as they are.
 pub fn shorten(lines: &[String], actor: Option<&Who>, target: Option<&Who>) -> Option<String> {
-    let plain: Vec<String> = lines.iter().map(|l| font::strip_codes(l).trim().to_string()).filter(|l| !l.is_empty()).collect();
+    let plain: Vec<String> =
+        lines.iter().map(|l| font::strip_codes(l).trim().to_string()).filter(|l| !l.is_empty()).collect();
     let (a, t) = (actor.map(name), target.map(name));
     // The actor is named first in the opening line, the target after it.
     let first = plain.first().map(|l| mark(&mark(l, actor, "{A}"), target, "{T}"))?;
@@ -92,7 +104,10 @@ pub fn shorten(lines: &[String], actor: Option<&Who>, target: Option<&Who>) -> O
     };
     match rest.as_slice() {
         [] => {
-            if let Some(n) = first.strip_prefix("{A} hits {T} for ").and_then(|l| l.strip_suffix(" points of damage.").or_else(|| l.strip_suffix(" point of damage."))) {
+            if let Some(n) = first
+                .strip_prefix("{A} hits {T} for ")
+                .and_then(|l| l.strip_suffix(" points of damage.").or_else(|| l.strip_suffix(" point of damage.")))
+            {
                 return short(None, n);
             }
             if first == "{A} misses {T}." {
@@ -102,7 +117,9 @@ pub fn shorten(lines: &[String], actor: Option<&Who>, target: Option<&Who>) -> O
                 return short(Some(x), "miss");
             }
             // "Lnxtest uses Provoke on the Snipper." -> "Lnxtest [Provoke] → Snipper".
-            if let Some(x) = first.strip_prefix("{A} uses ").and_then(|l| l.strip_suffix(" on {T}.")).filter(|x| !x.contains('{')) {
+            if let Some(x) =
+                first.strip_prefix("{A} uses ").and_then(|l| l.strip_suffix(" on {T}.")).filter(|x| !x.contains('{'))
+            {
                 return Some(format!("{} [{x}] → {}", a.clone()?, t.clone()?));
             }
             // A line about the target alone (an area action's later targets, a wear-off).
@@ -116,7 +133,10 @@ pub fn shorten(lines: &[String], actor: Option<&Who>, target: Option<&Who>) -> O
             if let Some(sc) = first.strip_prefix("Skillchain: ").and_then(|l| l.strip_suffix('.')) {
                 return Some(format!("[Skillchain: {sc}] → {}: {r}", t.clone()?));
             }
-            let act = first.strip_prefix("{A} uses ").or_else(|| first.strip_prefix("{A} casts ")).and_then(|l| l.strip_suffix('.'))?;
+            let act = first
+                .strip_prefix("{A} uses ")
+                .or_else(|| first.strip_prefix("{A} casts "))
+                .and_then(|l| l.strip_suffix('.'))?;
             let act = act.strip_suffix(" on {T}").unwrap_or(act);
             (!act.contains('{')).then(|| short(Some(act), &r)).flatten()
         }
@@ -138,15 +158,33 @@ mod tests {
         let me = who("Lnxcsfix", true, 0);
         let rabbit = who("Wild Rabbit", false, 0);
         let s = |l: &[&str]| shorten(&l.iter().map(|x| x.to_string()).collect::<Vec<_>>(), Some(&me), Some(&rabbit));
-        assert_eq!(s(&["Lnxcsfix uses Fast Blade.", "The Wild Rabbit takes 123 points of damage."]).as_deref(), Some("Lnxcsfix [Fast Blade] → Wild Rabbit: 123"));
-        assert_eq!(s(&["Lnxcsfix hits the Wild Rabbit for 18 points of damage."]).as_deref(), Some("Lnxcsfix → Wild Rabbit: 18"));
-        assert_eq!(s(&["Lnxcsfix scores a critical hit!", "The Wild Rabbit takes 31 points of damage."]).as_deref(), Some("Lnxcsfix → Wild Rabbit: 31!"));
+        assert_eq!(
+            s(&["Lnxcsfix uses Fast Blade.", "The Wild Rabbit takes 123 points of damage."]).as_deref(),
+            Some("Lnxcsfix [Fast Blade] → Wild Rabbit: 123")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix hits the Wild Rabbit for 18 points of damage."]).as_deref(),
+            Some("Lnxcsfix → Wild Rabbit: 18")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix scores a critical hit!", "The Wild Rabbit takes 31 points of damage."]).as_deref(),
+            Some("Lnxcsfix → Wild Rabbit: 31!")
+        );
         assert_eq!(s(&["Lnxcsfix misses the Wild Rabbit."]).as_deref(), Some("Lnxcsfix → Wild Rabbit: miss"));
-        assert_eq!(s(&["Lnxcsfix casts Dia.", "The Wild Rabbit gains the effect of dia."]).as_deref(), Some("Lnxcsfix [Dia] → Wild Rabbit: +Dia"));
-        assert_eq!(s(&["Lnxcsfix casts Fire.", "Magic Burst! The Wild Rabbit takes 80 points of damage."]).as_deref(), Some("Lnxcsfix [Fire] → Wild Rabbit: 80 (Magic Burst)"));
+        assert_eq!(
+            s(&["Lnxcsfix casts Dia.", "The Wild Rabbit gains the effect of dia."]).as_deref(),
+            Some("Lnxcsfix [Dia] → Wild Rabbit: +Dia")
+        );
+        assert_eq!(
+            s(&["Lnxcsfix casts Fire.", "Magic Burst! The Wild Rabbit takes 80 points of damage."]).as_deref(),
+            Some("Lnxcsfix [Fire] → Wild Rabbit: 80 (Magic Burst)")
+        );
         assert_eq!(s(&["The Wild Rabbit takes 48 points of damage."]).as_deref(), Some("Wild Rabbit: 48"));
         assert_eq!(s(&["Lnxcsfix defeats the Wild Rabbit."]), None);
-        assert_eq!(s(&["Lnxcsfix uses Provoke on the Wild Rabbit."]).as_deref(), Some("Lnxcsfix [Provoke] → Wild Rabbit"));
+        assert_eq!(
+            s(&["Lnxcsfix uses Provoke on the Wild Rabbit."]).as_deref(),
+            Some("Lnxcsfix [Provoke] → Wild Rabbit")
+        );
         let heal = shorten(&["Lnxcsfix casts Cure.".into(), "Lnxcsfix recovers 45 HP.".into()], Some(&me), Some(&me));
         assert_eq!(heal.as_deref(), Some("Lnxcsfix [Cure] → Lnxcsfix: +45 HP"));
         let red = who("Wild Rabbit", false, colour::OUR_CLAIM);

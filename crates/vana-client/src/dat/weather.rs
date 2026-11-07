@@ -51,7 +51,15 @@ impl Env {
         if b.len() < 0xac {
             return None;
         }
-        let g = |o: usize| Group { sun: c(b, o), moon: c(b, o + 4), ambient: c(b, o + 8), fog: c(b, o + 12), fog_end: f(b, o + 16), fog_start: f(b, o + 20), light_scale: f(b, o + 24) };
+        let g = |o: usize| Group {
+            sun: c(b, o),
+            moon: c(b, o + 4),
+            ambient: c(b, o + 8),
+            fog: c(b, o + 12),
+            fog_end: f(b, o + 16),
+            fog_start: f(b, o + 20),
+            light_scale: f(b, o + 24),
+        };
         let mut sky = [[0u8; 4]; 8];
         let mut stops = [0f32; 8];
         for i in 0..8 {
@@ -101,7 +109,11 @@ impl Env {
         out.unk50 = lf(prev.unk50, next.unk50);
         out.unk54 = lf(prev.unk54, next.unk54);
         out.draw_dist = lf(prev.draw_dist, next.draw_dist);
-        out.bytes5c = [lb(prev.bytes5c[0], next.bytes5c[0]), lb(prev.bytes5c[1], next.bytes5c[1]), lb(prev.bytes5c[2], next.bytes5c[2])];
+        out.bytes5c = [
+            lb(prev.bytes5c[0], next.bytes5c[0]),
+            lb(prev.bytes5c[1], next.bytes5c[1]),
+            lb(prev.bytes5c[2], next.bytes5c[2]),
+        ];
         out.unk68 = lf(prev.unk68, next.unk68);
         for i in 0..8 {
             out.sky[i] = lc(prev.sky[i], next.sky[i]);
@@ -178,7 +190,8 @@ impl ZoneWeather {
             }
             k
         };
-        let areas = areas.into_iter().map(|(id, k)| (id, Self { keys: sorted(k), areas: Default::default() })).collect();
+        let areas =
+            areas.into_iter().map(|(id, k)| (id, Self { keys: sorted(k), areas: Default::default() })).collect();
         Ok(Self { keys: sorted(keys), areas })
     }
 
@@ -333,7 +346,11 @@ impl LightEase {
             return;
         }
         let (sun, moon) = sun_moon(minute);
-        let (d, bg, actor) = if sun.y < 0.0 { (moon, rgb(env.bg.moon), rgb(env.actor.moon)) } else { (sun, rgb(env.bg.sun), rgb(env.actor.sun)) };
+        let (d, bg, actor) = if sun.y < 0.0 {
+            (moon, rgb(env.bg.moon), rgb(env.actor.moon))
+        } else {
+            (sun, rgb(env.bg.sun), rgb(env.actor.sun))
+        };
         if !self.init {
             self.init = true;
             self.bg = EasedLight { dir: d, color: bg };
@@ -368,7 +385,8 @@ impl Lighting {
         let (sun, moon) = sun_moon(minute);
         let night = sun.y < 0.0;
         let (dir, diffuse, actor_dir, actor_diffuse) = if env.flags & 1 != 0 {
-            let d = |c: [u8; 4]| Vec3::new(c[0] as i8 as f32, c[1] as i8 as f32, c[2] as i8 as f32).normalize_or(Vec3::Y);
+            let d =
+                |c: [u8; 4]| Vec3::new(c[0] as i8 as f32, c[1] as i8 as f32, c[2] as i8 as f32).normalize_or(Vec3::Y);
             (d(env.bg.moon), rgb(env.bg.sun), d(env.actor.moon), rgb(env.actor.sun))
         } else if night {
             (moon, rgb(env.bg.moon), moon, rgb(env.actor.moon))
@@ -383,7 +401,8 @@ impl Lighting {
         let sky = env.has_dome().then(|| (env.sky.map(rgb), env.stops));
         let scale = env.bg.light_scale;
         let two = if env.flags & 1 != 0 {
-            let d = |c: [u8; 4]| Vec3::new(c[0] as i8 as f32, c[1] as i8 as f32, c[2] as i8 as f32).normalize_or(Vec3::Y);
+            let d =
+                |c: [u8; 4]| Vec3::new(c[0] as i8 as f32, c[1] as i8 as f32, c[2] as i8 as f32).normalize_or(Vec3::Y);
             [d(env.bg.moon), rgb(env.bg.sun) * scale, moon, Vec3::ZERO]
         } else {
             [sun, rgb(env.bg.sun) * scale, moon, rgb(env.bg.moon) * scale]
@@ -410,8 +429,10 @@ impl Lighting {
 
 /// Weather tags by the server's weather number (FFXiMain table 0x1036bab8, FUN_10184ac0); the
 /// order is LSB's xi::Weather.
-pub const WEATHER_TAGS: [&str; 20] =
-    ["fine", "suny", "clod", "mist", "dryw", "heat", "rain", "squl", "dust", "sand", "wind", "stom", "snow", "bliz", "thdr", "bolt", "aura", "ligt", "fogd", "dark"];
+pub const WEATHER_TAGS: [&str; 20] = [
+    "fine", "suny", "clod", "mist", "dryw", "heat", "rain", "squl", "dust", "sand", "wind", "stom", "snow", "bliz",
+    "thdr", "bolt", "aura", "ligt", "fogd", "dark",
+];
 
 pub fn weather_tag(number: u16) -> &'static str {
     WEATHER_TAGS.get(number as usize).copied().unwrap_or("suny")
@@ -492,7 +513,10 @@ mod tests {
     fn env_lerp_retail() {
         if let Some(w) = weather(200) {
             let e = w.at("suny", 330.0).unwrap();
-            assert_eq!((&e.bg.sun[..3], &e.bg.moon[..3], &e.bg.fog[..3]), (&[113, 109, 77][..], &[53, 53, 53][..], &[78, 71, 59][..]));
+            assert_eq!(
+                (&e.bg.sun[..3], &e.bg.moon[..3], &e.bg.fog[..3]),
+                (&[113, 109, 77][..], &[53, 53, 53][..], &[78, 71, 59][..])
+            );
             assert!((e.bg.fog_end - 371.25).abs() < 0.01, "{}", e.bg.fog_end);
         }
         if let Some(w) = weather(126) {

@@ -27,7 +27,10 @@ impl Keys {
 
     pub fn from_ffximain(dll: &[u8]) -> Result<Self> {
         let table = |at: usize, want: &str| -> Result<[u8; 256]> {
-            let t: [u8; 256] = dll.get(at..at + 256).and_then(|s| s.try_into().ok()).ok_or_else(|| anyhow::anyhow!("FFXiMain.dll too short"))?;
+            let t: [u8; 256] = dll
+                .get(at..at + 256)
+                .and_then(|s| s.try_into().ok())
+                .ok_or_else(|| anyhow::anyhow!("FFXiMain.dll too short"))?;
             if hex::encode(Md5::digest(t)) != want {
                 bail!("model key table at {at:#x} does not match this FFXiMain.dll build");
             }
@@ -224,7 +227,13 @@ pub fn parse_mmb(p: &[u8]) -> Result<Mmb> {
                     let n = if wide_vertex { v + 24 } else { v + 12 };
                     let c = n + 12;
                     let delta = if wide_vertex { vec3_at(p, v + 12) } else { [0.0; 3] };
-                    Vertex { pos: vec3_at(p, v), normal: vec3_at(p, n), color: u32_at(p, c), uv: [f32_at(p, c + 4), f32_at(p, c + 8)], delta }
+                    Vertex {
+                        pos: vec3_at(p, v),
+                        normal: vec3_at(p, n),
+                        color: u32_at(p, c),
+                        uv: [f32_at(p, c + 4), f32_at(p, c + 8)],
+                        delta,
+                    }
                 })
                 .collect();
             at += nverts * stride;
@@ -242,7 +251,10 @@ pub fn parse_mmb(p: &[u8]) -> Result<Mmb> {
 }
 
 /// The 20 weather tags FUN_10160700 gathers sway curves for, in its order.
-pub const SWAY_TAGS: [&str; 20] = ["fine", "suny", "clod", "mist", "dryw", "heat", "rain", "sqal", "dust", "sand", "wind", "stom", "snow", "bliz", "thdr", "bolt", "aura", "ligt", "fogd", "dark"];
+pub const SWAY_TAGS: [&str; 20] = [
+    "fine", "suny", "clod", "mist", "dryw", "heat", "rain", "sqal", "dust", "sand", "wind", "stom", "snow", "bliz",
+    "thdr", "bolt", "aura", "ligt", "fogd", "dark",
+];
 
 /// The environment-animation curves (FUN_10160830): per weather tag the type-0x19 chunks of `weat/<tag>/kfrm`, else
 /// of `mode/kfrm`, at most 32 each; a curve is its (t, value) pairs up to the one at t = 1.
@@ -263,7 +275,8 @@ pub fn sway_curves(file: &[u8]) -> SwayCurves {
         }
         out
     };
-    let (mut weat, mut mode): (std::collections::HashMap<String, Vec<Vec<[f32; 2]>>>, Vec<Vec<[f32; 2]>>) = (Default::default(), Vec::new());
+    let (mut weat, mut mode): (std::collections::HashMap<String, Vec<Vec<[f32; 2]>>>, Vec<Vec<[f32; 2]>>) =
+        (Default::default(), Vec::new());
     let mut stack: Vec<String> = Vec::new();
     for c in chunks(file).unwrap_or_default() {
         match c.kind {
@@ -283,7 +296,12 @@ pub fn sway_curves(file: &[u8]) -> SwayCurves {
         }
     }
     let pick = |v: &[Vec<[f32; 2]>]| v.iter().take(32).cloned().collect::<Vec<_>>();
-    SwayCurves { by_tag: SWAY_TAGS.iter().map(|t| weat.get(*t).filter(|v| !v.is_empty()).map_or_else(|| pick(&mode), |v| pick(v))).collect() }
+    SwayCurves {
+        by_tag: SWAY_TAGS
+            .iter()
+            .map(|t| weat.get(*t).filter(|v| !v.is_empty()).map_or_else(|| pick(&mode), |v| pick(v)))
+            .collect(),
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -389,7 +407,10 @@ pub fn parse_mzb(p: &mut [u8]) -> Result<Vec<Placement>> {
     }
     let count = (p[4] as usize) | (p[5] as usize) << 8 | (p[6] as usize) << 16;
     let end = u32_at(p, 20) as usize;
-    let stride = [100usize, 84, 92].into_iter().find(|s| count * s + 32 == end).ok_or_else(|| anyhow::anyhow!("unknown MZB record size ({count} records end at {end})"))?;
+    let stride = [100usize, 84, 92]
+        .into_iter()
+        .find(|s| count * s + 32 == end)
+        .ok_or_else(|| anyhow::anyhow!("unknown MZB record size ({count} records end at {end})"))?;
     if end > p.len() {
         bail!("MZB: {count} records end at {end}, past the chunk");
     }
@@ -412,7 +433,19 @@ pub fn parse_mzb(p: &mut [u8]) -> Result<Vec<Placement>> {
                 *l = if rf >= 1 { keys.get(rf - 1).copied().unwrap_or(0) } else { 0 };
             }
         }
-        out.push(Placement { name: name_at(p, r, 16), translate: vec3_at(p, r + 16), rotate: vec3_at(p, r + 28), scale: vec3_at(p, r + 40), lights, link: u32_at(p, r + 0x50), area: u32_at(p, r + 0x4c), id: u32_at(p, r + 0x34), lod: [f32_at(p, r + 0x38), f32_at(p, r + 0x3c)], world, own_dist: (p[r + 0x46] & 1 != 0).then(|| f32_at(p, r + 0x40)) });
+        out.push(Placement {
+            name: name_at(p, r, 16),
+            translate: vec3_at(p, r + 16),
+            rotate: vec3_at(p, r + 28),
+            scale: vec3_at(p, r + 40),
+            lights,
+            link: u32_at(p, r + 0x50),
+            area: u32_at(p, r + 0x4c),
+            id: u32_at(p, r + 0x34),
+            lod: [f32_at(p, r + 0x38), f32_at(p, r + 0x3c)],
+            world,
+            own_dist: (p[r + 0x46] & 1 != 0).then(|| f32_at(p, r + 0x40)),
+        });
     }
     Ok(out)
 }
@@ -450,7 +483,8 @@ pub(crate) fn decode_dxt(data: &[u8], w: u32, h: u32, dxt3: bool) -> Vec<u8> {
             if at + block > data.len() {
                 return out;
             }
-            let (alpha, color) = if dxt3 { (Some(&data[at..at + 8]), &data[at + 8..at + 16]) } else { (None, &data[at..at + 8]) };
+            let (alpha, color) =
+                if dxt3 { (Some(&data[at..at + 8]), &data[at + 8..at + 16]) } else { (None, &data[at..at + 8]) };
             let (c0, c1) = (u16_at(color, 0), u16_at(color, 2));
             let (a, b) = (rgb565(c0), rgb565(c1));
             let mut palette = [[a[0], a[1], a[2], 255], [b[0], b[1], b[2], 255], [0; 4], [0; 4]];
@@ -523,7 +557,11 @@ pub fn parse_img(p: &[u8]) -> Result<Texture> {
                 let i = ((h - 1 - y) * w + x) as usize;
                 let bgra: [u8; 4] = match bits {
                     4 | 8 => {
-                        let idx = if bits == 4 { (p[px_at + i / 2] >> if i % 2 == 0 { 4 } else { 0 }) & 0xf } else { p[px_at + i] } as usize;
+                        let idx = if bits == 4 {
+                            (p[px_at + i / 2] >> if i % 2 == 0 { 4 } else { 0 }) & 0xf
+                        } else {
+                            p[px_at + i]
+                        } as usize;
                         p[at + idx * 4..at + idx * 4 + 4].try_into().unwrap()
                     }
                     24 => [p[px_at + i * 3], p[px_at + i * 3 + 1], p[px_at + i * 3 + 2], 0x80],
@@ -601,7 +639,9 @@ impl Region {
         let (dx, dy, dz) = (p[0] - self.pos[0], p[1] - self.pos[1], p[2] - self.pos[2]);
         let (s, c) = (-self.rot[1]).sin_cos();
         let (lx, lz) = (dx * c + dz * s, -dx * s + dz * c);
-        lx.abs() <= self.scale[0].abs() / 2.0 && dy.abs() <= self.scale[1].abs() / 2.0 && lz.abs() <= self.scale[2].abs() / 2.0
+        lx.abs() <= self.scale[0].abs() / 2.0
+            && dy.abs() <= self.scale[1].abs() / 2.0
+            && lz.abs() <= self.scale[2].abs() / 2.0
     }
 
     /// FUN_10175910: the segment a..b touches the box: an end inside, or it crosses a face.
@@ -721,7 +761,10 @@ impl ZoneScene {
         let names: std::collections::HashSet<&str> = self.meshes.iter().map(|m| m.name.as_str()).collect();
         let mesh = |p: &Placement| {
             let high = p.lod_names(|n| names.contains(n))[2].to_string();
-            self.meshes.iter().find(|m| m.name == high).map(|m| (m.min, m.max, m.models.iter().map(|x| x.vertices.len()).sum::<usize>()))
+            self.meshes
+                .iter()
+                .find(|m| m.name == high)
+                .map(|m| (m.min, m.max, m.models.iter().map(|x| x.vertices.len()).sum::<usize>()))
         };
         let key = |p: &Placement| {
             let q = |v: f32| (v * 1000.0).round() as i64;
@@ -746,7 +789,12 @@ impl ZoneScene {
             for a in 0..spot.len() {
                 let Some(ia) = info[a].filter(|_| !seen[a]) else { continue };
                 let members: Vec<usize> = (a..spot.len())
-                    .filter(|&b| b == a || (!seen[b] && self.placements[spot[b]].name != self.placements[spot[a]].name && info[b].is_some_and(|ib| iou((ia.0, ia.1), (ib.0, ib.1)) > 0.7)))
+                    .filter(|&b| {
+                        b == a
+                            || (!seen[b]
+                                && self.placements[spot[b]].name != self.placements[spot[a]].name
+                                && info[b].is_some_and(|ib| iou((ia.0, ia.1), (ib.0, ib.1)) > 0.7))
+                    })
                     .collect();
                 if members.len() < 2 {
                     continue;
@@ -764,7 +812,19 @@ impl ZoneScene {
 }
 
 pub fn load_scene(keys: &Keys, file: &[u8]) -> Result<ZoneScene> {
-    let mut scene = ZoneScene { regions: Vec::new(), collision: None, placements: Vec::new(), meshes: Vec::new(), textures: Vec::new(), warnings: Vec::new(), light_keys: Vec::new(), paths: Default::default(), camera_lists: Default::default(), sway: sway_curves(file), bumps: Vec::new() };
+    let mut scene = ZoneScene {
+        regions: Vec::new(),
+        collision: None,
+        placements: Vec::new(),
+        meshes: Vec::new(),
+        textures: Vec::new(),
+        warnings: Vec::new(),
+        light_keys: Vec::new(),
+        paths: Default::default(),
+        camera_lists: Default::default(),
+        sway: sway_curves(file),
+        bumps: Vec::new(),
+    };
     let list: Vec<Chunk> = chunks(file)?;
     for c in list {
         let mut data = c.data.to_vec();
@@ -772,7 +832,10 @@ pub fn load_scene(keys: &Keys, file: &[u8]) -> Result<ZoneScene> {
             0x1C => decode_mzb(keys, &mut data).and_then(|_| parse_mzb(&mut data)).map(|p| {
                 // As the collision, the last MZB's.
                 let base = scene.placements.len() as u32;
-                scene.camera_lists = camera_lists(&data).into_iter().map(|(at, l)| (at, l.into_iter().map(|i| i + base).collect())).collect();
+                scene.camera_lists = camera_lists(&data)
+                    .into_iter()
+                    .map(|(at, l)| (at, l.into_iter().map(|i| i + base).collect()))
+                    .collect();
                 scene.placements.extend(p);
                 for k in light_list(&data) {
                     if k != 0 && !scene.light_keys.contains(&k) {
@@ -825,8 +888,11 @@ mod tests {
         let (Ok(keys), Ok(file)) = (Keys::from_ffximain(&dll), index.read(file_id(733))) else { return };
         let z = load_scene(&keys, &file).unwrap();
         let v = z.variant_groups();
-        let at = |name: &str, sx: f32| z.placements.iter().position(|p| p.name == name && p.scale[0] == sx && p.translate[2] == -362.0526).unwrap();
-        let (stand_in, detailed, part) = (v[at("m_bri_gate_a", 1.0)].unwrap(), v[at("bri_gate_a_h", 1.0)].unwrap(), v[at("bri_gate_bf_h", 1.0)]);
+        let at = |name: &str, sx: f32| {
+            z.placements.iter().position(|p| p.name == name && p.scale[0] == sx && p.translate[2] == -362.0526).unwrap()
+        };
+        let (stand_in, detailed, part) =
+            (v[at("m_bri_gate_a", 1.0)].unwrap(), v[at("bri_gate_a_h", 1.0)].unwrap(), v[at("bri_gate_bf_h", 1.0)]);
         assert_eq!(stand_in.0, detailed.0);
         assert!(stand_in.1 && !detailed.1);
         assert!(part.is_none_or(|p| p.0 != stand_in.0));
@@ -865,7 +931,16 @@ mod tests {
     #[allow(clippy::approx_constant, reason = "a region's rotation as the zone DAT stores it")]
     fn zone_line_segments() {
         // Ru'Lude Gardens' Mog House lift: the box under the floor, our place at the button, the event's pose below.
-        let r = Region { name: "zmrmzmrn".into(), pos: [48.989, 17.19, -79.994], rot: [0.0, 3.1416, 0.0], scale: [12.0, 10.0, 10.0], class: 0, param: 0, flags: 0, floors: [0, 0] };
+        let r = Region {
+            name: "zmrmzmrn".into(),
+            pos: [48.989, 17.19, -79.994],
+            rot: [0.0, 3.1416, 0.0],
+            scale: [12.0, 10.0, 10.0],
+            class: 0,
+            param: 0,
+            flags: 0,
+            floors: [0, 0],
+        };
         let (button, down) = ([49.0, 9.65, -73.0], [51.531, 14.999, -77.941]);
         assert!(!r.touches(button, button));
         assert!(r.touches(button, down) && r.touches(down, down));

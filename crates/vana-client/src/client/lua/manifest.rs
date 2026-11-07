@@ -1,8 +1,8 @@
 //! A Lua mod's `mod.toml` (docs/lua-mods.md 3.4).
 
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
 use indexmap::IndexMap;
+use serde::Deserialize;
 use std::path::Path;
 
 /// The API version this client speaks; a mod declaring a newer one is not loaded.
@@ -64,7 +64,22 @@ pub struct Setting {
 }
 
 /// Every permission a mod may ask for.
-pub const PERMISSIONS: [&str; 14] = ["actions", "automation", "packets.read", "packets.write", "input.capture", "files.shared", "net", "exec", "multibox", "ui.native", "clipboard", "process", "devices", "mods"];
+pub const PERMISSIONS: [&str; 14] = [
+    "actions",
+    "automation",
+    "packets.read",
+    "packets.write",
+    "input.capture",
+    "files.shared",
+    "net",
+    "exec",
+    "multibox",
+    "ui.native",
+    "clipboard",
+    "process",
+    "devices",
+    "mods",
+];
 
 /// Reads `dir/mod.toml`.
 pub fn read(dir: &Path) -> Result<Manifest> {

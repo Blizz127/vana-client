@@ -31,7 +31,8 @@ fn name_file(name: &str) -> String {
 /// CON, PRN, AUX, NUL, COM0..9 and LPT0..9, which Windows opens as devices whatever the extension.
 fn device_name(name: &str) -> bool {
     let n = name.to_ascii_lowercase();
-    matches!(n.as_str(), "con" | "prn" | "aux" | "nul") || (n.len() == 4 && (n.starts_with("com") || n.starts_with("lpt")) && n.as_bytes()[3].is_ascii_digit())
+    matches!(n.as_str(), "con" | "prn" | "aux" | "nul")
+        || (n.len() == 4 && (n.starts_with("com") || n.starts_with("lpt")) && n.as_bytes()[3].is_ascii_digit())
 }
 
 /// A character's saved chat lines (the modern chat's history): in the data dir, or beside an FFXI_CONFIG copy.
@@ -108,7 +109,9 @@ pub fn is_copy() -> bool {
 
 /// FFXI_CONFIG points test runs at a copy, so they never write the user's file.
 fn config_path() -> PathBuf {
-    std::env::var_os("FFXI_CONFIG").map(PathBuf::from).unwrap_or_else(|| app_dir(dirs::config_dir()).join("config.json"))
+    std::env::var_os("FFXI_CONFIG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| app_dir(dirs::config_dir()).join("config.json"))
 }
 
 /// A login that worked: the server, the account (the Square Enix ID for PlayOnline), PlayOnline's member ID, and its
@@ -342,7 +345,11 @@ impl Default for ModernModes {
         // Combat hides the location panel (user, 2026-11-01) and the training regime; the skillchain helper only in
         // combat.
         let v = |ids: &[&str]| ids.iter().map(|s| s.to_string()).collect();
-        Self { hidden: [v(&["skillchains"]), v(&["where", "regime"]), v(&["skillchains"])], pinned: Vec::new(), fades: true }
+        Self {
+            hidden: [v(&["skillchains"]), v(&["where", "regime"]), v(&["skillchains"])],
+            pinned: Vec::new(),
+            fades: true,
+        }
     }
 }
 
@@ -587,8 +594,20 @@ impl Config {
     pub fn remember_login(&mut self) {
         let (server, username) = (self.server.trim().to_string(), self.username.trim().to_string());
         // A newer client's fields of this login stay with it.
-        let unknown = self.logins.iter().find(|o| same_server(&o.server, &server) && o.username == username).map(|o| o.unknown.clone()).unwrap_or_default();
-        let l = SavedLogin { server, username, pol_id: self.pol_id.clone(), remember_password: self.remember_password, saved_password: self.saved_password.clone(), unknown };
+        let unknown = self
+            .logins
+            .iter()
+            .find(|o| same_server(&o.server, &server) && o.username == username)
+            .map(|o| o.unknown.clone())
+            .unwrap_or_default();
+        let l = SavedLogin {
+            server,
+            username,
+            pol_id: self.pol_id.clone(),
+            remember_password: self.remember_password,
+            saved_password: self.saved_password.clone(),
+            unknown,
+        };
         self.logins.retain(|o| !(same_server(&o.server, &l.server) && o.username == l.username));
         self.logins.insert(0, l);
     }
@@ -668,9 +687,9 @@ mod tests {
     /// The first key or value of `a` that `b` lacks or changes (objects compared key by key, recursively).
     fn lost(a: &serde_json::Value, b: &serde_json::Value, at: &str) -> Option<String> {
         match (a, b) {
-            (serde_json::Value::Object(a), serde_json::Value::Object(b)) => {
-                a.iter().find_map(|(k, v)| b.get(k).map_or_else(|| Some(format!("{at}.{k} dropped")), |w| lost(v, w, &format!("{at}.{k}"))))
-            }
+            (serde_json::Value::Object(a), serde_json::Value::Object(b)) => a.iter().find_map(|(k, v)| {
+                b.get(k).map_or_else(|| Some(format!("{at}.{k} dropped")), |w| lost(v, w, &format!("{at}.{k}")))
+            }),
             (serde_json::Value::Array(a), serde_json::Value::Array(b)) if a.len() == b.len() => {
                 a.iter().zip(b).enumerate().find_map(|(i, (v, w))| lost(v, w, &format!("{at}[{i}]")))
             }

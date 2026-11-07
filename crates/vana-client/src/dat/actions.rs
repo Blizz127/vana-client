@@ -30,12 +30,18 @@ pub(crate) fn unmask(r: &mut [u8]) {
 
 fn records(index: &DatIndex, kind: u8, size: usize) -> Result<Vec<Vec<u8>>> {
     let file = index.read(FILE)?;
-    let c = super::chunks(&file)?.into_iter().find(|c| c.kind == kind).with_context(|| format!("file {FILE}: no chunk {kind:#x}"))?;
-    Ok(c.data.chunks_exact(size).map(|r| {
-        let mut r = r.to_vec();
-        unmask(&mut r);
-        r
-    }).collect())
+    let c = super::chunks(&file)?
+        .into_iter()
+        .find(|c| c.kind == kind)
+        .with_context(|| format!("file {FILE}: no chunk {kind:#x}"))?;
+    Ok(c.data
+        .chunks_exact(size)
+        .map(|r| {
+            let mut r = r.to_vec();
+            unmask(&mut r);
+            r
+        })
+        .collect())
 }
 
 fn u16_at(r: &[u8], o: usize) -> u16 {
@@ -127,7 +133,19 @@ impl Actions {
             .collect();
         let abilities = records(index, ABILITY_CHUNK, ABILITY_SIZE)?
             .iter()
-            .map(|r| Ability { id: u16_at(r, 0), kind: r[2], icon: r[3], icon_hd: u16_at(r, 4), cost: u16_at(r, 6), timer: u16_at(r, 8), targets: u16_at(r, 0xa), tp: r[0xc], tp16: u16_at(r, 0xc), sub: r[0xe], level: r[0xf] })
+            .map(|r| Ability {
+                id: u16_at(r, 0),
+                kind: r[2],
+                icon: r[3],
+                icon_hd: u16_at(r, 4),
+                cost: u16_at(r, 6),
+                timer: u16_at(r, 8),
+                targets: u16_at(r, 0xa),
+                tp: r[0xc],
+                tp16: u16_at(r, 0xc),
+                sub: r[0xe],
+                level: r[0xf],
+            })
             .collect();
         Ok(Actions { spells, abilities })
     }
@@ -168,7 +186,11 @@ mod tests {
         let trust = a.spell(896).unwrap();
         assert_eq!((trust.kind, trust.targets, trust.levels[1]), (8, 1, 1));
         assert!(a.spells.iter().enumerate().all(|(i, s)| s.id == 0 || s.id as usize == i));
-        assert!(a.can_cast(1, (3, 1), (0, 0), 0) && !a.can_cast(1, (1, 75), (0, 0), 0) && a.can_cast(1, (1, 75), (3, 37), 0));
+        assert!(
+            a.can_cast(1, (3, 1), (0, 0), 0)
+                && !a.can_cast(1, (1, 75), (0, 0), 0)
+                && a.can_cast(1, (1, 75), (3, 37), 0)
+        );
     }
 
     /// The schools the battle menu's suggestions keep apart: Dia and Protect white, Bio, Water and Poison black.

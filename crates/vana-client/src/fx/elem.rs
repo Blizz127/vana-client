@@ -361,9 +361,23 @@ pub fn ambient_ref(a: glam::Vec3) -> glam::Vec3 {
 /// FUN_100467e0 + D3D8 fixed function, one light: the light matrix B from the view rotation `v`, a parent `p` (none
 /// with +0xdf bit 1), the travel direction `dir` through it, then sat(Cv Ga + Cv Ld max(N.L, 0)) with N through
 /// `mv`'s inverse transpose, unnormalised.
-pub fn fx_lit_ref(cv: glam::Vec3, ambient: glam::Vec3, light: glam::Vec3, dir: glam::Vec3, v: glam::Mat4, p: Option<glam::Mat4>, mv: glam::Mat3, n: glam::Vec3) -> (glam::Vec3, glam::Vec3) {
+pub fn fx_lit_ref(
+    cv: glam::Vec3,
+    ambient: glam::Vec3,
+    light: glam::Vec3,
+    dir: glam::Vec3,
+    v: glam::Mat4,
+    p: Option<glam::Mat4>,
+    mv: glam::Mat3,
+    n: glam::Vec3,
+) -> (glam::Vec3, glam::Vec3) {
     use glam::{Mat4, Vec4};
-    let mut b = Mat4::from_cols(v.x_axis.truncate().extend(0.0), v.y_axis.truncate().extend(0.0), v.z_axis.truncate().extend(0.0), Vec4::W);
+    let mut b = Mat4::from_cols(
+        v.x_axis.truncate().extend(0.0),
+        v.y_axis.truncate().extend(0.0),
+        v.z_axis.truncate().extend(0.0),
+        Vec4::W,
+    );
     if let Some(p) = p {
         b = p.inverse() * Mat4::from_rotation_y(4.712389) * b;
     }
@@ -377,7 +391,13 @@ pub fn fx_lit_ref(cv: glam::Vec3, ambient: glam::Vec3, light: glam::Vec3, dir: g
 /// The update stream on the CPU, for checking the GPU pass (render/effects.wgsl `update`) in tests; the same ops
 /// and the same order.
 #[cfg(test)]
-pub fn update_ref(e: &mut Elem, ops: &[u32], key: &dyn Fn(u32, f32, bool, Option<f32>) -> f32, slot_words: &[u32], f: &super::Frame) {
+pub fn update_ref(
+    e: &mut Elem,
+    ops: &[u32],
+    key: &dyn Fn(u32, f32, bool, Option<f32>) -> f32,
+    slot_words: &[u32],
+    f: &super::Frame,
+) {
     use glam::Vec3;
     use std::f32::consts::PI;
     if e.0[w::STATE] & st::ALIVE == 0 {
@@ -418,9 +438,23 @@ pub fn update_ref(e: &mut Elem, ops: &[u32], key: &dyn Fn(u32, f32, bool, Option
     };
     let half = |v: f32| {
         let a = (v - 2.0 * (v / 2.0).trunc()) * PI;
-        if a > PI { a - 2.0 * PI } else if a < -PI { a + 2.0 * PI } else { a }
+        if a > PI {
+            a - 2.0 * PI
+        } else if a < -PI {
+            a + 2.0 * PI
+        } else {
+            a
+        }
     };
-    let wrap = |a: f32| if a > PI { a - 2.0 * PI } else if a < -PI { a + 2.0 * PI } else { a };
+    let wrap = |a: f32| {
+        if a > PI {
+            a - 2.0 * PI
+        } else if a < -PI {
+            a + 2.0 * PI
+        } else {
+            a
+        }
+    };
     let byte = |v: f32| ((v * 255.0) as i32 as u32 & 0xff) as u8;
     let mut ip = e.0[w::STREAM] as usize;
     let mut guard = 0;
@@ -528,7 +562,16 @@ mod lit_tests {
     use glam::{Mat3, Mat4, Vec3};
 
     fn lit(mv: Mat3, n: Vec3, p: Option<Mat4>) -> (f32, Vec3) {
-        let (c, l) = fx_lit_ref(Vec3::splat(128.0 / 255.0), Vec3::splat(80.0 / 255.0), Vec3::splat(192.0 / 255.0 * 1.4), Vec3::Y, Mat4::IDENTITY, p, mv, n);
+        let (c, l) = fx_lit_ref(
+            Vec3::splat(128.0 / 255.0),
+            Vec3::splat(80.0 / 255.0),
+            Vec3::splat(192.0 / 255.0 * 1.4),
+            Vec3::Y,
+            Mat4::IDENTITY,
+            p,
+            mv,
+            n,
+        );
         (c.x, l)
     }
 
@@ -555,7 +598,9 @@ mod lit_tests {
     #[test]
     fn crossfade_6e() {
         let r = |d: f32| crossfade_ref(d, 11.0, 14.0, 100.0, 120.0);
-        for (d, w) in [(5.0, 0.0), (11.0, 0.0), (12.5, 0.5), (14.0, 1.0), (50.0, 1.0), (110.0, 0.5), (120.0, 0.0), (130.0, 0.0)] {
+        for (d, w) in
+            [(5.0, 0.0), (11.0, 0.0), (12.5, 0.5), (14.0, 1.0), (50.0, 1.0), (110.0, 0.5), (120.0, 0.0), (130.0, 0.0)]
+        {
             assert!((r(d) - w).abs() < 1e-5, "{d}: {}", r(d));
         }
         let r = |d: f32| crossfade_ref(d, 11.0, 13.0, 22.0, 28.0);

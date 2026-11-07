@@ -3,8 +3,8 @@
 //! / most and the next cost in retail's colours), the cursor row's description under them; merit3 and sortyn as
 //! buttons, the raise asked by the modern confirm (merityn). Unity (client/unity.rs) in the same place.
 
-use super::super::merits::{self, PointList, PointRow};
 use super::super::game_ui::GameUi;
+use super::super::merits::{self, PointList, PointRow};
 use super::super::{World, aepoints, jobpoints, unity};
 use super::craft::{button, caption, tint};
 use super::{MenuWin, Panels, Title, hud, social};
@@ -32,7 +32,8 @@ fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, l: &PointList, 
     let mut click = None;
     egui::ScrollArea::vertical().id_salt(salt).max_height(TALL).auto_shrink([false, true]).show(ui, |ui| {
         for (k, r) in l.rows.iter().enumerate() {
-            let (rect, resp) = ui.allocate_exact_size(vec2(width - 14.0, ROW), if l.focused { Sense::click() } else { Sense::hover() });
+            let (rect, resp) = ui
+                .allocate_exact_size(vec2(width - 14.0, ROW), if l.focused { Sense::click() } else { Sense::hover() });
             let face = match () {
                 _ if k == l.cursor && l.focused => "controls/list_row_selected",
                 _ if k == l.cursor || l.focused && resp.hovered() => "controls/list_row_hover",
@@ -42,20 +43,47 @@ fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, l: &PointList, 
             let y = rect.center().y;
             let level_x = if cost_col { rect.max.x - 120.0 } else { rect.max.x - 12.0 };
             let (name, font) = match r.header {
-                Some(sprite) => (m.caption(gu, "menu    windowps", sprite).unwrap_or_default(), FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into()))),
+                Some(sprite) => (
+                    m.caption(gu, "menu    windowps", sprite).unwrap_or_default(),
+                    FontId::new(m.theme.small, FontFamily::Name(super::STRONG.into())),
+                ),
                 None => (r.name.clone(), FontId::proportional(m.theme.small)),
             };
             let clip = Rect::from_min_max(rect.min, pos2(level_x - 60.0, rect.max.y));
-            ui.painter().with_clip_rect(clip).text(pos2(rect.min.x + 24.0, y), Align2::LEFT_CENTER, name, font, tint(m, r.tint));
+            ui.painter().with_clip_rect(clip).text(
+                pos2(rect.min.x + 24.0, y),
+                Align2::LEFT_CENTER,
+                name,
+                font,
+                tint(m, r.tint),
+            );
             if let Some((s, c)) = &r.level {
-                ui.painter().text(pos2(level_x, y), Align2::RIGHT_CENTER, s, FontId::monospace(m.theme.small), tint(m, *c));
+                ui.painter().text(
+                    pos2(level_x, y),
+                    Align2::RIGHT_CENTER,
+                    s,
+                    FontId::monospace(m.theme.small),
+                    tint(m, *c),
+                );
             }
             if r.mark {
                 ui.painter().circle_filled(pos2(rect.max.x - 16.0, y), 4.5, m.theme.color("gold"));
             }
             if let Some((s, c)) = &r.cost {
-                ui.painter().text(pos2(rect.max.x - 100.0, y), Align2::LEFT_CENTER, &next, FontId::proportional(m.theme.small), tint(m, *c));
-                ui.painter().text(pos2(rect.max.x - 12.0, y), Align2::RIGHT_CENTER, s, FontId::monospace(m.theme.small), tint(m, *c));
+                ui.painter().text(
+                    pos2(rect.max.x - 100.0, y),
+                    Align2::LEFT_CENTER,
+                    &next,
+                    FontId::proportional(m.theme.small),
+                    tint(m, *c),
+                );
+                ui.painter().text(
+                    pos2(rect.max.x - 12.0, y),
+                    Align2::RIGHT_CENTER,
+                    s,
+                    FontId::monospace(m.theme.small),
+                    tint(m, *c),
+                );
             }
             if k == l.cursor && follow {
                 ui.scroll_to_rect(rect, None);
@@ -75,14 +103,24 @@ fn help(ui: &mut Ui, m: &super::Modern, (name, desc): &(String, String)) {
         return;
     }
     ui.add_space(8.0);
-    ui.label(egui::RichText::new(name).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(name)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     if !desc.is_empty() {
         super::gametext::label(ui, m, desc, m.theme.small, m.theme.color("text"));
     }
 }
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(super::STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(super::STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     ui.add_space(4.0);
 }
 
@@ -128,7 +166,13 @@ pub(super) fn search_open(w: &World) -> bool {
 /// The rows by name (a group header's has none, so it never matches), the level as the note.
 pub(super) fn search_rows(w: &World) -> Vec<super::super::listsearch::Entry> {
     search_list(w).map_or(Vec::new(), |(_, l)| {
-        l.rows.into_iter().map(|r| super::super::listsearch::Entry::named(if r.header.is_some() { String::new() } else { r.name }).note(r.level.map_or(String::new(), |x| x.0))).collect()
+        l.rows
+            .into_iter()
+            .map(|r| {
+                super::super::listsearch::Entry::named(if r.header.is_some() { String::new() } else { r.name })
+                    .note(r.level.map_or(String::new(), |x| x.0))
+            })
+            .collect()
     })
 }
 
@@ -162,7 +206,16 @@ pub(super) fn search_pick(w: &mut World, gu: Option<&GameUi>, k: usize) {
 
 /// `rows`, or a search's hits in their place while this list has the keys.
 #[allow(clippy::too_many_arguments)]
-fn rows_found(ui: &mut Ui, m: &super::Modern, gu: &GameUi, found: &mut Option<super::lists::Found>, salt: &str, l: &PointList, width: f32, cost_col: bool) -> Got {
+fn rows_found(
+    ui: &mut Ui,
+    m: &super::Modern,
+    gu: &GameUi,
+    found: &mut Option<super::lists::Found>,
+    salt: &str,
+    l: &PointList,
+    width: f32,
+    cost_col: bool,
+) -> Got {
     if l.focused && super::lists::rows_or(ui, m, found) {
         return None;
     }
@@ -202,55 +255,103 @@ fn unity_panel(p: &mut Panels, w: &mut World) {
     let note = format!("{}/99999", v.accolades);
     let width = COL_W + if v.info.is_some() { 16.0 + LIST_W } else { 0.0 } + 44.0;
     let (mut menu, mut rows_got, mut ranks_got) = (None, None, None);
-    p.panel("window", Some(Title { icon: Some("icons/status"), text: "Unity", note: Some(&note), name: false }), width, |ui| {
-        ui.horizontal_top(|ui| {
-            let col = MenuWin { name: unity::MENU, sel: v.sel, off: Vec::new(), labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
-            menu = social::column(ui, m, gu, &col, free && v.info.is_none());
-            let Some(i) = &v.info else { return };
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                heading(ui, m, &i.heading);
-                for l in &i.waiting {
-                    ui.label(egui::RichText::new(l).size(m.theme.small).color(m.theme.color("muted")));
-                }
-                for [a, b, c] in &i.lines {
-                    let (r, _) = ui.allocate_exact_size(vec2(LIST_W - 14.0, 24.0), Sense::hover());
-                    let y = r.center().y;
-                    ui.painter().text(pos2(r.min.x + 4.0, y), Align2::LEFT_CENTER, a, FontId::proportional(m.theme.small), m.theme.color("muted"));
-                    ui.painter().text(pos2(r.min.x + 200.0, y), Align2::LEFT_CENTER, b, FontId::proportional(m.theme.small), m.theme.color("text"));
-                    ui.painter().text(pos2(r.max.x - 4.0, y), Align2::RIGHT_CENTER, c, FontId::monospace(m.theme.small), m.theme.color("text"));
-                }
-                if !i.chat_label.is_empty() {
-                    ui.add_space(8.0);
-                    ui.label(egui::RichText::new(&i.chat_label).size(m.theme.small).color(m.theme.color("text")));
-                }
-                ui.add_space(4.0);
-                let two = PointList {
-                    rows: i.rows.iter().enumerate().map(|(k, t)| PointRow { name: t.clone(), tint: TINT_WHITE, mark: i.mode == 1 && (k == 0) == i.chat, ..Default::default() }).collect(),
-                    cursor: i.sel as usize - 1,
-                    focused: free && i.ranks.is_none(),
-                    help: Default::default(),
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/status"), text: "Unity", note: Some(&note), name: false }),
+        width,
+        |ui| {
+            ui.horizontal_top(|ui| {
+                let col = MenuWin {
+                    name: unity::MENU,
+                    sel: v.sel,
+                    off: Vec::new(),
+                    labels: Vec::new(),
+                    marked: Vec::new(),
+                    values: Vec::new(),
                 };
-                rows_got = rows(ui, m, gu, "unity rows", &two, LIST_W, false);
-                let Some((title, order, cursor)) = &i.ranks else { return };
-                ui.add_space(10.0);
-                heading(ui, m, title);
-                let list = PointList {
-                    rows: order.iter().map(|[rk, name, pt]| PointRow { name: format!("{rk}   {name}"), tint: TINT_WHITE, level: Some((pt.clone(), TINT_WHITE)), ..Default::default() }).collect(),
-                    cursor: *cursor,
-                    focused: free,
-                    help: Default::default(),
-                };
-                if list.rows.is_empty() {
+                menu = social::column(ui, m, gu, &col, free && v.info.is_none());
+                let Some(i) = &v.info else { return };
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    heading(ui, m, &i.heading);
                     for l in &i.waiting {
                         ui.label(egui::RichText::new(l).size(m.theme.small).color(m.theme.color("muted")));
                     }
-                }
-                ranks_got = rows(ui, m, gu, "unity ranks", &list, LIST_W, false);
+                    for [a, b, c] in &i.lines {
+                        let (r, _) = ui.allocate_exact_size(vec2(LIST_W - 14.0, 24.0), Sense::hover());
+                        let y = r.center().y;
+                        ui.painter().text(
+                            pos2(r.min.x + 4.0, y),
+                            Align2::LEFT_CENTER,
+                            a,
+                            FontId::proportional(m.theme.small),
+                            m.theme.color("muted"),
+                        );
+                        ui.painter().text(
+                            pos2(r.min.x + 200.0, y),
+                            Align2::LEFT_CENTER,
+                            b,
+                            FontId::proportional(m.theme.small),
+                            m.theme.color("text"),
+                        );
+                        ui.painter().text(
+                            pos2(r.max.x - 4.0, y),
+                            Align2::RIGHT_CENTER,
+                            c,
+                            FontId::monospace(m.theme.small),
+                            m.theme.color("text"),
+                        );
+                    }
+                    if !i.chat_label.is_empty() {
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new(&i.chat_label).size(m.theme.small).color(m.theme.color("text")));
+                    }
+                    ui.add_space(4.0);
+                    let two = PointList {
+                        rows: i
+                            .rows
+                            .iter()
+                            .enumerate()
+                            .map(|(k, t)| PointRow {
+                                name: t.clone(),
+                                tint: TINT_WHITE,
+                                mark: i.mode == 1 && (k == 0) == i.chat,
+                                ..Default::default()
+                            })
+                            .collect(),
+                        cursor: i.sel as usize - 1,
+                        focused: free && i.ranks.is_none(),
+                        help: Default::default(),
+                    };
+                    rows_got = rows(ui, m, gu, "unity rows", &two, LIST_W, false);
+                    let Some((title, order, cursor)) = &i.ranks else { return };
+                    ui.add_space(10.0);
+                    heading(ui, m, title);
+                    let list = PointList {
+                        rows: order
+                            .iter()
+                            .map(|[rk, name, pt]| PointRow {
+                                name: format!("{rk}   {name}"),
+                                tint: TINT_WHITE,
+                                level: Some((pt.clone(), TINT_WHITE)),
+                                ..Default::default()
+                            })
+                            .collect(),
+                        cursor: *cursor,
+                        focused: free,
+                        help: Default::default(),
+                    };
+                    if list.rows.is_empty() {
+                        for l in &i.waiting {
+                            ui.label(egui::RichText::new(l).size(m.theme.small).color(m.theme.color("muted")));
+                        }
+                    }
+                    ranks_got = rows(ui, m, gu, "unity ranks", &list, LIST_W, false);
+                });
             });
-        });
-    });
+        },
+    );
     if !free {
         return;
     }
@@ -281,52 +382,76 @@ fn merit_points(p: &mut Panels, w: &mut World) {
     let width = cols * (COL_W + 16.0) + if v.list.is_some() { LIST_W } else { 0.0 } + 44.0;
     let mut mouse = MeritMouse::default();
     let mut found = super::lists::found(p, w, "points");
-    p.panel("window", Some(Title { icon: Some("icons/status"), text: "Merit Points", note: note.as_deref(), name: false }), width, |ui| {
-        let limit = v.limit.unwrap_or(0);
-        let value = v.limit.map_or("----/10000".to_string(), |l| format!("{l}/10000"));
-        gauge(ui, m, limit as f32 / 10000.0, "Limit Points", &value, false);
-        ui.horizontal_top(|ui| {
-            let top = v.mode.is_none() && v.list.is_none() && v.edit.is_none();
-            let menu = MenuWin { name: merits::MENU, sel: v.menu.0, off: v.menu.1.clone(), labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
-            mouse.menu = social::column(ui, m, gu, &menu, free && top);
-            if let Some((sel, off)) = v.mode {
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/status"), text: "Merit Points", note: note.as_deref(), name: false }),
+        width,
+        |ui| {
+            let limit = v.limit.unwrap_or(0);
+            let value = v.limit.map_or("----/10000".to_string(), |l| format!("{l}/10000"));
+            gauge(ui, m, limit as f32 / 10000.0, "Limit Points", &value, false);
+            ui.horizontal_top(|ui| {
+                let top = v.mode.is_none() && v.list.is_none() && v.edit.is_none();
+                let menu = MenuWin {
+                    name: merits::MENU,
+                    sel: v.menu.0,
+                    off: v.menu.1.clone(),
+                    labels: Vec::new(),
+                    marked: Vec::new(),
+                    values: Vec::new(),
+                };
+                mouse.menu = social::column(ui, m, gu, &menu, free && top);
+                if let Some((sel, off)) = v.mode {
+                    ui.add_space(16.0);
+                    let mode = MenuWin {
+                        name: merits::MODE,
+                        sel,
+                        off: vec![off],
+                        labels: Vec::new(),
+                        marked: Vec::new(),
+                        values: Vec::new(),
+                    };
+                    mouse.mode = social::column(ui, m, gu, &mode, free && v.list.is_none());
+                }
+                let Some(l) = &v.list else { return };
                 ui.add_space(16.0);
-                let mode = MenuWin { name: merits::MODE, sel, off: vec![off], labels: Vec::new(), marked: Vec::new(), values: Vec::new() };
-                mouse.mode = social::column(ui, m, gu, &mode, free && v.list.is_none());
-            }
-            let Some(l) = &v.list else { return };
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                heading(ui, m, if v.cat == 0 { "Categories" } else { "Merits" });
-                mouse.list = rows_found(ui, m, gu, &mut found, "merit rows", l, LIST_W, v.cat != 0);
-                help(ui, m, &l.help);
-                let Some((sel, sortyn, raise, lower)) = v.edit else { return };
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    for (k, d, ok) in [(1u16, "Raise", raise), (2, "Lower", lower)] {
-                        if button(ui, m, &caption(gu, merits::EDIT, k, d), 130.0, sel == k, !ok) && free && sortyn.is_none() {
-                            mouse.edit = Some(k);
-                        }
-                    }
-                });
-                if let Some(yes) = sortyn {
-                    ui.add_space(6.0);
-                    let q = gu.menu_msg(if sel == 1 { 0x264 } else { 0x265 }, "");
-                    if !q.is_empty() {
-                        ui.label(egui::RichText::new(q).size(m.theme.small).color(m.theme.color("gold")));
-                    }
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    heading(ui, m, if v.cat == 0 { "Categories" } else { "Merits" });
+                    mouse.list = rows_found(ui, m, gu, &mut found, "merit rows", l, LIST_W, v.cat != 0);
+                    help(ui, m, &l.help);
+                    let Some((sel, sortyn, raise, lower)) = v.edit else { return };
+                    ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        for (k, d) in [(1u16, "Yes"), (2, "No")] {
-                            if button(ui, m, &caption(gu, merits::SORTYN, k, d), 130.0, yes == (k == 1), false) && free {
-                                mouse.yes = Some(k == 1);
+                        for (k, d, ok) in [(1u16, "Raise", raise), (2, "Lower", lower)] {
+                            if button(ui, m, &caption(gu, merits::EDIT, k, d), 130.0, sel == k, !ok)
+                                && free
+                                && sortyn.is_none()
+                            {
+                                mouse.edit = Some(k);
                             }
                         }
                     });
-                }
+                    if let Some(yes) = sortyn {
+                        ui.add_space(6.0);
+                        let q = gu.menu_msg(if sel == 1 { 0x264 } else { 0x265 }, "");
+                        if !q.is_empty() {
+                            ui.label(egui::RichText::new(q).size(m.theme.small).color(m.theme.color("gold")));
+                        }
+                        ui.horizontal(|ui| {
+                            for (k, d) in [(1u16, "Yes"), (2, "No")] {
+                                if button(ui, m, &caption(gu, merits::SORTYN, k, d), 130.0, yes == (k == 1), false)
+                                    && free
+                                {
+                                    mouse.yes = Some(k == 1);
+                                }
+                            }
+                        });
+                    }
+                });
             });
-        });
-    });
+        },
+    );
     if !free {
         return;
     }
@@ -360,40 +485,45 @@ fn job_points(p: &mut Panels, w: &mut World) {
     let width = SIDE_W + if v.page.is_some() { 16.0 + LIST_W } else { 0.0 } + 44.0;
     let (mut jobs, mut page, mut tab) = (None, None, None);
     let mut found = super::lists::found(p, w, "points");
-    p.panel("window", Some(Title { icon: Some("icons/status"), text: "Job Points", note: note.as_deref(), name: false }), width, |ui| {
-        let cap = v.points.map_or(0, |q| q[0]);
-        let value = v.points.map_or(String::new(), |q| format!("{}/30000", q[0]));
-        gauge(ui, m, cap as f32 / 30000.0, "Capacity Points", &value, false);
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(SIDE_W);
-                jobs = rows_found(ui, m, gu, &mut found, "jp jobs", &v.jobs, SIDE_W, false);
-                if v.page.is_none() {
-                    help(ui, m, &v.jobs.help);
-                }
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/status"), text: "Job Points", note: note.as_deref(), name: false }),
+        width,
+        |ui| {
+            let cap = v.points.map_or(0, |q| q[0]);
+            let value = v.points.map_or(String::new(), |q| format!("{}/30000", q[0]));
+            gauge(ui, m, cap as f32 / 30000.0, "Capacity Points", &value, false);
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(SIDE_W);
+                    jobs = rows_found(ui, m, gu, &mut found, "jp jobs", &v.jobs, SIDE_W, false);
+                    if v.page.is_none() {
+                        help(ui, m, &v.jobs.help);
+                    }
+                });
+                let Some((pg, l)) = &v.page else { return };
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    let tabs = super::tabs::strip(ui, m, "jp tabs", &["Job Points", "Gifts"], Some(*pg), None);
+                    if let Some(k) = tabs.iter().position(|r| r.clicked())
+                        && free
+                    {
+                        tab = Some(k);
+                    }
+                    ui.add_space(6.0);
+                    // The gifts page's header (windowps 723, "Gifts Combo Total:") with the points spent.
+                    if *pg == 1 {
+                        let head = m.caption(gu, "menu    windowps", 723).unwrap_or_else(|| "Combo Total:".into());
+                        let spent = v.points.map_or(0, |q| q[2]);
+                        heading(ui, m, &format!("{head} {spent}"));
+                    }
+                    page = rows_found(ui, m, gu, &mut found, "jp page", l, LIST_W, *pg == 0);
+                    help(ui, m, &l.help);
+                });
             });
-            let Some((pg, l)) = &v.page else { return };
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                let tabs = super::tabs::strip(ui, m, "jp tabs", &["Job Points", "Gifts"], Some(*pg), None);
-                if let Some(k) = tabs.iter().position(|r| r.clicked())
-                    && free
-                {
-                    tab = Some(k);
-                }
-                ui.add_space(6.0);
-                // The gifts page's header (windowps 723, "Gifts Combo Total:") with the points spent.
-                if *pg == 1 {
-                    let head = m.caption(gu, "menu    windowps", 723).unwrap_or_else(|| "Combo Total:".into());
-                    let spent = v.points.map_or(0, |q| q[2]);
-                    heading(ui, m, &format!("{head} {spent}"));
-                }
-                page = rows_found(ui, m, gu, &mut found, "jp page", l, LIST_W, *pg == 0);
-                help(ui, m, &l.help);
-            });
-        });
-    });
+        },
+    );
     if !free {
         return;
     }
@@ -420,24 +550,29 @@ fn alter_ego(p: &mut Panels, w: &mut World) {
     let width = SIDE_W + if v.attrs.is_some() { 16.0 + LIST_W } else { 0.0 } + 44.0;
     let (mut cats, mut attrs) = (None, None);
     let mut found = super::lists::found(p, w, "points");
-    p.panel("window", Some(Title { icon: Some("icons/status"), text: "Alter Ego Points", note: note.as_deref(), name: false }), width, |ui| {
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(SIDE_W);
-                cats = rows_found(ui, m, gu, &mut found, "ae cats", &v.cats, SIDE_W, false);
-                if v.attrs.is_none() {
-                    help(ui, m, &v.cats.help);
-                }
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/status"), text: "Alter Ego Points", note: note.as_deref(), name: false }),
+        width,
+        |ui| {
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(SIDE_W);
+                    cats = rows_found(ui, m, gu, &mut found, "ae cats", &v.cats, SIDE_W, false);
+                    if v.attrs.is_none() {
+                        help(ui, m, &v.cats.help);
+                    }
+                });
+                let Some(l) = &v.attrs else { return };
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(LIST_W);
+                    attrs = rows_found(ui, m, gu, &mut found, "ae attrs", l, LIST_W, true);
+                    help(ui, m, &l.help);
+                });
             });
-            let Some(l) = &v.attrs else { return };
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(LIST_W);
-                attrs = rows_found(ui, m, gu, &mut found, "ae attrs", l, LIST_W, true);
-                help(ui, m, &l.help);
-            });
-        });
-    });
+        },
+    );
     if !free {
         return;
     }

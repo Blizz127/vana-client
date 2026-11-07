@@ -188,7 +188,18 @@ pub fn active(w: &World) -> bool {
 /// FUN_100a38b0: Result -6 / -7 lines first, then the store by Command (only the Results each store takes), the log
 /// lines of Get / Clear / Reject, Query's answer, and the opens / closes.
 pub fn on_pbx(w: &mut World, p: Pbx) {
-    log::debug!("s2c 0x04B cmd {:#x} box {} post {} result {} res {:?} stat {} item {:#x} x{} {:?}", p.cmd, p.box_no, p.post, p.result, p.res, p.slot.stat, p.slot.item, p.slot.stack, p.slot.name);
+    log::debug!(
+        "s2c 0x04B cmd {:#x} box {} post {} result {} res {:?} stat {} item {:#x} x{} {:?}",
+        p.cmd,
+        p.box_no,
+        p.post,
+        p.result,
+        p.res,
+        p.slot.stat,
+        p.slot.item,
+        p.slot.stack,
+        p.slot.name
+    );
     match p.result {
         -6 => log_group9(w, 0x2d, 0x79),
         -7 => super::textcmd::refuse(w, 0xb9),
@@ -263,7 +274,8 @@ pub(super) fn log_group9(w: &mut World, id: usize, mode: u8) {
 /// A file 7031 line with work {slot + 1 or slot, ...} and the string parameter (FUN_100a1ab0).
 pub(super) fn system_line(w: &mut World, id: u16, work: [i32; 5], text: String) {
     let Some(bt) = w.battle.clone() else { return };
-    let ctx = crate::dat::battle::Ctx { me: w.name.clone(), work, strings: [text, String::new()], ..Default::default() };
+    let ctx =
+        crate::dat::battle::Ctx { me: w.name.clone(), work, strings: [text, String::new()], ..Default::default() };
     if let Some(line) = bt.system(id, &ctx) {
         let colour = bt.colour_in(line.mode.unwrap_or(0), &w.game);
         for l in line.lines.into_iter().filter(|l| !l.is_empty()) {
@@ -286,7 +298,13 @@ fn item_line(w: &mut World, p: &Pbx) {
         cmd::CLEAR => [0xbf, 0xc3, 0xc4],
         _ => [0xc0, 0xc5, 0xc6],
     };
-    let id = if s.item == GIL { ids[0] } else if s.stack == 1 { ids[1] } else { ids[2] };
+    let id = if s.item == GIL {
+        ids[0]
+    } else if s.stack == 1 {
+        ids[1]
+    } else {
+        ids[2]
+    };
     let text = w.battle.as_ref().and_then(|b| b.group9(if recv { 0xc1 } else { 0xc0 })).unwrap_or_default();
     system_line(w, id, [slot as i32 + 1, s.item as i32, s.stack as i32, 0, 0], text);
 }
@@ -305,7 +323,12 @@ fn gil_line(w: &mut World, slot: usize) {
     }
     let (item, sold) = (s.work_no & 0xffff, s.work_no >> 16 & 0xff);
     if (1..0xffff).contains(&item) {
-        system_line(w, if sold <= 1 { 0xab } else { 0xc7 }, [slot as i32 + 1, s.stack as i32, item as i32, sold as i32, 0], String::new());
+        system_line(
+            w,
+            if sold <= 1 { 0xab } else { 0xc7 },
+            [slot as i32 + 1, s.stack as i32, item as i32, sold as i32, 0],
+            String::new(),
+        );
     }
 }
 
@@ -315,7 +338,13 @@ fn may_open(w: &mut World) -> bool {
     if active(w) {
         return false;
     }
-    if w.win.is_some() || w.map.is_some() || w.config.is_some() || w.mogdoor.is_some() || w.magic.is_some() || w.ability.is_some() {
+    if w.win.is_some()
+        || w.map.is_some()
+        || w.config.is_some()
+        || w.mogdoor.is_some()
+        || w.magic.is_some()
+        || w.ability.is_some()
+    {
         super::textcmd::refuse(w, 0x45);
         return false;
     }
@@ -334,7 +363,20 @@ fn open_recv(w: &mut World) {
         return;
     }
     (w.post.last, w.post.recv_count) = (None, None);
-    w.post.recv_ui = Some(Recv { state: 1, slot: 0, timeout: None, count: 0, cursor: 1, last_cursor: 0, last_stat: 0, focus: RFocus::Post1, post2: 1, result: 5, no_return: false, busy: false });
+    w.post.recv_ui = Some(Recv {
+        state: 1,
+        slot: 0,
+        timeout: None,
+        count: 0,
+        cursor: 1,
+        last_cursor: 0,
+        last_stat: 0,
+        focus: RFocus::Post1,
+        post2: 1,
+        result: 5,
+        no_return: false,
+        busy: false,
+    });
     simple(w, cmd::WORK, 1, -1);
 }
 
@@ -577,7 +619,17 @@ fn open_send(w: &mut World) {
         return;
     }
     (w.post.last, w.post.send_count) = (None, None);
-    let dl = Stringdl { mode: 1, result: 0, cursor: 1, editing: false, text: String::new(), accepted: String::new(), label: 0x2e, shown: None, caret: Instant::now() };
+    let dl = Stringdl {
+        mode: 1,
+        result: 0,
+        cursor: 1,
+        editing: false,
+        text: String::new(),
+        accepted: String::new(),
+        label: 0x2e,
+        shown: None,
+        caret: Instant::now(),
+    };
     w.post.send_ui = Some(Send {
         state: 1,
         next: 0x18,
@@ -940,10 +992,10 @@ fn send_key(w: &mut World, gu: &GameUi, key: egui::Key) {
             let (mut sc, mut cu) = s.list;
             match key {
                 K::ArrowUp | K::ArrowDown => {
-                if super::items::list_keys(&mut sc, &mut cu, rows.len(), key) {
-                    w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    if super::items::list_keys(&mut sc, &mut cu, rows.len(), key) {
+                        w.sounds.push(crate::audio::Ui::Cursor as u32);
+                    }
                 }
-            }
                 K::ArrowRight | K::ArrowLeft => {
                     if super::items::page_keys(&mut sc, &mut cu, rows.len(), key == K::ArrowRight) {
                         w.sounds.push(Ui::Cursor as u32);
@@ -1227,12 +1279,21 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
         rects.extend(draw_list(gu, w, &info, (0, 0), false, None, sw, sh));
         rects.extend(draw_money(gu, w, sw, sh));
         let off: &[u16] = if r.no_return { &[3] } else { &[] };
-        if let Some(win) = gu.lobby_window_off(POST2, sw, sh, (0.0, 0.0), focused(RFocus::Post2).then_some(r.post2), focused(RFocus::Post2), off) {
+        if let Some(win) = gu.lobby_window_off(
+            POST2,
+            sw,
+            sh,
+            (0.0, 0.0),
+            focused(RFocus::Post2).then_some(r.post2),
+            focused(RFocus::Post2),
+            off,
+        ) {
             super::winhits::record(w, POST2, &win);
             let [x, y, ..] = win.frame;
             gu.disabled_children(POST2, x, y, off, focused(RFocus::Post2).then_some(r.post2));
             // FUN_1014dab0 / FUN_1014dc80: "Sender:" and the cursor slot's name (FUN_101ca250, cut at 128 px).
-            let s = w.post.recv.get((r.cursor as usize).wrapping_sub(1)).filter(|s| matches!(s.stat, 6 | 7 | 0xa..=0xe));
+            let s =
+                w.post.recv.get((r.cursor as usize).wrapping_sub(1)).filter(|s| matches!(s.stat, 6 | 7 | 0xa..=0xe));
             if let Some(s) = s {
                 let label = gu.item_msg(9, 0x33).unwrap_or_default();
                 gu.text(&label, x + 10.0, y + 6.0, 0, WHITE.to_le_bytes());
@@ -1240,9 +1301,18 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             }
             rects.push(win.frame);
         }
-        if let Some(win) = gu.lobby_window_off(POST1, sw, sh, (0.0, 0.0), focused(RFocus::Post1).then_some(r.cursor), focused(RFocus::Post1), &[]) {
+        if let Some(win) = gu.lobby_window_off(
+            POST1,
+            sw,
+            sh,
+            (0.0, 0.0),
+            focused(RFocus::Post1).then_some(r.cursor),
+            focused(RFocus::Post1),
+            &[],
+        ) {
             super::winhits::record(w, POST1, &win);
-            let slots: Vec<(u16, u32, bool)> = w.post.recv.iter().map(|s| (s.item, s.stack, matches!(s.stat, 6 | 7 | 0xa..=0xe))).collect();
+            let slots: Vec<(u16, u32, bool)> =
+                w.post.recv.iter().map(|s| (s.item, s.stack, matches!(s.stat, 6 | 7 | 0xa..=0xe))).collect();
             let cursor = focused(RFocus::Post1).then_some(r.cursor);
             draw_slots(gu, &info, POST1, win.frame, &slots, Some(9), cursor, |_| [1.0, 1.0, 1.0, 0.75]);
             rects.push(win.frame);
@@ -1255,7 +1325,15 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
     let tints: Vec<u32> = rows.iter().map(|r| picker_tint(w, r, s.on_account)).collect();
     rects.extend(draw_list(gu, w, &info, s.list, focused(SFocus::List), Some(&tints), sw, sh));
     rects.extend(draw_money(gu, w, sw, sh));
-    if let Some(win) = gu.lobby_window_off(DELIVERY, sw, sh, (0.0, 0.0), focused(SFocus::Delivery).then_some(s.cursor), focused(SFocus::Delivery), &[]) {
+    if let Some(win) = gu.lobby_window_off(
+        DELIVERY,
+        sw,
+        sh,
+        (0.0, 0.0),
+        focused(SFocus::Delivery).then_some(s.cursor),
+        focused(SFocus::Delivery),
+        &[],
+    ) {
         super::winhits::record(w, DELIVERY, &win);
         // FUN_1012e6d0: Stat 1 / 5 / 9 / 0x10 bright, 2 / 3 / 4 / 8 / 0xe / 0xf dim (0x80404040), others not drawn.
         let slots: Vec<(u16, u32, bool)> = (0..8)
@@ -1266,16 +1344,26 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Vec<[f32; 4]> {
             .collect();
         let stats: Vec<u32> = w.post.send.iter().map(|x| x.stat).collect();
         let cursor = focused(SFocus::Delivery).then_some(s.cursor);
-        draw_slots(gu, &info, DELIVERY, win.frame, &slots, Some(11), cursor, |i| if matches!(stats[i], 2..=4 | 8 | 0xe | 0xf) { [0.5, 0.5, 0.5, 1.0] } else { [1.0; 4] });
+        draw_slots(gu, &info, DELIVERY, win.frame, &slots, Some(11), cursor, |i| {
+            if matches!(stats[i], 2..=4 | 8 | 0xe | 0xf) { [0.5, 0.5, 0.5, 1.0] } else { [1.0; 4] }
+        });
         rects.push(win.frame);
     }
     // stringdl at (16, 144) (FUN_1014ef20); its buttons are drawn by code (FUN_1014f080): mode 1 keytops3 53 / 59,
     // mode 2 56 / 59, the cursor one 0x80805020.
     let dl_focus = focused(SFocus::Stringdl);
-    if let Some(win) = gu.lobby_window_off(STRINGDL, sw, sh, (16.0, 144.0), dl_focus.then_some(s.dl.cursor), dl_focus, &[2, 3]) {
+    if let Some(win) =
+        gu.lobby_window_off(STRINGDL, sw, sh, (16.0, 144.0), dl_focus.then_some(s.dl.cursor), dl_focus, &[2, 3])
+    {
         // Children 2 / 3 are hidden from the base draw (their sprites are the code's), so the layout gives their rects.
         let [x, y, ..] = win.frame;
-        let cells = gu.layout(STRINGDL).map_or(Vec::new(), |l| l.elements.iter().skip(1).map(|e| (e.id, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32])).collect());
+        let cells = gu.layout(STRINGDL).map_or(Vec::new(), |l| {
+            l.elements
+                .iter()
+                .skip(1)
+                .map(|e| (e.id, [x + e.x as f32, y + e.y as f32, e.w as f32, e.h as f32]))
+                .collect()
+        });
         super::winhits::record_rects(w, STRINGDL, win.frame, cells);
         let [x, y, ..] = win.frame;
         let label = gu.item_msg(9, s.dl.label).unwrap_or_default();
@@ -1334,16 +1422,40 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
             return;
         }
         match r.focus {
-            RFocus::Post1 => generic(w, gu, POST1, r.cursor, 1..=8, p, moved, clicked, right, |w, id| {
-                if let Some(r) = w.post.recv_ui.as_mut() {
-                    r.cursor = id;
-                }
-            }, keys),
-            RFocus::Post2 => generic(w, gu, POST2, r.post2, 1..=3, p, moved, clicked, right, |w, id| {
-                if let Some(r) = w.post.recv_ui.as_mut() {
-                    r.post2 = id;
-                }
-            }, keys),
+            RFocus::Post1 => generic(
+                w,
+                gu,
+                POST1,
+                r.cursor,
+                1..=8,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(r) = w.post.recv_ui.as_mut() {
+                        r.cursor = id;
+                    }
+                },
+                keys,
+            ),
+            RFocus::Post2 => generic(
+                w,
+                gu,
+                POST2,
+                r.post2,
+                1..=3,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(r) = w.post.recv_ui.as_mut() {
+                        r.post2 = id;
+                    }
+                },
+                keys,
+            ),
         }
         return;
     }
@@ -1354,18 +1466,42 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     match s.focus {
         SFocus::Delivery => {
             let last = if s.state == 0x10 { 10 } else { 11 };
-            generic(w, gu, DELIVERY, s.cursor, 1..=last, p, moved, clicked, right, |w, id| {
-                if let Some(s) = w.post.send_ui.as_mut() {
-                    s.cursor = id;
-                }
-            }, keys);
+            generic(
+                w,
+                gu,
+                DELIVERY,
+                s.cursor,
+                1..=last,
+                p,
+                moved,
+                clicked,
+                right,
+                |w, id| {
+                    if let Some(s) = w.post.send_ui.as_mut() {
+                        s.cursor = id;
+                    }
+                },
+                keys,
+            );
         }
         SFocus::Stringdl if s.dl.editing => {}
-        SFocus::Stringdl => generic(w, gu, STRINGDL, s.dl.cursor, 1..=3, p, moved, clicked, right, |w, id| {
-            if let Some(s) = w.post.send_ui.as_mut() {
-                s.dl.cursor = id;
-            }
-        }, keys),
+        SFocus::Stringdl => generic(
+            w,
+            gu,
+            STRINGDL,
+            s.dl.cursor,
+            1..=3,
+            p,
+            moved,
+            clicked,
+            right,
+            |w, id| {
+                if let Some(s) = w.post.send_ui.as_mut() {
+                    s.dl.cursor = id;
+                }
+            },
+            keys,
+        ),
         SFocus::List => {
             let (scroll, cursor) = s.list;
             let row = picker_row(gu, sw, sh, p);
@@ -1425,7 +1561,16 @@ fn clipped(gu: &mut GameUi, s: &str, x: f32, y: f32, max: f32, tint: u32) {
 /// items but gil; the cursor cell shifted by (-1, -1)) and the gil total (FUN_10140910: "N  G" right-aligned at the gil
 /// child's right edge + 10, always drawn).
 #[allow(clippy::too_many_arguments)]
-pub(super) fn draw_slots(gu: &mut GameUi, info: &super::items::ItemCache, name: &str, frame: [f32; 4], slots: &[(u16, u32, bool)], gil_child: Option<u16>, cursor: Option<u16>, tint: impl Fn(usize) -> [f32; 4]) {
+pub(super) fn draw_slots(
+    gu: &mut GameUi,
+    info: &super::items::ItemCache,
+    name: &str,
+    frame: [f32; 4],
+    slots: &[(u16, u32, bool)],
+    gil_child: Option<u16>,
+    cursor: Option<u16>,
+    tint: impl Fn(usize) -> [f32; 4],
+) {
     let Some(l) = gu.layout(name).cloned() else { return };
     let [x, y, ..] = frame;
     super::items::upload_icons(gu, info, slots.iter().filter(|s| s.2 && s.0 != 0).map(|s| s.0));
@@ -1472,7 +1617,8 @@ pub(super) fn picker_row(gu: &GameUi, sw: f32, sh: f32, p: (f32, f32)) -> Option
     let mut r = gu.window_rect("menu    inventor", sw, sh)?;
     r[0] += 200.0 - gu.window_rect_x("menu    inventor");
     let row = ((p.1 - r[1] - 4.0) / crate::inventory::ROW_PITCH).floor();
-    (p.0 >= r[0] && p.0 < r[0] + r[2] && row >= 0.0 && (row as usize) < crate::inventory::VISIBLE_ROWS).then_some(row as usize)
+    (p.0 >= r[0] && p.0 < r[0] + r[2] && row >= 0.0 && (row as usize) < crate::inventory::VISIBLE_ROWS)
+        .then_some(row as usize)
 }
 
 /// A list's (scroll, cursor) with row `k` under the cursor, as the list keys would leave it.
@@ -1483,7 +1629,16 @@ pub(super) fn list_at(k: usize) -> (usize, usize) {
 
 /// The inventory list moved to x 200 (the source's +4): the picker with its colours, or look-only.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn draw_list(gu: &mut GameUi, w: &World, info: &super::items::ItemCache, list: (usize, usize), focused: bool, tints: Option<&[u32]>, sw: f32, sh: f32) -> Option<[f32; 4]> {
+pub(super) fn draw_list(
+    gu: &mut GameUi,
+    w: &World,
+    info: &super::items::ItemCache,
+    list: (usize, usize),
+    focused: bool,
+    tints: Option<&[u32]>,
+    sw: f32,
+    sh: f32,
+) -> Option<[f32; 4]> {
     draw_rows(gu, &picker_rows(w), info, list, focused, tints, sw, sh)
 }
 
@@ -1510,7 +1665,16 @@ pub(super) fn picker_bar(w: &mut World, m: super::scrollbar::Msg) -> bool {
 
 /// The inventory list at x 200 over some rows.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn draw_rows(gu: &mut GameUi, rows: &[crate::inventory::Slot], info: &super::items::ItemCache, (scroll, cursor): (usize, usize), focused: bool, tints: Option<&[u32]>, sw: f32, sh: f32) -> Option<[f32; 4]> {
+pub(super) fn draw_rows(
+    gu: &mut GameUi,
+    rows: &[crate::inventory::Slot],
+    info: &super::items::ItemCache,
+    (scroll, cursor): (usize, usize),
+    focused: bool,
+    tints: Option<&[u32]>,
+    sw: f32,
+    sh: f32,
+) -> Option<[f32; 4]> {
     let mut built = crate::inventory::build_rows(rows, info, false);
     for (k, (r, s)) in built.iter_mut().zip(rows).enumerate() {
         r.tint = match tints {
@@ -1518,7 +1682,11 @@ pub(super) fn draw_rows(gu: &mut GameUi, rows: &[crate::inventory::Slot], info: 
             // FUN_1014c690: NoDelivery or equipped grey.
             None => {
                 let flags = info.item(s.id).map_or(0, |it| it.flags);
-                if flags & 0x2000 != 0 || s.equipped { crate::inventory::TINT_DIM } else { crate::inventory::TINT_WHITE }
+                if flags & 0x2000 != 0 || s.equipped {
+                    crate::inventory::TINT_DIM
+                } else {
+                    crate::inventory::TINT_WHITE
+                }
             }
         };
     }
@@ -1532,9 +1700,31 @@ pub(super) fn draw_rows(gu: &mut GameUi, rows: &[crate::inventory::Slot], info: 
         if let Some(e) = m.elements.first_mut() {
             e.x = 200;
         }
-        let [x, y, h] = crate::render::invwin::push_item_list(b, ui, style, font, GameUi::ATLAS, &m, &list, sw, sh, frame, 3.0, focused, crate::render::invwin::INVENTOR_BAR);
+        let [x, y, h] = crate::render::invwin::push_item_list(
+            b,
+            ui,
+            style,
+            font,
+            GameUi::ATLAS,
+            &m,
+            &list,
+            sw,
+            sh,
+            frame,
+            3.0,
+            focused,
+            crate::render::invwin::INVENTOR_BAR,
+        );
         if focused {
-            gu.bar_site(super::scrollbar::Owner::Picker, x, y, h, list.rows.len(), crate::inventory::VISIBLE_ROWS, list.scroll);
+            gu.bar_site(
+                super::scrollbar::Owner::Picker,
+                x,
+                y,
+                h,
+                list.rows.len(),
+                crate::inventory::VISIBLE_ROWS,
+                list.scroll,
+            );
         }
     }
     let mut r = gu.window_rect("menu    inventor", sw, sh)?;
@@ -1588,8 +1778,20 @@ pub(super) fn look(w: &World) -> Option<Look> {
             let x = &w.post.recv[i];
             (x.item, x.stack, matches!(x.stat, 6 | 7 | 0xa..=0xe), false)
         });
-        let sender = w.post.recv.get((r.cursor as usize).wrapping_sub(1)).filter(|x| matches!(x.stat, 6 | 7 | 0xa..=0xe)).map(|x| x.name.clone());
-        return Some(Look::Recv { slots, cursor: r.cursor, post2: (r.focus == RFocus::Post2).then_some(r.post2), no_return: r.no_return, sender, busy: r.busy || r.state == 0x12 });
+        let sender = w
+            .post
+            .recv
+            .get((r.cursor as usize).wrapping_sub(1))
+            .filter(|x| matches!(x.stat, 6 | 7 | 0xa..=0xe))
+            .map(|x| x.name.clone());
+        return Some(Look::Recv {
+            slots,
+            cursor: r.cursor,
+            post2: (r.focus == RFocus::Post2).then_some(r.post2),
+            no_return: r.no_return,
+            sender,
+            busy: r.busy || r.state == 0x12,
+        });
     }
     let s = w.post.send_ui.as_ref()?;
     let slots = std::array::from_fn(|i| {

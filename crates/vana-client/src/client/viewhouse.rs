@@ -118,7 +118,9 @@ pub fn key(w: &mut World, gu: &GameUi, key: egui::Key) {
         K::ArrowUp | K::ArrowDown => {
             let k = if key == K::ArrowUp { 2 } else { 3 };
             let to = gu.menu_links(WIN, sel).map_or(sel, |l| l[k] as u16);
-            if to != sel && to != 0 && to != 0xff
+            if to != sel
+                && to != 0
+                && to != 0xff
                 && let Some(v) = w.viewhouse.as_mut()
             {
                 v.sel = to;
@@ -169,7 +171,8 @@ pub fn pointer(w: &mut World, gu: &GameUi, sw: f32, sh: f32, p: (f32, f32), move
     });
     let Some(e) = hit else { return };
     gu.hover.set(true);
-    if (moved || clicked) && e.id != sel
+    if (moved || clicked)
+        && e.id != sel
         && let Some(v) = w.viewhouse.as_mut()
     {
         v.sel = e.id;

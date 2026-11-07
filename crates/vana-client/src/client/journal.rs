@@ -52,7 +52,11 @@ impl Store {
     pub fn record(&mut self, port: u16, d: [u32; 8]) {
         let bit = match (port, area_port(port)) {
             (_, Some((a, done))) => {
-                if done { self.completed[a] = d } else { self.current[a] = d }
+                if done {
+                    self.completed[a] = d
+                } else {
+                    self.current[a] = d
+                }
                 a + if done { 11 } else { 0 }
             }
             (0xd0, _) => {
@@ -103,7 +107,8 @@ fn bit(words: &[u32], n: usize) -> bool {
 }
 
 /// The mission logs' titles (group 0xd), file order as dat::journal::MISSION_FILES.
-pub const MISSION_TITLES: [usize; 15] = [0x15, 0x16, 0x17, 0x18, 0x83, 0x86, 0x87, 0x8f, 0x90, 0x9f, 0xb7, 0xbc, 0x98, 0x99, 0x9a];
+pub const MISSION_TITLES: [usize; 15] =
+    [0x15, 0x16, 0x17, 0x18, 0x83, 0x86, 0x87, 0x8f, 0x90, 0x9f, 0xb7, 0xbc, 0x98, 0x99, 0x9a];
 /// DAT_10386984: the expansion bit each log needs (0 = always).
 pub const MISSION_BITS: [u32; 15] = [0, 0, 0, 1, 2, 3, 3, 4, 4, 0xb, 0, 0, 5, 6, 7];
 
@@ -144,7 +149,11 @@ pub fn current(s: &Store, log: usize, f: &LogFile) -> Result<usize, usize> {
         3 => idx(s.rotz as usize),
         4 => {
             let target = if s.cop == 0 && s.tales & 8 != 0 { 1000 } else { s.cop };
-            f.entries.iter().position(|e| e.number == target).or_else(|| (0..n).filter(|&i| f.entries[i].number <= target).max_by_key(|&i| f.entries[i].number)).ok_or(0x39)
+            f.entries
+                .iter()
+                .position(|e| e.number == target)
+                .or_else(|| (0..n).filter(|&i| f.entries[i].number <= target).max_by_key(|&i| f.entries[i].number))
+                .ok_or(0x39)
         }
         // Area 6's current words 4..7: Assault, ToAU, Campaign, WotG.
         5 | 7 if s.current[6][if log == 5 { 4 } else { 7 }] == 0 => none,
@@ -237,7 +246,9 @@ mod tests {
     use crate::dat::journal::Entry;
 
     fn file(nums: &[u32]) -> LogFile {
-        LogFile { entries: nums.iter().map(|&n| Entry { number: n, name: format!("m{n}"), desc: String::new() }).collect() }
+        LogFile {
+            entries: nums.iter().map(|&n| Entry { number: n, name: format!("m{n}"), desc: String::new() }).collect(),
+        }
     }
 
     #[test]
@@ -264,13 +275,19 @@ mod tests {
         assert_eq!(current(&s, 1, &f), Err(0x39));
         s.nation_mission = 2;
         s.nations_done[2] = 0b11;
-        assert_eq!(mission_rows(&s, 1, &f), vec![Row::CurHead, Row::Current(2), Row::DoneHead, Row::Done(0), Row::Done(1)]);
+        assert_eq!(
+            mission_rows(&s, 1, &f),
+            vec![Row::CurHead, Row::Current(2), Row::DoneHead, Row::Done(0), Row::Done(1)]
+        );
         // CoP at "The Road Forks" (325) with path nibbles 1 and 0; "<=" lists the current one as done too.
         let cop = file(&[300, 325, 330, 331, 332, 340, 341]);
         s.cop = 0x145;
         s.cop_sub = 0x01;
         assert_eq!(current(&s, 4, &cop), Ok(1));
-        assert_eq!((0..7).map(|i| completed(&s, 4, &cop, i)).collect::<Vec<_>>(), [true, true, true, true, false, true, false]);
+        assert_eq!(
+            (0..7).map(|i| completed(&s, 4, &cop, i)).collect::<Vec<_>>(),
+            [true, true, true, true, false, true, false]
+        );
         // SoA: done once the next entry's number is reached; 0 with the declined flag counts as 1000.
         let soa = file(&[10, 10, 20, 30, 1000]);
         s.soa = 20;
@@ -291,7 +308,8 @@ mod tests {
     fn log_cycle() {
         let s = Store { rov: 100, ..Default::default() };
         // Only bit 0 (and 1 Zilart): 0 1 2 3 10 then back to 0 (TVR waits for RoV 340).
-        let order: Vec<usize> = std::iter::successors(Some(0), |&l| Some(next_log(&s, l, 0b11, true))).take(6).collect();
+        let order: Vec<usize> =
+            std::iter::successors(Some(0), |&l| Some(next_log(&s, l, 0b11, true))).take(6).collect();
         assert_eq!(order, [0, 1, 2, 3, 10, 0]);
         assert_eq!(next_log(&s, 0, 0b11, false), 10);
         assert_eq!(indent("__Name"), ("Name", 2));

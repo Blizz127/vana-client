@@ -58,7 +58,11 @@ impl GroundTilt {
             n
         } else {
             let ax = UP.cross(n).normalize_or_zero();
-            if ax == Vec3::ZERO { UP } else { (Quat::from_axis_angle(ax, std::f32::consts::FRAC_PI_6) * UP).normalize() }
+            if ax == Vec3::ZERO {
+                UP
+            } else {
+                (Quat::from_axis_angle(ax, std::f32::consts::FRAC_PI_6) * UP).normalize()
+            }
         };
         let b = (UP * (1.0 - self.w) + nc * self.w).normalize_or_zero();
         self.e = (b * t + self.e * (1.0 - t)).normalize_or_zero();
@@ -103,13 +107,19 @@ mod tests {
             let mut t = GroundTilt::default();
             let m = t.step(zf, Vec3::ONE, SQUARE, 0.1875);
             let plain = Mat3::from_rotation_y(yaw);
-            assert!((m.x_axis - plain.x_axis).length() < 1e-5 && (m.z_axis - plain.z_axis).length() < 1e-5 && (m.y_axis - Vec3::Y).length() < 1e-5);
+            assert!(
+                (m.x_axis - plain.x_axis).length() < 1e-5
+                    && (m.z_axis - plain.z_axis).length() < 1e-5
+                    && (m.y_axis - Vec3::Y).length() < 1e-5
+            );
         }
         let mut t = GroundTilt { n: slope(20.0), ..Default::default() };
-        let got: Vec<f32> = (0..4).map(|_| {
-            t.step(Vec3::Z, Vec3::ONE, SQUARE, 0.1875);
-            angle(t.e)
-        }).collect();
+        let got: Vec<f32> = (0..4)
+            .map(|_| {
+                t.step(Vec3::Z, Vec3::ONE, SQUARE, 0.1875);
+                angle(t.e)
+            })
+            .collect();
         for (g, want) in got.iter().zip([0.0, 3.711, 6.744, 9.218]) {
             assert!((g - want).abs() < 0.01, "{got:?}");
         }

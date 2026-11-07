@@ -27,13 +27,17 @@ impl Look {
 }
 
 fn info(lua: &Lua) -> std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>> {
-    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>().map(|f| f.clone()).unwrap_or_default()
+    lua.app_data_ref::<std::rc::Rc<std::cell::RefCell<super::state::FrameInfo>>>()
+        .map(|f| f.clone())
+        .unwrap_or_default()
 }
 
 pub(super) fn colour(v: Value) -> mlua::Result<Option<[u8; 4]>> {
     Ok(match v {
         Value::Table(t) => {
-            let get = |k: &str, i: i64, d: u8| -> mlua::Result<u8> { Ok(t.get::<Option<u8>>(k)?.or(t.get::<Option<u8>>(i)?).unwrap_or(d)) };
+            let get = |k: &str, i: i64, d: u8| -> mlua::Result<u8> {
+                Ok(t.get::<Option<u8>>(k)?.or(t.get::<Option<u8>>(i)?).unwrap_or(d))
+            };
             Some([get("r", 1, 255)?, get("g", 2, 255)?, get("b", 3, 255)?, get("a", 4, 255)?])
         }
         _ => None,
@@ -56,7 +60,9 @@ pub(super) fn install(lua: &Lua, g: &Table, mod_id: &str) -> mlua::Result<()> {
             };
             let tint = match s.get::<Value>("tint")? {
                 Value::Table(c) => {
-                    let get = |k: &str, i: i64| -> mlua::Result<f32> { Ok(c.get::<Option<f32>>(k)?.or(c.get::<Option<f32>>(i)?).unwrap_or(1.0)) };
+                    let get = |k: &str, i: i64| -> mlua::Result<f32> {
+                        Ok(c.get::<Option<f32>>(k)?.or(c.get::<Option<f32>>(i)?).unwrap_or(1.0))
+                    };
                     Some([get("r", 1)?, get("g", 2)?, get("b", 3)?])
                 }
                 _ => None,
@@ -112,7 +118,9 @@ pub(super) fn install(lua: &Lua, g: &Table, mod_id: &str) -> mlua::Result<()> {
         lua.create_function(move |lua, (id, params): (String, Vec<Table>)| {
             let info = info(lua);
             let mut f = info.borrow_mut();
-            let Some(s) = f.shaders.iter_mut().find(|s| s.0 == me && s.1 == id) else { return Err(mlua::Error::runtime(format!("no shader {id}"))) };
+            let Some(s) = f.shaders.iter_mut().find(|s| s.0 == me && s.1 == id) else {
+                return Err(mlua::Error::runtime(format!("no shader {id}")));
+            };
             // Each a {x, y, z, w} or a plain list; a value left out keeps what it was.
             for (k, v) in params.iter().take(4).enumerate() {
                 for (j, name) in ["x", "y", "z", "w"].into_iter().enumerate() {

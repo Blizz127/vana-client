@@ -238,11 +238,23 @@ pub fn draw(gu: &mut GameUi, w: &World, sw: f32, sh: f32) -> Option<[f32; 4]> {
 /// The mouse (winhits.rs): the generic window.
 pub fn pointer(w: &mut World, gu: &GameUi, p: (f32, f32), moved: bool, clicked: bool, right: bool) {
     let Some(c) = w.charlnk.as_ref() else { return };
-    super::winhits::generic(w, gu, CHARLNK, c.cursor, 1..=9, p, moved, clicked, right, |w, id| {
-        if let Some(c) = w.charlnk.as_mut() {
-            c.cursor = id;
-        }
-    }, |w, _, k| key(w, k));
+    super::winhits::generic(
+        w,
+        gu,
+        CHARLNK,
+        c.cursor,
+        1..=9,
+        p,
+        moved,
+        clicked,
+        right,
+        |w, id| {
+            if let Some(c) = w.charlnk.as_mut() {
+                c.cursor = id;
+            }
+        },
+        |w, _, k| key(w, k),
+    );
 }
 
 /// Help slot 1 and the title: the row's own.

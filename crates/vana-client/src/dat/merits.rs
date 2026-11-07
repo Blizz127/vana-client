@@ -74,7 +74,11 @@ impl MeritTables {
     /// FUN_10161070 (text code 7f b0): below 0x20 the category at that list position, else the merit record keyed
     /// `id`.
     pub fn name_of_id(&self, id: u16) -> Option<String> {
-        let n = if id < 0x20 { self.at(id).filter(|c| c.cap != 0)?.name } else { self.keys.get(id as usize).copied().filter(|&k| k == id)? };
+        let n = if id < 0x20 {
+            self.at(id).filter(|c| c.cap != 0)?.name
+        } else {
+            self.keys.get(id as usize).copied().filter(|&k| k == id)?
+        };
         Some(self.name(n)).filter(|t| !t.is_empty())
     }
 }

@@ -2,8 +2,8 @@
 //! slots (their numbers in the band colours) and the known spells side by side with every row, the spell's help under
 //! them; Refine by Type (bluesibo) as a list in the spells' place while it is open.
 
-use super::super::bluset::{self, RowLook};
 use super::super::World;
+use super::super::bluset::{self, RowLook};
 use super::super::game_ui::GameUi;
 use super::craft::tint;
 use super::{Panels, STRONG, Title};
@@ -15,13 +15,26 @@ const ICON: f32 = 20.0;
 const TALL: f32 = 12.0 * (ROW + 2.0);
 
 fn heading(ui: &mut Ui, m: &super::Modern, text: &str) {
-    ui.label(egui::RichText::new(text).size(m.theme.small).family(FontFamily::Name(STRONG.into())).color(m.theme.color("gold")));
+    ui.label(
+        egui::RichText::new(text)
+            .size(m.theme.small)
+            .family(FontFamily::Name(STRONG.into()))
+            .color(m.theme.color("gold")),
+    );
     ui.add_space(4.0);
 }
 
 /// A list's rows: the slot number, the spell's icon (`icons`: the room for one), the text in its tint; the cursor's
 /// kept in view; clicks where `clicks`. The row clicked.
-fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, rows: &[RowLook], cursor: usize, (focused, clicks, icons): (bool, bool, bool)) -> Option<usize> {
+fn rows(
+    ui: &mut Ui,
+    m: &super::Modern,
+    gu: &GameUi,
+    salt: &str,
+    rows: &[RowLook],
+    cursor: usize,
+    (focused, clicks, icons): (bool, bool, bool),
+) -> Option<usize> {
     let ctx = ui.ctx().clone();
     let seen = egui::Id::unique((salt, "bluset cursor seen"));
     let follow = ctx.data(|d| d.get_temp::<usize>(seen)) != Some(cursor);
@@ -29,7 +42,8 @@ fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, rows: &[RowLook
     let mut click = None;
     egui::ScrollArea::vertical().id_salt(salt).max_height(TALL).auto_shrink([false, true]).show(ui, |ui| {
         for (k, r) in rows.iter().enumerate() {
-            let (rect, resp) = ui.allocate_exact_size(vec2(COL_W - 14.0, ROW), if clicks { Sense::click() } else { Sense::hover() });
+            let (rect, resp) =
+                ui.allocate_exact_size(vec2(COL_W - 14.0, ROW), if clicks { Sense::click() } else { Sense::hover() });
             let face = match () {
                 _ if k == cursor && focused => "controls/list_row_selected",
                 _ if k == cursor || clicks && resp.hovered() => "controls/list_row_hover",
@@ -39,17 +53,34 @@ fn rows(ui: &mut Ui, m: &super::Modern, gu: &GameUi, salt: &str, rows: &[RowLook
             let y = rect.center().y;
             let mut x = rect.min.x + 24.0;
             if let Some((n, band)) = r.number {
-                ui.painter().text(pos2(x, y), Align2::LEFT_CENTER, n.to_string(), FontId::monospace(m.theme.small), tint(m, band));
+                ui.painter().text(
+                    pos2(x, y),
+                    Align2::LEFT_CENTER,
+                    n.to_string(),
+                    FontId::monospace(m.theme.small),
+                    tint(m, band),
+                );
                 x += 22.0;
             }
             if let Some(t) = r.icon.and_then(|i| m.sprite_icon(&ctx, gu, "menu    magiconw", i)) {
-                ui.painter().image(t, Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                ui.painter().image(
+                    t,
+                    Rect::from_center_size(pos2(x + ICON / 2.0, y), vec2(ICON, ICON)),
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
             }
             if icons {
                 x += ICON + 6.0;
             }
             let clip = Rect::from_min_max(rect.min, pos2(rect.max.x - 8.0, rect.max.y));
-            ui.painter().with_clip_rect(clip).text(pos2(x, y), Align2::LEFT_CENTER, &r.text, FontId::proportional(m.theme.small), tint(m, r.tint));
+            ui.painter().with_clip_rect(clip).text(
+                pos2(x, y),
+                Align2::LEFT_CENTER,
+                &r.text,
+                FontId::proportional(m.theme.small),
+                tint(m, r.tint),
+            );
             if k == cursor && follow {
                 ui.scroll_to_rect(rect, None);
             }
@@ -75,43 +106,81 @@ pub fn draw(p: &mut Panels, w: &mut World) {
     let title = gu.title_msg(0x8d).unwrap_or_else(|| "Blue Magic".into());
     let (mut equip, mut inven, mut sibo) = (None, None, None);
     let mut found = super::lists::found(p, w, "bluset");
-    p.panel("window", Some(Title { icon: Some("icons/magic"), text: &title, note: Some(&note), name: false }), 2.0 * COL_W + 16.0 + 44.0, |ui| {
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(COL_W);
-                heading(ui, m, "Set Spells");
-                // The other list's rows take a click only while nothing is picked (its focus moves first).
-                equip = rows(ui, m, gu, "bluset slots", &v.equip.0, v.equip.1, (open && v.on_equip, open && (v.on_equip || !v.picking), true));
-            });
-            ui.add_space(16.0);
-            ui.vertical(|ui| {
-                ui.set_width(COL_W);
-                match &v.sibo {
-                    Some((families, r)) => {
-                        heading(ui, m, &gu.focus_text("menu    bluesibo", 0)[1].clone().unwrap_or_else(|| "Type".into()));
-                        let fam: Vec<RowLook> = families.iter().map(|f| RowLook { number: None, icon: None, text: f.clone(), tint: crate::inventory::TINT_WHITE }).collect();
-                        sibo = rows(ui, m, gu, "bluset sibo", &fam, *r as usize - 1, (free, free, false));
-                    }
-                    None => {
-                        heading(ui, m, "Spells");
-                        if super::lists::rows_or(ui, m, &mut found) {
-                            return;
+    p.panel(
+        "window",
+        Some(Title { icon: Some("icons/magic"), text: &title, note: Some(&note), name: false }),
+        2.0 * COL_W + 16.0 + 44.0,
+        |ui| {
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(COL_W);
+                    heading(ui, m, "Set Spells");
+                    // The other list's rows take a click only while nothing is picked (its focus moves first).
+                    equip = rows(
+                        ui,
+                        m,
+                        gu,
+                        "bluset slots",
+                        &v.equip.0,
+                        v.equip.1,
+                        (open && v.on_equip, open && (v.on_equip || !v.picking), true),
+                    );
+                });
+                ui.add_space(16.0);
+                ui.vertical(|ui| {
+                    ui.set_width(COL_W);
+                    match &v.sibo {
+                        Some((families, r)) => {
+                            heading(
+                                ui,
+                                m,
+                                &gu.focus_text("menu    bluesibo", 0)[1].clone().unwrap_or_else(|| "Type".into()),
+                            );
+                            let fam: Vec<RowLook> = families
+                                .iter()
+                                .map(|f| RowLook {
+                                    number: None,
+                                    icon: None,
+                                    text: f.clone(),
+                                    tint: crate::inventory::TINT_WHITE,
+                                })
+                                .collect();
+                            sibo = rows(ui, m, gu, "bluset sibo", &fam, *r as usize - 1, (free, free, false));
                         }
-                        inven = rows(ui, m, gu, "bluset spells", &v.inven.0, v.inven.1, (open && !v.on_equip, open && (!v.on_equip || !v.picking), true));
+                        None => {
+                            heading(ui, m, "Spells");
+                            if super::lists::rows_or(ui, m, &mut found) {
+                                return;
+                            }
+                            inven = rows(
+                                ui,
+                                m,
+                                gu,
+                                "bluset spells",
+                                &v.inven.0,
+                                v.inven.1,
+                                (open && !v.on_equip, open && (!v.on_equip || !v.picking), true),
+                            );
+                        }
                     }
-                }
+                });
             });
-        });
-        if let Some([name, head, desc, foot]) = &v.help {
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(name).size(m.theme.small).family(FontFamily::Name(STRONG.into())).color(m.theme.color("gold")));
-                ui.label(egui::RichText::new(head).size(m.theme.small).color(m.theme.color("muted")));
-            });
-            super::gametext::label(ui, m, desc, m.theme.small, m.theme.color("text"));
-            ui.label(egui::RichText::new(foot).size(m.theme.small).color(m.theme.color("muted")));
-        }
-    });
+            if let Some([name, head, desc, foot]) = &v.help {
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(name)
+                            .size(m.theme.small)
+                            .family(FontFamily::Name(STRONG.into()))
+                            .color(m.theme.color("gold")),
+                    );
+                    ui.label(egui::RichText::new(head).size(m.theme.small).color(m.theme.color("muted")));
+                });
+                super::gametext::label(ui, m, desc, m.theme.small, m.theme.color("text"));
+                ui.label(egui::RichText::new(foot).size(m.theme.small).color(m.theme.color("muted")));
+            }
+        },
+    );
     if !free {
         return;
     }

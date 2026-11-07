@@ -29,7 +29,9 @@ pub struct Saved {
 /// The releases after `from` up to `to`, newest first (drafts and pre-releases left out).
 pub fn fetch(from: &str, to: &str) -> Result<Vec<Note>> {
     // VANA_RELEASES_API: another endpoint for the test drives (a local mock of the GitHub answer).
-    let url = std::env::var("VANA_RELEASES_API").unwrap_or_else(|_| format!("https://api.github.com/repos/{}/releases?per_page=50", super::updater::RELEASE_REPO));
+    let url = std::env::var("VANA_RELEASES_API").unwrap_or_else(|_| {
+        format!("https://api.github.com/repos/{}/releases?per_page=50", super::updater::RELEASE_REPO)
+    });
     let v: serde_json::Value = serde_json::from_str(&super::updater::get_text(&url)?)?;
     Ok(between(&v, from, to))
 }
@@ -43,7 +45,11 @@ fn between(v: &serde_json::Value, from: &str, to: &str) -> Vec<Note> {
         .filter_map(|r| {
             let tag = r["tag_name"].as_str()?.to_string();
             let date = r["published_at"].as_str().unwrap_or_default().chars().take(10).collect();
-            (newer(&tag, from) && !newer(&tag, to)).then(|| Note { tag, date, body: r["body"].as_str().unwrap_or_default().to_string() })
+            (newer(&tag, from) && !newer(&tag, to)).then(|| Note {
+                tag,
+                date,
+                body: r["body"].as_str().unwrap_or_default().to_string(),
+            })
         })
         .collect();
     out.sort_by(|a, b| {
@@ -110,7 +116,8 @@ pub fn fetch_since(seen: String) -> Fetch {
     let o = out.clone();
     std::thread::spawn(move || {
         let me = env!("CARGO_PKG_VERSION");
-        let r = if seen.is_empty() { fetch("0", me).map(|n| n.into_iter().take(1).collect()) } else { fetch(&seen, me) };
+        let r =
+            if seen.is_empty() { fetch("0", me).map(|n| n.into_iter().take(1).collect()) } else { fetch(&seen, me) };
         *o.lock().unwrap() = match r {
             Ok(notes) => Some((!notes.is_empty()).then(|| Saved { from: seen, to: me.into(), notes })),
             Err(e) => {
@@ -136,7 +143,11 @@ pub enum Block {
     Release(String, String),
     Heading(u8, Vec<Span>),
     /// A paragraph (depth 0) or a list item's text (its list depth), with the item's bullet on its first paragraph.
-    Text { depth: u8, bullet: bool, spans: Vec<Span> },
+    Text {
+        depth: u8,
+        bullet: bool,
+        spans: Vec<Span>,
+    },
     /// A fenced or indented code block, a line each.
     Code(Vec<String>),
     /// Rows of cells (the first the header).
@@ -213,7 +224,9 @@ pub fn parse(md: &str) -> Vec<Block> {
                 flush(&mut out, &mut spans, depth, &mut bullet);
                 bullet = true;
             }
-            Event::End(TagEnd::Item | TagEnd::Paragraph | TagEnd::BlockQuote(_)) => flush(&mut out, &mut spans, depth, &mut bullet),
+            Event::End(TagEnd::Item | TagEnd::Paragraph | TagEnd::BlockQuote(_)) => {
+                flush(&mut out, &mut spans, depth, &mut bullet)
+            }
             Event::Start(Tag::CodeBlock(_)) => {
                 flush(&mut out, &mut spans, depth, &mut bullet);
                 code = Some(String::new());
@@ -329,7 +342,15 @@ const H: f32 = 440.0;
 impl NotesUi {
     pub fn open(saved: Saved) -> Self {
         let blocks = blocks(&saved.notes);
-        Self { saved, blocks, scroll: 0.0, metrics: Cell::new(Metrics::default()), zoom: 1.0, classic: RefCell::new(None), grab: None }
+        Self {
+            saved,
+            blocks,
+            scroll: 0.0,
+            metrics: Cell::new(Metrics::default()),
+            zoom: 1.0,
+            classic: RefCell::new(None),
+            grab: None,
+        }
     }
 
     pub fn title(&self) -> String {
@@ -337,7 +358,8 @@ impl NotesUi {
     }
 
     pub fn help(&self) -> String {
-        "What changed since your last version. Up / Down, Page Up / Page Down or the wheel scrolls; Enter closes.".into()
+        "What changed since your last version. Up / Down, Page Up / Page Down or the wheel scrolls; Enter closes."
+            .into()
     }
 
     fn scroll_by(&mut self, d: f32) -> bool {
@@ -459,7 +481,12 @@ impl NotesUi {
         }
         let lines = &cache.as_ref().unwrap().1;
         let page = (th / 16.0).floor().max(1.0) as usize;
-        self.metrics.set(Metrics { step: 1.0, page: page.saturating_sub(1).max(1) as f32, max: lines.len().saturating_sub(page) as f32, view: page as f32 });
+        self.metrics.set(Metrics {
+            step: 1.0,
+            page: page.saturating_sub(1).max(1) as f32,
+            max: lines.len().saturating_sub(page) as f32,
+            view: page as f32,
+        });
         let top = (self.scroll as usize).min(lines.len().saturating_sub(page));
         for (k, l) in lines.iter().skip(top).take(page).enumerate() {
             let ly = ty + 16.0 * k as f32;
@@ -497,7 +524,13 @@ fn coded(spans: &[Span]) -> String {
     use crate::dat::font::colour_code;
     let mut s = String::new();
     for sp in spans {
-        let c = if sp.code { Some(2) } else if sp.bold { Some(1) } else { None };
+        let c = if sp.code {
+            Some(2)
+        } else if sp.bold {
+            Some(1)
+        } else {
+            None
+        };
         if let Some(c) = c {
             s.push(colour_code(c));
         }
@@ -519,7 +552,13 @@ fn classic_lines(gu: &GameUi, blocks: &[Block], width: f32) -> Vec<Line> {
             out.push(Line { x: 0.0, bullet: None, cells: Vec::new(), colour: BODY, strip: false });
         }
     };
-    let one = |x: f32, text: String, colour: [u8; 4]| Line { x, bullet: None, cells: vec![(0.0, text)], colour, strip: false };
+    let one = |x: f32, text: String, colour: [u8; 4]| Line {
+        x,
+        bullet: None,
+        cells: vec![(0.0, text)],
+        colour,
+        strip: false,
+    };
     for b in blocks {
         match b {
             Block::Release(v, date) => {
@@ -568,7 +607,8 @@ fn classic_lines(gu: &GameUi, blocks: &[Block], width: f32) -> Vec<Line> {
                 }
                 fit_columns(&mut widths, width);
                 for (i, r) in rows.iter().enumerate() {
-                    let wrapped: Vec<Vec<String>> = r.iter().enumerate().map(|(c, cell)| gu.wrap(&coded(cell), widths[c] - 12.0)).collect();
+                    let wrapped: Vec<Vec<String>> =
+                        r.iter().enumerate().map(|(c, cell)| gu.wrap(&coded(cell), widths[c] - 12.0)).collect();
                     let n = wrapped.iter().map(Vec::len).max().unwrap_or(0);
                     for k in 0..n {
                         let mut cells = Vec::new();
@@ -579,7 +619,13 @@ fn classic_lines(gu: &GameUi, blocks: &[Block], width: f32) -> Vec<Line> {
                             }
                             cx += widths[c];
                         }
-                        out.push(Line { x: 0.0, bullet: None, cells, colour: if i == 0 { WHITE } else { BODY }, strip: false });
+                        out.push(Line {
+                            x: 0.0,
+                            bullet: None,
+                            cells,
+                            colour: if i == 0 { WHITE } else { BODY },
+                            strip: false,
+                        });
                     }
                 }
             }
@@ -601,7 +647,16 @@ mod tests {
         assert_eq!(b[1], Block::Heading(3, vec![s("Updates")]));
         assert_eq!(
             b[2],
-            Block::Text { depth: 1, bullet: true, spans: vec![Span { text: "Each platform".into(), bold: true, code: false }, s(" updates to "), Span { text: "its own".into(), bold: false, code: true }, s(" build.")] }
+            Block::Text {
+                depth: 1,
+                bullet: true,
+                spans: vec![
+                    Span { text: "Each platform".into(), bold: true, code: false },
+                    s(" updates to "),
+                    Span { text: "its own".into(), bold: false, code: true },
+                    s(" build.")
+                ]
+            }
         );
         assert_eq!(b[3], Block::Text { depth: 2, bullet: true, spans: vec![s("nested one")] });
         assert_eq!(b[4], Block::Text { depth: 0, bullet: false, spans: vec![s("A paragraph wrapped.")] });
@@ -650,7 +705,11 @@ mod tests {
 
     #[test]
     fn saved_notes_show_once_for_their_version() {
-        let s = Saved { from: "1.0.6".into(), to: "v1.0.7".into(), notes: vec![Note { tag: "v1.0.7".into(), date: String::new(), body: "x".into() }] };
+        let s = Saved {
+            from: "1.0.6".into(),
+            to: "v1.0.7".into(),
+            notes: vec![Note { tag: "v1.0.7".into(), date: String::new(), body: "x".into() }],
+        };
         assert_eq!(decide(&s, "1.0.7"), Some(true));
         // The restart did not take: kept for the new binary.
         assert_eq!(decide(&s, "1.0.6"), None);

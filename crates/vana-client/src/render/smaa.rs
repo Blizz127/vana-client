@@ -307,7 +307,13 @@ pub struct Smaa {
     targets: Option<Targets>,
 }
 
-fn texture(gpu: &Gpu, label: &str, size: [u32; 2], format: wgpu::TextureFormat, view_formats: &[wgpu::TextureFormat]) -> wgpu::Texture {
+fn texture(
+    gpu: &Gpu,
+    label: &str,
+    size: [u32; 2],
+    format: wgpu::TextureFormat,
+    view_formats: &[wgpu::TextureFormat],
+) -> wgpu::Texture {
     gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         size: wgpu::Extent3d { width: size[0], height: size[1], depth_or_array_layers: 1 },
@@ -315,7 +321,10 @@ fn texture(gpu: &Gpu, label: &str, size: [u32; 2], format: wgpu::TextureFormat, 
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats,
     })
 }
@@ -324,11 +333,18 @@ impl Smaa {
     /// `format`: the scene texture's format (the output texture matches it).
     pub fn new(gpu: &Gpu, format: wgpu::TextureFormat) -> Self {
         let device = &gpu.device;
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("smaa"), source: wgpu::ShaderSource::Wgsl(SHADER.into()) });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("smaa"),
+            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        });
         let tex_entry = |binding| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float { filterable: true }, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
             count: None,
         };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -337,21 +353,39 @@ impl Smaa {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
-                wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::FRAGMENT, ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering), count: None },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
                 tex_entry(2),
                 tex_entry(3),
                 tex_entry(4),
             ],
         });
-        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("smaa"), bind_group_layouts: &[Some(&layout)], immediate_size: 0 });
+        let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("smaa"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
         let pipe = |entry: &str, format: wgpu::TextureFormat| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(entry),
                 layout: Some(&pl),
-                vertex: wgpu::VertexState { module: &shader, entry_point: Some("vs"), compilation_options: Default::default(), buffers: &[] },
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[],
+                },
                 primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
                 depth_stencil: None,
                 multisample: Default::default(),
@@ -359,7 +393,11 @@ impl Smaa {
                     module: &shader,
                     entry_point: Some(entry),
                     compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState { format, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
                 }),
                 multiview_mask: None,
                 cache: None,
@@ -375,13 +413,22 @@ impl Smaa {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             ..Default::default()
         });
-        let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("smaa"), size: 16, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
+        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("smaa"),
+            size: 16,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let lut = |label, size: [u32; 2], format, bytes: &[u8], bpp: u32| {
             let t = texture(gpu, label, size, format, &[]);
             gpu.queue.write_texture(
                 t.as_image_copy(),
                 bytes,
-                wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(size[0] * bpp), rows_per_image: Some(size[1]) },
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(size[0] * bpp),
+                    rows_per_image: Some(size[1]),
+                },
                 wgpu::Extent3d { width: size[0], height: size[1], depth_or_array_layers: 1 },
             );
             t.create_view(&Default::default())
@@ -408,27 +455,57 @@ impl Smaa {
     /// Anti-aliases `scene` (`size`, in `format`) into the output texture, which it returns. Edges are found on the
     /// gamma-space values (a plain view); the blend reads and writes through the scene format's own views, as the
     /// reference does with sRGB views. The bind groups are remade when `size` or the scene texture changes.
-    pub fn run(&mut self, gpu: &Gpu, encoder: &mut wgpu::CommandEncoder, scene: &wgpu::Texture, size: [u32; 2]) -> &wgpu::TextureView {
+    pub fn run(
+        &mut self,
+        gpu: &Gpu,
+        encoder: &mut wgpu::CommandEncoder,
+        scene: &wgpu::Texture,
+        size: [u32; 2],
+    ) -> &wgpu::TextureView {
         let size = [size[0].max(1), size[1].max(1)];
         if self.targets.as_ref().is_none_or(|t| t.size != size || t.scene != *scene) {
             let plain = self.format.remove_srgb_suffix();
-            let edges = texture(gpu, "smaa edges", size, wgpu::TextureFormat::Rg8Unorm, &[]).create_view(&Default::default());
-            let weights = texture(gpu, "smaa weights", size, wgpu::TextureFormat::Rgba8Unorm, &[]).create_view(&Default::default());
+            let edges =
+                texture(gpu, "smaa edges", size, wgpu::TextureFormat::Rg8Unorm, &[]).create_view(&Default::default());
+            let weights = texture(gpu, "smaa weights", size, wgpu::TextureFormat::Rgba8Unorm, &[])
+                .create_view(&Default::default());
             let out_view = texture(gpu, "smaa out", size, self.format, &[plain]).create_view(&Default::default());
-            let scene_plain = scene.create_view(&wgpu::TextureViewDescriptor { format: Some(plain), ..Default::default() });
+            let scene_plain =
+                scene.create_view(&wgpu::TextureViewDescriptor { format: Some(plain), ..Default::default() });
             let scene_view = scene.create_view(&Default::default());
             let edges_group = self.group(gpu, [&scene_plain, &self.area, &self.search]);
             let weights_group = self.group(gpu, [&edges, &self.area, &self.search]);
             let blend_group = self.group(gpu, [&scene_view, &weights, &self.search]);
-            self.targets = Some(Targets { size, scene: scene.clone(), edges, weights, out_view, edges_group, weights_group, blend_group });
+            self.targets = Some(Targets {
+                size,
+                scene: scene.clone(),
+                edges,
+                weights,
+                out_view,
+                edges_group,
+                weights_group,
+                blend_group,
+            });
         }
         let t = self.targets.as_ref().unwrap();
         let rt = [1.0 / size[0] as f32, 1.0 / size[1] as f32, size[0] as f32, size[1] as f32];
         gpu.queue.put(&self.uniform, 0, bytemuck::cast_slice(&rt));
-        for (view, pipeline, group) in [(&t.edges, &self.edges, &t.edges_group), (&t.weights, &self.weights, &t.weights_group), (&t.out_view, &self.blend, &t.blend_group)] {
+        for (view, pipeline, group) in [
+            (&t.edges, &self.edges, &t.edges_group),
+            (&t.weights, &self.weights, &t.weights_group),
+            (&t.out_view, &self.blend, &t.blend_group),
+        ] {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("smaa"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment { view, depth_slice: None, resolve_target: None, ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store } })],
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,

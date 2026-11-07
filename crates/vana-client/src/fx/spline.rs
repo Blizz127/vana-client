@@ -84,7 +84,10 @@ pub fn gpu_words(segs: &[Seg]) -> Vec<[f32; 4]> {
 pub fn points(d: &[u8]) -> Vec<Vec3> {
     let n = d.get(0..4).map_or(0, |b| u32::from_le_bytes(b.try_into().unwrap())) as usize;
     let f = |o: usize| d.get(o..o + 4).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
-    (0..n).take_while(|i| 0x10 + i * 16 + 12 <= d.len()).map(|i| Vec3::new(f(0x10 + i * 16), f(0x14 + i * 16), f(0x18 + i * 16))).collect()
+    (0..n)
+        .take_while(|i| 0x10 + i * 16 + 12 <= d.len())
+        .map(|i| Vec3::new(f(0x10 + i * 16), f(0x14 + i * 16), f(0x18 + i * 16)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -108,14 +111,23 @@ mod tests {
     fn worked_paths() {
         let Some(q) = vtx(202, b"lin2") else { return };
         let s = build(&q).unwrap();
-        for (u, p) in [(0.0, Vec3::new(122.9643, -1.5996, 446.3557)), (0.25, Vec3::new(137.8889, -6.2966, 313.4352)), (0.5, Vec3::new(70.5023, -4.3057, 178.0302)), (0.75, Vec3::new(-27.9632, -9.8760, 111.9538)), (1.0, Vec3::new(-127.1780, -18.9483, 26.7836))] {
+        for (u, p) in [
+            (0.0, Vec3::new(122.9643, -1.5996, 446.3557)),
+            (0.25, Vec3::new(137.8889, -6.2966, 313.4352)),
+            (0.5, Vec3::new(70.5023, -4.3057, 178.0302)),
+            (0.75, Vec3::new(-27.9632, -9.8760, 111.9538)),
+            (1.0, Vec3::new(-127.1780, -18.9483, 26.7836)),
+        ] {
             assert!(close(eval(&s, u), p), "lin2 u {u}: {}", eval(&s, u));
         }
         let Some(q) = vtx(265, b"a7  ") else { return };
         let s = build(&q).unwrap();
-        for (u, p) in [(0.25, Vec3::new(-492.9381, -170.8691, -233.2339)), (0.5, Vec3::new(-494.5517, -170.8691, -233.7639)), (1.0, Vec3::new(-497.9810, -170.8691, -233.8575))] {
+        for (u, p) in [
+            (0.25, Vec3::new(-492.9381, -170.8691, -233.2339)),
+            (0.5, Vec3::new(-494.5517, -170.8691, -233.7639)),
+            (1.0, Vec3::new(-497.9810, -170.8691, -233.8575)),
+        ] {
             assert!(close(eval(&s, u), p), "a7 u {u}: {}", eval(&s, u));
         }
     }
 }
-

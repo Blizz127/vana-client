@@ -16,7 +16,8 @@ const ROD_FILES: [u32; 9] = [39307, 39307, 39339, 39371, 39403, 39435, 39435, 39
 const STATUS_SCHED: [&[u8; 4]; 7] = [b"fsh0", b"fsh7", b"fsh2", b"fsh3", b"fsh4", b"fsh5", b"fsh6"];
 
 /// FUN_100cae60's table 0x10330ef8 for 0x38..0x3e: the rod's line scheduler (1 `!f01`, 2 `!f02`) and its delay.
-const LINE: [Option<(u8, f32)>; 7] = [Some((1, 136.0)), None, Some((2, 102.0)), Some((2, 40.0)), Some((2, 44.0)), Some((2, 68.0)), Some((2, 0.0))];
+const LINE: [Option<(u8, f32)>; 7] =
+    [Some((1, 136.0)), None, Some((2, 102.0)), Some((2, 40.0)), Some((2, 44.0)), Some((2, 68.0)), Some((2, 0.0))];
 
 /// The status whose scheduler the model and the rod have had; the line's pending scheduler and ticks left (+0x81c /
 /// +0x820) for the status it was set by.
@@ -68,7 +69,12 @@ pub fn walking_hold(w: &World, id: u32, status: u8) -> bool {
 /// Per frame, before the motion files: each angler's rod made, its status scheduler once its files are in, the rod's
 /// line; the schedulers stopped and the rod gone when it stops fishing.
 pub fn update(w: &mut World, dt: f32) {
-    let mut anglers: Vec<u32> = w.entities.iter().filter(|(id, e)| **id != w.my_id && e.kind == EntityKind::Player && fishing_status(e.motion.status)).map(|(id, _)| *id).collect();
+    let mut anglers: Vec<u32> = w
+        .entities
+        .iter()
+        .filter(|(id, e)| **id != w.my_id && e.kind == EntityKind::Player && fishing_status(e.motion.status))
+        .map(|(id, _)| *id)
+        .collect();
     if fishing_status(w.my_motion.status) {
         anglers.push(w.my_id);
     }
@@ -85,7 +91,9 @@ pub fn update(w: &mut World, dt: f32) {
         let kind = if look >= 0x55 { 5 } else { look as u32 + 5 };
         let src = Source::File(ROD_FILES[(race as usize).min(8)] + kind - 5);
         let rod = ROD | id;
-        if w.actors.get(&rod).is_none_or(|a| a.key != format!("{src:?}")) && !w.event_looks.iter().any(|(i, _)| *i == rod) {
+        if w.actors.get(&rod).is_none_or(|a| a.key != format!("{src:?}"))
+            && !w.event_looks.iter().any(|(i, _)| *i == rod)
+        {
             w.event_looks.push((rod, src));
         }
         // The rod at the angler's size *(inf)*.
@@ -132,7 +140,8 @@ pub fn update(w: &mut World, dt: f32) {
             w.effects.stop_actor_scheduler(id, u32::from_le_bytes(*s));
         }
     }
-    let stray: Vec<u32> = w.actors.keys().filter(|id| **id & ROD != 0 && !anglers.contains(&(**id & !ROD))).copied().collect();
+    let stray: Vec<u32> =
+        w.actors.keys().filter(|id| **id & ROD != 0 && !anglers.contains(&(**id & !ROD))).copied().collect();
     for id in stray {
         w.actors.remove(&id);
         w.effects.forget_actor(id);

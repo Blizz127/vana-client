@@ -137,7 +137,8 @@ pub fn extract_all<R: Read + Seek>(
     if &hdr[..4] != b"MSCF" {
         bail!("not a cabinet");
     }
-    let (files_offset, n_folders, n_files, flags) = (u32le(&hdr, 16), u16le(&hdr, 26), u16le(&hdr, 28), u16le(&hdr, 30));
+    let (files_offset, n_folders, n_files, flags) =
+        (u32le(&hdr, 16), u16le(&hdr, 26), u16le(&hdr, 28), u16le(&hdr, 30));
     let (mut folder_reserve, mut data_reserve) = (0usize, 0usize);
     if flags & 4 != 0 {
         let mut res = [0u8; 4];

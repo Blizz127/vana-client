@@ -173,9 +173,15 @@ fn fix_up(w: &mut World, set: &Set, print: bool) -> Vec<[u8; 3]> {
             1 => {
                 let (c, i, id) = set.entry(slot);
                 let inv = &w.inv.slots;
-                let find = |bag: u8, used: &[(u8, u8)]| inv.range((bag, 1)..=(bag, 255)).find(|(k, v)| v.0 == id && !used.contains(k)).map(|(&k, _)| k);
+                let find = |bag: u8, used: &[(u8, u8)]| {
+                    inv.range((bag, 1)..=(bag, 255)).find(|(k, v)| v.0 == id && !used.contains(k)).map(|(&k, _)| k)
+                };
                 let stays = BAGS.contains(&c) && inv.get(&(c, i)).is_some_and(|v| v.0 == id) && !used.contains(&(c, i));
-                let at = if stays { Some((c, i)) } else { find(c, &used).or_else(|| BAGS.iter().find_map(|&b| find(b, &used))) };
+                let at = if stays {
+                    Some((c, i))
+                } else {
+                    find(c, &used).or_else(|| BAGS.iter().find_map(|&b| find(b, &used)))
+                };
                 match at {
                     Some((c, i)) => {
                         used.push((c, i));

@@ -75,7 +75,10 @@ pub fn category(items: &Items, id: u16) -> Option<Category> {
     let kids = (0..n)
         .map(|i| {
             let o = 8 + i * 20;
-            (u16::from_le_bytes([r[o], r[o + 1]]), std::array::from_fn(|k| r[o + 4 + 4 * k..o + 8 + 4 * k].try_into().unwrap()))
+            (
+                u16::from_le_bytes([r[o], r[o + 1]]),
+                std::array::from_fn(|k| r[o + 4 + 4 * k..o + 8 + 4 * k].try_into().unwrap()),
+            )
         })
         .collect();
     let (name, _) = texts(&r[0x238..], 1, items.lang());
@@ -99,7 +102,10 @@ mod tests {
         let basics = category(&items, 0xf230).unwrap();
         assert_eq!(basics.kids[0].0, 0xe001);
         let o = objective(&items, 0xe001).unwrap();
-        assert_eq!((o.name.as_str(), o.repeatable, o.goal, o.sparks, o.exp), ("First Step Forward", false, 1, 100, 300));
+        assert_eq!(
+            (o.name.as_str(), o.repeatable, o.goal, o.sparks, o.exp),
+            ("First Step Forward", false, 1, 100, 300)
+        );
         let o = objective(&items, 0xe00c).unwrap();
         assert_eq!((o.repeatable, o.goal, o.sparks, o.acc), (true, 200, 1000, 100));
         assert!(!objective(&items, 0xe331).unwrap().pages[1].is_empty());
