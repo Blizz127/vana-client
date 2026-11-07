@@ -203,6 +203,9 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `//ride <part of a name>` the first that matches, `//ride list` names them (key items 3072 + the mount's index).
   Seen live: Chocobo and Raptor listed, the Raptor ridden. It found `game.key_items()` returning the bit table's raw
   words, not ids: fixed (Inventory HUD's key item rows read it too).
+- **Log Files** (assets/mods/log-files; Logger, logs, KParser's input): the chat log, battle lines optional, to
+  `logs/<character>/<date>.log` in its data folder as plain words with the time, written once a second (the lines are
+  taken raw in a chat filter and made plain in the mod phase, where the auto-translate dictionary is). Seen live.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
