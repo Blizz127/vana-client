@@ -148,7 +148,7 @@ pub const FUNCS: &[Func] = &[
     Func { ns: "timer", name: "after", doc: "Calls `handler` once after `seconds`.", params: &[("seconds", "number", ""), ("handler", "function", "")], ret: "integer" },
     Func { ns: "timer", name: "every", doc: "Calls `handler` every `seconds` until cancelled.", params: &[("seconds", "number", "at least 0.01"), ("handler", "function", "")], ret: "integer" },
     Func { ns: "timer", name: "cancel", doc: "Stops a timer.", params: &[("id", "integer", "what timer.after / timer.every returned")], ret: "" },
-    Func { ns: "game", name: "player", doc: "Our character: name, id, index, zone, pos {x, y, z}, heading, status, hp / mp / tp and their percents, maxima, jobs and levels, target id.", params: &[], ret: "vana.Player" },
+    Func { ns: "game", name: "player", doc: "Our character: name, id, index, zone, pos {x, y, z}, heading, status, hp / mp / tp and their percents, maxima, jobs and levels, target id, the away / anonymous / seeking flags.", params: &[], ret: "vana.Player" },
     Func { ns: "game", name: "zone", doc: "The zone id: nil before the first zone; while zoning, the old zone until the new one loads (zone_change).", params: &[], ret: "integer?" },
     Func { ns: "game", name: "entity", doc: "An entity in range by server id or index, or nil.", params: &[("key", "integer", "server id or index")], ret: "vana.Entity?" },
     Func { ns: "game", name: "entities", doc: "Every entity in range, by index.", params: &[("filter?", "{distance: number?, kinds: ('player'|'npc'|'mob')[]?}", "")], ret: "vana.Entity[]" },
@@ -470,6 +470,9 @@ pub const CLASSES: &[Class] = &[
         ("sub_job", "integer?", ""),
         ("sub_level", "integer?", ""),
         ("target", "integer?", "our target's server id"),
+        ("away", "boolean", "the /away flag (the server's word; /online clears it)"),
+        ("anonymous", "boolean", "the /anon flag"),
+        ("seeking", "boolean", "seeking a party (/seacom's flag)"),
     ] },
     Class { name: "vana.Entity", doc: "A character, NPC or monster in the zone (game.entity, game.entities, game.target); ours too, with `me`.", fields: &[
         ("id", "integer", ""),

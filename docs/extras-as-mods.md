@@ -206,6 +206,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
 - **Log Files** (assets/mods/log-files; Logger, logs, KParser's input): the chat log, battle lines optional, to
   `logs/<character>/<date>.log` in its data folder as plain words with the time, written once a second (the lines are
   taken raw in a chat filter and made plain in the mod phase, where the auto-translate dictionary is). Seen live.
+- **Tell Inbox** (assets/mods/tell-inbox; answeringmachine, respond, autorespond): while the game's `/away` flag is up
+  (game.player gained `away`, `anonymous`, `seeking` from our 0x037 flags) tells are kept and each sender may get one
+  Away Reply; back `/online`, they are counted and shown; `//tells` shows them again; `//r <message>` answers the last
+  tell. Seen live: /away and /online followed (no tell came in from the bot); a Rust test covers keeping and replies.
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

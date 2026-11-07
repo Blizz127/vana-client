@@ -1499,6 +1499,10 @@ fn player(lua: &Lua) -> mlua::Result<Table> {
     t.set("pos", pos)?;
     t.set("heading", my_heading(w))?;
     t.set("status", w.my_motion.status)?;
+    // Our 0x037 flags word: bit 4 seeking a party, 5 anonymous, 7 away.
+    t.set("seeking", w.self_flags >> 4 & 1 != 0)?;
+    t.set("anonymous", w.self_flags >> 5 & 1 != 0)?;
+    t.set("away", w.self_flags >> 7 & 1 != 0)?;
     if let Some((hp, mp, tp, hpp, mpp)) = w.vitals {
         t.set("hp", hp)?;
         t.set("mp", mp)?;

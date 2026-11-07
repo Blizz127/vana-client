@@ -65,6 +65,9 @@
 ---@field sub_job integer?
 ---@field sub_level integer?
 ---@field target integer? our target's server id
+---@field away boolean the /away flag (the server's word; /online clears it)
+---@field anonymous boolean the /anon flag
+---@field seeking boolean seeking a party (/seacom's flag)
 
 --- A character, NPC or monster in the zone (game.entity, game.entities, game.target); ours too, with `me`.
 ---@class vana.Entity
@@ -853,7 +856,7 @@ function timer.every(seconds, handler) end
 ---@param id integer what timer.after / timer.every returned
 function timer.cancel(id) end
 
---- Our character: name, id, index, zone, pos {x, y, z}, heading, status, hp / mp / tp and their percents, maxima, jobs and levels, target id.
+--- Our character: name, id, index, zone, pos {x, y, z}, heading, status, hp / mp / tp and their percents, maxima, jobs and levels, target id, the away / anonymous / seeking flags.
 ---@return vana.Player
 function game.player() end
 

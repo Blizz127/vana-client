@@ -27,6 +27,9 @@ Your own character, as `game.player()` returns it. Fields that need data from th
 | `sub_job` | `integer?` | Support job id. |
 | `sub_level` | `integer?` | Support job level. |
 | `target` | `integer?` | Your target's server id; nil without a target. |
+| `away` | `boolean` | The /away flag as the server last sent it (/online clears it). |
+| `anonymous` | `boolean` | The /anon flag. |
+| `seeking` | `boolean` | Seeking a party (the search comment's flag). |
 
 `hp`, `mp`, `tp`, `hpp` and `mpp` are nil until the server has sent your vitals; `hp_max`, `mp_max` and the four job fields until it has sent your stats.
 
