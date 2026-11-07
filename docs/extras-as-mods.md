@@ -362,6 +362,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (actions.attach), then says which the server refused; list and delete. The customization window is the client's
   own. A Rust test covers the round trip; not seen live (no Puppetmaster with attachments). Not yet: the burden
   tracker.
+- **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
+  target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
+  items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
+  (`//lootlog reset`). Seen live: hare kills counted; a Rust test covers TH and the pool (no Thief or party drops in
+  the test).
 - Not ported: Discord Status (it needs a Discord application id: the user's call); Safety Catches' call-for-help block (the game's own /blockhelp does it; the cast hold while moving is
   not done); GM Helper (gmcommand: LSB takes `!` lines as they are); Mod Profiles (plugin_manager: mod sets per character) waits for a settings API across mods; the emote
   picker is the game's Emotes list.
