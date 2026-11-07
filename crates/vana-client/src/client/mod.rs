@@ -5452,6 +5452,14 @@ impl Default for NationShow {
     }
 }
 
+/// `s` (an actor's drawn source) as the look before the mods' (render.look): a player look is its look_base.
+fn base_source(w: &World, id: u32, s: Source) -> Source {
+    match s {
+        Source::Pc(_) => w.look_base.get(&id).map_or(s, |l| Source::Pc(*l)),
+        other => other,
+    }
+}
+
 /// A character drawn with its real model: our own, or another player's.
 /// What an actor is drawn from: a player-style look, or an NPC/monster look.
 #[derive(Clone, Copy, Debug)]
@@ -11608,6 +11616,8 @@ impl App {
             if matches!(source, Source::Pc(l) if l.race == 0) {
                 continue;
             }
+            // The look before the mods': what waits (held, under a costume) is normalized again when it comes back.
+            let base = source;
             let source = match source {
                 Source::Pc(l) => {
                     world.look_base.insert(id, l);
@@ -11622,7 +11632,7 @@ impl App {
             // come off.
             let source = match costume::worn(world, id) {
                 Some(c) if !costume::is_model(&source, c) => {
-                    world.costume_base.insert(id, source);
+                    world.costume_base.insert(id, base);
                     continue;
                 }
                 _ => source,
@@ -11634,7 +11644,7 @@ impl App {
             // FUN_10095dd0: a changed look waits while its actor is held (busy +0x11c: ops 0x1f / 0x20 / 0x59, a load).
             if world.actors.get(&id).is_some_and(|a| a.character.is_some() && a.key != key) && combat::held(world, id) {
                 world.held_looks.retain(|l| l.0 != id);
-                world.held_looks.push((id, source));
+                world.held_looks.push((id, base));
                 continue;
             }
             let actor = world.actors.entry(id).or_insert_with(Actor::new);
