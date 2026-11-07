@@ -282,6 +282,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Southern San d'Oria.
 - **Screen Notes** (assets/mods/screen-notes; Text): `//note <name> <text>` puts a note on the screen, dragged to its
   place and kept per character; `//note <name>` removes it, `//notes` lists them. Seen live: a note added and dragged.
+- **Calculator** (assets/mods/calculator; calculator): `//calc <sum>` prints the answer (+ - * / % ^, brackets, 1.5k,
+  2m, commas in the answer); `//calc` alone opens a window that answers as Enter ends the line. Parsed by hand, never
+  run as Lua; a Rust test covers it. Seen live in chat and in the window. (The emote picker add-on is the game's own
+  Emotes list, so it has no port.)
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

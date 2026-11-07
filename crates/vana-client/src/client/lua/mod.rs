@@ -501,7 +501,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes",
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2045,6 +2045,36 @@ mod tests {
             assert(#storage.character.inbox == 2)
             C.r("see", "you")
             assert(ran[#ran] == "/tell Other see you", ran[#ran])
+        "#;
+        vm.lua.globals().set("INIT", init).unwrap();
+        vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// Calculator: precedence, brackets, powers, k / m, commas in the answer; bad input is an error line, never run.
+    #[test]
+    fn calculator_answers() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "calculator").unwrap().2;
+        let vm = Vm::new(bundled_manifest("calculator").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let init = files.iter().find(|f| f.0 == "init.lua").unwrap().1;
+        let script = r#"
+            local C, said = {}, {}
+            settings = { get = function() return true end }
+            commands = { register = function(n, f) C[n] = f end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            ui = { window = function() end, open = function() end, on = function() end, update = function() end }
+            load(INIT)()
+            local function calc(s) C.calc(s) return said[#said] end
+            assert(calc("12 * 99 + 450") == "12 * 99 + 450 = 1,638", said[#said])
+            assert(calc("(2+3)*4") == "(2+3)*4 = 20")
+            assert(calc("2^10") == "2^10 = 1,024")
+            assert(calc("1.5k / 4") == "1.5k / 4 = 375")
+            assert(calc("2m - 1") == "2m - 1 = 1,999,999")
+            assert(calc("10 / 4") == "10 / 4 = 2.5")
+            assert(calc("os.exit()"):find("^Calculator: "))
+            assert(calc("1/0"):find("no answer"))
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));

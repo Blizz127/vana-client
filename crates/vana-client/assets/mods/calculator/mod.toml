@@ -1,0 +1,10 @@
+name = "Calculator"
+version = "1.0.0"
+description = "Works out sums in the chat line or a small window: gil, stacks, prices (the calculator add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Calculator"
+help = "//calc <sum> prints the answer, e.g. //calc 12 * 99 + 450; //calc alone opens a window. + - * / % ^ and brackets; k and m for thousands and millions."
