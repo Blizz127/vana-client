@@ -269,6 +269,35 @@ for _, it in ipairs(game.find_items("Leaping Boots", {0, 8})) do
 end
 ```
 
+## `game.auction`
+
+```lua
+game.auction() -> table?
+```
+
+Our auction house listings while the auction house is open (the server sends them as it opens).
+
+**Returns** `table?`: nil while the auction house is closed; else `{slots}`, a list of our listings:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `slot` | `integer` | The listing's slot, from 1. |
+| `item` | `integer` | The item id. |
+| `count` | `integer` | How many (a stack's size, or 1). |
+| `price` | `integer` | The asking price in gil. |
+| `state` | `string` | `listed`, `sold`, `returned`, `sold, collected`, `returned, collected`, `being returned` or `selling`. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local ah = game.auction()
+for _, s in ipairs(ah and ah.slots or {}) do
+  print(s.slot, (res.item(s.item) or {}).name, s.price, s.state)
+end
+```
+
 ## `game.can_wear`
 
 ```lua

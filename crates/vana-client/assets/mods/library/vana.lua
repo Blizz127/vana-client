@@ -916,6 +916,10 @@ function game.items(bag) end
 ---@return integer?
 function game.bag_size(bag) end
 
+--- While the auction house is open: {slots}, our listings, each {slot, item, count, price, state} (state: listed, sold, returned, sold, collected, returned, collected, being returned, selling); nil when it is closed.
+---@return {slots: {slot: integer, item: integer, count: integer, price: integer, state: string}[]}?
+function game.auction() end
+
 --- Whether our character can wear the item now, by the client's rule (the shops' yellow): its race, main job and level, superior level and no encumbrance on its slots.
 ---@param item integer item id
 ---@return boolean
@@ -1213,6 +1217,18 @@ function actions.sell(slot, count) end
 ---@param slot integer 
 ---@param spell integer 
 function actions.blue_set(slot, spell) end
+
+--- At an open auction house: the game's bid question for an item at a price, as the bid window asks it; the player answers. Needs actions.
+---@param item integer item id
+---@param price integer gil
+---@param stack boolean? a stack, not one
+function actions.auction_bid(item, price, stack) end
+
+--- At an open auction house: puts an inventory slot up for sale at a price as the Sell button does; the fee and the sale are asked as the window asks them. Needs actions.
+---@param slot integer inventory slot (game.items(0)'s slot)
+---@param price integer gil
+---@param stack boolean? the whole stack, not one
+function actions.auction_sell(slot, price, stack) end
 
 --- Empties a blue magic slot (1..20); one change a second, as blue_set.
 ---@param slot integer 

@@ -805,6 +805,27 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             Ok(out)
         })?,
     )?;
+    // Our auction slots while the auction house is open.
+    game.set(
+        "auction",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let Some(slots) = super::super::auction::mod_slots(w) else { return Ok(None) };
+            let t = lua.create_table()?;
+            let list = lua.create_table()?;
+            for (slot, item, count, price, state) in slots {
+                let r = lua.create_table()?;
+                r.set("slot", slot)?;
+                r.set("item", item)?;
+                r.set("count", count)?;
+                r.set("price", price)?;
+                r.set("state", state)?;
+                list.push(r)?;
+            }
+            t.set("slots", list)?;
+            Ok(Some(t))
+        })?,
+    )?;
     // The client's wear rule (the shops' yellow): race, main job and level, superior level, encumbrance.
     game.set(
         "can_wear",

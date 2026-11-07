@@ -38,6 +38,10 @@ pub(in crate::client) enum Action {
     Lock(bool),
     /// A BLU slot (0..19) set to a spell id or emptied (0), a PUP slot (0..13) to an item id or emptied.
     BlueSlot(usize, u16),
+    /// item, price, single
+    AhBid(u16, u32, bool),
+    /// inventory slot, price, single
+    AhSell(u8, u32, bool),
     PupSlot(usize, u16),
     Scan,
     Track(u16),
@@ -289,6 +293,16 @@ pub(super) fn apply(w: &mut World, gu: Option<&GameUi>, a: Action) {
                 w.chat.push_colour(format!("actions.{}: {e}", if spell == 0 { "blue_remove" } else { "blue_set" }), super::ERROR);
             }
         }
+        Action::AhBid(item, price, single) => {
+            if let Err(e) = super::super::auction::mod_bid(w, item, price, single) {
+                w.chat.push_colour(format!("actions.auction_bid: {e}"), super::ERROR);
+            }
+        }
+        Action::AhSell(inv, price, single) => {
+            if let Err(e) = super::super::auction::mod_sell(w, inv, price, single) {
+                w.chat.push_colour(format!("actions.auction_sell: {e}"), super::ERROR);
+            }
+        }
         Action::PupSlot(i, item) => {
             if let Err(e) = super::super::pupset::set_slot(w, i, item) {
                 w.chat.push_colour(format!("actions.{}: {e}", if item == 0 { "detach" } else { "attach" }), super::ERROR);
@@ -508,6 +522,14 @@ pub(super) fn install(lua: &Lua, g: &Table) -> mlua::Result<()> {
             }
             queue(lua, Action::BlueSlot(blue(slot)?, spell))
         })?,
+    )?;
+    t.set(
+        "auction_bid",
+        lua.create_function(|lua, (item, price, stack): (u16, u32, Option<bool>)| queue(lua, Action::AhBid(item, price, !stack.unwrap_or(false))))?,
+    )?;
+    t.set(
+        "auction_sell",
+        lua.create_function(|lua, (slot, price, stack): (u8, u32, Option<bool>)| queue(lua, Action::AhSell(slot, price, !stack.unwrap_or(false))))?,
     )?;
     t.set("blue_remove", lua.create_function(move |lua, slot: usize| queue(lua, Action::BlueSlot(blue(slot)?, 0)))?)?;
     t.set(

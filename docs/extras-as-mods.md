@@ -397,6 +397,12 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   Nyzul Isle (floor, objective, cleared, tokens this run). A Rust test feeds each content's lines; seen live in
   Abyssea - Konschtat (the window and its lights). Not done: the contents LandSandBoat lacks (Omen, Delve, Odyssey,
   Sortie), Reives, the pop item lists, cellhelp's lotting.
+- **Auction Desk** (assets/mods/auction-desk; AuctionHelper, Auctioneer, ahpro): at the auction house, `//ahbuy <item>
+  <price> [stack]` and `//ahsell <item> <price> [stack]` (prices take k and m) start the game's own bid and sale, whose
+  questions the player answers as in the windows; `//ahlist` prints our listings. New `actions.auction_bid`,
+  `actions.auction_sell` and `game.auction`. Seen live at Southern San d'Oria's counter: the listings, the bid question
+  for a Fire Crystal at 1.5k, the sale's 21 gil fee question for a Wind Crystal (both answered No). ahcolors' row
+  colours are the client's own (the shops' rule: worn, wearable, learned, learnable). Not done: price lookups.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

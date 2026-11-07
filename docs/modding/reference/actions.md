@@ -1062,6 +1062,71 @@ end)
 
 Whether the shop takes the item is the server's to decide.
 
+## `actions.auction_bid`
+
+```lua
+actions.auction_bid(item, price, stack?) -> nil
+```
+
+At an open auction house, asks the game's bid question for an item at a price, the one the bid window asks after its
+price entry. The player answers it; a Yes bids as the window does, into the first free slot.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `item` | `integer` | yes | The item id. |
+| `price` | `integer` | yes | The bid in gil, 1 or more. |
+| `stack` | `boolean` | no | `true` bids on a stack; one item when left out. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //bid 4096 120: a bid on one Fire Crystal for 120 gil.
+commands.register("bid", function(item, price)
+  actions.auction_bid(tonumber(item), tonumber(price))
+end)
+```
+
+Problems are printed in the log in red: `actions.auction_bid: open the auction house first`, `actions.auction_bid: another question is open`, `actions.auction_bid: the price is 1 gil or more`. The bid's result comes as the window's does.
+
+## `actions.auction_sell`
+
+```lua
+actions.auction_sell(slot, price, stack?) -> nil
+```
+
+At an open auction house, puts an inventory slot up for sale as the Sell button does: the game asks the server for
+the fee, then asks the player about the fee and the sale, as the window does.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slot` | `integer` | yes | The inventory slot (`slot` of a `game.items(0)` entry). |
+| `price` | `integer` | yes | The price in gil, 1 or more. |
+| `stack` | `boolean` | no | `true` sells the whole stack; one item when left out. |
+
+**Returns** nothing.
+
+**Needs** the `actions` permission (while handling the player's input) or `automation`.
+
+**Example**
+
+```lua
+-- //sellone <name> <price>: one of an item we hold.
+commands.register("sellone", function(name, price)
+  local it = game.find_items(name, { 0 })[1]
+  if it then actions.auction_sell(it.slot, tonumber(price)) end
+end)
+```
+
+Problems are printed in the log in red: `actions.auction_sell: open the auction house first`, `actions.auction_sell: nothing in that inventory slot`, `actions.auction_sell: another sale is being asked`, `actions.auction_sell: the price is 1 gil or more`.
+
 ## `actions.blue_set`
 
 ```lua
