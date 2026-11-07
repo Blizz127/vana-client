@@ -264,6 +264,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `event | match | line` a line (login, zone, job, gain, lose, hp_below, mp_below, chat, day, weather); an example file
   is written on first start; `//rules` lists, `//rules reload` reads it again. Seen live: login, Sneak gained and lost.
   Not yet: autoex's XML rule files (no XML helper yet).
+- **Music Picker** (assets/mods/music-picker; BattleStations, MountMuzzle, setbgm, VanaTunes, nocombat, NoMount):
+  `//music <track>` holds a track until `//music off`; Battle Music the game's, the zone's own day / night track, or
+  silence; Mount Music the game's or silence. The zone's tracks come from the new `audio.music_slots()`. Seen live:
+  Southern San d'Oria's slots read, track 108 held and released (the log's music lines; test runs have no sound).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:

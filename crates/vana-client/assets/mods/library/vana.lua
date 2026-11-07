@@ -636,6 +636,10 @@ function audio.play_se(id, volume) end
 ---@param id? integer 
 function audio.music(id) end
 
+--- The zone's music tracks as the server set them: 1 day, 2 night, 3 solo battle, 4 party battle, 5 mounted, 6 K.O., 7 and 8 from events (0 unset); audio.music plays one of them.
+---@return integer[]
+function audio.music_slots() end
+
 --- Silences the music while held (true, the default) or gives it back (false).
 ---@param on? boolean 
 function audio.mute_music(on) end

@@ -22,6 +22,7 @@ end)
 | [`audio.play_ui(id)`](#audioplay_ui) | Plays one of the game's interface sounds by id. |
 | [`audio.music(id?)`](#audiomusic) | Holds the music on a game track, or gives the music back. |
 | [`audio.mute_music(on?)`](#audiomute_music) | Silences the music, or gives it back. |
+| [`audio.music_slots()`](#audiomusic_slots) | The zone's music tracks, as the server set them. |
 
 ## `audio.play`
 
@@ -182,3 +183,27 @@ end)
 
 `audio.mute_music(false)` and `audio.music()` do the same thing: they release your mod's hold on the music, whether
 it held a track or silence.
+
+## `audio.music_slots`
+
+```lua
+audio.music_slots() -> integer[]
+```
+
+The zone's music tracks as the server set them, in the game's eight slots: 1 day, 2 night, 3 solo battle, 4 party
+battle, 5 mounted, 6 K.O., 7 and 8 set by events. 0 is an unset slot. The game picks one by our state and the hour
+(night from 18:00 to 6:00); `audio.music` can play any of them.
+
+**Returns** `integer[]`: eight track ids.
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+-- The zone's own field music while fighting.
+events.on("status_change", function(status)
+  local slots = audio.music_slots()
+  if status == 1 then audio.music(slots[1]) else audio.music() end
+end)
+```
