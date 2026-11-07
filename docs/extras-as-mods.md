@@ -233,6 +233,10 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   the speaker read from the line's form (`Name :`, `(Name)`, `<Name>`, `[1]<Name>`, `Name>>`). A Rust test covers the
   rules; live our own lines pass as they should and no bot chat came in the minute watched. Linkshell 2 and Unity
   lines are not taken yet (their log modes still to be read).
+- **Storage Search** went into **Find** (findAll, FindAll, findall, GearFinder): each character's bags are kept in the
+  account's storage (every minute, on zoning and at logout) and `/find` lists the account's other characters' holdings
+  after ours (`Lnxcsfix's Inventory 1`). Seen live: Lnxcsfix's Wind Crystal found while playing Lnxtest. Not yet: key
+  items, and characters of other accounts (that needs files.shared).
 
 A mod's edge window without a built-in panel takes a place the first time it shows (on the left edge under the
 built-in windows shown and the other mods' left-edge windows) and keeps it, saved as if the player had put it there:
