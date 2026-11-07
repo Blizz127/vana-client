@@ -1,4 +1,4 @@
-//! Ours (not retail; the clock add-ons): the Clock extra. Beside the game's Vana'diel clock, Earth's local time in
+//! Ours (not retail; the clock add-ons): what the clock slot shows (game.clock, the bundled Clock mod). Earth's local time in
 //! retail's own format (config 0x96 12 / 24 hour), the moon (group 0x11's phase and /clock's percent) and how long
 //! until the next Vana'diel day.
 

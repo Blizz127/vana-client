@@ -60,6 +60,11 @@ Done so far (checked live, Lnxcsfix):
   `game.map` reports the record with its `kind` / `owned`. Seen live: NO MAP with our marker in Western Adoulin (the
   map not ours), beside the menu's map window showing the same. A script's `act:wheel` now passes the mods'
   mouse filters, as the window's wheel does.
+- **Clock** and **Target Info** (assets/mods/clock, target-info): `ui.native.slot` fills a built-in panel's slot with
+  the mod's values, drawn by the panel as its own text (the clock line beside the game's clock, the target window's
+  distance and HP %); `game.clock` gives the clock line's parts; entities have `gauge`. Compared shot for shot with
+  master in both UIs: the same text, font, place and colours; the settings carried over and their rows stand where
+  they stood (a test pins each Extras tab's order).
 
 ## Order
 

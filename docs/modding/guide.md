@@ -422,6 +422,8 @@ A mod can change the built-in interface as well as add to it. In the modern UI, 
   stand where it was.
 - **Move, scale or fade** a panel (`ui.native.place("target", {x = 600, y = 80, scale = 1.3, alpha = 0.9})`), and find
   where any panel is (`ui.native.rect`).
+- **Fill its slots** (both UIs): your text in a built-in panel, drawn as its own (`ui.native.slot("clock", game.clock())`
+  beside the game's clock; `target_distance` and `target_hpp` in the target window).
 - **Reskin** it: replace its sprites with your PNGs, set its palette colours, or give its windows a new frame
   (`ui.skin.sprite`, `ui.skin.colour`, `ui.skin.frame`). Every panel, and every mod's window, draws with them.
 

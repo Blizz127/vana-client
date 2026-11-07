@@ -27,6 +27,7 @@ end)
 | [`game.buffs()`](#gamebuffs) | Your status effects and their time left. |
 | [`game.recasts()`](#gamerecasts) | Seconds left on your spell and ability recasts, and their whole lengths. |
 | [`game.time()`](#gametime) | The Vana'diel date, clock and moon. |
+| [`game.clock()`](#gameclock) | Earth time, the moon and the next Vana'diel day, as the clock slot shows them. |
 | [`game.weather()`](#gameweather) | The current weather id. |
 | [`game.key_items()`](#gamekey_items) | The key items you hold. |
 | [`game.treasure()`](#gametreasure) | The items in the treasure pool. |
@@ -377,6 +378,34 @@ The Vana'diel clock and calendar, and the moon.
 local t = game.time()
 print(("%d/%02d/%02d %02d:%02d, %s, %s (%d%%)"):format(
   t.year, t.month, t.day, t.hour, t.minute, res.day(t.weekday), res.moon(t.moon_phase), t.moon))
+```
+
+## `game.clock`
+
+```lua
+game.clock() -> table?
+```
+
+What the line beside the game's clock shows ([`ui.native.slot`](ui.native.md#uinativeslot)'s `clock`), worded as the
+game words it.
+
+**Returns** `nil` until the server has sent the time and the game's message tables have loaded; then a table:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `earth` | `string` | Earth's local time in the player's 12 or 24 hour format (`"20:40"`, `"8:40 PM"`). |
+| `moon_name` | `string` | The moon phase's name (`"Waxing Crescent"`). |
+| `moon` | `integer` | The moon's percent. |
+| `next_day` | `string` | The next Vana'diel day's name. |
+| `next_minutes` | `integer` | Earth minutes until it. |
+
+**Errors** "game state is not available here" in the lobby or a chat filter.
+
+**Example**
+
+```lua
+local c = game.clock()
+if c then print(("%s, %s %d%%, %s in %d min"):format(c.earth, c.moon_name, c.moon, c.next_day, c.next_minutes)) end
 ```
 
 ## `game.weather`

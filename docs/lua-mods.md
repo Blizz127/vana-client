@@ -110,7 +110,8 @@ Built (client/lua/, modern/modwin.rs), each checked live:
   with it) and fades any panel but the edge windows; `ui.native.rect` / `panels` say where each is (a hidden one where
   it would stand now); a HUD element's `anchor` places it from a panel's corner (a replacement where a hidden one
   stands, or beside a shown one: HUD elements draw under panels); `ui.skin` replaces the pack's sprites (keeping their
-  logical size and insets), palette colours and window frames (border and gradient). Each undone when its mod
+  logical size and insets), palette colours and window frames (border and gradient); `ui.native.slot` puts a mod's values in a built-in panel's slot (the clock line, the
+  target window's distance and HP %), drawn by the panel as its own text in both UIs. Each undone when its mod
   unloads. Checked live (modern UI) with the action-bar and panel-tweaks examples: icons, tooltips, a swap and a bar
   moved by drags, a Berserk recast's total, a scaled target window, the location panel replaced, the skin on and off.
 - **Render** (`render`): per entity, while the mod runs (the newest mod's wins): hidden (model and plate), plate name and

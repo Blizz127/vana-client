@@ -3912,15 +3912,17 @@ fn world_hud(gu: &mut GameUi, world: &mut World, input: &UiInput, size: [u32; 2]
                     let tid = world.target.unwrap_or(0);
                     let tint = name_colour(tid, e, world, |i| gu.ncol(i));
                     gu.wrapped_name(monstrosity::name(e), max, t.x, t.y, tint, true, e.no_gauge);
-                    // Extras: the distance left of the HP gauge, the HP percent at the window's right, on the gauge's row.
+                    // The mods' slots (the bundled Target Info's): the distance left of the HP gauge, the HP percent at the
+                    // window's right, on the gauge's row.
                     if !e.no_gauge {
-                        if world.target_distance {
-                            gu.shape_text(&format!("{:.1}", e.pos.distance(world.pos)), t.x, t.y + 17.0, 0x8080_8080, false);
+                        if let Some(d) = world.lua.slot_num("target_distance") {
+                            gu.shape_text(&format!("{:.1}", d as f32), t.x, t.y + 17.0, 0x8080_8080, false);
                         }
-                        if world.target_hpp
+                        if let Some(h) = world.lua.slot_num("target_hpp")
                             && let Some(r) = rect
                         {
-                            gu.shape_text(&format!("{}%", e.hpp), r[0] + r[2] - 6.0, t.y + 17.0, gu.hp_tint(e.hpp), true);
+                            let h = h.clamp(0.0, 255.0) as u8;
+                            gu.shape_text(&format!("{h}%"), r[0] + r[2] - 6.0, t.y + 17.0, gu.hp_tint(h), true);
                         }
                     }
                 }
@@ -6452,15 +6454,11 @@ struct World {
     stamp_all_lines: bool,
     /// The skillchain helper's resonances and seen skills (client/skillchain.rs).
     skillchain: skillchain::Tracker,
-    /// Config `target_distance` / `target_hpp` (extras).
-    target_distance: bool,
-    target_hpp: bool,
     /// The lamps' lights (client/lamps.rs, Settings' Lamp Lights).
     lamps: lamps::Lamps,
     /// The actor shadows' light-state slots (client/shadows.rs).
     shadow_slots: shadows::Slots,
-    /// Config `earth_clock` (an extra, client/clock.rs) and `hide_ready_lines`.
-    earth_clock: bool,
+    /// Config `hide_ready_lines` (an extra).
     hide_ready_lines: bool,
     /// Config `short_battle` / `battle_name_colours` (extras, client/battlemod.rs).
     short_battle: bool,
@@ -7545,8 +7543,7 @@ impl App {
             w.map_opacity = self.cfg.map_overlay_opacity;
             w.window_opacity = self.cfg.window_opacity.clone();
             w.stamp_all_lines = self.cfg.stamp_all_lines;
-            (w.target_distance, w.target_hpp) = (self.cfg.target_distance, self.cfg.target_hpp);
-            (w.earth_clock, w.hide_ready_lines) = (self.cfg.earth_clock, self.cfg.hide_ready_lines);
+            w.hide_ready_lines = self.cfg.hide_ready_lines;
             (w.short_battle, w.name_colours) = (self.cfg.short_battle, self.cfg.battle_name_colours);
             w.extra_timers = self.cfg.timers;
             w.extra_regime = self.cfg.regime;
@@ -8414,9 +8411,6 @@ impl App {
                             synth_amount: self.cfg.synth_amount,
                             stamp_all_lines: self.cfg.stamp_all_lines,
                             skillchain: Default::default(),
-                            target_distance: self.cfg.target_distance,
-                            target_hpp: self.cfg.target_hpp,
-                            earth_clock: self.cfg.earth_clock,
                             lamps: Default::default(),
                             shadow_slots: Default::default(),
                             hide_ready_lines: self.cfg.hide_ready_lines,

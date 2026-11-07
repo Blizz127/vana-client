@@ -485,7 +485,7 @@ macro_rules! bundled {
         &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
     };
 }
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info"];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -604,6 +604,7 @@ impl Host {
         }
         info.placed.retain(|_, p| p.0 != vm.manifest.id);
         info.opacity.retain(|_, p| p.0 != vm.manifest.id);
+        info.slots.retain(|_, s| s.0 != vm.manifest.id);
         info.skin.forget(&vm.manifest.id);
         info.looks.retain(|_, l| l.0 != vm.manifest.id);
         info.item_tints.retain(|_, t| t.0 != vm.manifest.id);
@@ -1474,6 +1475,24 @@ impl Host {
         let mut out: std::collections::HashMap<String, f32> = self.info.borrow().opacity.iter().map(|(k, v)| (k.clone(), v.1)).collect();
         out.extend(player.iter().map(|(k, v)| (k.clone(), *v)));
         out
+    }
+
+    /// A built-in panel's slot a mod fills (ui.native.slot).
+    pub(in crate::client) fn slot(&self, name: &str) -> Option<serde_json::Value> {
+        self.info.borrow().slots.get(name).map(|s| s.1.clone())
+    }
+
+    /// A number slot (target_distance, target_hpp).
+    pub(in crate::client) fn slot_num(&self, name: &str) -> Option<f64> {
+        self.info.borrow().slots.get(name).and_then(|s| s.1.as_f64())
+    }
+
+    /// The clock slot as the panels draw it.
+    pub(in crate::client) fn clock_slot(&self) -> Option<super::clock::Parts> {
+        let v = self.slot("clock")?;
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or_default().to_string();
+        let n = |k: &str| v.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
+        Some(super::clock::Parts { earth: s("earth"), moon: (s("moon_name"), n("moon") as i32), next: (s("next_day"), n("next_minutes").max(0) as u64) })
     }
 
     /// Whether the mods' HUD draws: they run and `/lua hide` is off.
@@ -2487,10 +2506,10 @@ mod stub_tests {
     }
 }
 
-/// The labels of the bundled mods' settings on our Extras tabs (the Settings window's test that each has a place).
+/// The bundled mods' settings on our Extras tabs: (label, tab, place).
 #[cfg(test)]
-pub(in crate::client) fn bundled_tab_labels() -> Vec<String> {
-    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| d.label)).collect()
+pub(in crate::client) fn bundled_tab_rows() -> Vec<(String, String, Option<usize>)> {
+    BUNDLED.iter().filter_map(|b| bundled_manifest(b.0)).flat_map(|m| m.settings.into_values().filter(|d| !d.tab.is_empty()).map(|d| (d.label, d.tab, d.place))).collect()
 }
 
 /// A bundled mod's manifest.

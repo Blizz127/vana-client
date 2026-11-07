@@ -2282,15 +2282,6 @@ impl Overlay {
         self.shade.as_ref().map_or(0.0, |s| s.at(px - region.ox as f32, py - region.oy as f32))
     }
 
-    /// Extra, the minimap (client/minimap.rs): the style frame at `rect`, inside it `span` map pixels across centred on
-    /// `pos`, the dots (world x, z, colour, the target drawn larger) and our marker, coloured as the overlay's at
-    /// opacity `mix` (user, 2026-10-25: the two markers alike).
-    #[allow(clippy::too_many_arguments)]
-    /// The map's region and its image's texture once loaded (a Lua mod's map).
-    pub fn region(&self) -> Option<Region> {
-        self.region
-    }
-
     /// A window onto the image (a Lua HUD map in the classic UI): `rect`, centred on world (x, z), `span` map pixels
     /// across, at `alpha`; clipped to the rect. `me`: our marker at world (x, z) facing, as the classic map draws it.
     pub fn draw_window(&mut self, gu: &mut GameUi, rect: [f32; 4], centre: (f32, f32), span: f32, alpha: f32, me: Option<((f32, f32), f32)>) {
@@ -2308,6 +2299,10 @@ impl Overlay {
         gu.clip(None);
     }
 
+    /// Extra, the minimap (client/minimap.rs): the style frame at `rect`, inside it `span` map pixels across centred on
+    /// `pos`, the dots (world x, z, colour, the target drawn larger) and our marker, coloured as the overlay's at
+    /// opacity `mix` (user, 2026-10-25: the two markers alike).
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_mini(&mut self, gu: &mut GameUi, rect: [f32; 4], pos: (f32, f32), facing: f32, span: f32, dots: &[(f32, f32, u32, bool)], mix: f32) {
         self.poll(gu);
         let (Some(region), Some(t)) = (self.region, self.texture.clone()) else { return };

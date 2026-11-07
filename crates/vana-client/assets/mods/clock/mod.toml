@@ -1,0 +1,13 @@
+name = "Clock"
+version = "1.0.0"
+description = "Earth time, the moon phase and the next Vana'diel day beside the game's clock (the clock add-ons)."
+permissions = ["ui.native"]
+
+[settings.on]
+type = "bool"
+default = false
+label = "Clock"
+help = "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock."
+tab = "Misc."
+place = 2
+from = "earth_clock"

@@ -28,6 +28,8 @@ pub(super) struct FrameInfo {
     pub skin: super::skin::Skin,
     /// The modern UI's pixels per point while it is on (the HUD's UI unit there).
     pub modern_ppp: Option<f32>,
+    /// What mods put in the built-in panels' slots (ui.native.slot): slot -> (mod, value).
+    pub slots: std::collections::BTreeMap<String, (String, serde_json::Value)>,
     /// Mods' opacity for their own windows ("mod:<mod>:<window>", "hud:<mod>:<window>"): window -> (mod, opacity).
     pub opacity: std::collections::BTreeMap<String, (String, f32)>,
     /// This frame's view-projection, for draw.to_screen.
@@ -282,6 +284,20 @@ pub(super) fn install(lua: &Lua, game: &Table) -> mlua::Result<()> {
                 }
                 t.set(row, r)?;
             }
+            Ok(Some(t))
+        })?,
+    )?;
+    game.set(
+        "clock",
+        lua.create_function(|lua, ()| {
+            let w = world(lua)?;
+            let Some(c) = super::super::clock::parts(w) else { return Ok(None) };
+            let t = lua.create_table()?;
+            t.set("earth", c.earth)?;
+            t.set("moon_name", c.moon.0)?;
+            t.set("moon", c.moon.1)?;
+            t.set("next_day", c.next.0)?;
+            t.set("next_minutes", c.next.1)?;
             Ok(Some(t))
         })?,
     )?;

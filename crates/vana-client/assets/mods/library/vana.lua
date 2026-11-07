@@ -72,6 +72,7 @@
 ---@field heading number radians, 0 to 2π
 ---@field distance number from us, in yalms
 ---@field hpp integer
+---@field gauge boolean it has an HP gauge (the target window shows one)
 ---@field status integer
 ---@field speed number
 ---@field claim integer
@@ -500,10 +501,15 @@ function ui.native.interface_hidden() end
 ---@param show boolean 
 function ui.native.interface(show) end
 
---- Hides a HUD piece of the game in both UIs while the mod is loaded, or a modern panel by name (ui.native.panels: those that never take the keys; in the classic UI only the pieces hide): party (party and alliance lists, their status icons), target, buffs (our status icons), compass (the modern location panel), minimap, cast (the cast bar), plates (name plates), alliance (the alliance lists alone), log (the log windows: back while an event, a prompt or the chat line needs them), timers, regime (the training regime window), network (the connection panel), palette (the macro palette's drawing; its keys still run macros), clock (the Clock Extra's Earth time line), experience (the modern party window's experience bar). Needs ui.native.
+--- Hides a HUD piece of the game in both UIs while the mod is loaded, or a modern panel by name (ui.native.panels: those that never take the keys; in the classic UI only the pieces hide): party (party and alliance lists, their status icons), target, buffs (our status icons), compass (the modern location panel), minimap, cast (the cast bar), plates (name plates), alliance (the alliance lists alone), log (the log windows: back while an event, a prompt or the chat line needs them), timers, regime (the training regime window), network (the connection panel), palette (the macro palette's drawing; its keys still run macros), clock (the clock slot's line, ui.native.slot), experience (the modern party window's experience bar). Needs ui.native.
 ---@param piece string a piece or a panel
 ---@param hidden? boolean default true; false shows it again
 function ui.native.hide(piece, hidden) end
+
+--- Fills a built-in panel's slot, drawn by the panel in both UIs as its own text while the mod is loaded (the newest mod's value wins); nil empties it if it is this mod's. clock: {earth, moon_name, moon, next_day, next_minutes} (game.clock's table) beside the game's clock; target_distance: a number (yalms) in the target window; target_hpp: a number (percent) at the classic target window's right, in the HP colour. The target slots show on the current target. Needs ui.native.
+---@param slot string clock, target_distance or target_hpp
+---@param value? any nil empties it
+function ui.native.slot(slot, value) end
 
 --- Places, scales or fades a modern panel while the mod is loaded (the newest mod's place wins): x, y (its top left in window pixels, negative from the right or bottom edge; none keeps the panel's own place, and a panel placed at a point is not moved by the player), scale (0.25..4; the pointer works on it scaled) about origin (top_left (the default), top_right, bottom_left, bottom_right, center: the corner that stays put) and alpha (0..1). nil gives it back. The edge windows (timers, minimap, regime) only hide. Modern UI only. Needs ui.native.
 ---@param panel string a name from ui.native.panels
@@ -885,6 +891,10 @@ function game.recasts() end
 --- The Vana'diel clock: earth (seconds since the Vana'diel epoch), year, month, day, hour, minute, weekday (0 Firesday), moon_phase, moon (percent).
 ---@return vana.Time
 function game.time() end
+
+--- What the clock slot shows (ui.native.slot): earth (Earth's local time in the player's 12 / 24 hour format), moon_name, moon (percent), next_day (the next Vana'diel day's name), next_minutes (Earth minutes until it); nil until the clock and the message tables are known.
+---@return {earth: string, moon_name: string, moon: integer, next_day: string, next_minutes: integer}?
+function game.clock() end
 
 --- The weather id.
 ---@return integer

@@ -905,7 +905,7 @@ fn where_view(p: Look, w: &World) -> Option<WhereView> {
         day: (day, name),
         weather: Some(w.weather).filter(|&id| id < 20),
         compass: compass_view(w),
-        clock: (w.earth_clock && !w.lua.hides("clock")).then(|| super::super::clock::parts(w)).flatten(),
+        clock: (!w.lua.hides("clock")).then(|| w.lua.clock_slot()).flatten(),
     })
 }
 
@@ -1036,5 +1036,5 @@ fn target_view(w: &World, gu: Option<&super::super::game_ui::GameUi>) -> Option<
         "indicators/target_neutral"
     };
     let colour = gu.map(|gu| super::chat::colour(super::super::name_colour(id, e, w, |i| gu.ncol(i)).to_le_bytes()));
-    Some(TargetView { name, ring, locked: w.locked, hp: (!e.no_gauge).then_some((e.hpp, w.target_gauge.1 as f32 / 100.0)), colour, cast: target_cast(w, id), distance: w.target_distance.then(|| e.pos.distance(w.pos)) })
+    Some(TargetView { name, ring, locked: w.locked, hp: (!e.no_gauge).then_some((e.hpp, w.target_gauge.1 as f32 / 100.0)), colour, cast: target_cast(w, id), distance: w.lua.slot_num("target_distance").map(|d| d as f32) })
 }

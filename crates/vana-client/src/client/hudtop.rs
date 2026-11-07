@@ -481,11 +481,10 @@ impl HudTop {
                 self.grid = super::map::grid_text(w, gu.map_regions());
             }
             let end = gu.shape_text(&format!("{}:{:02}  {}", m / 60, m % 60, self.grid), cx - 50.0, cy + 26.0, tint, false);
-            // Ours (the Clock extra): Earth time and the moon over the next day, right of the compass and its time
-            // (under it is the log).
-            if w.earth_clock
-                && !w.lua.hides("clock")
-                && let Some(c) = super::clock::parts(w)
+            // Ours (the clock slot, the bundled Clock mod's): Earth time and the moon over the next day, right of the
+            // compass and its time (under it is the log).
+            if !w.lua.hides("clock")
+                && let Some(c) = w.lua.clock_slot()
             {
                 let x = end.max(cx + 40.0) + 16.0;
                 gu.shape_text(&format!("Earth {}  Moon {}%", c.earth, c.moon.1), x, cy + 12.0, tint, false);

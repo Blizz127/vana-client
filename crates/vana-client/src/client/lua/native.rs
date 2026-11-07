@@ -261,6 +261,36 @@ pub(super) fn install(lua: &Lua, ui: &Table, mod_id: &str) -> mlua::Result<()> {
             Ok(out)
         })?,
     )?;
+    let me = mod_id.to_string();
+    t.set(
+        "slot",
+        lua.create_function(move |lua, (name, value): (String, mlua::Value)| {
+            need(lua, "ui.native")?;
+            let v: serde_json::Value = match value {
+                mlua::Value::Nil | mlua::Value::Boolean(false) => serde_json::Value::Null,
+                v => mlua::LuaSerdeExt::from_value(lua, v)?,
+            };
+            // Each slot's shape, checked here so the panels draw only what they can.
+            let ok = match name.as_str() {
+                "clock" => v.is_null() || ["earth", "moon_name", "next_day"].iter().all(|k| v.get(k).is_some_and(|x| x.is_string())) && ["moon", "next_minutes"].iter().all(|k| v.get(k).is_some_and(|x| x.is_number())),
+                "target_distance" | "target_hpp" => v.is_null() || v.is_number(),
+                _ => return Err(mlua::Error::runtime(format!("no slot {name:?} (clock, target_distance, target_hpp)"))),
+            };
+            if !ok {
+                return Err(mlua::Error::runtime(format!("slot {name}: the wrong shape of value (see ui.native.slot)")));
+            }
+            let info = info(lua);
+            let mut f = info.borrow_mut();
+            if v.is_null() {
+                if f.slots.get(&name).is_some_and(|s| s.0 == me) {
+                    f.slots.remove(&name);
+                }
+            } else {
+                f.slots.insert(name, (me.clone(), v));
+            }
+            Ok(())
+        })?,
+    )?;
     t.set(
         "hidden",
         lua.create_function(|lua, what: String| Ok(info(lua).borrow().hidden.get(&what).is_some_and(|m| !m.is_empty())))?,

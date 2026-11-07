@@ -1303,6 +1303,8 @@ pub(super) fn entity(lua: &Lua, w: &World, id: u32, e: &super::super::Entity) ->
     t.set("heading", e.yaw)?;
     t.set("distance", e.pos.distance(w.pos))?;
     t.set("hpp", e.hpp)?;
+    // It has an HP gauge (the target window shows one).
+    t.set("gauge", !e.no_gauge)?;
     t.set("status", e.motion.status)?;
     t.set("speed", f32::from(e.motion.speed) / 10.0)?;
     t.set("claim", e.claim)?;
@@ -1357,6 +1359,7 @@ pub(super) fn self_entity(lua: &Lua, w: &World) -> mlua::Result<Table> {
     t.set("heading", my_heading(w))?;
     t.set("distance", 0.0)?;
     t.set("hpp", w.vitals.map_or(100, |v| v.3))?;
+    t.set("gauge", true)?;
     t.set("status", w.my_motion.status)?;
     t.set("speed", f32::from(w.my_motion.speed) / 10.0)?;
     t.set("claim", 0)?;

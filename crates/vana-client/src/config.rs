@@ -202,10 +202,6 @@ pub struct Config {
     /// Extra (the timestamp add-on): retail's chat timestamps (config 0xb5) on every log line; seconds while 0xb5 is
     /// off.
     pub stamp_all_lines: bool,
-    /// Extra (the distance / target-info add-ons): the target's distance in the target window, and its HP percent in the
-    /// classic one (the modern one shows it anyway).
-    pub target_distance: bool,
-    pub target_hpp: bool,
     /// Not retail (Settings' Lamp Lights): real point lights at the zones' lamps in place of their baked lamplight
     /// (client/lamps.rs).
     pub lamp_lights: bool,
@@ -216,8 +212,6 @@ pub struct Config {
     pub shadow_map: u32,
     /// Ambient occlusion on the scenery (render/ssao.rs). Not a retail option.
     pub ssao: bool,
-    /// Extra (the clock add-ons): Earth time, the moon and the next day beside the Vana'diel clock (client/clock.rs).
-    pub earth_clock: bool,
     /// The Game Master window (ours, client/gm.rs): its request (c2s 0x1F0) goes out at a zone-in only while this is
     /// on and only to a private server. No Settings row: only a server with its GM extension can use it, so it is set
     /// in config.json by hand.
@@ -460,9 +454,6 @@ impl Default for Config {
             map_overlay_opacity: 0.6,
             synth_amount: false,
             stamp_all_lines: false,
-            target_distance: false,
-            target_hpp: false,
-            earth_clock: false,
             gm_window: false,
             notes_seen: env!("CARGO_PKG_VERSION").into(),
             lamp_lights: true,

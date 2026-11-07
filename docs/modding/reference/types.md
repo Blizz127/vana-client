@@ -51,6 +51,7 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `heading` | `number` | The way it faces, in radians (0 east, π/2 south). |
 | `distance` | `number` | Its straight-line distance from you in yalms, height included; 0 for yourself. |
 | `hpp` | `integer` | HP percent. Yours is 100 until the server has sent your vitals. |
+| `gauge` | `boolean` | It has an HP gauge: the target window shows one for it. |
 | `status` | `integer` | The server's status, as `Player.status`. |
 | `speed` | `number` | Its movement speed, in yalms per second. |
 | `claim` | `integer` | The server id of whoever has claimed it; 0 when nobody has. Always 0 for yourself. |

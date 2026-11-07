@@ -33,6 +33,7 @@ end)
 | [`ui.native.interface(show)`](#uinativeinterface) | Shows or hides the whole interface. |
 | [`ui.native.hide(piece, hidden?)`](#uinativehide) | Hides or shows a piece of the game's HUD, or a modern panel. |
 | [`ui.native.hidden(piece)`](#uinativehidden) | Whether any mod hides a HUD piece or panel. |
+| [`ui.native.slot(slot, value?)`](#uinativeslot) | Fills a built-in panel's slot: the clock line, the target's distance and HP %. |
 | [`ui.native.place(panel, place?)`](#uinativeplace) | Moves, scales or fades a modern panel. |
 | [`ui.native.rect(panel)`](#uinativerect) | Where a modern panel is on screen. |
 | [`ui.native.panels()`](#uinativepanels) | Every modern panel a mod may name, with where it is. |
@@ -102,7 +103,7 @@ end)
 | `"regime"` | The training regime window. |
 | `"network"` | The connection panel. |
 | `"palette"` | The macro palette's drawing (its keys still run macros). |
-| `"clock"` | The Earth time line of the Clock extra. |
+| `"clock"` | The line beside the game's clock ([`ui.native.slot`](#uinativeslot)'s `clock`). |
 | `"experience"` | The experience bar on the modern party window's top edge. |
 
 ## Modern panels
@@ -390,6 +391,49 @@ Whether any mod (yours or another) hides a HUD piece now.
 if ui.native.hidden("minimap") then
   print("another mod hides the minimap")
 end
+```
+
+## `ui.native.slot`
+
+```lua
+ui.native.slot(slot, value?)
+```
+
+Puts your values in a slot of a built-in panel. The panel draws them as its own text, in both UIs, in its own font,
+place and colours, so they look as the rest of it does. The value stays until you change it, empty it with `nil`, or
+your mod unloads. If two mods fill one slot, the last call wins; a mod's `nil` only empties a slot it filled.
+
+| Slot | Value | Where it shows |
+| --- | --- | --- |
+| `"clock"` | `{earth, moon_name, moon, next_day, next_minutes}`, the table [`game.clock`](game.md#gameclock) returns | Beside the game's clock: Earth time, the moon's percent and the next day (the modern location panel puts it on one line, the moon's name in its tooltip). |
+| `"target_distance"` | `number`, in yalms | The target window: left of the HP gauge in the classic UI (targets with a gauge), beside the name in the modern one. Shown with one decimal. |
+| `"target_hpp"` | `number`, a percent | The classic target window's right edge, on the gauge's row, in the HP colour. The modern one always shows the percent. |
+
+The target slots show on whatever is targeted, so set them as the target changes: every frame is simplest.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `slot` | `string` | yes | `"clock"`, `"target_distance"` or `"target_hpp"`. |
+| `value` | see above | no | `nil` (or `false`) empties the slot. |
+
+**Returns** nothing.
+
+**Needs** the `ui.native` permission.
+
+**Errors**
+- Without the permission: `this needs the ui.native permission: ...`.
+- An unknown slot: `no slot "..."`, with the list; a value of the wrong shape: `slot ...: the wrong shape of value`.
+
+**Example**
+
+```lua
+-- The bundled Target Info's way: the distance with every frame.
+events.on("frame", function()
+  local t = game.target()
+  ui.native.slot("target_distance", t and t.distance or nil)
+end)
 ```
 
 ## `ui.native.place`

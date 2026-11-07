@@ -24,9 +24,6 @@ pub struct Settings {
     pub map_opacity: u32,
     pub synth_amount: bool,
     pub stamp_all_lines: bool,
-    pub target_distance: bool,
-    pub target_hpp: bool,
-    pub earth_clock: bool,
     pub lamp_lights: bool,
     pub actor_shadows: u32,
     pub shadow_map: u32,
@@ -77,9 +74,6 @@ impl Settings {
             map_opacity: pct(c.map_overlay_opacity),
             synth_amount: c.synth_amount,
             stamp_all_lines: c.stamp_all_lines,
-            target_distance: c.target_distance,
-            target_hpp: c.target_hpp,
-            earth_clock: c.earth_clock,
             lamp_lights: c.lamp_lights,
             actor_shadows: c.actor_shadows,
             shadow_map: c.shadow_map,
@@ -127,9 +121,6 @@ impl Settings {
         c.map_overlay_opacity = self.map_opacity as f32 / 100.0;
         c.synth_amount = self.synth_amount;
         c.stamp_all_lines = self.stamp_all_lines;
-        c.target_distance = self.target_distance;
-        c.target_hpp = self.target_hpp;
-        c.earth_clock = self.earth_clock;
         c.lamp_lights = self.lamp_lights;
         c.actor_shadows = self.actor_shadows;
         c.shadow_map = self.shadow_map;
@@ -187,9 +178,6 @@ enum Val {
     PartyTp,
     SynthAmount,
     StampAll,
-    TargetDistance,
-    TargetHpp,
-    EarthClock,
     LampLights,
     ActorShadows,
     ShadowMap,
@@ -381,8 +369,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const TIMERS_MODERN: &[SRow] = &[TIMERS_ROW, REGIME_ROW, SKILLCHAIN_ROW];
     // A page holds 7 rows: what touches battle has its own.
     const EXTRA_BATTLE: &[SRow] = &[
-        row("Target Distance", "Shows how far away your target is in the target window.", TargetDistance, OFF_ON, Now),
-        row("Target HP %", "Shows your target's HP percent next to its HP bar in the classic target window. The modern one always shows it.", TargetHpp, OFF_ON, Now),
         row("Ready Lines", "Shows every \"readies\" and \"starts casting\" line, or only yours and monsters' so you see what is coming at you.", ReadyLines, &[(0, "All"), (1, "Mine, Monsters'")], Now),
         row("Battle Text", "Shows battle lines the way the game words them, or shortened, like \"Name [Fast Blade] → Wild Rabbit: 123\".", ShortBattle, &[(0, "Retail"), (1, "Short")], Now),
         row("Battle Names", "Shows names in battle lines in one colour, or coloured by who they are: you, your party, your alliance, monsters you claimed, and others' claims.", NameColours, &[(0, "Plain"), (1, "Coloured")], Now),
@@ -390,7 +376,6 @@ fn rows(kind: Kind, tab: usize, in_game: bool, modern: bool) -> &'static [SRow] 
     const EXTRA_MISC: &[SRow] = &[
         row("Synthesis Amount", "After you press Synthesize, asks how many to make and crafts them one after another.", SynthAmount, OFF_ON, Now),
         row("Timestamps on All Lines", "Puts the time on every chat log line, not only chat.", StampAll, OFF_ON, Now),
-        row("Clock", "Shows Earth time, the moon phase and the next Vana'diel day next to the game's clock.", EarthClock, OFF_ON, Now),
     ];
     match kind {
         Kind::Extras if modern => [&MAPS[..2], TIMERS_MODERN, EXTRA_BATTLE, EXTRA_MISC].get(tab).copied().unwrap_or(&[]),
@@ -590,9 +575,6 @@ impl SettingsUi {
             Val::MouseCamSpeed => self.s.mouse_camera_speed,
             Val::SynthAmount => self.s.synth_amount as u32,
             Val::StampAll => self.s.stamp_all_lines as u32,
-            Val::TargetDistance => self.s.target_distance as u32,
-            Val::TargetHpp => self.s.target_hpp as u32,
-            Val::EarthClock => self.s.earth_clock as u32,
             Val::LampLights => self.s.lamp_lights as u32,
             Val::ActorShadows => self.s.actor_shadows,
             Val::ShadowMap => self.s.shadow_map,
@@ -635,9 +617,6 @@ impl SettingsUi {
             Val::MouseCamSpeed => self.s.mouse_camera_speed = x,
             Val::SynthAmount => self.s.synth_amount = x != 0,
             Val::StampAll => self.s.stamp_all_lines = x != 0,
-            Val::TargetDistance => self.s.target_distance = x != 0,
-            Val::TargetHpp => self.s.target_hpp = x != 0,
-            Val::EarthClock => self.s.earth_clock = x != 0,
             Val::LampLights => self.s.lamp_lights = x != 0,
             Val::ActorShadows => self.s.actor_shadows = x,
             Val::ShadowMap => self.s.shadow_map = x,
@@ -1180,7 +1159,7 @@ impl SettingsUi {
     #[cfg(test)]
     pub fn all_labels(in_game: bool, modern: bool) -> Vec<&'static str> {
         let pages = (0..TABS.len()).filter(|&t| t != MODS).map(|t| (Kind::Settings, t)).chain((0..EXTRA_TABS.len()).map(|t| (Kind::Extras, t)));
-        let bundled = super::lua::bundled_tab_labels().into_iter().map(|l| &*Box::leak(l.into_boxed_str()));
+        let bundled = super::lua::bundled_tab_rows().into_iter().map(|r| &*Box::leak(r.0.into_boxed_str()));
         pages.flat_map(|(k, t)| rows(k, t, in_game, modern).iter()).map(|r| r.label).chain(bundled).collect()
     }
 }
@@ -1670,6 +1649,24 @@ mod tests {
         ui.set(shown[0].val, 1);
         assert_eq!(ui.mod_changes, [("m".to_string(), "first".to_string(), serde_json::Value::from(3))]);
         assert_eq!(ui.get(shown[0].val), 1);
+    }
+
+    /// The Extras tabs with the bundled mods' rows read as they did before those Extras became mods.
+    #[test]
+    fn extras_rows_keep_their_order() {
+        let mut ui = SettingsUi::open_kind(&Config::default(), [1280, 800], Kind::Extras);
+        let rows = crate::client::lua::bundled_tab_rows()
+            .into_iter()
+            .map(|(label, tab, place)| ModRow { key: label.clone(), label, help: String::new(), choices: vec![("ON".into(), true.into()), ("OFF".into(), false.into())], at: 0, tab, place })
+            .collect();
+        ui.set_mod_pages(vec![ModPage { id: "bundled".into(), name: "Bundled".into(), rows }]);
+        let tab = |ui: &mut SettingsUi, t: usize| {
+            ui.tab = t;
+            ui.rows().iter().map(|r| r.label.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(tab(&mut ui, 0), ["Map Overlay", "Map Overlay Opacity", "Minimap", "Minimap Position", "Minimap Size"]);
+        assert_eq!(tab(&mut ui, 2), ["Target Distance", "Target HP %", "Trust Speech", "Ready Lines", "Battle Text", "Battle Names"]);
+        assert_eq!(tab(&mut ui, 3), ["Synthesis Amount", "Timestamps on All Lines", "Clock", "Text Auto-Advance"]);
     }
 
     #[test]
