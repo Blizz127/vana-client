@@ -511,6 +511,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "auction-desk",
     "npc-errands",
     "completion-log",
+    "monster-notes",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -2455,6 +2456,22 @@ mod tests {
         "#;
         vm.lua.globals().set("INIT", init).unwrap();
         vm.lua.load(script).exec().unwrap_or_else(|e| panic!("{e}"));
+    }
+
+    /// No two bundled mods register the same // command (the first loaded would take it).
+    #[test]
+    fn bundled_commands_unique() {
+        let mut seen: std::collections::HashMap<String, &str> = std::collections::HashMap::new();
+        for (id, _, files) in BUNDLED {
+            for (_, src) in files.iter() {
+                for part in src.split("commands.register(\"").skip(1) {
+                    let name = part.split('"').next().unwrap().to_string();
+                    if let Some(other) = seen.insert(name.clone(), id) {
+                        assert_eq!(other, *id, "//{name} is registered by both {other} and {id}");
+                    }
+                }
+            }
+        }
     }
 
     /// Calculator: precedence, brackets, powers, k / m, commas in the answer; bad input is an error line, never run.

@@ -1,0 +1,17 @@
+name = "Monster Notes"
+version = "1.0.0"
+description = "A bar across the top of the screen with the zone, the time and weather, and your target: its /check result and the notes you keep on it (the info bar add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = false
+label = "Monster Notes"
+help = "A bar with the zone, Vana'diel time, weather and the target (distance, HP, its last /check). //mobnote <text> keeps a note on the targeted monster's name; //mobnote clear removes it."
+
+[settings.place]
+type = "enum"
+default = "Top"
+options = ["Top", "Bottom"]
+label = "Bar Place"
+help = "Across the top of the screen, or above the log."

@@ -416,6 +416,12 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (an area's quests, done, under way or not started); `//left spells [job]` and `//left quests` print summaries. New
   `game.quests` (the Quests window's own data and names). Seen live: BLM's unlearned spells, Windurst's quests, the
   summaries. Not done: titles, missions, key items, quest markers over NPCs.
+- **Monster Notes** (assets/mods/monster-notes; InfoBar, ibar, mobdb): a bar across the top of the screen (or above
+  the log) with the zone, Vana'diel time and day, the weather, and the target: HP, distance, its last /check (level,
+  difficulty, defence and evasion, from the check's message) and the note kept on its name (`//mobnote <text>`,
+  `//mobnote clear`). Seen live on a Forest Hare: "Lv 2, too weak, low defence, low evasion" beside the game's own
+  lines. Not done: a bundled monster table (this LandSandBoat keeps most monster data in its zone scripts).
+  A Rust test now keeps two bundled mods from registering the same `//` command (`//note` was Screen Notes').
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
