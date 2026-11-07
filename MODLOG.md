@@ -22902,6 +22902,12 @@ From FFXiMain.dll (Steven's unpacked copy), full_text.asm, FUN_100a7b80.
   our id as actor before that and within 2 s of the ask is taken as the refusal (but experience, limit and capacity
   points, defeats: 6, 8, 105, 253, 371, 372, 718, 735). *inf:* the heuristic leans on LSB answering a refused action
   at once with a 0x029 and an accepted one with a 0x028 first.
+- 2026-11-07: the chip is the bundled mod Pending Actions (assets/mods/pending-actions; the user: a mod, not a
+  built-in): the asks from c2s 0x01A (categories 3 / 7 / 9) and 0x037 seen by packets.on_out, the confirmation by the
+  `action` event, the refusal by `battle_message` with its line from res.message (the game's own text whatever other
+  mods filter); a window with `panel = "pending"` holding a `chip` element the client draws as the chip was
+  (modern/pending.rs chip). pending.rs and World.asked are gone. Compared with master live (Provoke on Fulchia:
+  refused, "You cannot attack that target.", gone after 4 s): the same chip.
 
 ## itemctrl / moneyctr: the mouse (2026-11-02)
 

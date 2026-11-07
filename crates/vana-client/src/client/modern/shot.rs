@@ -301,7 +301,7 @@ fn sample(m: &Modern, ctx: &egui::Context, layout: &mut Layout, opts: &Opts) {
     }
     hud::cast_panel(&mut p, "cast", "Casting", 0.6, "60%");
     // A refused action's chip over the cast bar (pending.rs).
-    super::pending::panel(&mut p, &super::pending::View { what: "Cure III".into(), on: Some("Raven".into()), state: super::super::pending::State::Refused("Raven is out of range.".into()), secs: 0.6 });
+    p.panel("pending", None, 300.0, |ui| super::pending::chip(ui, m, "Cure III \u{2192} Raven", "refused", 1, "Raven is out of range."));
     if !opts.titles {
         hud::target_panel(&mut p, &TargetView { name: "Robber Crab".into(), ring: "indicators/target_hostile", locked: true, hp: Some((72, 0.72)), colour: Some(egui::Color32::from_rgb(255, 80, 80)), cast: Some(("Firaga".into(), Some(0.4))), distance: Some(12.4) });
     }

@@ -408,6 +408,7 @@ pub(super) fn install(lua: &Lua, vm: &super::vm::Vm, storage: (serde_json::Value
             match e {
                 Elem::Timers { builtin, .. } => t.set("builtin", *builtin)?,
                 Elem::Targets { rows, .. } => t.set("count", rows.len())?,
+                Elem::Chip { text, .. } => t.set("text", text.as_str())?,
                 Elem::Text { text, .. } | Elem::Input { text, .. } => t.set("text", text.as_str())?,
                 Elem::Buttons { marked, .. } => t.set("at", marked.map(|m| m + 1))?,
                 Elem::Slider { at, .. } | Elem::List { at, .. } | Elem::Tabs { at, .. } | Elem::Choice { at, .. } => t.set("at", at + 1)?,
@@ -1770,9 +1771,26 @@ fn elem_only(t: &Table) -> mlua::Result<super::window::Elem> {
             dim: t.get::<Option<bool>>("dim")?.unwrap_or(false),
         },
         "separator" => Elem::Separator,
+        "chip" => Elem::Chip {
+            id: t.get::<Option<String>>("id")?.unwrap_or_default(),
+            text: t.get::<Option<String>>("text")?.unwrap_or_default(),
+            note: t.get::<Option<String>>("note")?.unwrap_or_default(),
+            tone: tone(t.get::<Option<String>>("tone")?.as_deref())?,
+            detail: t.get::<Option<String>>("detail")?.unwrap_or_default(),
+        },
         "targets" => Elem::Targets { id: t.get::<Option<String>>("id")?.unwrap_or_default(), rows: target_rows(t.get("rows")?)? },
         other => return Err(mlua::Error::runtime(format!("unknown element type {other:?}"))),
     })
+}
+
+/// A `chip` element's tone.
+fn tone(v: Option<&str>) -> mlua::Result<u8> {
+    match v {
+        None | Some("waiting") => Ok(0),
+        Some("refused") => Ok(1),
+        Some("quiet") => Ok(2),
+        Some(o) => Err(mlua::Error::runtime(format!("chip tone {o:?}: waiting, refused or quiet"))),
+    }
 }
 
 /// A `targets` element's rows: {entity, label, tag} each.
@@ -1834,6 +1852,12 @@ fn update(e: &mut super::window::Elem, t: &Table) -> mlua::Result<()> {
         }
         Elem::Targets { rows, .. } => {
             if t.contains_key("rows")? { *rows = target_rows(t.get("rows")?)?; }
+        }
+        Elem::Chip { text, note, tone: k, detail, .. } => {
+            if let Some(v) = t.get::<Option<String>>("text")? { *text = v; }
+            if let Some(v) = t.get::<Option<String>>("note")? { *note = v; }
+            if let Some(v) = t.get::<Option<String>>("detail")? { *detail = v; }
+            if t.contains_key("tone")? { *k = tone(t.get::<Option<String>>("tone")?.as_deref())?; }
         }
         Elem::Gauge { label, value, text, kind, dim, .. } => {
             if let Some(v) = t.get::<Option<bool>>("dim")? { *dim = v; }

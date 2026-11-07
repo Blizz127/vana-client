@@ -42,7 +42,6 @@ mod game_ui;
 mod hudtop;
 mod listsearch;
 mod favs;
-mod pending;
 mod suggest;
 mod augment;
 mod iteminfo;
@@ -6510,8 +6509,6 @@ struct World {
     favourites: Vec<String>,
     fav_strip: bool,
     fav_save: bool,
-    /// The action we asked the server for and its answer so far (pending.rs).
-    asked: Option<pending::Pending>,
     /// The battle menu's suggestions (suggest.rs::refresh_root), when they were taken, and the one the cursor is on.
     root_sugg: Vec<suggest::Suggestion>,
     root_sugg_at: Option<Instant>,
@@ -8636,7 +8633,6 @@ impl App {
                             favourites: self.cfg.modern_favourites.get(&login.name).cloned().unwrap_or_default(),
                             fav_strip: self.cfg.modern_fav_strip,
                             fav_save: false,
-                            asked: None,
                             root_sugg: Vec::new(),
                             root_sugg_at: None,
                             battle_rows: Vec::new(),
@@ -14014,7 +14010,6 @@ impl App {
             combat::battle_frame(w);
             synth::update(w);
             resttick::update(w);
-            pending::update(w);
             servmes::frame(w);
             ranking::frame(w);
             // A server's certificate pin that could not be saved: told once a run.

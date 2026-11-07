@@ -124,6 +124,9 @@ pub enum Elem {
     /// Rows naming entities (a label, the entity's name in its colour, its HP), drawn as the focus panel's; a click
     /// targets the entity. Modern UI only.
     Targets { id: String, rows: Vec<TargetRow> },
+    /// A status line as the pending-action chip's: a dot, the text, a note at the right in the tone's colour, and a
+    /// detail line under it. Tone 0 waiting, 1 refused, 2 quiet. Modern UI only.
+    Chip { id: String, text: String, note: String, tone: u8, detail: String },
 }
 
 /// A `targets` row: the entity by server id, a short label before its name, the tag that names it in commands.
@@ -155,7 +158,7 @@ pub struct Meta {
 
 impl Elem {
     pub fn stop(&self) -> bool {
-        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. } | Elem::Timers { .. } | Elem::Targets { .. })
+        !matches!(self, Elem::Text { .. } | Elem::Gauge { .. } | Elem::Separator | Elem::Canvas { .. } | Elem::Timers { .. } | Elem::Targets { .. } | Elem::Chip { .. })
     }
 
     pub fn id(&self) -> Option<&str> {
@@ -169,7 +172,7 @@ impl Elem {
             | Elem::Colour { id, .. }
             | Elem::Section { id, .. }
             | Elem::Canvas { id, .. } => Some(id),
-            Elem::Text { id, .. } | Elem::Gauge { id, .. } | Elem::Timers { id, .. } | Elem::Targets { id, .. } if !id.is_empty() => Some(id),
+            Elem::Text { id, .. } | Elem::Gauge { id, .. } | Elem::Timers { id, .. } | Elem::Targets { id, .. } | Elem::Chip { id, .. } if !id.is_empty() => Some(id),
             _ => None,
         }
     }
@@ -948,7 +951,7 @@ impl Window {
         }
         match &self.elems[i] {
             // The Timers' panels draw their sections (timers.rs, modern/extras.rs); target rows are modern only.
-            Elem::Timers { .. } | Elem::Targets { .. } => 0.0,
+            Elem::Timers { .. } | Elem::Targets { .. } | Elem::Chip { .. } => 0.0,
             Elem::Text { .. } => LINE,
             Elem::Buttons { .. } | Elem::Slider { .. } | Elem::Input { .. } | Elem::Choice { .. } => PITCH,
             Elem::List { height, columns, .. } => LINE * (*height + usize::from(has_header(columns))) as f32 + 6.0,
@@ -993,7 +996,7 @@ impl Window {
             }
             let here = self.focus && i == self.at;
             match e {
-                Elem::Timers { .. } | Elem::Targets { .. } => {}
+                Elem::Timers { .. } | Elem::Targets { .. } | Elem::Chip { .. } => {}
                 Elem::Text { text, dim, colour, .. } => {
                     gu.text_fit(text, x + 20.0, ey, w - 40.0, colour.map_or(if *dim { DIM } else { N }, tint));
                 }

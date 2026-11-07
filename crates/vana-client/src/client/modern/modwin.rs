@@ -199,6 +199,7 @@ pub(super) fn body(ui: &mut egui::Ui, m: &super::Modern, ctx: &egui::Context, gu
         match e {
             // The Timers' panels draw their sections (extras.rs).
             Elem::Timers { .. } => {}
+            Elem::Chip { text, note, tone, detail, .. } => super::pending::chip(ui, m, text, note, *tone, detail),
             Elem::Targets { rows, .. } => {
                 if let Some(w) = world
                     && let Some(id) = super::hud::other_rows(ui, m, &super::hud::other_views(w, gu, rows))

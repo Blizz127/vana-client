@@ -333,7 +333,6 @@ impl Modern {
         extras::draw(&mut p, w);
         hud::draw(&mut p, w);
         favs::draw(&mut p, w);
-        pending::draw(&mut p, w);
         command::draw(&mut p, w);
         combat::draw(&mut p, w);
         lists::draw(&mut p, w);

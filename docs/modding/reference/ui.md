@@ -242,6 +242,20 @@ fields, all numbers defaulting to `0` unless shown:
 | `"text"` | `x`, `y`, `text` (default `""`) | Text with its top left at (x, y), in the UI's text font. |
 | `"icon"` | `x`, `y`, `size` (default `16`), `kind`, `id` | A square icon with its top left at (x, y): `kind` is `"item"` (or none), `"status"`, `"spell"` or `"ability"`, as for [`hud.icon`](hud.md#hudicon). `id` is required. |
 
+### chip
+
+A status line drawn as the modern pending-action chip: a dot, the text, a note at the right and a detail line under
+it, in the tone's colour (`waiting`: the note muted and the dot in the focus colour; `refused`: red; `quiet`: muted).
+It is not a cursor stop, and the classic UI does not draw it. `ui.update` changes any field.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | `""` | The element's id, for `ui.update`. |
+| `text` | `string` | `""` | The line (`"Cure III → Raven"`). |
+| `note` | `string` | `""` | The note at the right (`"waiting..."`, `"refused"`). |
+| `tone` | `string` | `"waiting"` | `"waiting"`, `"refused"` or `"quiet"`. |
+| `detail` | `string` | `""` | A line under it; none when empty. |
+
 ### targets
 
 Rows that each name an entity, drawn as the modern focus panel's rows were: a short label, the entity's name in its
@@ -402,7 +416,7 @@ redraws it with the new elements; the values you give (`at`, `text`, `open` and 
 | `edge` | `boolean` | `false` | An edge window, drawn as the Timers and the training regime windows are: on a screen edge (in the modern UI the player drags it along the edges), folding to a tab that shows `title`, with `heading` as a line over the elements; a click on that line folds it. It is a HUD window: it never takes the keys. |
 | `heading` | `string` | the title | An edge window's line over its elements. |
 | `resize` | `boolean` | `false` | An edge window the player can make wider (modern UI). |
-| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"`, `"timers_debuffs"`, `"skillchains"` (the client's skillchain helper view, drawn whatever the window's elements are) or `"minimap"` (the client's minimap, with Wide Scan under it in the modern UI): the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows; in the modern UI one takes a place the first time it shows (the left edge under the edge windows there if it fits above the location panel, else the right edge under the minimap) and keeps it until the player moves it. An ordinary (not edge) window takes `"focus"`: it stands in for the modern focus panel, on the target panel, with its place, `ui.native.hide` and `/uimodes`; it is not drawn while an event takes the target window down, nor in the classic UI. |
+| `panel` | `string` | none | `"regime"`, `"timers_recasts"`, `"timers_buffs"`, `"timers_debuffs"`, `"skillchains"` (the client's skillchain helper view, drawn whatever the window's elements are) or `"minimap"` (the client's minimap, with Wide Scan under it in the modern UI): the edge window stands in for that built-in panel: its saved place and fold, its name for `ui.native.hide` and `/uimodes`, and in the classic UI its place in the Timers' dock (under the Timers window, with the drawer arrow and the slide). The classic UI draws an edge window without a `panel` as other windows; in the modern UI one takes a place the first time it shows (the left edge under the edge windows there if it fits above the location panel, else the right edge under the minimap) and keeps it until the player moves it. An ordinary (not edge) window takes `"focus"` (the modern focus panel, on the target panel; not drawn while an event takes the target window down) or `"pending"` (the pending-action chip's panel, over the cast bar): it stands in for that panel, with its place, `ui.native.hide` and `/uimodes`; neither is drawn in the classic UI. |
 
 **Returns** nothing.
 

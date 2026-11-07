@@ -502,7 +502,7 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 
 /// The built-in modern panels a mod's ordinary window may stand in for (ui.window's `panel`): its place and docking,
 /// /uimodes and hiding; not drawn in the classic UI.
-pub(in crate::client) const STAND_IN_PANELS: [&str; 1] = ["focus"];
+pub(in crate::client) const STAND_IN_PANELS: [&str; 2] = ["focus", "pending"];
 
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
@@ -522,6 +522,7 @@ const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance"
     "item-details" ["src/trials.lua"],
     "objective-sets",
     "focus-target",
+    "pending-actions",
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],

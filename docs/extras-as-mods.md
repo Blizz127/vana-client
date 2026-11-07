@@ -455,6 +455,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `/uimodes`, hiding; not drawn while an event takes the target window down, nor in the classic UI), the `targets`
   element (rows of entities drawn by the client as the panel's rows were; a click targets), and `game.player()`'s
   `focus_target` / `last_target`. `<lt>` / `<ft>` stay the client's. Compared live with master: the same panel.
+- **Pending Actions** (assets/mods/pending-actions, on by default): the modern UI's pending-action chip (PR #74) as a
+  mod: asks seen in c2s 0x01A / 0x037, the confirmation in the `action` event, the refusal from our battle message
+  with the game's own line (`res.message`). New: the `chip` element and the `"pending"` stand-in panel. Compared live
+  with master: the same chip, place and keep time. On the way: the sandbox's `os.clock` is now wall time (C's clock()
+  is CPU time; fourteen bundled mods' countdowns ran at its pace).
 - `/uimodes` lists every loaded mod's windows and HUD groups (the user: all mods' windows there): each a row with
   Shown / Hidden per mode and a pin, faded as the built-in panels are. Seen live: Hotbars and the XP Tracker's
   window hidden in Exploration.

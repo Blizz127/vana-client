@@ -186,6 +186,12 @@ impl ModState {
 /// A filter's budget per call (it runs inside the game's own paths).
 pub(super) const FILTER_CAP: Duration = Duration::from_millis(20);
 
+/// The client's start, for os.clock.
+fn process_start() -> Instant {
+    static START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+    *START.get_or_init(Instant::now)
+}
+
 pub(super) struct Handler {
     pub id: u64,
     pub event: String,
@@ -235,9 +241,12 @@ impl Vm {
         // os: the clock and the date only.
         let os: mlua::Table = g.get("os")?;
         let keep = lua.create_table()?;
-        for name in ["time", "date", "clock", "difftime"] {
+        for name in ["time", "date", "difftime"] {
             keep.raw_set(name, os.get::<Value>(name)?)?;
         }
+        // os.clock as wall time (seconds on a monotonic clock since the client started): C's clock() is the process's
+        // CPU time, which runs at its own pace in a many-threaded client and broke mods' countdowns.
+        keep.raw_set("clock", lua.create_function(|_, ()| Ok(process_start().elapsed().as_secs_f64()))?)?;
         g.raw_set("os", keep)?;
         for name in ["dofile", "loadfile"] {
             g.raw_set(name, Value::Nil)?;
