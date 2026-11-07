@@ -422,6 +422,11 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   `//mobnote clear`). Seen live on a Forest Hare: "Lv 2, too weak, low defence, low evasion" beside the game's own
   lines. Not done: a bundled monster table (this LandSandBoat keeps most monster data in its zone scripts).
   A Rust test now keeps two bundled mods from registering the same `//` command (`//note` was Screen Notes').
+- **Chat Windows** (assets/mods/chat-windows; RuptChat, chatty, xichats, lschat): `//chatwin <tell | party | ls | ls2
+  | say | shout | yell | unity>` opens a window with that channel's lines and a line to answer in (a tell answers the
+  last one who wrote); `//chatfind <words>` lists this session's log lines with them. The tabs, the full log and a
+  second log window are the client's own. Seen live: the Say window with the bots' lines, an answer sent from it and
+  kept in it, a search.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster
