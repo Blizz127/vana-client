@@ -77,13 +77,50 @@ A look is kept by server id, so it applies again whenever that entity is drawn, 
 a look for the same entity, the latest call wins; `render.entity(id, nil)` only removes a look your own mod set, and
 the other mod's earlier look does not come back.
 
+## `render.look`
+
+```lua
+render.look(id, look?) -> nothing
+```
+
+Draws a player-style character with other parts while your mod is loaded: another race or face, or other gear
+models. The parts you leave out stay the character's own, and they follow its own changes (a gear swap shows in the
+slots you did not set). The model is built again whenever the look changes, as a gear change does. `game.entity()`
+and `game.player()` still give the real look. Monsters, NPCs drawn from one model and characters in costume are not
+changed. The newest mod's look wins for an entity.
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `integer` | yes | The entity's server id; ourselves too (`game.player().id`). |
+| `look` | `table` | no | The parts to draw, all optional: `race` (1 Hume male, 2 Hume female, 3 Elvaan male, 4 Elvaan female, 5 Tarutaru male, 6 Tarutaru female, 7 Mithra, 8 Galka), `face` (as `game.entity().look.face`), and `head`, `body`, `hands`, `legs`, `feet`, `main`, `sub`, `range` (model ids, as `game.entity().look` gives them). Left out: your mod's look for the entity is removed. |
+
+**Returns** nothing.
+
+**Errors** `render.look: race is 1..8`, `render.look: face is 0..255`, `render.look: <slot> is a model id 0..4095`.
+
+**Example**
+
+```lua
+-- Wear the target's look.
+commands.register("copylook", function()
+  local t = game.entity(game.player().target or 0)
+  if t and t.look then
+    local l = t.look
+    render.look(game.player().id, { race = t.race, face = l.face, head = l.head, body = l.body, hands = l.hands,
+      legs = l.legs, feet = l.feet, main = l.main, sub = l.sub, range = l.range })
+  end
+end)
+```
+
 ## `render.clear`
 
 ```lua
 render.clear() -> nothing
 ```
 
-Removes every entity look your mod set with `render.entity`. Other mods' looks stay.
+Removes every entity look your mod set with `render.entity` and `render.look`. Other mods' looks stay.
 
 **Returns** nothing.
 

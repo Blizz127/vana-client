@@ -506,6 +506,7 @@ pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timer
 const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap", "suggestions", "xp-tracker", "cutscene-speed", "loot-rules", "client-tweaks", "equipment-grid", "inventory-hud", "chat-alerts", "player-bars", "effect-remover", "macro-books", "mount-picker", "log-files", "tell-inbox", "link-catcher", "trust-lineups", "sell-hand-in", "web-search", "camera-range", "chat-filter", "target-bar", "quick-commands", "countdowns", "party-tools", "key-commands", "event-rules", "music-picker", "typing-helpers", "zone-banner", "use-all", "hide-rules", "screen-notes", "calculator", "attendance", "screen-capture", "quick-play", "target-marker", "cast-grid", "target-debuffs", "skill-log", "swing-timer", "weather-watch", "targeting", "entity-styles", "visual-tweaks", "window-placement", "range-rings", "tracking", "pet-status", "job-gauges", "roll-helper", "automaton-sets", "loot-tracker", "monster-alerts", "gathering-log", "casket-solver", "blue-sets",
     "warp-helper" ["src/places.lua"],
     "dialogue-bubbles",
+    "look-changer" ["src/models.lua"],
     "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
     "hotbar" ["src/actions.lua", "src/bar.lua", "src/data.lua", "src/jobs.lua", "src/keys.lua", "src/manager.lua", "src/runner.lua",
         "src/stock.lua"],
@@ -642,6 +643,11 @@ impl Host {
         info.slots.retain(|_, s| s.0 != vm.manifest.id);
         info.skin.forget(&vm.manifest.id);
         info.looks.retain(|_, l| l.0 != vm.manifest.id);
+        let n = info.models.len();
+        info.models.retain(|_, m| m.0 != vm.manifest.id);
+        if info.models.len() != n {
+            info.models_ver += 1;
+        }
         info.item_tints.retain(|_, t| t.0 != vm.manifest.id);
         info.shaders.retain(|s| s.0 != vm.manifest.id);
         drop(info);
@@ -1620,6 +1626,12 @@ impl Host {
     /// A mod's colour for an item's name in the game's lists (shops, the auction house).
     pub(in crate::client) fn item_tint(&self, id: u16) -> Option<u32> {
         self.info.borrow().item_tints.get(&id).map(|t| t.1)
+    }
+
+    /// The player looks mods set (render.look) and their version.
+    pub(in crate::client) fn models(&self) -> (u64, std::collections::HashMap<u32, render::Model>) {
+        let f = self.info.borrow();
+        (f.models_ver, f.models.iter().map(|(id, m)| (*id, m.1)).collect())
     }
 
     pub(in crate::client) fn looks(&self) -> std::collections::HashMap<u32, render::Look> {

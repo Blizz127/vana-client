@@ -589,12 +589,17 @@ function ui.skin.list() end
 --- Gives back every sprite, colour and frame this mod changed.
 function ui.skin.reset() end
 
+--- A player-style look's parts drawn in place of the entity's own while the mod is loaded: race (1..8), face, and the model ids of head, body, hands, legs, feet, main, sub, range (as game.entity().look gives them); parts left out stay its own. nil clears the mod's look for it; the newest mod's wins. game.entity() still gives the real look.
+---@param id integer server id (ourselves too)
+---@param look table? 
+function render.look(id, look) end
+
 --- How an entity draws while the mod is loaded: {hidden (model and plate), name (its plate's), name_colour {r, g, b, a}, alpha (0..1, at most its own), tint {r, g, b} multipliers, scale}. nil clears the mod's look for it; the newest mod's look wins.
 ---@param id integer server id (ourselves too)
 ---@param look table? 
 function render.entity(id, look) end
 
---- Clears every look the mod set.
+--- Clears every look the mod set (render.entity and render.look).
 function render.clear() end
 
 --- A post-process pass over the world, drawn in the order set, under the screen fades and the 2D layer (nil removes it). The source is WGSL with `@fragment fn fs_main(in: VsOut) -> @location(0) vec4<f32>`; it has `scene` (the frame so far) and `samp`, `depth` (texture_depth_2d), `post.size`, `post.time` and `post.p[0..3]` (shader_params), and `in.uv`. A WGSL error is a red line in the chat log (its line numbers count 15 header lines first) and the pass is skipped.

@@ -5998,6 +5998,9 @@ struct World {
     costume_base: HashMap<u32, Source>,
     /// Changed looks waiting while their actor is held (FUN_10095dd0 waits for FUN_10095850).
     held_looks: Vec<(u32, Source)>,
+    /// Each actor's last player look before the mods' (render.look), and the mods' version it was built with.
+    look_base: HashMap<u32, Look>,
+    models_ver: u64,
     /// Event op 0xab 0x11 (DAT_1035af3c != -1): once no event runs, every model but ours is built again.
     rebuild_models: bool,
     /// Our riding fields (0x037, 0x067), and every rider's state (ride.rs).
@@ -8578,6 +8581,8 @@ impl App {
                             costumes: HashMap::new(),
                             costume_base: HashMap::new(),
                             held_looks: Vec::new(),
+                            look_base: HashMap::new(),
+                            models_ver: 0,
                             rebuild_models: false,
                             my_ride: Default::default(),
                             my_aura: Default::default(),
@@ -10398,12 +10403,34 @@ impl App {
         // Looks the event scripts changed (op 0xb6) load like the server's; held ones go first, newer ones win.
         looks.extend(std::mem::take(&mut world.event_looks));
         looks.splice(0..0, std::mem::take(&mut world.held_looks));
+        // The mods' looks changed (render.look): every player look in sight again, before the newer ones.
+        let (models_ver, models) = world.lua.models();
+        if models_ver != world.models_ver {
+            world.models_ver = models_ver;
+            let again: Vec<(u32, Source)> = world
+                .look_base
+                .iter()
+                .filter(|(id, _)| **id == world.my_id || world.entities.contains_key(id))
+                .map(|(id, l)| (*id, Source::Pc(*l)))
+                .collect();
+            looks.splice(0..0, again);
+        }
         // Load a character model whenever an actor's look is new or changed.
         let mut wanted = Vec::new();
         for (id, source) in looks {
             if matches!(source, Source::Pc(l) if l.race == 0) {
                 continue;
             }
+            let source = match source {
+                Source::Pc(l) => {
+                    world.look_base.insert(id, l);
+                    Source::Pc(models.get(&id).map_or(l, |m| m.applied(l)))
+                }
+                other => {
+                    world.look_base.remove(&id);
+                    other
+                }
+            };
             // FUN_100d2f60 case 2: in costume the model is the costume's whatever the look; the look waits for it to
             // come off.
             let source = match costume::worn(world, id) {

@@ -383,6 +383,13 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   for a key; over the speaker's head (clear of the name plate) or at the bottom of the screen, above other mods' HUD.
   The log keeps its copy and the keys stay the game's. `game.event().text` now has the page's `lines` and the event's
   `actor`. Seen live with Daggao in Southern San d'Oria, both places. Not done: portraits (no portrait art).
+- **Look Changer** (assets/mods/look-changer; DressUp, PlasticSurgeon, singlerace, Cosplay, sexchange): how characters
+  are drawn on this screen only, kept per character: `//look race <race>`, `face <1a..8b>`, `<slot> <item | none |
+  own>` (an item's model from LandSandBoat's equipment list, bundled), `copy [name]` (the target's look, or anyone's
+  in sight by name), `others <race | own>` (one race for every other player), `reset`. New `render.look(id, parts)`
+  draws a player-style look with other parts (the rest follow the character's own changes); `game.entity` now gives
+  our own look too. Seen live: Lnxcsfix as a Galka (kept across a relog), a Chainmail body, Daggao's look copied,
+  face 4b, reset. Not done: holding looks still through gear swaps (BlinkMeNot); whether our swaps blink is unchecked.
 - **Loot Tracker** (assets/mods/loot-tracker; TreasurePool, thtracker, LootScope, Lootz): an edge window with the
   target's Treasure Hunter level (its rises: an additional effect, message 603, the level as its value), the pool's
   items with their 5 minutes counting down (dim once lotted or passed), and this session's kills and drops by monster

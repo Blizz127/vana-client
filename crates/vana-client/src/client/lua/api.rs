@@ -1467,6 +1467,15 @@ pub(super) fn self_entity(lua: &Lua, w: &World) -> mlua::Result<Table> {
     t.set("in_alliance", true)?;
     t.set("race", w.my_race)?;
     t.set("me", true)?;
+    // Our look (0x00A / 0x051): the last one our model was built from, before the mods' (render.look).
+    t.set("model", 0)?;
+    if let Some(l) = w.look_base.get(&w.my_id) {
+        let look = lua.create_table()?;
+        for (k, v) in [("face", l.face), ("head", l.head), ("body", l.body), ("hands", l.hands), ("legs", l.legs), ("feet", l.feet), ("main", l.main), ("sub", l.sub), ("range", l.range)] {
+            look.set(k, v)?;
+        }
+        t.set("look", look)?;
+    }
     // Ours from s2c 0x037 @0x59 (actor +0x208).
     t.set("hitbox", w.my_plate.hitbox)?;
     if let Some((tid, e)) = w.target.and_then(|id| w.entities.get(&id).map(|e| (id, e))) {

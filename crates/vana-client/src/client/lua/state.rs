@@ -43,6 +43,9 @@ pub(super) struct FrameInfo {
     /// Post-process passes mods set (render.shader), in order: mod, id, version, WGSL, parameters.
     pub shaders: Vec<crate::render::postfx::Want>,
     pub shader_ver: u64,
+    /// Player looks mods set (render.look): server id -> (mod, the parts given); the version bumps on each change.
+    pub models: std::collections::HashMap<u32, (String, super::render::Model)>,
+    pub models_ver: u64,
 }
 
 /// A modern panel's place from a mod: its top left in window pixels (negative from the right or bottom edge; none

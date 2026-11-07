@@ -1,0 +1,10 @@
+name = "Look Changer"
+version = "1.0.0"
+description = "Changes how characters look on your screen only: your race, face and gear, a target's look copied, one race for everyone else (the dress-up add-ons)."
+permissions = []
+
+[settings.on]
+type = "bool"
+default = true
+label = "Look Changer"
+help = "//look race <race>, //look face <1a..8b>, //look <slot> <item | none | own>, //look copy [name], //look others <race | own>, //look reset. Only your screen changes."

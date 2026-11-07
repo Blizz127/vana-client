@@ -64,7 +64,7 @@ A character, NPC or monster in the zone, from `game.entity`, `game.entities`, `g
 | `me` | `boolean?` | true for your own character; nil for everyone else. |
 | `race` | `integer?` | Its race number; nil when unknown. |
 | `model` | `integer?` | The model id of an NPC or monster; 0 for one drawn from a look. nil for your own entity. |
-| `look` | `table?` | A character-style look: the model ids `{face, head, body, hands, legs, feet, main, sub, range}` (all integers). nil when it has none, and for your own entity. With `race` added, it is what `res.model_files` takes. |
+| `look` | `table?` | A character-style look: the model ids `{face, head, body, hands, legs, feet, main, sub, range}` (all integers). nil when it has none; your own is the look your model was built from (before any `render.look`). With `race` added, it is what `res.model_files` takes. |
 | `in_party` | `boolean` | It is in your party. true for yourself. |
 | `in_alliance` | `boolean` | It is in your party or alliance. true for yourself. |
 | `hitbox` | `number` | Its model radius as the server gives it, in yalms. |
