@@ -55,7 +55,8 @@ Done so far (checked live, Lnxcsfix):
   2026-11-06: "no map exists" is not "you don't have it yet"): where no map exists (Mordion Gaol) the error sound and
   it stays shut; a map not ours, or not known to be yet, retail's NO MAP image (m_000_00) over the map's place with
   our marker, the map replacing it once the key item is in; a record needing no map, its image without a marker.
-  `game.map` reports the record with its `kind` / `owned`. The NO MAP showing is not seen live yet. A script's `act:wheel` now passes the mods'
+  `game.map` reports the record with its `kind` / `owned`. Seen live: NO MAP with our marker in Western Adoulin (the
+  map not ours), beside the menu's map window showing the same. A script's `act:wheel` now passes the mods'
   mouse filters, as the window's wheel does.
 
 ## Order
