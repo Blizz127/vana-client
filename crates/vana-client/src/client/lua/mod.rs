@@ -487,8 +487,11 @@ fn changes(a: &Snap, b: &Snap) -> Vec<(&'static str, Vec<serde_json::Value>)> {
 /// mod.toml, files).
 /// Our own features on the mod API (docs/extras-as-mods.md): id, mod.toml, files.
 macro_rules! bundled {
-    ($($id:literal),* $(,)?) => {
-        &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))])),*]
+    ($($id:literal $([$($file:literal),*])?),* $(,)?) => {
+        &[$(($id, include_str!(concat!("../../../assets/mods/", $id, "/mod.toml")), &[
+            ("init.lua", include_str!(concat!("../../../assets/mods/", $id, "/init.lua")))
+            $($(, ($file, include_str!(concat!("../../../assets/mods/", $id, "/", $file))))*)?
+        ])),*]
     };
 }
 /// The built-in edge panels a mod's edge window may stand in for (ui.window's `panel`).
@@ -497,7 +500,9 @@ pub(in crate::client) const EDGE_PANELS: [&str; 6] = ["regime", "timers_recasts"
 /// The timers' sections' panels, in section order.
 pub(in crate::client) const TIMERS_PANELS: [&str; 3] = ["timers_recasts", "timers_buffs", "timers_debuffs"];
 
-const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap"];
+const BUNDLED: &[(&str, &str, &[(&str, &str)])] = bundled!["dps", "auto-advance", "trust-speech", "find", "map-overlay", "clock", "target-info", "battle-text", "timestamps", "synth-amount", "regime", "timers", "skillchain", "minimap",
+    "gearshift" ["src/core.lua", "src/compat.lua", "src/names.lua", "src/gs.lua", "src/lac.lua", "src/windower.lua"],
+];
 
 /// Where mods keep their settings and storage: beside an FFXI_CONFIG copy for test runs.
 fn data_dir() -> PathBuf {
@@ -1833,6 +1838,106 @@ mod tests {
         assert_eq!(l, ["Forest Hare"]);
         assert!(area.contains("Ronfaure"), "{area}");
         assert_eq!(page(704), (vec!["Siege Bat".to_string(), "Borer Beetle".to_string()], "Garlaige Citadel".to_string()));
+    }
+
+    /// Gearshift with a fake game: a GearSwap file and a LuAshitacast profile each wear their precast gear before a
+    /// Cure's action packet and their midcast gear after it, in one batch; the client's own packet is dropped.
+    #[test]
+    fn gearshift_swaps_around_a_cast() {
+        let host = Host::default();
+        let files = BUNDLED.iter().find(|b| b.0 == "gearshift").unwrap().2;
+        let vm = Vm::new(bundled_manifest("gearshift").unwrap(), PathBuf::from("."), vm::Source::Bundled(files)).unwrap();
+        vm.lua.set_app_data(host.info.clone());
+        api::install(&vm.lua, &vm, (serde_json::Value::Null, serde_json::Value::Null)).unwrap();
+        let script = r#"
+            local sent, said = {}, {}
+            local ITEMS = {
+              [1001] = { name = "Fast Hat", log_name = "Fast Hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+              [1002] = { name = "Cast Coat", log_name = "Cast Coat", slots = 1 << 5, jobs = 1 << 3, level = 1 },
+              [1003] = { name = "Heal Gloves", log_name = "Healing Gloves", slots = 1 << 6, jobs = 1 << 3, level = 1 },
+              [1004] = { name = "Idle Hat", log_name = "Idle Hat", slots = 1 << 4, jobs = 1 << 3, level = 1 },
+            }
+            local FILES = {}
+            game = {
+              player = function() return { name = "Tester", id = 100, index = 1, main_job = 3, main_level = 75, sub_job = 4,
+                sub_level = 37, hp = 900, mp = 500, tp = 0, hpp = 100, mpp = 100, hp_max = 900, mp_max = 500, status = 0, zone = 230 } end,
+              equipment = function() return {} end,
+              items = function(bag) if bag ~= 0 then return {} end
+                return { { bag = 0, slot = 1, id = 1001, count = 1, locked = 0 }, { bag = 0, slot = 2, id = 1002, count = 1, locked = 0 },
+                  { bag = 0, slot = 3, id = 1003, count = 1, locked = 0 }, { bag = 0, slot = 4, id = 1004, count = 1, locked = 0 } } end,
+              buffs = function() return {} end,
+              target = function() return nil end,
+              entity = function(id) return { id = id, index = 5, name = "Tester", kind = "player", me = true, hpp = 100, distance = 0, status = 0 } end,
+              entity_by_tag = function() return nil end,
+              time = function() return { weekday = 0, moon_phase = 0, moon = 50, hour = 12, minute = 0, day = 1 } end,
+              weather = function() return 0 end,
+              info = function() return { mog_house = false, zone = 230 } end,
+              party = function() return {} end,
+              find_items = function() return {} end,
+              entities = function() return {} end,
+            }
+            res = setmetatable({
+              item = function(id) return ITEMS[id] end,
+              spell = function(id) if id == 1 then return { name = "Cure", kind = 1, skill = 33, element = 6, mp = 8, cast_time = 2, recast = 5, targets = 63 } end end,
+              ability = function() return nil end,
+              job = function(id) return ({ "WAR", "MNK", "WHM", "BLM" })[id] end,
+              status = function() return nil end,
+              zone = function() return "Somewhere" end,
+              day = function() return "Firesday" end, moon = function() return "Full Moon" end, weather = function() return "Clear" end,
+            }, { __index = function() return function() return nil end end })
+            packets.inject_out = function(d) sent[#sent + 1] = d end
+            fs = { list = function(dir) local t = {} for k in pairs(FILES) do local n = k:match("^" .. dir:gsub("%p", "%%%0") .. "([^/]+)$") if n then t[#t + 1] = n end end return t end,
+              read = function(p) return FILES[p] end, exists = function(p) return FILES[p] ~= nil end }
+            chat = { add = function(t) said[#said + 1] = t end }
+            local function cast_packet()
+              return packets.build(0x01A, string.pack("<I4I2I2I4fff", 100, 1, 3, 1, 0, 0, 0))
+            end
+            local function ids()
+              local t = {}
+              for _, d in ipairs(sent) do t[#t + 1] = string.format("%03X", string.unpack("<I2", d) & 0x1ff) end
+              return table.concat(t, " ")
+            end
+            local core = require("src.core")
+
+            FILES["gearswap/Tester_WHM.lua"] = [[
+              function get_sets()
+                sets.precast = { FC = { head = "Fast Hat", body = "Cast Coat" } }
+                sets.midcast = { Cure = { hands = "Healing Gloves" } }
+              end
+              function precast(spell) if spell.action_type == "Magic" then equip(sets.precast.FC) end end
+              function midcast(spell) if spell.english == "Cure" then equip(sets.midcast.Cure) end end
+            ]]
+            local gs = require("src.gs")
+            assert(gs.find() == "gearswap/Tester_WHM.lua", tostring(gs.find()))
+            assert(gs.load(gs.find()), table.concat(said, " | "))
+            gs.typed('/ma "Cure" <me>')
+            local act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(gs.action(act) == false)
+            local gs_order = ids()
+            assert(sent[#sent]:sub(5, 8) == string.pack("BBBB", 3, 6, 0, 0), "the gloves after the action")
+            gs.unload()
+
+            sent = {}
+            core.sent = {}
+            FILES["ashitacast/Tester_100/WHM.lua"] = [[
+              local profile = {}
+              profile.Sets = { Precast = { Head = "Fast Hat", Body = "Cast Coat" }, Cure = { Hands = "Heal Gloves" } }
+              profile.HandlePrecast = function() gFunc.EquipSet("precast") end
+              profile.HandleMidcast = function() if gData.GetAction().Name == "Cure" then gFunc.EquipSet(profile.Sets.Cure) end end
+              return profile
+            ]]
+            local lac = require("src.lac")
+            assert(lac.find() == "ashitacast/Tester_100/WHM.lua", tostring(lac.find()))
+            assert(lac.load(lac.find()), table.concat(said, " | "))
+            act = core.parse_action({ id = 0x01A, data = cast_packet() })
+            assert(lac.action(act) == false)
+            return gs_order, ids()
+        "#;
+        let (gs, lac): (String, String) = vm.lua.load(script).eval().unwrap_or_else(|e| panic!("{e}"));
+        // GearSwap: two pieces go as single equips, then the action, then the midcast piece.
+        assert_eq!(gs, "050 050 01A 050");
+        // LuAshitacast: its precast is one equipset, its midcast single equips.
+        assert_eq!(lac, "051 01A 050");
     }
 
     /// ui.native.place / rect / panels and ui.skin: names checked, the permission asked, each change its mod's (another

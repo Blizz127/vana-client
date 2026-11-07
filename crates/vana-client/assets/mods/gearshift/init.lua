@@ -1,0 +1,92 @@
+-- Gear swapping from players' own files: a GearSwap job file (gearswap/ in this mod's data folder, named as GearSwap
+-- names them) or a LuAshitacast profile (ashitacast/<Name>_<Id>/<JOB>.lua or ashitacast/<Name>_<JOB>.lua), loaded
+-- for the main job. Both run around the action packets we send: the gear before an action, the action, the gear
+-- after it, in one batch.
+
+local core = require("src.core")
+local gs = require("src.gs")
+local lac = require("src.lac")
+
+local job_now
+
+local function load_for_job()
+  gs.unload()
+  lac.unload()
+  if not settings.get("on") then return end
+  local f = gs.find()
+  if f then gs.load(f) return end
+  f = lac.find()
+  if f then lac.load(f) end
+end
+
+local function main_job()
+  local p = game.player()
+  return p and p.main_job
+end
+
+local started = false
+local function start()
+  started = true
+  job_now = main_job()
+  load_for_job()
+end
+
+-- The action packets we send: held, and sent again by the front end with the gear around them.
+local function on_out(p)
+  if p.injected then return end
+  local act = core.parse_action(p)
+  if not act then return end
+  if gs.loaded() then return gs.action(act) end
+  if lac.loaded() then return lac.action(act) end
+end
+packets.on_out(0x01A, on_out)
+packets.on_out(0x037, on_out)
+
+filters.typed(function(line) gs.typed(line) end)
+
+events.on("action", function(a)
+  gs.on_action(a)
+  lac.on_action(a)
+end)
+events.on("battle_message", function(actor, target, message) gs.battle_message(actor, target, message) end)
+events.on("status_change", function(new, old)
+  gs.status_change(new, old)
+  gs.user_event("status change", new, old)
+end)
+events.on("buff_gain", function(id)
+  gs.buff_change(id, true)
+  gs.user_event("gain buff", id)
+end)
+events.on("buff_lose", function(id)
+  gs.buff_change(id, false)
+  gs.user_event("lose buff", id)
+end)
+events.on("job_change", function(main, _, sub)
+  if main ~= job_now and main ~= 0 then
+    started, job_now = true, main
+    load_for_job()
+  end
+  if gs.loaded() and gs.sub ~= sub then gs.sub_job_change(sub, gs.sub) end
+  gs.sub = sub
+end)
+events.on("zone_change", function(zone, previous) gs.user_event("zone change", zone, previous) end)
+events.on("target_change", function(id) gs.user_event("target change", id) end)
+events.on("settings_changed", start)
+-- The first frame our main job is known loads its file (the mod can start before the server has said).
+events.on("frame", function()
+  core.decode_augments()
+  if not started and main_job() and main_job() ~= 0 then
+    gs.sub = game.player().sub_job
+    start()
+  end
+end)
+timer.every(0.4, lac.tick)
+
+commands.register("gs", function(...) gs.command({ ... }) end)
+commands.register("lac", function(...) lac.command({ ... }) end)
+commands.register("gearshift", function(cmd)
+  cmd = (cmd or ""):lower()
+  if cmd == "reload" then start() end
+  chat.add("Gearshift: " .. (gs.file or lac.file or "no file for this job (gearswap/ or ashitacast/ in its data folder)"))
+end)
+

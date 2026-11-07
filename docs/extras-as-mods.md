@@ -143,3 +143,15 @@ Each conversion removes the Rust it replaces, keeps the extra's look in both UIs
   (GearSwap job files, AshitaCast profiles, and any others) read and run those scripts unchanged.
 - Our mods on GitHub: the client lists them and offers download and install in Settings, and installs from a file:
   an archive (as many formats as we can read) or a folder with a manifest and a mod.
+
+### Ports so far
+
+- **Gearshift** (assets/mods/gearshift, docs/mods/gearshift.md): GearSwap job files and LuAshitacast profiles,
+  unchanged, from its data folder. One engine (src/core.lua: held items resolved by name, bag and augments, the
+  wear check, 0x050 / 0x051 built and sent, what was sent counted as worn until the server agrees) under two front
+  ends (src/gs.lua with a Windower shim, src/lac.lua with gFunc / gData / a little of AshitaCore). Our outgoing
+  action packet (0x01A categories 3 / 7 / 9 / 16, 0x037) is held by a packets.on_out hook and sent again with the gear
+  around it: the precast gear, the action, the midcast gear, in one batch, as both add-ons send them. GearSwap's
+  hooks follow the command lines (filters.typed); LuAshitacast's every action. A Rust test runs both kinds of file
+  against a fake game; seen live (Lnxcsfix, Berserk): a GearSwap file's precast, midcast and aftercast swaps, and a
+  profile's HandleAbility and HandleDefault, the gear on the server as sent. What is left is in its doc.
