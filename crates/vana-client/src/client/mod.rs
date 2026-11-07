@@ -1625,6 +1625,17 @@ fn chat_shortcut(k: egui::Key) -> Option<&'static str> {
     })
 }
 
+fn swallow_shortcut_text(pending: &mut Option<egui::Key>, event: &egui::Event) -> bool {
+    match event {
+        egui::Event::Text(text) => pending.take().is_some_and(|key| text.eq_ignore_ascii_case(key.name())),
+        egui::Event::Key { pressed: true, .. } => {
+            *pending = None;
+            false
+        }
+        _ => false,
+    }
+}
+
 /// Key function 0x78 (numpad +, Ctrl / Alt + F), FUN_10151550: with focus somewhere (or nowhere to go) back
 /// to 0, else SE "0013" and the next of logwindo / buff (not modelled: no buff window) / none.
 fn log_cycle(w: &mut World) {
@@ -2403,7 +2414,11 @@ fn world_hud(
     }
     // Each key's own Shift and repeat flag, for the handlers it reaches; none outside this loop.
     (world.key_shift, world.key_repeat) = (false, false);
+    let mut swallow_text = None;
     for ev in input.events.iter().filter(|_| !input_open) {
+        if swallow_shortcut_text(&mut swallow_text, ev) {
+            continue;
+        }
         if let egui::Event::Key { modifiers, repeat, .. } = ev {
             (world.key_shift, world.key_repeat) = (modifiers.shift, *repeat);
         }
@@ -2501,10 +2516,12 @@ fn world_hud(
                     && let Some(p) = chat_shortcut(*k) =>
                 {
                     chat_prefix(world, p);
+                    swallow_text = modifiers.alt.then_some(*k);
                     keys.clear();
                 }
                 egui::Key::R if (modifiers.ctrl || modifiers.alt) && (world.typing || !event::cinema(world)) => {
                     reply(world);
+                    swallow_text = modifiers.alt.then_some(egui::Key::R);
                     keys.clear();
                 }
                 _ if world.typing => {}
@@ -18900,6 +18917,54 @@ pub fn run(cfg: Config, drive: Drive) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    fn shortcut_key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
+        egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }
+    }
+
+    #[test]
+    fn alt_chat_shortcut_text_channels() {
+        for (key, typed, text, expected) in [
+            (egui::Key::L, "", "l", "/linkshell "),
+            (egui::Key::S, "", "s", "/say "),
+            (egui::Key::L, "/say hello", "L", "/linkshell hello"),
+        ] {
+            let mut pending = None;
+            assert!(!swallow_shortcut_text(&mut pending, &shortcut_key(key, egui::Modifiers::ALT)));
+            let mut line = format!("{}{}", chat_shortcut(key).unwrap(), strip_channel(typed));
+            pending = Some(key);
+            if !swallow_shortcut_text(&mut pending, &egui::Event::Text(text.into())) {
+                line.push_str(text);
+            }
+            assert_eq!(line, expected);
+            assert_eq!(pending, None);
+        }
+    }
+
+    #[test]
+    fn alt_chat_shortcut_text_preserves_other_input() {
+        let mut pending = Some(egui::Key::L);
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Paste("paste".into())));
+        assert!(swallow_shortcut_text(&mut pending, &egui::Event::Text("l".into())));
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Text("hello".into())));
+        pending = Some(egui::Key::L);
+        assert!(!swallow_shortcut_text(&mut pending, &shortcut_key(egui::Key::L, egui::Modifiers::NONE)));
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Text("l".into())));
+        pending = Some(egui::Key::R);
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Text("different".into())));
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Text("r".into())));
+        pending = Some(egui::Key::R);
+        assert!(swallow_shortcut_text(&mut pending, &egui::Event::Text("r".into())));
+    }
+
+    #[test]
+    fn alt_chat_shortcut_text_ctrl_without_text() {
+        let mut pending = None;
+        assert!(!swallow_shortcut_text(&mut pending, &shortcut_key(egui::Key::L, egui::Modifiers::CTRL)));
+        assert!(!swallow_shortcut_text(&mut pending, &shortcut_key(egui::Key::S, egui::Modifiers::NONE)));
+        assert!(!swallow_shortcut_text(&mut pending, &egui::Event::Text("s".into())));
+        assert_eq!(pending, None);
+    }
+
     /// Batch 12 item 78: a set change fades the palette 1 -> 0 over 20 ticks and 0 -> 1 over the next 20.
     #[test]
     fn palette_flip_fades_out_and_in() {
